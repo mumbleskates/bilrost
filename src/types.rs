@@ -407,7 +407,7 @@ impl Message for () {
     }
     fn merge_field<B>(
         &mut self,
-        tag: u32,
+        _tag: u32,
         wire_type: WireType,
         buf: &mut B,
         ctx: DecodeContext,
