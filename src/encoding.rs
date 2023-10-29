@@ -261,15 +261,13 @@ pub fn encoded_len_varint(value: u64) -> usize {
 #[repr(u8)]
 pub enum WireType {
     Varint = 0,
-    SixtyFourBit = 1,
-    LengthDelimited = 2,
-    StartGroup = 3,
-    EndGroup = 4,
-    ThirtyTwoBit = 5,
+    LengthDelimited = 1,
+    SixtyFourBit = 2,
+    ThirtyTwoBit = 3,
 }
 
 pub const MIN_TAG: u32 = 1;
-pub const MAX_TAG: u32 = (1 << 29) - 1;
+pub const MAX_TAG: u32 = (1 << 30) - 1;
 
 impl TryFrom<u64> for WireType {
     type Error = DecodeError;
@@ -278,11 +276,9 @@ impl TryFrom<u64> for WireType {
     fn try_from(value: u64) -> Result<Self, Self::Error> {
         match value {
             0 => Ok(WireType::Varint),
-            1 => Ok(WireType::SixtyFourBit),
-            2 => Ok(WireType::LengthDelimited),
-            3 => Ok(WireType::StartGroup),
-            4 => Ok(WireType::EndGroup),
-            5 => Ok(WireType::ThirtyTwoBit),
+            1 => Ok(WireType::LengthDelimited),
+            2 => Ok(WireType::SixtyFourBit),
+            3 => Ok(WireType::ThirtyTwoBit),
             _ => Err(DecodeError::new(format!(
                 "invalid wire type value: {}",
                 value
@@ -299,7 +295,7 @@ where
     B: BufMut,
 {
     debug_assert!((MIN_TAG..=MAX_TAG).contains(&tag));
-    let key = (tag << 3) | wire_type as u32;
+    let key = (tag << 2) | wire_type as u32;
     encode_varint(u64::from(key), buf);
 }
 
@@ -314,8 +310,8 @@ where
     if key > u64::from(u32::MAX) {
         return Err(DecodeError::new(format!("invalid key value: {}", key)));
     }
-    let wire_type = WireType::try_from(key & 0x07)?;
-    let tag = key as u32 >> 3;
+    let wire_type = WireType::try_from(key & 0x03)?;
+    let tag = key as u32 >> 2;
 
     if tag < MIN_TAG {
         return Err(DecodeError::new("invalid tag value: 0"));
@@ -328,7 +324,7 @@ where
 /// The returned width will be between 1 and 5 bytes (inclusive).
 #[inline]
 pub fn key_len(tag: u32) -> usize {
-    encoded_len_varint(u64::from(tag << 3))
+    encoded_len_varint(u64::from(tag << 2))
 }
 
 /// Checks that the expected wire type matches the actual wire type,
@@ -375,7 +371,6 @@ where
 
 pub fn skip_field<B>(
     wire_type: WireType,
-    tag: u32,
     buf: &mut B,
     ctx: DecodeContext,
 ) -> Result<(), DecodeError>
@@ -388,19 +383,6 @@ where
         WireType::ThirtyTwoBit => 4,
         WireType::SixtyFourBit => 8,
         WireType::LengthDelimited => decode_varint(buf)?,
-        WireType::StartGroup => loop {
-            let (inner_tag, inner_wire_type) = decode_key(buf)?;
-            match inner_wire_type {
-                WireType::EndGroup => {
-                    if inner_tag != tag {
-                        return Err(DecodeError::new("unexpected end group tag"));
-                    }
-                    break 0;
-                }
-                _ => skip_field(inner_wire_type, inner_tag, buf, ctx.enter_recursion())?,
-            }
-        },
-        WireType::EndGroup => return Err(DecodeError::new("unexpected end group tag")),
     };
 
     if len > buf.remaining() as u64 {
@@ -1131,91 +1113,6 @@ pub mod message {
     }
 }
 
-pub mod group {
-    use super::*;
-
-    pub fn encode<M, B>(tag: u32, msg: &M, buf: &mut B)
-    where
-        M: Message,
-        B: BufMut,
-    {
-        encode_key(tag, WireType::StartGroup, buf);
-        msg.encode_raw(buf);
-        encode_key(tag, WireType::EndGroup, buf);
-    }
-
-    pub fn merge<M, B>(
-        tag: u32,
-        wire_type: WireType,
-        msg: &mut M,
-        buf: &mut B,
-        ctx: DecodeContext,
-    ) -> Result<(), DecodeError>
-    where
-        M: Message,
-        B: Buf,
-    {
-        check_wire_type(WireType::StartGroup, wire_type)?;
-
-        ctx.limit_reached()?;
-        loop {
-            let (field_tag, field_wire_type) = decode_key(buf)?;
-            if field_wire_type == WireType::EndGroup {
-                if field_tag != tag {
-                    return Err(DecodeError::new("unexpected end group tag"));
-                }
-                return Ok(());
-            }
-
-            M::merge_field(msg, field_tag, field_wire_type, buf, ctx.enter_recursion())?;
-        }
-    }
-
-    pub fn encode_repeated<M, B>(tag: u32, messages: &[M], buf: &mut B)
-    where
-        M: Message,
-        B: BufMut,
-    {
-        for msg in messages {
-            encode(tag, msg, buf);
-        }
-    }
-
-    pub fn merge_repeated<M, B>(
-        tag: u32,
-        wire_type: WireType,
-        messages: &mut Vec<M>,
-        buf: &mut B,
-        ctx: DecodeContext,
-    ) -> Result<(), DecodeError>
-    where
-        M: Message + Default,
-        B: Buf,
-    {
-        check_wire_type(WireType::StartGroup, wire_type)?;
-        let mut msg = M::default();
-        merge(tag, WireType::StartGroup, &mut msg, buf, ctx)?;
-        messages.push(msg);
-        Ok(())
-    }
-
-    #[inline]
-    pub fn encoded_len<M>(tag: u32, msg: &M) -> usize
-    where
-        M: Message,
-    {
-        2 * key_len(tag) + msg.encoded_len()
-    }
-
-    #[inline]
-    pub fn encoded_len_repeated<M>(tag: u32, messages: &[M]) -> usize
-    where
-        M: Message,
-    {
-        2 * key_len(tag) * messages.len() + messages.iter().map(Message::encoded_len).sum::<usize>()
-    }
-}
-
 /// Rust doesn't have a `Map` trait, so macros are currently the best way to be
 /// generic over `HashMap` and `BTreeMap`.
 macro_rules! map {
@@ -1357,7 +1254,7 @@ macro_rules! map {
                     match tag {
                         1 => key_merge(wire_type, key, buf, ctx),
                         2 => val_merge(wire_type, val, buf, ctx),
-                        _ => skip_field(wire_type, tag, buf, ctx),
+                        _ => skip_field(wire_type, buf, ctx),
                     }
                 },
             )?;
