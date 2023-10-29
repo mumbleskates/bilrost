@@ -252,9 +252,22 @@ impl DecodeContext {
 /// The returned value will be between 1 and 10, inclusive.
 #[inline]
 pub fn encoded_len_varint(value: u64) -> usize {
-    // Based on [VarintSize64][1].
-    // [1]: https://github.com/google/protobuf/blob/3.3.x/src/google/protobuf/io/coded_stream.h#L1301-L1309
-    ((((value | 1).leading_zeros() ^ 63) * 9 + 73) / 64) as usize
+    for (i, limit) in [
+        0x80u64,
+        0x4080,
+        0x20_4080,
+        0x1020_4080,
+        0x8_1020_4080,
+        0x408_1020_4080,
+        0x2_0408_1020_4080,
+        0x102_0408_1020_4080,
+        0x8102_0408_1020_4080,
+    ].into_iter().enumerate() {
+        if value < limit {
+            return i + 1;
+        }
+    }
+    return 10;
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
