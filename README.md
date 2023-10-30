@@ -1,16 +1,19 @@
 # *BILROST!*
 
-`bilrost` is a [Protocol Buffers](https://developers.google.com/protocol-buffers/)
-fork for the [Rust Language](https://www.rust-lang.org/). `bilrost`
-generates simple, idiomatic Rust code from `proto2` and `proto3` files that
-serializes and deserializes data in a slightly different way:
+`bilrost` is a [Protocol Buffers](https://developers.google.com/protocol-buffers/)-alike
+fork for the [Rust Language](https://www.rust-lang.org/). It is a direct fork of
+[`prost`](https://github.com/tokio-rs/prost). Like `prost`, `bilrost` can generate
+simple, idiomatic Rust code from `proto3` files that serializes and deserializes
+data similar to protocol buffers but in a slightly different, incompatible way:
 
-* All varints (including tag fields and lengths) use bijective numeration which
-  cannot be length-extended with trailing zeros.
-* Groups are completely deprecated as a wire-type, reducing the number of wire
-  types from 6 to 4
-* Wire types are packed into 2 bits instead of 3, allowing for 31 different
-  one-byte field IDs instead of only 15.
+* All varints (including tag fields and lengths) use
+  [bijective numeration](https://en.wikipedia.org/wiki/Bijective_numeration),
+  which cannot be length-extended with trailing zeros the way protobuf varints
+  can (and are more compact, if negligibly so).
+* "Groups" are completely deprecated as a wire-type, reducing the number of wire
+  types from 6 to 4.
+* These four wire types are packed into 2 bits instead of 3, allowing for 31
+  different one-byte field IDs instead of only 15.
 
 Compared to other Protocol Buffers implementations, `bilrost`
 
