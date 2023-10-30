@@ -1,26 +1,26 @@
 [package]
-name = "prost"
+name = "bilrost"
 version = "0.12.1"
 authors = [
     "Dan Burkert <dan@danburkert.com>",
     "Lucio Franco <luciofranco14@gmail.com",
     "Tokio Contributors <team@tokio.rs>",
+    "Kent Ross <k@mad.cash>",
 ]
 license = "Apache-2.0"
-repository = "https://github.com/tokio-rs/prost"
-documentation = "https://docs.rs/prost"
+repository = "https://github.com/mumbleskates/bilrost"
 readme = "README.md"
 description = "A Protocol Buffers implementation for the Rust Language."
 keywords = ["protobuf", "serialization"]
 categories = ["encoding"]
 edition = "2021"
-rust-version = "1.60"
+rust-version = "1.74"
 
 [workspace]
 members = [
-  "prost-build",
-  "prost-derive",
-  "prost-types",
+  "bilrost-build",
+  "bilrost-derive",
+  "bilrost-types",
   "protobuf",
   "tests",
   "tests/single-include",
@@ -39,13 +39,13 @@ exclude = [
 bench = false
 
 [features]
-default = ["prost-derive", "std"]
+default = ["bilrost-derive", "std"]
 no-recursion-limit = []
 std = []
 
 [dependencies]
 bytes = { version = "1", default-features = false }
-prost-derive = { version = "0.12.1", path = "prost-derive", optional = true }
+bilrost-derive = { version = "0.12.1", path = "bilrost-derive", optional = true }
 
 [dev-dependencies]
 criterion = { version = "0.4", default-features = false }

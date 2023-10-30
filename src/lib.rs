@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/prost/0.12.1")]
+#![doc(html_root_url = "https://docs.rs/bilrost/0.12.1")]
 #![cfg_attr(not(feature = "std"), no_std)]
 #![doc = include_str!("../README.md")]
 
@@ -86,10 +86,10 @@ where
 // Based on serde's equivalent re-export [1], but enabled by default.
 //
 // [1]: https://github.com/serde-rs/serde/blob/v1.0.89/serde/src/lib.rs#L245-L256
-#[cfg(feature = "prost-derive")]
+#[cfg(feature = "bilrost-derive")]
 #[allow(unused_imports)]
 #[macro_use]
-extern crate prost_derive;
-#[cfg(feature = "prost-derive")]
+extern crate bilrost_derive;
+#[cfg(feature = "bilrost-derive")]
 #[doc(hidden)]
-pub use prost_derive::*;
+pub use bilrost_derive::*;

@@ -3,8 +3,8 @@ include!(concat!(env!("OUT_DIR"), "/well_known_types.rs"));
 #[test]
 fn test_well_known_types() {
     let msg = Foo {
-        null: ::prost_types::NullValue::NullValue.into(),
-        timestamp: Some(::prost_types::Timestamp {
+        null: ::bilrost_types::NullValue::NullValue.into(),
+        timestamp: Some(::bilrost_types::Timestamp {
             seconds: 99,
             nanos: 42,
         }),
@@ -27,12 +27,12 @@ fn test_well_known_types() {
 fn test_timestamp() {
     use std::collections::HashSet;
 
-    let timestamp = ::prost_types::Timestamp {
+    let timestamp = ::bilrost_types::Timestamp {
         seconds: 100,
         nanos: 42,
     };
 
-    let mut non_normalized_timestamp = ::prost_types::Timestamp {
+    let mut non_normalized_timestamp = ::bilrost_types::Timestamp {
         seconds: 99,
         nanos: 1_000_000_042,
     };

@@ -65,7 +65,7 @@ fn main() -> Result<()> {
             .iter()
             .map(|proto| datasets_include_dir.join(proto)),
     );
-    prost_build::compile_protos(&benchmark_protos, &[benchmarks_include_dir]).unwrap();
+    bilrost_build::compile_protos(&benchmark_protos, &[benchmarks_include_dir]).unwrap();
 
     let test_includes = &include_dir.join("google").join("protobuf");
 
@@ -73,7 +73,7 @@ fn main() -> Result<()> {
     // that encode/decode roundtrips can use encoded output for comparison. Otherwise trying to
     // compare based on the Rust PartialEq implementations is difficult, due to presence of NaN
     // values.
-    prost_build::Config::new()
+    bilrost_build::Config::new()
         .btree_map(["."])
         .compile_protos(
             &[

@@ -7,7 +7,7 @@ publish = false
 license = "MIT"
 
 [dependencies]
-prost = { path = "../.." }
+bilrost = { path = "../.." }
 
 [build-dependencies]
-prost-build = { path = "../../prost-build" }
+bilrost-build = { path = "../../bilrost-build" }

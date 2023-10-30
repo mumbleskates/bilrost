@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Script which automates publishing a crates.io release of the prost crates.
+# Script which automates publishing a crates.io release of the bilrost crates.
 
 set -ex
 
@@ -13,10 +13,10 @@ fi
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
 CRATES=( \
-  "prost-derive" \
+  "bilrost-derive" \
   "." \
-  "prost-types" \
-  "prost-build" \
+  "bilrost-types" \
+  "bilrost-build" \
 )
 
 for CRATE in "${CRATES[@]}"; do

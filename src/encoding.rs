@@ -189,7 +189,7 @@ pub struct DecodeContext {
     /// the recursion limit.
     ///
     /// The recursion limit is defined by `RECURSION_LIMIT` and cannot be
-    /// customized. The recursion limit can be ignored by building the Prost
+    /// customized. The recursion limit can be ignored by building the Bilrost
     /// crate with the `no-recursion-limit` feature.
     #[cfg(not(feature = "no-recursion-limit"))]
     recurse_count: u32,

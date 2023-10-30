@@ -4,7 +4,7 @@ extern crate cfg_if;
 cfg_if! {
     if #[cfg(feature = "edition-2015")] {
         extern crate env_logger;
-        extern crate prost_build;
+        extern crate bilrost_build;
     }
 }
 
@@ -24,7 +24,7 @@ fn main() {
     // that encode/decode roundtrips can use encoded output for comparison. Otherwise trying to
     // compare based on the Rust PartialEq implementations is difficult, due to presence of NaN
     // values.
-    let mut config = prost_build::Config::new();
+    let mut config = bilrost_build::Config::new();
     config.btree_map(["."]);
     // Tests for custom attributes
     config.type_attribute("Foo.Bar_Baz.Foo_barBaz", "#[derive(Eq, PartialOrd, Ord)]");
@@ -111,13 +111,13 @@ fn main() {
         .compile_protos(&[src.join("option_struct.proto")], includes)
         .unwrap();
 
-    prost_build::Config::new()
+    bilrost_build::Config::new()
         .protoc_arg("--experimental_allow_proto3_optional")
         .compile_protos(&[src.join("proto3_presence.proto")], includes)
         .unwrap();
 
     {
-        let mut config = prost_build::Config::new();
+        let mut config = bilrost_build::Config::new();
         config.disable_comments(["."]);
 
         config
@@ -135,7 +135,7 @@ fn main() {
 
     std::fs::create_dir_all(&out_path).unwrap();
 
-    prost_build::Config::new()
+    bilrost_build::Config::new()
         .bytes(["."])
         .out_dir(out_path)
         .include_file("wellknown_include.rs")
@@ -160,7 +160,7 @@ fn main() {
     let no_root_packages = out_dir.as_path().join("no_root_packages");
 
     fs::create_dir_all(&no_root_packages).expect("failed to create prefix directory");
-    let mut no_root_packages_config = prost_build::Config::new();
+    let mut no_root_packages_config = bilrost_build::Config::new();
     no_root_packages_config
         .out_dir(&no_root_packages)
         .default_package_filename("__.default")
@@ -174,7 +174,7 @@ fn main() {
     let no_root_packages_with_default = out_dir.as_path().join("no_root_packages_with_default");
 
     fs::create_dir_all(&no_root_packages_with_default).expect("failed to create prefix directory");
-    let mut no_root_packages_config = prost_build::Config::new();
+    let mut no_root_packages_config = bilrost_build::Config::new();
     no_root_packages_config
         .out_dir(&no_root_packages_with_default)
         .compile_protos(

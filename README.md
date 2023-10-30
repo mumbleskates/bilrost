@@ -1,16 +1,18 @@
-![continuous integration](https://github.com/tokio-rs/prost/workflows/continuous%20integration/badge.svg)
-[![Documentation](https://docs.rs/prost/badge.svg)](https://docs.rs/prost/)
-[![Crate](https://img.shields.io/crates/v/prost.svg)](https://crates.io/crates/prost)
-[![Dependency Status](https://deps.rs/repo/github/tokio-rs/prost/status.svg)](https://deps.rs/repo/github/tokio-rs/prost)
-[![Discord](https://img.shields.io/discord/500028886025895936)](https://discord.gg/tokio)
+# *BILROST!*
 
-# *PROST!*
+`bilrost` is a [Protocol Buffers](https://developers.google.com/protocol-buffers/)
+fork for the [Rust Language](https://www.rust-lang.org/). `bilrost`
+generates simple, idiomatic Rust code from `proto2` and `proto3` files that
+serializes and deserializes data in a slightly different way:
 
-`prost` is a [Protocol Buffers](https://developers.google.com/protocol-buffers/)
-implementation for the [Rust Language](https://www.rust-lang.org/). `prost`
-generates simple, idiomatic Rust code from `proto2` and `proto3` files.
+* All varints (including tag fields and lengths) use bijective numeration which
+  cannot be length-extended with trailing zeros.
+* Groups are completely deprecated as a wire-type, reducing the number of wire
+  types from 6 to 4
+* Wire types are packed into 2 bits instead of 3, allowing for 31 different
+  one-byte field IDs instead of only 15.
 
-Compared to other Protocol Buffers implementations, `prost`
+Compared to other Protocol Buffers implementations, `bilrost`
 
 * Generates simple, idiomatic, and readable Rust types by taking advantage of
   Rust `derive` attributes.
@@ -24,19 +26,19 @@ Compared to other Protocol Buffers implementations, `prost`
 * Preserves unknown enum values during deserialization.
 * Does not include support for runtime reflection or message descriptors.
 
-## Using `prost` in a Cargo Project
+## Using `bilrost` in a Cargo Project
 
-First, add `prost` and its public dependencies to your `Cargo.toml`:
+First, add `bilrost` and its public dependencies to your `Cargo.toml`:
 
 ```ignore
 [dependencies]
-prost = "0.12"
+bilrost = "0.12"
 # Only necessary if using Protobuf well-known types:
-prost-types = "0.12"
+bilrost-types = "0.12"
 ```
 
 The recommended way to add `.proto` compilation to a Cargo project is to use the
-`prost-build` library. See the [`prost-build` documentation](prost-build) for
+`bilrost-build` library. See the [`bilrost-build` documentation](bilrost-build) for
 more details and examples.
 
 See the [snazzy repository](https://github.com/danburkert/snazzy) for a simple
@@ -44,21 +46,21 @@ start-to-finish example.
 
 ### MSRV
 
-`prost` follows the `tokio-rs` projects MSRV model and supports 1.60. For more
+`bilrost` follows the `tokio-rs` projects MSRV model and supports 1.60. For more
 information on the tokio msrv policy you can check it out [here][tokio msrv]
 
 [tokio msrv]: https://github.com/tokio-rs/tokio/#supported-rust-versions
 
 ## Generated Code
 
-`prost` generates Rust code from source `.proto` files using the `proto2` or
-`proto3` syntax. `prost`'s goal is to make the generated code as simple as
+`bilrost` generates Rust code from source `.proto` files using the `proto2` or
+`proto3` syntax. `bilrost`'s goal is to make the generated code as simple as
 possible.
 
 ### `protoc`
 
-With `prost-build` v0.11 release, `protoc` will be required to invoke
-`compile_protos` (unless `skip_protoc` is enabled). Prost will no longer provide
+With `bilrost-build` v0.11 release, `protoc` will be required to invoke
+`compile_protos` (unless `skip_protoc` is enabled). Bilrost will no longer provide
 bundled a `protoc` or attempt to compile `protoc` for users. For install
 instructions for `protoc` please check out the [protobuf install] instructions.
 
@@ -67,8 +69,8 @@ instructions for `protoc` please check out the [protobuf install] instructions.
 
 ### Packages
 
-Prost can now generate code for `.proto` files that don't have a package spec.
-`prost` will translate the Protobuf package into
+Bilrost can now generate code for `.proto` files that don't have a package spec.
+`bilrost` will translate the Protobuf package into
 a Rust module. For example, given the `package` specifier:
 
 [package]: https://developers.google.com/protocol-buffers/docs/proto#packages
@@ -89,7 +91,7 @@ message Foo {
 }
 ```
 
-`prost` will generate the following Rust struct:
+`bilrost` will generate the following Rust struct:
 
 ```rust,ignore
 /// Sample message.
@@ -157,7 +159,7 @@ You can convert a `PhoneType` value to an `i32` by doing:
 PhoneType::Mobile as i32
 ```
 
-The `#[derive(::prost::Enumeration)]` annotation added to the generated
+The `#[derive(::bilrost::Enumeration)]` annotation added to the generated
 `PhoneType` adds these associated functions to the type:
 
 ```rust,ignore
@@ -247,14 +249,14 @@ from the Protobuf key and value types.
 Message fields are converted to the corresponding struct type. The table of
 field modifiers above applies to message fields, except that `proto3` message
 fields without a modifier (the default) will be wrapped in an `Option`.
-Typically message fields are unboxed. `prost` will automatically box a message
+Typically message fields are unboxed. `bilrost` will automatically box a message
 field if the field type and the parent type are recursively nested in order to
 avoid an infinite sized struct.
 
 #### Oneof Fields
 
 Oneof fields convert to a Rust enum. Protobuf `oneof`s types are not named, so
-`prost` uses the name of the `oneof` field for the resulting Rust enum, and
+`bilrost` uses the name of the `oneof` field for the resulting Rust enum, and
 defines the enum in a module under the struct. For example, a `proto3` message
 such as:
 
@@ -287,7 +289,7 @@ pub mod foo {
 
 ### Services
 
-`prost-build` allows a custom code-generator to be used for processing `service`
+`bilrost-build` allows a custom code-generator to be used for processing `service`
 definitions. This can be used to output Rust traits according to an
 application's specific needs.
 
@@ -327,28 +329,28 @@ message AddressBook {
 and the generated Rust code (`tutorial.rs`):
 
 ```rust,ignore
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, ::bilrost::Message)]
 pub struct Person {
-    #[prost(string, tag="1")]
-    pub name: ::prost::alloc::string::String,
+    #[bilrost(string, tag="1")]
+    pub name: ::bilrost::alloc::string::String,
     /// Unique ID number for this person.
-    #[prost(int32, tag="2")]
+    #[bilrost(int32, tag="2")]
     pub id: i32,
-    #[prost(string, tag="3")]
-    pub email: ::prost::alloc::string::String,
-    #[prost(message, repeated, tag="4")]
-    pub phones: ::prost::alloc::vec::Vec<person::PhoneNumber>,
+    #[bilrost(string, tag="3")]
+    pub email: ::bilrost::alloc::string::String,
+    #[bilrost(message, repeated, tag="4")]
+    pub phones: ::bilrost::alloc::vec::Vec<person::PhoneNumber>,
 }
 /// Nested message and enum types in `Person`.
 pub mod person {
-    #[derive(Clone, PartialEq, ::prost::Message)]
+    #[derive(Clone, PartialEq, ::bilrost::Message)]
     pub struct PhoneNumber {
-        #[prost(string, tag="1")]
-        pub number: ::prost::alloc::string::String,
-        #[prost(enumeration="PhoneType", tag="2")]
+        #[bilrost(string, tag="1")]
+        pub number: ::bilrost::alloc::string::String,
+        #[bilrost(enumeration="PhoneType", tag="2")]
         pub r#type: i32,
     }
-    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::bilrost::Enumeration)]
     #[repr(i32)]
     pub enum PhoneType {
         Mobile = 0,
@@ -357,46 +359,46 @@ pub mod person {
     }
 }
 /// Our address book file is just one of these.
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, ::bilrost::Message)]
 pub struct AddressBook {
-    #[prost(message, repeated, tag="1")]
-    pub people: ::prost::alloc::vec::Vec<Person>,
+    #[bilrost(message, repeated, tag="1")]
+    pub people: ::bilrost::alloc::vec::Vec<Person>,
 }
 ```
 
 ## Accessing the `protoc` `FileDescriptorSet`
 
-The `prost_build::Config::file_descriptor_set_path` option can be used to emit a file descriptor set
+The `bilrost_build::Config::file_descriptor_set_path` option can be used to emit a file descriptor set
 during the build & code generation step. When used in conjunction with the `std::include_bytes`
-macro and the `prost_types::FileDescriptorSet` type, applications and libraries using Prost can
+macro and the `bilrost_types::FileDescriptorSet` type, applications and libraries using Bilrost can
 implement introspection capabilities requiring details from the original `.proto` files.
 
-## Using `prost` in a `no_std` Crate
+## Using `bilrost` in a `no_std` Crate
 
-`prost` is compatible with `no_std` crates. To enable `no_std` support, disable
-the `std` features in `prost` and `prost-types`:
+`bilrost` is compatible with `no_std` crates. To enable `no_std` support, disable
+the `std` features in `bilrost` and `bilrost-types`:
 
 ```ignore
 [dependencies]
-prost = { version = "0.6", default-features = false, features = ["prost-derive"] }
+bilrost = { version = "0.6", default-features = false, features = ["bilrost-derive"] }
 # Only necessary if using Protobuf well-known types:
-prost-types = { version = "0.6", default-features = false }
+bilrost-types = { version = "0.6", default-features = false }
 ```
 
-Additionally, configure `prost-build` to output `BTreeMap`s instead of `HashMap`s
+Additionally, configure `bilrost-build` to output `BTreeMap`s instead of `HashMap`s
 for all Protobuf `map` fields in your `build.rs`:
 
 ```rust,ignore
-let mut config = prost_build::Config::new();
+let mut config = bilrost_build::Config::new();
 config.btree_map(&["."]);
 ```
 
 When using edition 2015, it may be necessary to add an `extern crate core;`
-directive to the crate which includes `prost`-generated code.
+directive to the crate which includes `bilrost`-generated code.
 
 ## Serializing Existing Types
 
-`prost` uses a custom derive macro to handle encoding and decoding types, which
+`bilrost` uses a custom derive macro to handle encoding and decoding types, which
 means that if your existing Rust type is compatible with Protobuf types, you can
 serialize and deserialize it by adding the appropriate derive and field
 annotations.
@@ -406,7 +408,7 @@ generated code examples above.
 
 ### Tag Inference for Existing Types
 
-Prost automatically infers tags for the struct.
+Bilrost automatically infers tags for the struct.
 
 Fields are tagged sequentially in the order they
 are specified, starting with `1`.
@@ -417,33 +419,33 @@ the `tag` attribute on the first field after the gap. The following fields will
 be tagged sequentially starting from the next number.
 
 ```rust,ignore
-use prost;
-use prost::{Enumeration, Message};
+use bilrost;
+use bilrost::{Enumeration, Message};
 
 #[derive(Clone, PartialEq, Message)]
 struct Person {
-    #[prost(string, tag = "1")]
+    #[bilrost(string, tag = "1")]
     pub id: String, // tag=1
     // NOTE: Old "name" field has been removed
     // pub name: String, // tag=2 (Removed)
-    #[prost(string, tag = "6")]
+    #[bilrost(string, tag = "6")]
     pub given_name: String, // tag=6
-    #[prost(string)]
+    #[bilrost(string)]
     pub family_name: String, // tag=7
-    #[prost(string)]
+    #[bilrost(string)]
     pub formatted_name: String, // tag=8
-    #[prost(uint32, tag = "3")]
+    #[bilrost(uint32, tag = "3")]
     pub age: u32, // tag=3
-    #[prost(uint32)]
+    #[bilrost(uint32)]
     pub height: u32, // tag=4
-    #[prost(enumeration = "Gender")]
+    #[bilrost(enumeration = "Gender")]
     pub gender: i32, // tag=5
     // NOTE: Skip to less commonly occurring fields
-    #[prost(string, tag = "16")]
+    #[bilrost(string, tag = "16")]
     pub name_prefix: String, // tag=16  (eg. mr/mrs/ms)
-    #[prost(string)]
+    #[bilrost(string)]
     pub name_suffix: String, // tag=17  (eg. jr/esq)
-    #[prost(string)]
+    #[bilrost(string)]
     pub maiden_name: String, // tag=18
 }
 
@@ -457,14 +459,14 @@ pub enum Gender {
 
 ## Nix
 
-The prost project maintains flakes support for local development. Once you have
+The bilrost project maintains flakes support for local development. Once you have
 nix and nix flakes setup you can just run `nix develop` to get a shell
 configured with the required dependencies to compile the whole project.
 
 
 ## FAQ
 
-1. **Could `prost` be implemented as a serializer for [Serde](https://serde.rs/)?**
+1. **Could `bilrost` be implemented as a serializer for [Serde](https://serde.rs/)?**
 
   Probably not, however I would like to hear from a Serde expert on the matter.
   There are two complications with trying to serialize Protobuf messages with
@@ -479,7 +481,7 @@ configured with the required dependencies to compile the whole project.
     counterparts.
 
   But it is possible to place `serde` derive tags onto the generated types, so
-  the same structure can support both `prost` and `Serde`.
+  the same structure can support both `bilrost` and `Serde`.
 
 2. **I get errors when trying to run `cargo test` on MacOS**
 
@@ -493,8 +495,8 @@ configured with the required dependencies to compile the whole project.
 
 ## License
 
-`prost` is distributed under the terms of the Apache License (Version 2.0).
+`bilrost` is distributed under the terms of the Apache License (Version 2.0).
 
-See [LICENSE](https://github.com/tokio-rs/prost/blob/master/LICENSE) for details.
+See [LICENSE](https://github.com/mumbleskates/bilrost/blob/master/LICENSE) for details.
 
 Copyright 2022 Dan Burkert & Tokio Contributors

@@ -2,8 +2,8 @@
 //!
 //! This module provides implementations of `Message` for Rust standard library types which
 //! correspond to a Protobuf well-known wrapper type. The remaining well-known types are defined in
-//! the `prost-types` crate in order to avoid a cyclic dependency between `prost` and
-//! `prost-build`.
+//! the `bilrost-types` crate in order to avoid a cyclic dependency between `bilrost` and
+//! `bilrost-build`.
 
 use alloc::string::String;
 use alloc::vec::Vec;

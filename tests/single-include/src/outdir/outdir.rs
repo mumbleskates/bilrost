@@ -1,10 +1,10 @@
 #[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, ::bilrost::Message)]
 pub struct OutdirRequest {
-    #[prost(string, tag = "1")]
-    pub query: ::prost::alloc::string::String,
-    #[prost(int32, tag = "2")]
+    #[bilrost(string, tag = "1")]
+    pub query: ::bilrost::alloc::string::String,
+    #[bilrost(int32, tag = "2")]
     pub page_number: i32,
-    #[prost(int32, tag = "3")]
+    #[bilrost(int32, tag = "3")]
     pub result_per_page: i32,
 }

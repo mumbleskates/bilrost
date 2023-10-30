@@ -5,7 +5,7 @@ use std::path::Path;
 
 use cfg_if::cfg_if;
 use criterion::{criterion_group, criterion_main, Criterion};
-use prost::Message;
+use bilrost::Message;
 
 use protobuf::benchmarks::{
     dataset, google_message3::GoogleMessage3, google_message4::GoogleMessage4, proto2, proto3,
@@ -21,7 +21,7 @@ fn load_dataset(dataset: &Path) -> Result<BenchmarkDataset, Box<dyn Error>> {
 
 fn benchmark_dataset<M>(criterion: &mut Criterion, name: &str, dataset: &'static Path)
 where
-    M: prost::Message + Default + 'static,
+    M: bilrost::Message + Default + 'static,
 {
     let mut group = criterion.benchmark_group(&format!("dataset/{}", name));
 

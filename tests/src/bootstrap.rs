@@ -21,11 +21,11 @@ fn bootstrap() {
     let protobuf = include.join("google").join("protobuf");
 
     let tempdir = tempfile::Builder::new()
-        .prefix("prost-types-bootstrap")
+        .prefix("bilrost-types-bootstrap")
         .tempdir()
         .unwrap();
 
-    prost_build::Config::new()
+    bilrost_build::Config::new()
         .compile_well_known_types()
         .btree_map(["."])
         .out_dir(tempdir.path())
@@ -64,7 +64,7 @@ fn bootstrap() {
     let src = Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .expect("no parent")
-        .join("prost-types")
+        .join("bilrost-types")
         .join("src");
 
     let mut protobuf = String::new();

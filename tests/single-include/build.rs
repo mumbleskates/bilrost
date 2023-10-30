@@ -1,4 +1,4 @@
-use prost_build::Config;
+use bilrost_build::Config;
 
 fn main() {
     Config::new()

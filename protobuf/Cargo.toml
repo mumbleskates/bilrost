@@ -9,19 +9,19 @@ publish = false
 edition = "2018"
 
 [dependencies]
-prost = { path = ".." }
-prost-types = { path = "../prost-types" }
+bilrost = { path = ".." }
+bilrost-types = { path = "../bilrost-types" }
 
 [build-dependencies]
 anyhow = "1.0.1"
 curl = "0.4.13"
 flate2 = "1.0.3"
-prost-build = { path = "../prost-build" }
+bilrost-build = { path = "../bilrost-build" }
 tar = "0.4.15"
 tempfile = "3"
 
 # With libz-sys `1.1.8` the msrv has been bumped to 1.54. Since, this dep
-# is not a dep of the actual prost crates we will force cargo to not include
+# is not a dep of the actual bilrost crates we will force cargo to not include
 # the new version.
 #
 # https://github.com/rust-lang/libz-sys/issues/101
@@ -40,4 +40,4 @@ name = "dataset"
 harness = false
 
 [package.metadata.cargo-machete]
-ignored = ["prost-types"]
+ignored = ["bilrost-types"]

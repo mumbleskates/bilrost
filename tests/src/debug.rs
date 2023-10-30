@@ -3,7 +3,7 @@
 //! The tests check against expected output. This may be a bit fragile, but it is likely OK for
 //! actual use.
 
-use prost::alloc::{format, string::String};
+use bilrost::alloc::{format, string::String};
 
 // Borrow some types from other places.
 #[cfg(feature = "std")]
@@ -59,8 +59,8 @@ fn basic() {
 /// A special case with a tuple struct
 #[test]
 fn tuple_struct() {
-    #[derive(Clone, PartialEq, prost::Message)]
-    struct NewType(#[prost(enumeration = "BasicEnumeration", tag = "5")] i32);
+    #[derive(Clone, PartialEq, bilrost::Message)]
+    struct NewType(#[bilrost(enumeration = "BasicEnumeration", tag = "5")] i32);
     assert_eq!(
         format!("{:?}", NewType(BasicEnumeration::TWO as i32)),
         "NewType(TWO)"
@@ -69,19 +69,19 @@ fn tuple_struct() {
 }
 
 #[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, prost::Oneof)]
+#[derive(Clone, PartialEq, bilrost::Oneof)]
 pub enum OneofWithEnum {
-    #[prost(int32, tag = "8")]
+    #[bilrost(int32, tag = "8")]
     Int(i32),
-    #[prost(string, tag = "9")]
+    #[bilrost(string, tag = "9")]
     String(String),
-    #[prost(enumeration = "BasicEnumeration", tag = "10")]
+    #[bilrost(enumeration = "BasicEnumeration", tag = "10")]
     Enumeration(i32),
 }
 
-#[derive(Clone, PartialEq, prost::Message)]
+#[derive(Clone, PartialEq, bilrost::Message)]
 struct MessageWithOneof {
-    #[prost(oneof = "OneofWithEnum", tags = "8, 9, 10")]
+    #[bilrost(oneof = "OneofWithEnum", tags = "8, 9, 10")]
     of: Option<OneofWithEnum>,
 }
 

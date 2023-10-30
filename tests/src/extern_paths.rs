@@ -16,7 +16,7 @@ pub mod widget {
 fn test() {
     use crate::packages::gizmo;
     use crate::packages::DoIt;
-    use prost::Message;
+    use bilrost::Message;
 
     let mut widget_factory = widget::factory::WidgetFactory::default();
     assert_eq!(0, widget_factory.encoded_len());

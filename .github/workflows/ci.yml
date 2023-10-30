@@ -54,12 +54,12 @@ jobs:
       - name: test
         run: cargo test --workspace --all-targets
       - name: test no-default-features
-        run: cargo test -p prost-build -p prost-derive -p prost-types --all-targets --no-default-features
+        run: cargo test -p bilrost-build -p bilrost-derive -p bilrost-types --all-targets --no-default-features
       # Run doc tests separately: https://github.com/rust-lang/cargo/issues/6669
       - name: test doc
         run: cargo test --workspace --doc
       - name: test doc no-default-features
-        run: cargo test -p prost-build -p prost-derive -p prost-types --doc --no-default-features
+        run: cargo test -p bilrost-build -p bilrost-derive -p bilrost-types --doc --no-default-features
 
   kani:
     runs-on: ubuntu-latest
@@ -70,7 +70,7 @@ jobs:
         with:
           enable-propproof: true
           args: |
-            --tests -p prost-types --default-unwind 3 \
+            --tests -p bilrost-types --default-unwind 3 \
             --harness "tests::check_timestamp_roundtrip_via_system_time" \
             --harness "tests::check_duration_roundtrip" \
             --harness "tests::check_duration_roundtrip_nanos"
@@ -95,14 +95,14 @@ jobs:
         uses: baptiste0928/cargo-install@v2
         with:
           crate: cargo-no-std-check
-      - name: prost cargo-no-std-check
+      - name: bilrost cargo-no-std-check
         run: cargo no-std-check --manifest-path Cargo.toml --no-default-features
-      - name: prost-types cargo-no-std-check
-        run: cargo no-std-check --manifest-path prost-types/Cargo.toml --no-default-features
-      # prost-build depends on prost with --no-default-features, but when
-      # prost-build is built through the workspace, prost typically has default
+      - name: bilrost-types cargo-no-std-check
+        run: cargo no-std-check --manifest-path bilrost-types/Cargo.toml --no-default-features
+      # bilrost-build depends on bilrost with --no-default-features, but when
+      # bilrost-build is built through the workspace, bilrost typically has default
       # features enabled due to vagaries in Cargo workspace feature resolution.
-      # This additional check ensures that prost-build does not rely on any of
-      # prost's default features to compile.
-      - name: prost-build check
-        run: cargo check --manifest-path prost-build/Cargo.toml
+      # This additional check ensures that bilrost-build does not rely on any of
+      # bilrost's default features to compile.
+      - name: bilrost-build check
+        run: cargo check --manifest-path bilrost-build/Cargo.toml

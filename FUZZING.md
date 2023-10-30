@@ -1,6 +1,6 @@
 # Fuzzing
 
-Prost ships a few fuzz tests, using both libfuzzer and aflfuzz.
+Bilrost ships a few fuzz tests, using both libfuzzer and aflfuzz.
 
 
 ## afl

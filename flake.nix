@@ -1,5 +1,5 @@
 {
-  description = "Prost dependencies";
+  description = "Bilrost dependencies";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";

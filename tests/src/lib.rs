@@ -15,11 +15,11 @@ cfg_if! {
         extern crate anyhow;
         extern crate bytes;
         extern crate core;
-        extern crate prost;
-        extern crate prost_types;
+        extern crate bilrost;
+        extern crate bilrost_types;
         extern crate protobuf;
         #[cfg(test)]
-        extern crate prost_build;
+        extern crate bilrost_build;
         #[cfg(test)]
         extern crate tempfile;
     }
@@ -137,17 +137,17 @@ pub mod default_string_escape {
 use alloc::vec::Vec;
 
 use anyhow::anyhow;
-use prost::bytes::Buf;
+use bilrost::bytes::Buf;
 
-use prost::Message;
+use bilrost::Message;
 
 pub enum RoundtripResult {
     /// The roundtrip succeeded.
     Ok(Vec<u8>),
-    /// The data could not be decoded. This could indicate a bug in prost,
+    /// The data could not be decoded. This could indicate a bug in bilrost,
     /// or it could indicate that the input was bogus.
-    DecodeError(prost::DecodeError),
-    /// Re-encoding or validating the data failed.  This indicates a bug in `prost`.
+    DecodeError(bilrost::DecodeError),
+    /// Re-encoding or validating the data failed.  This indicates a bug in `bilrost`.
     Error(anyhow::Error),
 }
 
@@ -164,7 +164,7 @@ impl RoundtripResult {
     }
 
     /// Unwrap the roundtrip result. Panics if the result was a validation or re-encoding error.
-    pub fn unwrap_error(self) -> Result<Vec<u8>, prost::DecodeError> {
+    pub fn unwrap_error(self) -> Result<Vec<u8>, bilrost::DecodeError> {
         match self {
             RoundtripResult::Ok(buf) => Ok(buf),
             RoundtripResult::DecodeError(error) => Err(error),
@@ -414,7 +414,7 @@ mod tests {
 
     #[test]
     fn test_deep_nesting() {
-        fn build_and_roundtrip(depth: usize) -> Result<(), prost::DecodeError> {
+        fn build_and_roundtrip(depth: usize) -> Result<(), bilrost::DecodeError> {
             use crate::nesting::A;
 
             let mut a = Box::new(A::default());
@@ -435,7 +435,7 @@ mod tests {
 
     #[test]
     fn test_deep_nesting_oneof() {
-        fn build_and_roundtrip(depth: usize) -> Result<(), prost::DecodeError> {
+        fn build_and_roundtrip(depth: usize) -> Result<(), bilrost::DecodeError> {
             use crate::recursive_oneof::{a, A, C};
 
             let mut a = Box::new(A {
@@ -458,7 +458,7 @@ mod tests {
 
     #[test]
     fn test_deep_nesting_group() {
-        fn build_and_roundtrip(depth: usize) -> Result<(), prost::DecodeError> {
+        fn build_and_roundtrip(depth: usize) -> Result<(), bilrost::DecodeError> {
             use crate::groups::{nested_group2::OptionalGroup, NestedGroup2};
 
             let mut a = NestedGroup2::default();
@@ -481,7 +481,7 @@ mod tests {
 
     #[test]
     fn test_deep_nesting_repeated() {
-        fn build_and_roundtrip(depth: usize) -> Result<(), prost::DecodeError> {
+        fn build_and_roundtrip(depth: usize) -> Result<(), bilrost::DecodeError> {
             use crate::nesting::C;
 
             let mut c = C::default();
@@ -502,7 +502,7 @@ mod tests {
 
     #[test]
     fn test_deep_nesting_map() {
-        fn build_and_roundtrip(depth: usize) -> Result<(), prost::DecodeError> {
+        fn build_and_roundtrip(depth: usize) -> Result<(), bilrost::DecodeError> {
             use crate::nesting::D;
 
             let mut d = D::default();
@@ -612,7 +612,7 @@ mod tests {
             PrivacyLevel::try_from(4)
         );
         assert_eq!(
-            Err(prost::DecodeError::new("invalid enumeration value")),
+            Err(bilrost::DecodeError::new("invalid enumeration value")),
             PrivacyLevel::try_from(5)
         );
 
@@ -719,6 +719,6 @@ mod tests {
     fn test_file_descriptor_set_path() {
         let file_descriptor_set_bytes =
             include_bytes!(concat!(env!("OUT_DIR"), "/file_descriptor_set.bin"));
-        prost_types::FileDescriptorSet::decode(&file_descriptor_set_bytes[..]).unwrap();
+        bilrost_types::FileDescriptorSet::decode(&file_descriptor_set_bytes[..]).unwrap();
     }
 }
