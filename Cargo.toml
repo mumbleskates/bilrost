@@ -18,14 +18,11 @@ rust-version = "1.60"
 
 [workspace]
 members = [
-  "conformance",
   "prost-build",
   "prost-derive",
   "prost-types",
   "protobuf",
   "tests",
-  "tests-2015",
-  "tests-no-std",
   "tests/single-include",
 ]
 
