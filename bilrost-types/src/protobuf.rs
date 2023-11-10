@@ -201,7 +201,7 @@ pub mod field_descriptor_proto {
         /// negative values are likely.
         Int64 = 3,
         Uint64 = 4,
-        /// Not ZigZag encoded.  Negative numbers take 10 bytes.  Use TYPE_SINT32 if
+        /// Not ZigZag encoded.  Negative numbers take 5 bytes.  Use TYPE_SINT32 if
         /// negative values are likely.
         Int32 = 5,
         Fixed64 = 6,

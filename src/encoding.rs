@@ -565,8 +565,6 @@ macro_rules! varint {
 varint!(bool, bool,
         to_uint64(value) u64::from(*value),
         from_uint64(value) value != 0);
-varint!(i32, int32);
-varint!(i64, int64);
 varint!(u32, uint32);
 varint!(u64, uint64);
 varint!(i32, sint32,
@@ -1735,8 +1733,6 @@ mod test {
 
     #[cfg(feature = "std")]
     map_tests!(keys: [
-        (i32, int32),
-        (i64, int64),
         (u32, uint32),
         (u64, uint64),
         (i32, sint32),
@@ -1751,8 +1747,6 @@ mod test {
     vals: [
         (f32, float),
         (f64, double),
-        (i32, int32),
-        (i64, int64),
         (u32, uint32),
         (u64, uint64),
         (i32, sint32),

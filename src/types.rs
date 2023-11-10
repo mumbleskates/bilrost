@@ -12,7 +12,7 @@ use ::bytes::{Buf, BufMut, Bytes};
 
 use crate::{
     encoding::{
-        bool, bytes, double, float, int32, int64, skip_field, string, uint32, uint64,
+        bool, bytes, double, float, sint32, sint64, skip_field, string, uint32, uint64,
         DecodeContext, WireType,
     },
     DecodeError, Message,
@@ -139,7 +139,7 @@ impl Message for i32 {
         B: BufMut,
     {
         if *self != 0 {
-            int32::encode(1, self, buf)
+            sint32::encode(1, self, buf)
         }
     }
     fn merge_field<B>(
@@ -153,14 +153,14 @@ impl Message for i32 {
         B: Buf,
     {
         if tag == 1 {
-            int32::merge(wire_type, self, buf, ctx)
+            sint32::merge(wire_type, self, buf, ctx)
         } else {
             skip_field(wire_type, buf, ctx)
         }
     }
     fn encoded_len(&self) -> usize {
         if *self != 0 {
-            int32::encoded_len(1, self)
+            sint32::encoded_len(1, self)
         } else {
             0
         }
@@ -177,7 +177,7 @@ impl Message for i64 {
         B: BufMut,
     {
         if *self != 0 {
-            int64::encode(1, self, buf)
+            sint64::encode(1, self, buf)
         }
     }
     fn merge_field<B>(
@@ -191,14 +191,14 @@ impl Message for i64 {
         B: Buf,
     {
         if tag == 1 {
-            int64::merge(wire_type, self, buf, ctx)
+            sint64::merge(wire_type, self, buf, ctx)
         } else {
             skip_field(wire_type, buf, ctx)
         }
     }
     fn encoded_len(&self) -> usize {
         if *self != 0 {
-            int64::encoded_len(1, self)
+            sint64::encoded_len(1, self)
         } else {
             0
         }

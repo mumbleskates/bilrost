@@ -386,8 +386,6 @@ impl Field {
 pub enum Ty {
     Double,
     Float,
-    Int32,
-    Int64,
     Uint32,
     Uint64,
     Sint32,
@@ -430,8 +428,6 @@ impl Ty {
         let ty = match *attr {
             Meta::Path(ref name) if name.is_ident("float") => Ty::Float,
             Meta::Path(ref name) if name.is_ident("double") => Ty::Double,
-            Meta::Path(ref name) if name.is_ident("int32") => Ty::Int32,
-            Meta::Path(ref name) if name.is_ident("int64") => Ty::Int64,
             Meta::Path(ref name) if name.is_ident("uint32") => Ty::Uint32,
             Meta::Path(ref name) if name.is_ident("uint64") => Ty::Uint64,
             Meta::Path(ref name) if name.is_ident("sint32") => Ty::Sint32,
@@ -475,8 +471,6 @@ impl Ty {
         let ty = match s.trim() {
             "float" => Ty::Float,
             "double" => Ty::Double,
-            "int32" => Ty::Int32,
-            "int64" => Ty::Int64,
             "uint32" => Ty::Uint32,
             "uint64" => Ty::Uint64,
             "sint32" => Ty::Sint32,
@@ -511,8 +505,6 @@ impl Ty {
         match *self {
             Ty::Double => "double",
             Ty::Float => "float",
-            Ty::Int32 => "int32",
-            Ty::Int64 => "int64",
             Ty::Uint32 => "uint32",
             Ty::Uint64 => "uint64",
             Ty::Sint32 => "sint32",
@@ -542,8 +534,6 @@ impl Ty {
         match *self {
             Ty::Double => quote!(f64),
             Ty::Float => quote!(f32),
-            Ty::Int32 => quote!(i32),
-            Ty::Int64 => quote!(i64),
             Ty::Uint32 => quote!(u32),
             Ty::Uint64 => quote!(u64),
             Ty::Sint32 => quote!(i32),
@@ -631,8 +621,8 @@ impl DefaultValue {
     }
 
     pub fn from_lit(ty: &Ty, lit: Lit) -> Result<DefaultValue, Error> {
-        let is_i32 = *ty == Ty::Int32 || *ty == Ty::Sint32 || *ty == Ty::Sfixed32;
-        let is_i64 = *ty == Ty::Int64 || *ty == Ty::Sint64 || *ty == Ty::Sfixed64;
+        let is_i32 = *ty == Ty::Sint32 || *ty == Ty::Sfixed32;
+        let is_i64 = *ty == Ty::Sint64 || *ty == Ty::Sfixed64;
 
         let is_u32 = *ty == Ty::Uint32 || *ty == Ty::Fixed32;
         let is_u64 = *ty == Ty::Uint64 || *ty == Ty::Fixed64;
@@ -767,8 +757,8 @@ impl DefaultValue {
         match *ty {
             Ty::Float => DefaultValue::F32(0.0),
             Ty::Double => DefaultValue::F64(0.0),
-            Ty::Int32 | Ty::Sint32 | Ty::Sfixed32 => DefaultValue::I32(0),
-            Ty::Int64 | Ty::Sint64 | Ty::Sfixed64 => DefaultValue::I64(0),
+            Ty::Sint32 | Ty::Sfixed32 => DefaultValue::I32(0),
+            Ty::Sint64 | Ty::Sfixed64 => DefaultValue::I64(0),
             Ty::Uint32 | Ty::Fixed32 => DefaultValue::U32(0),
             Ty::Uint64 | Ty::Fixed64 => DefaultValue::U64(0),
 

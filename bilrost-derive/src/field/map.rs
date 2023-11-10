@@ -356,9 +356,7 @@ impl Field {
 fn key_ty_from_str(s: &str) -> Result<scalar::Ty, Error> {
     let ty = scalar::Ty::from_str(s)?;
     match ty {
-        scalar::Ty::Int32
-        | scalar::Ty::Int64
-        | scalar::Ty::Uint32
+        scalar::Ty::Uint32
         | scalar::Ty::Uint64
         | scalar::Ty::Sint32
         | scalar::Ty::Sint64
