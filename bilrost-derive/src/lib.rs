@@ -402,8 +402,8 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
             Fields::Unit => Punctuated::new(),
             Fields::Named(FieldsNamed { named: fields, .. })
             | Fields::Unnamed(FieldsUnnamed {
-                unnamed: fields, ..
-            }) => fields,
+                                  unnamed: fields, ..
+                              }) => fields,
         };
         if variant_fields.len() != 1 {
             bail!("Oneof enum variants must have a single field");

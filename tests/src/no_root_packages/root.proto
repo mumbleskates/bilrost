@@ -1,6 +1,0 @@
-syntax = "proto3";
-
-message Root {
-  message Inner {
-  }
-}

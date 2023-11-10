@@ -18,12 +18,8 @@ rust-version = "1.74"
 
 [workspace]
 members = [
-  "bilrost-build",
   "bilrost-derive",
   "bilrost-types",
-  "protobuf",
-  "tests",
-  "tests/single-include",
 ]
 
 exclude = [
