@@ -132,13 +132,13 @@ impl Field {
         let module = self.map_ty.module();
         match &self.value_ty {
             ValueTy::Scalar(scalar::Ty::Enumeration(ty)) => {
-                let default = quote!(#ty::default() as i32);
+                let default = quote!(#ty::default() as u32);
                 quote! {
                     ::bilrost::encoding::#module::encode_with_default(
                         #ke,
                         #kl,
-                        ::bilrost::encoding::int32::encode,
-                        ::bilrost::encoding::int32::encoded_len,
+                        ::bilrost::encoding::uint32::encode,
+                        ::bilrost::encoding::uint32::encoded_len,
                         &(#default),
                         #tag,
                         &#ident,
@@ -184,11 +184,11 @@ impl Field {
         let module = self.map_ty.module();
         match &self.value_ty {
             ValueTy::Scalar(scalar::Ty::Enumeration(ty)) => {
-                let default = quote!(#ty::default() as i32);
+                let default = quote!(#ty::default() as u32);
                 quote! {
                     ::bilrost::encoding::#module::merge_with_default(
                         #km,
-                        ::bilrost::encoding::int32::merge,
+                        ::bilrost::encoding::uint32::merge,
                         #default,
                         &mut #ident,
                         buf,
@@ -221,11 +221,11 @@ impl Field {
         let module = self.map_ty.module();
         match &self.value_ty {
             ValueTy::Scalar(scalar::Ty::Enumeration(ty)) => {
-                let default = quote!(#ty::default() as i32);
+                let default = quote!(#ty::default() as u32);
                 quote! {
                     ::bilrost::encoding::#module::encoded_len_with_default(
                         #kl,
-                        ::bilrost::encoding::int32::encoded_len,
+                        ::bilrost::encoding::uint32::encoded_len,
                         &(#default),
                         #tag,
                         &#ident,

@@ -116,8 +116,6 @@ Scalar value types are converted as follows:
 | --- | --- |
 | `double` | `f64` |
 | `float` | `f32` |
-| `int32` | `i32` |
-| `int64` | `i64` |
 | `uint32` | `u32` |
 | `uint64` | `u64` |
 | `sint32` | `i32` |
@@ -337,7 +335,7 @@ pub struct Person {
     #[bilrost(string, tag="1")]
     pub name: ::bilrost::alloc::string::String,
     /// Unique ID number for this person.
-    #[bilrost(int32, tag="2")]
+    #[bilrost(sint32, tag="2")]
     pub id: i32,
     #[bilrost(string, tag="3")]
     pub email: ::bilrost::alloc::string::String,
@@ -478,10 +476,9 @@ configured with the required dependencies to compile the whole project.
   - Protobuf fields require a numbered tag, and currently there appears to be no
     mechanism suitable for this in `serde`.
   - The mapping of Protobuf type to Rust type is not 1-to-1. As a result,
-    trait-based approaches to dispatching don't work very well. Example: six
+    trait-based approaches to dispatching don't work very well. Example: four
     different Protobuf field types correspond to a Rust `Vec<i32>`: `repeated
-    int32`, `repeated sint32`, `repeated sfixed32`, and their packed
-    counterparts.
+    sint32`, `repeated sfixed32`, and their packed counterparts.
 
   But it is possible to place `serde` derive tags onto the generated types, so
   the same structure can support both `bilrost` and `Serde`.

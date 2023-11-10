@@ -303,36 +303,20 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
     let is_valid = variants
         .iter()
         .map(|&(_, ref value)| quote!(#value => true));
-    let from = variants.iter().map(
-        |&(ref variant, ref value)| quote!(#value => ::core::option::Option::Some(#ident::#variant)),
-    );
 
     let try_from = variants.iter().map(
         |&(ref variant, ref value)| quote!(#value => ::core::result::Result::Ok(#ident::#variant)),
     );
 
     let is_valid_doc = format!("Returns `true` if `value` is a variant of `{}`.", ident);
-    let from_i32_doc = format!(
-        "Converts an `i32` to a `{}`, or `None` if `value` is not a valid variant.",
-        ident
-    );
 
     let expanded = quote! {
         impl #impl_generics #ident #ty_generics #where_clause {
             #[doc=#is_valid_doc]
-            pub fn is_valid(value: i32) -> bool {
+            pub fn is_valid(value: u32) -> bool {
                 match value {
                     #(#is_valid,)*
                     _ => false,
-                }
-            }
-
-            #[deprecated = "Use the TryFrom<i32> implementation instead"]
-            #[doc=#from_i32_doc]
-            pub fn from_i32(value: i32) -> ::core::option::Option<#ident> {
-                match value {
-                    #(#from,)*
-                    _ => ::core::option::Option::None,
                 }
             }
         }
@@ -343,16 +327,16 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
             }
         }
 
-        impl #impl_generics ::core::convert::From::<#ident> for i32 #ty_generics #where_clause {
-            fn from(value: #ident) -> i32 {
-                value as i32
+        impl #impl_generics ::core::convert::From::<#ident> for u32 #ty_generics #where_clause {
+            fn from(value: #ident) -> u32 {
+                value as u32
             }
         }
 
-        impl #impl_generics ::core::convert::TryFrom::<i32> for #ident #ty_generics #where_clause {
+        impl #impl_generics ::core::convert::TryFrom::<u32> for #ident #ty_generics #where_clause {
             type Error = ::bilrost::DecodeError;
 
-            fn try_from(value: i32) -> ::core::result::Result<#ident, ::bilrost::DecodeError> {
+            fn try_from(value: u32) -> ::core::result::Result<#ident, ::bilrost::DecodeError> {
                 match value {
                     #(#try_from,)*
                     _ => ::core::result::Result::Err(::bilrost::DecodeError::new("invalid enumeration value")),

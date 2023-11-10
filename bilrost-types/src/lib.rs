@@ -11,8 +11,6 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
-#[rustfmt::skip]
-pub mod compiler;
 mod datetime;
 #[rustfmt::skip]
 mod protobuf;

@@ -216,7 +216,7 @@ impl Field {
     fn debug_inner(&self, wrap_name: TokenStream) -> TokenStream {
         if let Ty::Enumeration(ref ty) = self.ty {
             quote! {
-                struct #wrap_name<'a>(&'a i32);
+                struct #wrap_name<'a>(&'a u32);
                 impl<'a> ::core::fmt::Debug for #wrap_name<'a> {
                     fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
                         let res: ::core::result::Result<#ty, _> = ::core::convert::TryFrom::try_from(*self.0);
@@ -551,7 +551,7 @@ impl Ty {
 
     pub fn module(&self) -> Ident {
         match *self {
-            Ty::Enumeration(..) => Ident::new("int32", Span::call_site()),
+            Ty::Enumeration(..) => Ident::new("uint32", Span::call_site()),
             _ => Ident::new(self.as_str(), Span::call_site()),
         }
     }
