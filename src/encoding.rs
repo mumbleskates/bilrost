@@ -20,8 +20,8 @@ use ::bytes::{Buf, BufMut, Bytes};
 use crate::DecodeError;
 use crate::Message;
 
-/// Encodes an integer value into LEB128 variable length format, and writes it to the buffer.
-/// The buffer must have enough remaining space (maximum 10 bytes).
+/// Encodes an integer value into LEB128-bijective variable length format, and writes it to the
+/// buffer. The buffer must have enough remaining space (maximum 10 bytes).
 #[inline]
 pub fn encode_varint<B>(mut value: u64, buf: &mut B)
 where
@@ -38,7 +38,7 @@ where
     }
 }
 
-/// Decodes a LEB128-encoded variable length integer from the buffer.
+/// Decodes a LEB128-bijective-encoded variable length integer from the buffer.
 #[inline]
 pub fn decode_varint<B>(buf: &mut B) -> Result<u64, DecodeError>
 where
@@ -55,7 +55,8 @@ where
         buf.advance(1);
         Ok(u64::from(byte))
     } else if len > 10 || bytes[len - 1] < 0x80 {
-        let (value, advance) = decode_varint_slice(bytes)?;
+        // SAFETY: we have ensured that the varint doesn't overrun the buffer.
+        let (value, advance) = unsafe { decode_varint_slice(bytes) }?;
         buf.advance(advance);
         Ok(value)
     } else {
@@ -63,8 +64,8 @@ where
     }
 }
 
-/// Decodes a LEB128-encoded variable length integer from the slice, returning the value and the
-/// number of bytes read.
+/// Decodes a LEB128-bijective-encoded variable length integer from the slice, returning the value
+/// and the number of bytes read.
 ///
 /// Based loosely on [`ReadVarint64FromArray`][1] with a varint overflow check from
 /// [`ConsumeVarint`][2].
@@ -77,7 +78,7 @@ where
 /// [1]: https://github.com/google/protobuf/blob/3.3.x/src/google/protobuf/io/coded_stream.cc#L365-L406
 /// [2]: https://github.com/protocolbuffers/protobuf-go/blob/v1.27.1/encoding/protowire/wire.go#L358
 #[inline]
-fn decode_varint_slice(bytes: &[u8]) -> Result<(u64, usize), DecodeError> {
+unsafe fn decode_varint_slice(bytes: &[u8]) -> Result<(u64, usize), DecodeError> {
     // Fully unrolled varint decoding loop. Splitting into 32-bit pieces gives better performance.
 
     // Use assertions to ensure memory safety, but it should always be optimized after inline.
@@ -147,10 +148,6 @@ fn decode_varint_slice(bytes: &[u8]) -> Result<(u64, usize), DecodeError> {
 
 /// Decodes a LEB128-encoded variable length integer from the buffer, advancing the buffer as
 /// necessary.
-///
-/// Contains a varint overflow check from [`ConsumeVarint`][1].
-///
-/// [1]: https://github.com/protocolbuffers/protobuf-go/blob/v1.27.1/encoding/protowire/wire.go#L358
 #[inline(never)]
 #[cold]
 fn decode_varint_slow<B>(buf: &mut B) -> Result<u64, DecodeError>
@@ -162,11 +159,21 @@ where
         let byte = buf.get_u8();
         // Check for u64 overflow
         if count == 8 {
+            // The decoding process for bijective varints is largely the same as for non-bijective,
+            // except we simply don't remove the MSB from each byte before adding it to the decoded
+            // value. Thus, all 64 bits are already spoken for after the 9th byte (56 from the lower
+            // 7 of the first 8 bytes and 8 more from the 9th byte) and we can check for uint64
+            // overflow after reading the 9th byte; the 10th byte is obligated by the encoding if we
+            // care about generalizing the encoding to more than 64 bit numbers, but it will always
+            // be zero in this case.
+            // TODO(widders): reduce this to a 9-byte-max encoding. any varints that are likely to
+            //  be over 64b will be more compact in a prefix-length encoding (blob wiretype) anyway
             let top_8_bits = (byte as u64) + (value >> 56);
             if top_8_bits > 0xff {
                 return Err(DecodeError::new("invalid varint"));
             }
         } else if count == 9 && byte > 0 {
+            // A tenth byte with a value greater than zero will always overflow uint64.
             return Err(DecodeError::new("invalid varint"));
         }
         value += u64::from(byte) << (count * 7);
