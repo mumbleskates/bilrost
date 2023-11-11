@@ -27,7 +27,7 @@ pub fn encode_varint<B>(mut value: u64, buf: &mut B)
 where
     B: BufMut,
 {
-    loop {
+    for _ in 0..9 {
         if value < 0x80 {
             buf.put_u8(value as u8);
             break;
@@ -54,7 +54,7 @@ where
     if byte < 0x80 {
         buf.advance(1);
         Ok(u64::from(byte))
-    } else if len > 10 || bytes[len - 1] < 0x80 {
+    } else if len >= 9 || bytes[len - 1] < 0x80 {
         // SAFETY: we have ensured that the varint doesn't overrun the buffer.
         let (value, advance) = unsafe { decode_varint_slice(bytes) }?;
         buf.advance(advance);
@@ -72,7 +72,7 @@ where
 ///
 /// ## Safety
 ///
-/// The caller must ensure that `bytes` is non-empty and either `bytes.len() >= 10` or the last
+/// The caller must ensure that `bytes` is non-empty and either `bytes.len() >= 9` or the last
 /// element in bytes is < `0x80`.
 ///
 /// [1]: https://github.com/google/protobuf/blob/3.3.x/src/google/protobuf/io/coded_stream.cc#L365-L406
@@ -83,7 +83,8 @@ unsafe fn decode_varint_slice(bytes: &[u8]) -> Result<(u64, usize), DecodeError>
 
     // Use assertions to ensure memory safety, but it should always be optimized after inline.
     assert!(!bytes.is_empty());
-    assert!(bytes.len() > 10 || bytes[bytes.len() - 1] < 0x80);
+    // If the varint is 9 bytes long, the last byte may have its MSB set.
+    assert!(bytes.len() > 8 || bytes[bytes.len() - 1] < 0x80);
 
     let mut b: u8 = unsafe { *bytes.get_unchecked(0) };
     let mut part0: u32 = u32::from(b);
@@ -130,20 +131,8 @@ unsafe fn decode_varint_slice(bytes: &[u8]) -> Result<(u64, usize), DecodeError>
     let value = value + ((u64::from(part1)) << 28);
 
     b = unsafe { *bytes.get_unchecked(8) };
-    let mut part2: u32 = u32::from(b);
-    if b < 0x80 {
-        return Ok((value + (u64::from(part2) << 56), 9));
-    };
-    b = unsafe { *bytes.get_unchecked(9) };
-    part2 += u32::from(b) << 7;
-    // Check for u64::MAX overflow.
-    if (value >> 56) + (part2 as u64) < 0x100 {
-        return Ok((value + (u64::from(part2) << 56), 10));
-    };
-
-    // We have overrun the maximum size of a varint (10 bytes) or the final byte caused an overflow.
-    // Assume the data is corrupt.
-    Err(DecodeError::new("invalid varint"))
+    return u64::checked_add(value, u64::from(b) << 56)
+        .map_or(Err(DecodeError::new("overflowed varint")), |res| Ok((res, 9)));
 }
 
 /// Decodes a LEB128-encoded variable length integer from the buffer, advancing the buffer as
@@ -155,34 +144,27 @@ where
     B: Buf,
 {
     let mut value = 0;
-    for count in 0..min(10, buf.remaining()) {
+    for count in 0..min(8, buf.remaining()) {
         let byte = buf.get_u8();
-        // Check for u64 overflow
-        if count == 8 {
-            // The decoding process for bijective varints is largely the same as for non-bijective,
-            // except we simply don't remove the MSB from each byte before adding it to the decoded
-            // value. Thus, all 64 bits are already spoken for after the 9th byte (56 from the lower
-            // 7 of the first 8 bytes and 8 more from the 9th byte) and we can check for uint64
-            // overflow after reading the 9th byte; the 10th byte is obligated by the encoding if we
-            // care about generalizing the encoding to more than 64 bit numbers, but it will always
-            // be zero in this case.
-            // TODO(widders): reduce this to a 9-byte-max encoding. any varints that are likely to
-            //  be over 64b will be more compact in a prefix-length encoding (blob wiretype) anyway
-            let top_8_bits = (byte as u64) + (value >> 56);
-            if top_8_bits > 0xff {
-                return Err(DecodeError::new("invalid varint"));
-            }
-        } else if count == 9 && byte > 0 {
-            // A tenth byte with a value greater than zero will always overflow uint64.
-            return Err(DecodeError::new("invalid varint"));
-        }
         value += u64::from(byte) << (count * 7);
         if byte <= 0x7F {
             return Ok(value);
         }
     }
-
-    Err(DecodeError::new("invalid varint"))
+    // There is, or should be, a ninth byte; read it if it exists.
+    if !buf.has_remaining() {
+        return Err(DecodeError::new("truncated varint"));
+    }
+    // The decoding process for bijective varints is largely the same as for non-bijective, except
+    // we simply don't remove the MSB from each byte before adding it to the decoded value. Thus,
+    // all 64 bits are already spoken for after the 9th byte (56 from the lower 7 of the first 8
+    // bytes and 8 more from the 9th byte) and we can check for uint64 overflow after reading the
+    // 9th byte; the 10th byte that would be obligated by the encoding if we cared about
+    // generalizing the encoding to more than 64 bit numbers would always be zero, and if there is a
+    // desire to encode varints greater than 64 bits in size it is more efficient to use a
+    // length-prefixed encoding, which is just the blob wiretype.
+    return u64::checked_add(value, u64::from(buf.get_u8()) << 56)
+        .ok_or(DecodeError::new("overflowed varint"));
 }
 
 /// Additional information passed to every decode/merge function.
@@ -268,13 +250,12 @@ pub fn encoded_len_varint(value: u64) -> usize {
         0x408_1020_4080,
         0x2_0408_1020_4080,
         0x102_0408_1020_4080,
-        0x8102_0408_1020_4080,
     ].into_iter().enumerate() {
         if value < limit {
             return i + 1;
         }
     }
-    return 10;
+    return 9;
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -1633,7 +1614,7 @@ mod test {
         );
         check(
             0x8102040810204080,
-            &[0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x00],
+            &[0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80],
         );
         // check(
         //     0x10102040810204080, //
@@ -1642,7 +1623,7 @@ mod test {
 
         check(
             u64::MAX,
-            &[0xFF, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0x00],
+            &[0xFF, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE],
         );
         check(
             i64::MAX as u64,
@@ -1653,18 +1634,45 @@ mod test {
     #[test]
     fn varint_overflow() {
         let mut u64_max_plus_one: &[u8] =
-            &[0x80, 0xFF, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0x00];
+            &[0x80, 0xFF, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE];
 
         decode_varint(&mut u64_max_plus_one).expect_err("decoding u64::MAX + 1 succeeded");
         decode_varint_slow(&mut u64_max_plus_one)
             .expect_err("slow decoding u64::MAX + 1 succeeded");
 
         let mut u64_over_max: &[u8] =
-            &[0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x01];
+            &[0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF];
 
         decode_varint(&mut u64_over_max).expect_err("decoding over-max succeeded");
         decode_varint_slow(&mut u64_over_max)
             .expect_err("slow decoding over-max succeeded");
+    }
+
+    #[test]
+    fn varint_truncated() {
+        let mut truncated_one_byte: &[u8] =
+            &[0x80];
+        decode_varint(&mut truncated_one_byte).expect_err("decoding truncated 1 byte succeeded");
+        decode_varint_slow(&mut truncated_one_byte)
+            .expect_err("slow decoding truncated 1 byte succeeded");
+
+        let mut truncated_two_bytes: &[u8] =
+            &[0x80, 0xFF];
+        decode_varint(&mut truncated_two_bytes).expect_err("decoding truncated 6 bytes succeeded");
+        decode_varint_slow(&mut truncated_two_bytes)
+            .expect_err("slow decoding truncated 6 bytes succeeded");
+
+        let mut truncated_six_bytes: &[u8] =
+            &[0x80, 0x81, 0x82, 0x8A, 0x8B, 0x8C];
+        decode_varint(&mut truncated_six_bytes).expect_err("decoding truncated 6 bytes succeeded");
+        decode_varint_slow(&mut truncated_six_bytes)
+            .expect_err("slow decoding truncated 6 bytes succeeded");
+
+        let mut truncated_eight_bytes: &[u8] =
+            &[0x80, 0x81, 0x82, 0x8A, 0x8B, 0x8C, 0xBE, 0xEF];
+        decode_varint(&mut truncated_eight_bytes).expect_err("decoding truncated 8 bytes succeeded");
+        decode_varint_slow(&mut truncated_eight_bytes)
+            .expect_err("slow decoding truncated 8 bytes succeeded");
     }
 
     /// This big bowl o' macro soup generates an encoding property test for each combination of map
