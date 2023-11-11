@@ -127,6 +127,7 @@ pub struct Any {
     #[bilrost(bytes = "vec", tag = "2")]
     pub value: ::bilrost::alloc::vec::Vec<u8>,
 }
+
 /// A Duration represents a signed, fixed-length span of time represented
 /// as a count of seconds and fractions of seconds at nanosecond
 /// resolution. It is independent of any calendar and concepts like "day"
@@ -208,6 +209,7 @@ pub struct Duration {
     #[bilrost(sfixed32, tag = "2")]
     pub nanos: i32,
 }
+
 /// `Struct` represents a structured data value, consisting of fields
 /// which map to dynamically typed values. In some languages, `Struct`
 /// might be supported by a native representation. For example, in
@@ -226,6 +228,7 @@ pub struct Struct {
         Value,
     >,
 }
+
 /// `Value` represents a dynamically typed value which can be either
 /// null, a number, a string, a boolean, a recursive struct value, or a
 /// list of values. A producer of value is expected to set one of these
@@ -239,6 +242,7 @@ pub struct Value {
     #[bilrost(oneof = "value::Kind", tags = "1, 2, 3, 4, 5, 6")]
     pub kind: ::core::option::Option<value::Kind>,
 }
+
 /// Nested message and enum types in `Value`.
 pub mod value {
     /// The kind of value.
@@ -265,6 +269,7 @@ pub mod value {
         ListValue(super::ListValue),
     }
 }
+
 /// `ListValue` is a wrapper around a repeated field of values.
 ///
 /// The JSON representation for `ListValue` is JSON array.
@@ -275,6 +280,7 @@ pub struct ListValue {
     #[bilrost(message, repeated, tag = "1")]
     pub values: ::bilrost::alloc::vec::Vec<Value>,
 }
+
 /// `NullValue` is a singleton enumeration to represent the null value for the
 /// `Value` type union.
 ///
@@ -285,6 +291,7 @@ pub enum NullValue {
     /// Null value.
     NullValue = 0,
 }
+
 impl NullValue {
     /// String value of the enum field names used in the ProtoBuf definition.
     ///
@@ -303,6 +310,7 @@ impl NullValue {
         }
     }
 }
+
 /// A Timestamp represents a point in time independent of any time zone or local
 /// calendar, encoded as a count of seconds and fractions of seconds at
 /// nanosecond resolution. The count is relative to an epoch at UTC midnight on
@@ -417,3 +425,4 @@ pub struct Timestamp {
     #[bilrost(sfixed32, tag = "2")]
     pub nanos: i32,
 }
+
