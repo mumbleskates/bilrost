@@ -24,8 +24,8 @@ use crate::Message;
 /// buffer. The buffer must have enough remaining space (maximum 10 bytes).
 #[inline]
 pub fn encode_varint<B>(mut value: u64, buf: &mut B)
-where
-    B: BufMut,
+    where
+        B: BufMut,
 {
     for _ in 0..9 {
         if value < 0x80 {
@@ -41,8 +41,8 @@ where
 /// Decodes a LEB128-bijective-encoded variable length integer from the buffer.
 #[inline]
 pub fn decode_varint<B>(buf: &mut B) -> Result<u64, DecodeError>
-where
-    B: Buf,
+    where
+        B: Buf,
 {
     let bytes = buf.chunk();
     let len = bytes.len();
@@ -140,8 +140,8 @@ unsafe fn decode_varint_slice(bytes: &[u8]) -> Result<(u64, usize), DecodeError>
 #[inline(never)]
 #[cold]
 fn decode_varint_slow<B>(buf: &mut B) -> Result<u64, DecodeError>
-where
-    B: Buf,
+    where
+        B: Buf,
 {
     let mut value = 0;
     for count in 0..min(8, buf.remaining()) {
@@ -292,8 +292,8 @@ impl TryFrom<u64> for WireType {
 /// the field tag.
 #[inline]
 pub fn encode_key<B>(tag: u32, wire_type: WireType, buf: &mut B)
-where
-    B: BufMut,
+    where
+        B: BufMut,
 {
     debug_assert!((MIN_TAG..=MAX_TAG).contains(&tag));
     let key = (tag << 2) | wire_type as u32;
@@ -304,8 +304,8 @@ where
 /// the field tag.
 #[inline(always)]
 pub fn decode_key<B>(buf: &mut B) -> Result<(u32, WireType), DecodeError>
-where
-    B: Buf,
+    where
+        B: Buf,
 {
     let key = decode_varint(buf)?;
     if key > u64::from(u32::MAX) {
@@ -349,9 +349,9 @@ pub fn merge_loop<T, M, B>(
     ctx: DecodeContext,
     mut merge: M,
 ) -> Result<(), DecodeError>
-where
-    M: FnMut(&mut T, &mut B, DecodeContext) -> Result<(), DecodeError>,
-    B: Buf,
+    where
+        M: FnMut(&mut T, &mut B, DecodeContext) -> Result<(), DecodeError>,
+        B: Buf,
 {
     let len = decode_varint(buf)?;
     let remaining = buf.remaining();
@@ -375,8 +375,8 @@ pub fn skip_field<B>(
     buf: &mut B,
     ctx: DecodeContext,
 ) -> Result<(), DecodeError>
-where
-    B: Buf,
+    where
+        B: Buf,
 {
     ctx.limit_reached()?;
     let len = match wire_type {
@@ -769,21 +769,22 @@ pub mod string {
     use super::*;
 
     pub fn encode<B>(tag: u32, value: &String, buf: &mut B)
-    where
-        B: BufMut,
+        where
+            B: BufMut,
     {
         encode_key(tag, WireType::LengthDelimited, buf);
         encode_varint(value.len() as u64, buf);
         buf.put_slice(value.as_bytes());
     }
+
     pub fn merge<B>(
         wire_type: WireType,
         value: &mut String,
         buf: &mut B,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError>
-    where
-        B: Buf,
+        where
+            B: Buf,
     {
         // ## Unsafety
         //
@@ -857,13 +858,13 @@ mod sealed {
 
         /// Replace contents of this buffer with the contents of another buffer.
         fn replace_with<B>(&mut self, buf: B)
-        where
-            B: Buf;
+            where
+                B: Buf;
 
         /// Appends this buffer to the (contents of) other buffer.
         fn append_to<B>(&self, buf: &mut B)
-        where
-            B: BufMut;
+            where
+                B: BufMut;
 
         fn is_empty(&self) -> bool {
             self.len() == 0
@@ -879,15 +880,15 @@ impl sealed::BytesAdapter for Bytes {
     }
 
     fn replace_with<B>(&mut self, mut buf: B)
-    where
-        B: Buf,
+        where
+            B: Buf,
     {
         *self = buf.copy_to_bytes(buf.remaining());
     }
 
     fn append_to<B>(&self, buf: &mut B)
-    where
-        B: BufMut,
+        where
+            B: BufMut,
     {
         buf.put(self.clone())
     }
@@ -901,8 +902,8 @@ impl sealed::BytesAdapter for Vec<u8> {
     }
 
     fn replace_with<B>(&mut self, buf: B)
-    where
-        B: Buf,
+        where
+            B: Buf,
     {
         self.clear();
         self.reserve(buf.remaining());
@@ -910,8 +911,8 @@ impl sealed::BytesAdapter for Vec<u8> {
     }
 
     fn append_to<B>(&self, buf: &mut B)
-    where
-        B: BufMut,
+        where
+            B: BufMut,
     {
         buf.put(self.as_slice())
     }
@@ -921,9 +922,9 @@ pub mod bytes {
     use super::*;
 
     pub fn encode<A, B>(tag: u32, value: &A, buf: &mut B)
-    where
-        A: BytesAdapter,
-        B: BufMut,
+        where
+            A: BytesAdapter,
+            B: BufMut,
     {
         encode_key(tag, WireType::LengthDelimited, buf);
         encode_varint(value.len() as u64, buf);
@@ -936,9 +937,9 @@ pub mod bytes {
         buf: &mut B,
         _ctx: DecodeContext,
     ) -> Result<(), DecodeError>
-    where
-        A: BytesAdapter,
-        B: Buf,
+        where
+            A: BytesAdapter,
+            B: Buf,
     {
         check_wire_type(WireType::LengthDelimited, wire_type)?;
         let len = decode_varint(buf)?;
@@ -969,9 +970,9 @@ pub mod bytes {
         buf: &mut B,
         _ctx: DecodeContext,
     ) -> Result<(), DecodeError>
-    where
-        A: BytesAdapter,
-        B: Buf,
+        where
+            A: BytesAdapter,
+            B: Buf,
     {
         check_wire_type(WireType::LengthDelimited, wire_type)?;
         let len = decode_varint(buf)?;
@@ -1030,9 +1031,9 @@ pub mod message {
     use super::*;
 
     pub fn encode<M, B>(tag: u32, msg: &M, buf: &mut B)
-    where
-        M: Message,
-        B: BufMut,
+        where
+            M: Message,
+            B: BufMut,
     {
         encode_key(tag, WireType::LengthDelimited, buf);
         encode_varint(msg.encoded_len() as u64, buf);
@@ -1045,9 +1046,9 @@ pub mod message {
         buf: &mut B,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError>
-    where
-        M: Message,
-        B: Buf,
+        where
+            M: Message,
+            B: Buf,
     {
         check_wire_type(WireType::LengthDelimited, wire_type)?;
         ctx.limit_reached()?;
@@ -1063,9 +1064,9 @@ pub mod message {
     }
 
     pub fn encode_repeated<M, B>(tag: u32, messages: &[M], buf: &mut B)
-    where
-        M: Message,
-        B: BufMut,
+        where
+            M: Message,
+            B: BufMut,
     {
         for msg in messages {
             encode(tag, msg, buf);
@@ -1078,9 +1079,9 @@ pub mod message {
         buf: &mut B,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError>
-    where
-        M: Message + Default,
-        B: Buf,
+        where
+            M: Message + Default,
+            B: Buf,
     {
         check_wire_type(WireType::LengthDelimited, wire_type)?;
         let mut msg = M::default();
@@ -1091,8 +1092,8 @@ pub mod message {
 
     #[inline]
     pub fn encoded_len<M>(tag: u32, msg: &M) -> usize
-    where
-        M: Message,
+        where
+            M: Message,
     {
         let len = msg.encoded_len();
         key_len(tag) + encoded_len_varint(len as u64) + len
@@ -1100,15 +1101,15 @@ pub mod message {
 
     #[inline]
     pub fn encoded_len_repeated<M>(tag: u32, messages: &[M]) -> usize
-    where
-        M: Message,
+        where
+            M: Message,
     {
         key_len(tag) * messages.len()
             + messages
-                .iter()
-                .map(Message::encoded_len)
-                .map(|len| len + encoded_len_varint(len as u64))
-                .sum::<usize>()
+            .iter()
+            .map(Message::encoded_len)
+            .map(|len| len + encoded_len_varint(len as u64))
+            .sum::<usize>()
     }
 }
 
@@ -1329,9 +1330,9 @@ mod test {
         merge: fn(WireType, &mut T, &mut Bytes, DecodeContext) -> Result<(), DecodeError>,
         encoded_len: fn(u32, &B) -> usize,
     ) -> TestCaseResult
-    where
-        T: Debug + Default + PartialEq + Borrow<B>,
-        B: ?Sized,
+        where
+            T: Debug + Default + PartialEq + Borrow<B>,
+            B: ?Sized,
     {
         prop_assume!((MIN_TAG..=MAX_TAG).contains(&tag));
 
@@ -1394,7 +1395,7 @@ mod test {
             &mut buf,
             DecodeContext::default(),
         )
-        .map_err(|error| TestCaseError::fail(error.to_string()))?;
+            .map_err(|error| TestCaseError::fail(error.to_string()))?;
 
         prop_assert!(
             !buf.has_remaining(),
@@ -1415,12 +1416,12 @@ mod test {
         mut merge: M,
         encoded_len: L,
     ) -> TestCaseResult
-    where
-        T: Debug + Default + PartialEq + Borrow<B>,
-        B: ?Sized,
-        E: FnOnce(u32, &B, &mut BytesMut),
-        M: FnMut(WireType, &mut T, &mut Bytes, DecodeContext) -> Result<(), DecodeError>,
-        L: FnOnce(u32, &B) -> usize,
+        where
+            T: Debug + Default + PartialEq + Borrow<B>,
+            B: ?Sized,
+            E: FnOnce(u32, &B, &mut BytesMut),
+            M: FnMut(WireType, &mut T, &mut Bytes, DecodeContext) -> Result<(), DecodeError>,
+            L: FnOnce(u32, &B) -> usize,
     {
         prop_assume!((MIN_TAG..=MAX_TAG).contains(&tag));
 
@@ -1466,7 +1467,7 @@ mod test {
                 &mut buf,
                 DecodeContext::default(),
             )
-            .map_err(|error| TestCaseError::fail(error.to_string()))?;
+                .map_err(|error| TestCaseError::fail(error.to_string()))?;
         }
 
         prop_assert_eq!(value, roundtrip_value);
