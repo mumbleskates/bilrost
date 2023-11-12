@@ -32,7 +32,7 @@ pub fn encode_varint<B>(mut value: u64, buf: &mut B)
             buf.put_u8(value as u8);
             break;
         } else {
-            buf.put_u8(((value & 0x7F) | 0x80) as u8);
+            buf.put_u8((value & 0xFF) as u8);
             value = (value >> 7) - 1;
         }
     }
@@ -150,7 +150,7 @@ fn decode_varint_slow<B>(buf: &mut B) -> Result<u64, DecodeError>
     for count in 0..min(8, buf.remaining()) {
         let byte = buf.get_u8();
         value += u64::from(byte) << (count * 7);
-        if byte <= 0x7F {
+        if byte < 0x80 {
             return Ok(value);
         }
     }
@@ -167,12 +167,11 @@ fn decode_varint_slow<B>(buf: &mut B) -> Result<u64, DecodeError>
     // generalizing the encoding to more than 64 bit numbers would always be zero, and if there is a
     // desire to encode varints greater than 64 bits in size it is more efficient to use a
     // length-prefixed encoding, which is just the blob wiretype.
-    let ninth_byte = buf.get_u8();
-    if (ninth_byte as u32) + ((value >> 56) as u32) > 0xff {
-        Err(DecodeError::new("overflowed varint"))
-    } else {
-        Ok(value + (u64::from(ninth_byte) << 56))
-    }
+    return u64::checked_add(value, u64::from(buf.get_u8()) << 56)
+        .ok_or(DecodeError::new("overflowed varint"));
+    // There is probably a reason why using u64::checked_add here seems to cause decoding even
+    // smaller varints to bench faster, while using it in the fast-path in decode_varint_slice
+    // causes a 5x pessimization. Probably best not to worry about it too much.
 }
 
 /// Additional information passed to every decode/merge function.
