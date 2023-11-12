@@ -151,7 +151,8 @@ fn decode_varint_slow<B>(buf: &mut B) -> Result<u64, DecodeError>
             return Ok(value);
         }
     }
-    // There is, or should be, a ninth byte; read it if it exists.
+    // We only reach here if every byte so far had its high bit set. We've either reached the end of
+    // the buffer or the ninth byte. If it's the former, the varint qualifies as truncated.
     if !buf.has_remaining() {
         return Err(DecodeError::new("truncated varint"));
     }
