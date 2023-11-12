@@ -32,7 +32,7 @@ pub fn encode_varint<B>(mut value: u64, buf: &mut B)
             buf.put_u8(value as u8);
             break;
         } else {
-            buf.put_u8((value & 0xFF) as u8);
+            buf.put_u8(((value & 0x7F) | 0x80) as u8);
             value = (value >> 7) - 1;
         }
     }
