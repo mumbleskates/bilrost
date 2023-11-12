@@ -21,7 +21,7 @@ use crate::DecodeError;
 use crate::Message;
 
 /// Encodes an integer value into LEB128-bijective variable length format, and writes it to the
-/// buffer. The buffer must have enough remaining space (maximum 10 bytes).
+/// buffer. The buffer must have enough remaining space (maximum 9 bytes).
 #[inline]
 pub fn encode_varint<B>(mut value: u64, buf: &mut B)
     where
@@ -55,8 +55,7 @@ pub fn decode_varint<B>(buf: &mut B) -> Result<u64, DecodeError>
         buf.advance(1);
         Ok(u64::from(byte))
     } else if len >= 9 || bytes[len - 1] < 0x80 {
-        // SAFETY: we have ensured that the varint doesn't overrun the buffer.
-        let (value, advance) = unsafe { decode_varint_slice(bytes) }?;
+        let (value, advance) = decode_varint_slice(bytes)?;
         buf.advance(advance);
         Ok(value)
     } else {
@@ -78,13 +77,13 @@ pub fn decode_varint<B>(buf: &mut B) -> Result<u64, DecodeError>
 /// [1]: https://github.com/google/protobuf/blob/3.3.x/src/google/protobuf/io/coded_stream.cc#L365-L406
 /// [2]: https://github.com/protocolbuffers/protobuf-go/blob/v1.27.1/encoding/protowire/wire.go#L358
 #[inline]
-unsafe fn decode_varint_slice(bytes: &[u8]) -> Result<(u64, usize), DecodeError> {
+fn decode_varint_slice(bytes: &[u8]) -> Result<(u64, usize), DecodeError> {
     // Fully unrolled varint decoding loop. Splitting into 32-bit pieces gives better performance.
 
     // Use assertions to ensure memory safety, but it should always be optimized after inline.
     assert!(!bytes.is_empty());
     // If the varint is 9 bytes long, the last byte may have its MSB set.
-    assert!(bytes.len() > 8 || bytes[bytes.len() - 1] < 0x80);
+    assert!(bytes.len() >= 9 || bytes[bytes.len() - 1] < 0x80);
 
     let mut b: u8 = unsafe { *bytes.get_unchecked(0) };
     let mut part0: u32 = u32::from(b);
@@ -249,7 +248,7 @@ impl DecodeContext {
 #[inline]
 pub fn encoded_len_varint(value: u64) -> usize {
     for (i, limit) in [
-        0x80u64,
+        0x80,
         0x4080,
         0x20_4080,
         0x1020_4080,
