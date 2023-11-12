@@ -131,8 +131,11 @@ unsafe fn decode_varint_slice(bytes: &[u8]) -> Result<(u64, usize), DecodeError>
     let value = value + ((u64::from(part1)) << 28);
 
     b = unsafe { *bytes.get_unchecked(8) };
-    return u64::checked_add(value, u64::from(b) << 56)
-        .map_or(Err(DecodeError::new("overflowed varint")), |res| Ok((res, 9)));
+    if (b as u32) + ((value >> 56) as u32) > 0xff {
+        Err(DecodeError::new("overflowed varint"))
+    } else {
+        Ok((value + (u64::from(b) << 56), 9))
+    }
 }
 
 /// Decodes a LEB128-encoded variable length integer from the buffer, advancing the buffer as
@@ -164,8 +167,12 @@ fn decode_varint_slow<B>(buf: &mut B) -> Result<u64, DecodeError>
     // generalizing the encoding to more than 64 bit numbers would always be zero, and if there is a
     // desire to encode varints greater than 64 bits in size it is more efficient to use a
     // length-prefixed encoding, which is just the blob wiretype.
-    return u64::checked_add(value, u64::from(buf.get_u8()) << 56)
-        .ok_or(DecodeError::new("overflowed varint"));
+    let ninth_byte = buf.get_u8();
+    if (ninth_byte as u32) + ((value >> 56) as u32) > 0xff {
+        Err(DecodeError::new("overflowed varint"))
+    } else {
+        Ok(value + (u64::from(ninth_byte) << 56))
+    }
 }
 
 /// Additional information passed to every decode/merge function.
