@@ -175,6 +175,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         impl #impl_generics ::bilrost::Message for #ident #ty_generics #where_clause {
             #[allow(unused_variables)]
             fn encode_raw<B>(&self, buf: &mut B) where B: ::bilrost::bytes::BufMut {
+                let writer = &mut ::bilrost::encoding::OrderedTagWriter::new(buf);
                 #(#encode)*
             }
 
@@ -195,7 +196,8 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
             }
 
             #[inline]
-            fn encoded_len(&self) -> usize {
+            fn encoded_len<B: ::bilrost::bytes::BufMut>(&self, writer: &OrderedTagWriter<B>) -> usize {
+                // TODO(widders): this doesn't work unless we fully track our would-be-encoded tags
                 0 #(+ #encoded_len)*
             }
 

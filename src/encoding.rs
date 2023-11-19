@@ -286,7 +286,7 @@ impl TryFrom<u64> for WireType {
 }
 
 pub struct OrderedTagWriter<B: BufMut> {
-    buf: B,
+    buf: B, // TODO(widders): don't include buf
     last_tag: u32,
 }
 
@@ -357,7 +357,7 @@ impl<B: BufMut> OrderedTagWriter<B> {
 }
 
 pub struct OrderedTagReader<B: Buf> {
-    buf: B,
+    buf: B, // TODO(widders): don't include buf
     last_tag: u32,
 }
 
