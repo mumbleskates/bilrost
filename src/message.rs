@@ -6,9 +6,7 @@ use core::usize;
 
 use bytes::{Buf, BufMut};
 
-use crate::encoding::{
-    decode_key, encode_varint, encoded_len_varint, message, DecodeContext, WireType,
-};
+use crate::encoding::{encode_varint, encoded_len_varint, message, DecodeContext, OrderedTagReader, WireType};
 use crate::DecodeError;
 use crate::EncodeError;
 
@@ -130,15 +128,16 @@ pub trait Message: Debug + Send + Sync {
     /// Decodes an instance of the message from a buffer, and merges it into `self`.
     ///
     /// The entire buffer will be consumed.
-    fn merge<B>(&mut self, mut buf: B) -> Result<(), DecodeError>
+    fn merge<B>(&mut self, buf: B) -> Result<(), DecodeError>
     where
         B: Buf,
         Self: Sized,
     {
         let ctx = DecodeContext::default();
-        while buf.has_remaining() {
-            let (tag, wire_type) = decode_key(&mut buf)?;
-            self.merge_field(tag, wire_type, &mut buf, ctx.clone())?;
+        let mut reader = OrderedTagReader::new(buf);
+        while reader.has_remaining() {
+            let (tag, wire_type) = reader.decode_key()?;
+            self.merge_field(tag, wire_type, reader.buf(), ctx.clone())?;
         }
         Ok(())
     }
