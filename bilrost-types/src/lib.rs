@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/bilrost-types/0.12.1")]
+#![doc(html_root_url = "https://docs.rs/bilrost-types/0.12.2")]
 
 //! Protocol Buffers well-known types.
 //!

@@ -1,6 +1,6 @@
 [package]
 name = "bilrost"
-version = "0.12.1"
+version = "0.12.2"
 authors = [
     "Dan Burkert <dan@danburkert.com>",
     "Lucio Franco <luciofranco14@gmail.com",
@@ -14,7 +14,7 @@ description = "A Protocol Buffers implementation for the Rust Language."
 keywords = ["protobuf", "serialization"]
 categories = ["encoding"]
 edition = "2021"
-rust-version = "1.74"
+rust-version = "1.60"
 
 [workspace]
 members = [
@@ -41,7 +41,7 @@ std = []
 
 [dependencies]
 bytes = { version = "1", default-features = false }
-bilrost-derive = { version = "0.12.1", path = "bilrost-derive", optional = true }
+bilrost-derive = { version = "0.12.2", path = "bilrost-derive", optional = true }
 
 [dev-dependencies]
 criterion = { version = "0.4", default-features = false }
