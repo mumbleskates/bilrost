@@ -13,7 +13,7 @@ use ::bytes::{Buf, BufMut, Bytes};
 use crate::{
     encoding::{
         bool, bytes, double, float, sint32, sint64, skip_field, string, uint32, uint64,
-        OrderedTagWriter, DecodeContext, WireType,
+        TagWriter, DecodeContext, WireType,
     },
     DecodeError, Message,
 };
@@ -25,7 +25,7 @@ impl Message for bool {
         B: BufMut,
     {
         if *self {
-            bool::encode(1, self, &mut OrderedTagWriter::new(buf))
+            bool::encode(1, self, &mut TagWriter::new(buf))
         }
     }
     fn merge_field<B>(
@@ -63,7 +63,7 @@ impl Message for u32 {
         B: BufMut,
     {
         if *self != 0 {
-            uint32::encode(1, self, &mut OrderedTagWriter::new(buf))
+            uint32::encode(1, self, &mut TagWriter::new(buf))
         }
     }
     fn merge_field<B>(
@@ -84,7 +84,7 @@ impl Message for u32 {
     }
     fn encoded_len(&self) -> usize {
         if *self != 0 {
-            uint32::encoded_len(1, self, &mut OrderedTagWriter::new(&mut [] as &mut [u8]))
+            uint32::encoded_len(1, self, &mut TagWriter::new(&mut [] as &mut [u8]))
         } else {
             0
         }
@@ -101,7 +101,7 @@ impl Message for u64 {
         B: BufMut,
     {
         if *self != 0 {
-            uint64::encode(1, self, &mut OrderedTagWriter::new(buf))
+            uint64::encode(1, self, &mut TagWriter::new(buf))
         }
     }
     fn merge_field<B>(
@@ -122,7 +122,7 @@ impl Message for u64 {
     }
     fn encoded_len(&self) -> usize {
         if *self != 0 {
-            uint64::encoded_len(1, self, &mut OrderedTagWriter::new(&mut [] as &mut [u8]))
+            uint64::encoded_len(1, self, &mut TagWriter::new(&mut [] as &mut [u8]))
         } else {
             0
         }
@@ -139,7 +139,7 @@ impl Message for i32 {
         B: BufMut,
     {
         if *self != 0 {
-            sint32::encode(1, self, &mut OrderedTagWriter::new(buf))
+            sint32::encode(1, self, &mut TagWriter::new(buf))
         }
     }
     fn merge_field<B>(
@@ -160,7 +160,7 @@ impl Message for i32 {
     }
     fn encoded_len(&self) -> usize {
         if *self != 0 {
-            sint32::encoded_len(1, self, &mut OrderedTagWriter::new(&mut [] as &mut [u8]))
+            sint32::encoded_len(1, self, &mut TagWriter::new(&mut [] as &mut [u8]))
         } else {
             0
         }
@@ -177,7 +177,7 @@ impl Message for i64 {
         B: BufMut,
     {
         if *self != 0 {
-            sint64::encode(1, self, &mut OrderedTagWriter::new(buf))
+            sint64::encode(1, self, &mut TagWriter::new(buf))
         }
     }
     fn merge_field<B>(
@@ -198,7 +198,7 @@ impl Message for i64 {
     }
     fn encoded_len(&self) -> usize {
         if *self != 0 {
-            sint64::encoded_len(1, self, &mut OrderedTagWriter::new(&mut [] as &mut [u8]))
+            sint64::encoded_len(1, self, &mut TagWriter::new(&mut [] as &mut [u8]))
         } else {
             0
         }
@@ -215,7 +215,7 @@ impl Message for f32 {
         B: BufMut,
     {
         if *self != 0.0 {
-            float::encode(1, self, &mut OrderedTagWriter::new(buf))
+            float::encode(1, self, &mut TagWriter::new(buf))
         }
     }
     fn merge_field<B>(
@@ -236,7 +236,7 @@ impl Message for f32 {
     }
     fn encoded_len(&self) -> usize {
         if *self != 0.0 {
-            float::encoded_len(1, self, &mut OrderedTagWriter::new(&mut [] as &mut [u8]))
+            float::encoded_len(1, self, &mut TagWriter::new(&mut [] as &mut [u8]))
         } else {
             0
         }
@@ -253,7 +253,7 @@ impl Message for f64 {
         B: BufMut,
     {
         if *self != 0.0 {
-            double::encode(1, self, &mut OrderedTagWriter::new(buf))
+            double::encode(1, self, &mut TagWriter::new(buf))
         }
     }
     fn merge_field<B>(
@@ -274,7 +274,7 @@ impl Message for f64 {
     }
     fn encoded_len(&self) -> usize {
         if *self != 0.0 {
-            double::encoded_len(1, self, &mut OrderedTagWriter::new(&mut [] as &mut [u8]))
+            double::encoded_len(1, self, &mut TagWriter::new(&mut [] as &mut [u8]))
         } else {
             0
         }
@@ -291,7 +291,7 @@ impl Message for String {
         B: BufMut,
     {
         if !self.is_empty() {
-            string::encode(1, self, &mut OrderedTagWriter::new(buf))
+            string::encode(1, self, &mut TagWriter::new(buf))
         }
     }
     fn merge_field<B>(
@@ -312,7 +312,7 @@ impl Message for String {
     }
     fn encoded_len(&self) -> usize {
         if !self.is_empty() {
-            string::encoded_len(1, self, &mut OrderedTagWriter::new(&mut [] as &mut [u8]))
+            string::encoded_len(1, self, &mut TagWriter::new(&mut [] as &mut [u8]))
         } else {
             0
         }
@@ -329,7 +329,7 @@ impl Message for Vec<u8> {
         B: BufMut,
     {
         if !self.is_empty() {
-            bytes::encode(1, self, &mut OrderedTagWriter::new(buf))
+            bytes::encode(1, self, &mut TagWriter::new(buf))
         }
     }
     fn merge_field<B>(
@@ -350,7 +350,7 @@ impl Message for Vec<u8> {
     }
     fn encoded_len(&self) -> usize {
         if !self.is_empty() {
-            bytes::encoded_len(1, self, &mut OrderedTagWriter::new(&mut [] as &mut [u8]))
+            bytes::encoded_len(1, self, &mut TagWriter::new(&mut [] as &mut [u8]))
         } else {
             0
         }
@@ -367,7 +367,7 @@ impl Message for Bytes {
         B: BufMut,
     {
         if !self.is_empty() {
-            bytes::encode(1, self, &mut OrderedTagWriter::new(buf))
+            bytes::encode(1, self, &mut TagWriter::new(buf))
         }
     }
     fn merge_field<B>(
@@ -388,7 +388,7 @@ impl Message for Bytes {
     }
     fn encoded_len(&self) -> usize {
         if !self.is_empty() {
-            bytes::encoded_len(1, self, &mut OrderedTagWriter::new(&mut [] as &mut [u8]))
+            bytes::encoded_len(1, self, &mut TagWriter::new(&mut [] as &mut [u8]))
         } else {
             0
         }
