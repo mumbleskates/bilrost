@@ -65,7 +65,7 @@ impl Field {
     pub fn encode(&self, ident: TokenStream) -> TokenStream {
         quote! {
             if let Some(ref oneof) = #ident {
-                oneof.encode(buf)
+                oneof.encode(buf, tw)
             }
         }
     }

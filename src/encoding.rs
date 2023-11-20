@@ -12,8 +12,7 @@ use core::cmp::min;
 use core::convert::TryFrom;
 use core::mem;
 use core::str;
-use std::cmp::Ordering::{Equal, Greater, Less};
-use std::ops::{Deref, DerefMut};
+use core::cmp::Ordering::{Equal, Greater, Less};
 
 use ::bytes::{Buf, BufMut, Bytes};
 
@@ -291,7 +290,7 @@ pub struct TagWriter {
 
 impl TagWriter {
     pub fn new() -> Self {
-        Self{last_tag: 0}
+        Self { last_tag: 0 }
     }
 
     /// Encode the key delta to the given key into the buffer.
@@ -343,7 +342,7 @@ pub struct TagReader {
 
 impl TagReader {
     pub fn new() -> Self {
-        Self{last_tag: 0}
+        Self { last_tag: 0 }
     }
 
     #[inline(always)]
@@ -377,26 +376,26 @@ pub fn check_wire_type(expected: WireType, actual: WireType) -> Result<(), Decod
 /// by decoding values until the length of bytes is exhausted.
 pub fn merge_loop<T, M, B>(
     value: &mut T,
-    reader: &mut TagReader<B>,
+    buf: &mut B,
     ctx: DecodeContext,
     mut merge: M,
 ) -> Result<(), DecodeError>
     where
-        M: FnMut(&mut T, &mut TagReader<B>, DecodeContext) -> Result<(), DecodeError>,
+        M: FnMut(&mut T, &mut B, DecodeContext) -> Result<(), DecodeError>,
         B: Buf,
 {
-    let len = decode_varint(reader.buf())?;
-    let remaining = reader.remaining();
+    let len = decode_varint(buf)?;
+    let remaining = buf.remaining();
     if len > remaining as u64 {
         return Err(DecodeError::new("field truncated"));
     }
 
     let limit = remaining - len as usize;
-    while reader.remaining() > limit {
-        merge(value, reader, ctx.clone())?;
+    while buf.remaining() > limit {
+        merge(value, buf, ctx.clone())?;
     }
 
-    if reader.remaining() != limit {
+    if buf.remaining() != limit {
         return Err(DecodeError::new("delimited length exceeded"));
     }
     Ok(())
@@ -426,9 +425,9 @@ pub fn skip_field<B: Buf>(
 /// Helper macro which emits an `encode_repeated` function for the type.
 macro_rules! encode_repeated {
     ($ty:ty) => {
-        pub fn encode_repeated<B: BufMut>(tag: u32, values: &[$ty], writer: &mut TagWriter<B>) {
+        pub fn encode_repeated<B: BufMut>(tag: u32, values: &[$ty], buf: &mut B, tw: &mut TagWriter) {
             for value in values {
-                encode(tag, value, writer);
+                encode(tag, value, buf, tw);
             }
         }
     };
@@ -489,9 +488,9 @@ macro_rules! varint {
          pub mod $proto_ty {
             use crate::encoding::*;
 
-            pub fn encode<B: BufMut>(tag: u32, $to_uint64_value: &$ty, writer: &mut TagWriter<B>) {
-                writer.encode_key(tag, WireType::Varint);
-                encode_varint($to_uint64, writer.buf());
+            pub fn encode<B: BufMut>(tag: u32, $to_uint64_value: &$ty, buf: &mut B, tw: &mut TagWriter) {
+                tw.encode_key(tag, WireType::Varint, buf);
+                encode_varint($to_uint64, buf);
             }
 
             pub fn merge<B: Buf>(
@@ -508,43 +507,51 @@ macro_rules! varint {
 
             encode_repeated!($ty);
 
-            pub fn encode_packed<B: BufMut>(tag: u32, values: &[$ty], writer: &mut TagWriter<B>) {
+            pub fn encode_packed<B: BufMut>(tag: u32, values: &[$ty], buf: &mut B, tw: &mut TagWriter) {
                 if values.is_empty() { return; }
 
-                writer.encode_key(tag, WireType::LengthDelimited);
+                tw.encode_key(tag, WireType::LengthDelimited, buf);
                 let len: usize = values.iter().map(|$to_uint64_value| {
                     encoded_len_varint($to_uint64)
                 }).sum();
-                encode_varint(len as u64, writer.buf());
+                encode_varint(len as u64, buf);
 
                 for $to_uint64_value in values {
-                    encode_varint($to_uint64, writer.buf());
+                    encode_varint($to_uint64, buf);
                 }
             }
 
             merge_repeated_numeric!($ty, WireType::Varint, merge, merge_repeated);
 
             #[inline]
-            pub fn encoded_len<B: BufMut>(tag: u32, $to_uint64_value: &$ty, writer: &TagWriter<B>) -> usize {
-                writer.key_len(tag) + encoded_len_varint($to_uint64)
+            pub fn encoded_len<B: BufMut>(tag: u32, $to_uint64_value: &$ty, tw: &TagWriter) -> usize {
+                tw.key_len(tag) + encoded_len_varint($to_uint64)
             }
 
             #[inline]
-            pub fn encoded_len_repeated<B: BufMut>(tag: u32, values: &[$ty], writer: &TagWriter<B>) -> usize {
-                writer.key_len(tag) * values.len() + values.iter().map(|$to_uint64_value| {
-                    encoded_len_varint($to_uint64)
-                }).sum::<usize>()
+            pub fn encoded_len_repeated<B: BufMut>(tag: u32, values: &[$ty], tw: &TagWriter) -> usize {
+                if values.is_empty() {
+                    0
+                } else {
+                    tw.key_len(tag) + values.len() - 1
+                        + values
+                            .iter()
+                            .map(|$to_uint64_value| {
+                                encoded_len_varint($to_uint64)
+                            })
+                            .sum::<usize>()
+                }
             }
 
             #[inline]
-            pub fn encoded_len_packed<B: BufMut>(tag: u32, values: &[$ty], writer: &TagWriter<B>) -> usize {
+            pub fn encoded_len_packed<B: BufMut>(tag: u32, values: &[$ty], tw: &TagWriter) -> usize {
                 if values.is_empty() {
                     0
                 } else {
                     let len = values.iter()
                                     .map(|$to_uint64_value| encoded_len_varint($to_uint64))
                                     .sum::<usize>();
-                    writer.key_len(tag) + encoded_len_varint(len as u64) + len
+                    tw.key_len(tag) + encoded_len_varint(len as u64) + len
                 }
             }
 
@@ -615,23 +622,17 @@ macro_rules! fixed_width {
         pub mod $proto_ty {
             use crate::encoding::*;
 
-            pub fn encode<B>(tag: u32, value: &$ty, writer: &mut TagWriter<B>)
-            where
-                B: BufMut,
-            {
-                writer.encode_key(tag, $wire_type);
-                writer.$put(*value);
+            pub fn encode<B: BufMut>(tag: u32, value: &$ty, buf: &mut B, tw: &mut TagWriter) {
+                tw.encode_key(tag, $wire_type, buf);
+                buf.$put(*value);
             }
 
-            pub fn merge<B>(
+            pub fn merge<B: Buf>(
                 wire_type: WireType,
                 value: &mut $ty,
                 buf: &mut B,
                 _ctx: DecodeContext,
-            ) -> Result<(), DecodeError>
-            where
-                B: Buf,
-            {
+            ) -> Result<(), DecodeError> {
                 check_wire_type($wire_type, wire_type)?;
                 if buf.remaining() < $width {
                     return Err(DecodeError::new("field truncated"));
@@ -642,47 +643,44 @@ macro_rules! fixed_width {
 
             encode_repeated!($ty);
 
-            pub fn encode_packed<B>(tag: u32, values: &[$ty], writer: &mut TagWriter<B>)
-            where
-                B: BufMut,
-            {
+            pub fn encode_packed<B: BufMut>(tag: u32, values: &[$ty], buf: &mut B, tw: &mut TagWriter) {
                 if values.is_empty() {
                     return;
                 }
 
-                writer.encode_key(tag, WireType::LengthDelimited);
+                tw.encode_key(tag, WireType::LengthDelimited, buf);
                 let len = values.len() as u64 * $width;
-                encode_varint(len as u64, writer.buf());
+                encode_varint(len as u64, buf);
 
                 for value in values {
-                    writer.$put(*value);
+                    buf.$put(*value);
                 }
             }
 
             merge_repeated_numeric!($ty, $wire_type, merge, merge_repeated);
 
             #[inline]
-            pub fn encoded_len<B: BufMut>(tag: u32, _: &$ty, buf: &TagWriter<B>) -> usize {
-                buf.key_len(tag) + $width
+            pub fn encoded_len<B: BufMut>(tag: u32, _: &$ty, tw: &TagWriter) -> usize {
+                tw.key_len(tag) + $width
             }
 
             #[inline]
-            pub fn encoded_len_repeated<B: BufMut>(tag: u32, values: &[$ty], buf: &TagWriter<B>) -> usize {
+            pub fn encoded_len_repeated<B: BufMut>(tag: u32, values: &[$ty], tw: &TagWriter) -> usize {
                 if values.is_empty() {
                     0
                 } else {
                     // successive repeated keys always take up 1 byte
-                    buf.key_len(tag) - 1 + (1 + $width) * values.len()
+                    tw.key_len(tag) - 1 + (1 + $width) * values.len()
                 }
             }
 
             #[inline]
-            pub fn encoded_len_packed<B: BufMut>(tag: u32, values: &[$ty], buf: &TagWriter<B>) -> usize {
+            pub fn encoded_len_packed<B: BufMut>(tag: u32, values: &[$ty], tw: &TagWriter) -> usize {
                 if values.is_empty() {
                     0
                 } else {
                     let len = $width * values.len();
-                    buf.key_len(tag) + encoded_len_varint(len as u64) + len
+                    tw.key_len(tag) + encoded_len_varint(len as u64) + len
                 }
             }
 
@@ -787,17 +785,17 @@ macro_rules! length_delimited {
         }
 
         #[inline]
-        pub fn encoded_len<B: BufMut>(tag: u32, value: &$ty, buf: &TagWriter<B>) -> usize {
-            buf.key_len(tag) + encoded_len_varint(value.len() as u64) + value.len()
+        pub fn encoded_len<B: BufMut>(tag: u32, value: &$ty, tw: &TagWriter) -> usize {
+            tw.key_len(tag) + encoded_len_varint(value.len() as u64) + value.len()
         }
 
         #[inline]
-        pub fn encoded_len_repeated<B: BufMut>(tag: u32, values: &[$ty], buf: &TagWriter<B>) -> usize {
+        pub fn encoded_len_repeated<B: BufMut>(tag: u32, values: &[$ty], tw: &TagWriter) -> usize {
             if values.is_empty() {
                 0
             } else {
                 // successive repeated keys always take up 1 byte
-                buf.key_len(tag) + values.len() - 1
+                tw.key_len(tag) + values.len() - 1
                     + values
                         .iter()
                         .map(|value| encoded_len_varint(value.len() as u64) + value.len())
@@ -810,13 +808,13 @@ macro_rules! length_delimited {
 pub mod string {
     use super::*;
 
-    pub fn encode<B>(tag: u32, value: &String, writer: &mut TagWriter<B>)
+    pub fn encode<B>(tag: u32, value: &String, buf: &mut B, tw: &mut TagWriter)
         where
             B: BufMut,
     {
-        writer.encode_key(tag, WireType::LengthDelimited);
-        encode_varint(value.len() as u64, writer.buf());
-        writer.put_slice(value.as_bytes());
+        tw.encode_key(tag, WireType::LengthDelimited, buf);
+        encode_varint(value.len() as u64, buf);
+        buf.put_slice(value.as_bytes());
     }
 
     pub fn merge<B>(
@@ -963,14 +961,14 @@ impl sealed::BytesAdapter for Vec<u8> {
 pub mod bytes {
     use super::*;
 
-    pub fn encode<A, B>(tag: u32, value: &A, writer: &mut TagWriter<B>)
+    pub fn encode<A, B>(tag: u32, value: &A, buf: &mut B, tw: &mut TagWriter)
         where
             A: BytesAdapter,
             B: BufMut,
     {
-        writer.encode_key(tag, WireType::LengthDelimited);
-        encode_varint(value.len() as u64, writer.buf());
-        value.append_to(writer.deref_mut());
+        tw.encode_key(tag, WireType::LengthDelimited, buf);
+        encode_varint(value.len() as u64, buf);
+        value.append_to(buf);
     }
 
     pub fn merge<A, B>(
@@ -1072,14 +1070,14 @@ pub mod bytes {
 pub mod message {
     use super::*;
 
-    pub fn encode<M, B>(tag: u32, msg: &M, writer: &mut TagWriter<B>)
+    pub fn encode<M, B>(tag: u32, msg: &M, buf: &mut B, tw: &mut TagWriter)
         where
             M: Message,
             B: BufMut,
     {
-        writer.encode_key(tag, WireType::LengthDelimited);
-        encode_varint(msg.encoded_len() as u64, writer.buf());
-        msg.encode_raw(writer.buf());
+        tw.encode_key(tag, WireType::LengthDelimited, buf);
+        encode_varint(msg.encoded_len() as u64, buf);
+        msg.encode_raw(buf);
     }
 
     pub fn merge<M, B>(
@@ -1094,25 +1092,25 @@ pub mod message {
     {
         check_wire_type(WireType::LengthDelimited, wire_type)?;
         ctx.limit_reached()?;
-        let mut reader = TagReader::new(buf);
+        let mut reader = TagReader::new();
         merge_loop(
             msg,
-            &mut reader,
+            buf,
             ctx.enter_recursion(),
-            |msg, reader, ctx| {
-                let (tag, wire_type) = reader.decode_key()?;
-                msg.merge_field(tag, wire_type, reader.buf(), ctx)
+            |msg, buf, ctx| {
+                let (tag, wire_type) = reader.decode_key(buf)?;
+                msg.merge_field(tag, wire_type, buf, ctx)
             },
         )
     }
 
-    pub fn encode_repeated<M, B>(tag: u32, messages: &[M], writer: &mut TagWriter<B>)
+    pub fn encode_repeated<M, B>(tag: u32, messages: &[M], buf: &mut B, tw: &mut TagWriter)
         where
             M: Message,
             B: BufMut,
     {
         for msg in messages {
-            encode(tag, msg, writer);
+            encode(tag, msg, buf, tw);
         }
     }
 
@@ -1134,26 +1132,21 @@ pub mod message {
     }
 
     #[inline]
-    pub fn encoded_len<M, B>(tag: u32, msg: &M, buf: &TagWriter<B>) -> usize
-        where
-            M: Message,
-            B: BufMut,
-    {
+    pub fn encoded_len<M: Message>(tag: u32, msg: &M, tw: &TagWriter) -> usize {
         let len = msg.encoded_len();
-        buf.key_len(tag) + encoded_len_varint(len as u64) + len
+        tw.key_len(tag) + encoded_len_varint(len as u64) + len
     }
 
     #[inline]
-    pub fn encoded_len_repeated<M, B>(tag: u32, messages: &[M], buf: &TagWriter<B>) -> usize
+    pub fn encoded_len_repeated<M>(tag: u32, messages: &[M], tw: &TagWriter) -> usize
         where
             M: Message,
-            B: BufMut,
     {
         if messages.is_empty() {
             0
         } else {
             // successive repeated keys always take up 1 byte
-            buf.key_len(tag) + messages.len() - 1
+            tw.key_len(tag) + messages.len() - 1
                 + messages
                 .iter()
                 .map(Message::encoded_len)
@@ -1178,7 +1171,8 @@ macro_rules! map {
             val_encoded_len: VL,
             tag: u32,
             values: &$map_ty<K, V>,
-            writer: &mut TagWriter<B>,
+            buf: &mut B,
+            tw: &mut TagWriter,
         ) where
             K: Default + Eq + Hash + Ord,
             V: Default + PartialEq,
@@ -1196,7 +1190,8 @@ macro_rules! map {
                 &V::default(),
                 tag,
                 values,
-                writer,
+                buf,
+                tw,
             )
         }
 
@@ -1224,7 +1219,7 @@ macro_rules! map {
             val_encoded_len: VL,
             tag: u32,
             values: &$map_ty<K, V>,
-            writer: &TagWriter<B>,
+            tw: &TagWriter,
         ) -> usize
         where
             K: Default + Eq + Hash + Ord,
@@ -1233,7 +1228,7 @@ macro_rules! map {
             VL: Fn(u32, &V) -> usize,
             B: BufMut,
         {
-            encoded_len_with_default(key_encoded_len, val_encoded_len, &V::default(), tag, values, writer)
+            encoded_len_with_default(key_encoded_len, val_encoded_len, &V::default(), tag, values, tw)
         }
 
         /// Generic protobuf map encode function with an overridden value default.
@@ -1250,7 +1245,8 @@ macro_rules! map {
             val_default: &V,
             tag: u32,
             values: &$map_ty<K, V>,
-            writer: &mut TagWriter<B>,
+            buf: &mut B,
+            tw: &mut TagWriter,
         ) where
             K: Default + Eq + Hash + Ord,
             V: PartialEq,
@@ -1267,13 +1263,13 @@ macro_rules! map {
                 let len = (if skip_key { 0 } else { key_encoded_len(1, key) })
                     + (if skip_val { 0 } else { val_encoded_len(2, val) });
 
-                writer.encode_key(tag, WireType::LengthDelimited);
-                encode_varint(len as u64, writer.buf());
+                tw.encode_key(tag, WireType::LengthDelimited, buf);
+                encode_varint(len as u64, buf);
                 if !skip_key {
-                    key_encode(1, key, writer);
+                    key_encode(1, key, buf);
                 }
                 if !skip_val {
-                    val_encode(2, val, writer);
+                    val_encode(2, val, buf);
                 }
             }
         }
@@ -1306,13 +1302,15 @@ macro_rules! map {
                 &mut (&mut key, &mut val),
                 reader,
                 ctx.enter_recursion(),
-                |&mut (ref mut key, ref mut val), reader, ctx| {
-                    let mut one_entry_reader = TagReader::new(reader.buf());
-                    let (tag, wire_type) = one_entry_reader.decode_key()?;
+                |&mut (ref mut key, ref mut val), buf, ctx| {
+                    let mut tr = TagReader::new();
+                    let (tag, wire_type) = tr.decode_key(buf)?;
+                    // TODO(widders): does this have correct behavior if k or v are incorrectly
+                    //  repeated?
                     match tag {
-                        1 => key_merge(wire_type, key, one_entry_reader.buf(), ctx),
-                        2 => val_merge(wire_type, val, one_entry_reader.buf(), ctx),
-                        _ => skip_field(wire_type, one_entry_reader.buf(), ctx),
+                        1 => key_merge(wire_type, key, buf, ctx),
+                        2 => val_merge(wire_type, val, buf, ctx),
+                        _ => skip_field(wire_type, buf, ctx),
                     }
                 },
             )?;
@@ -1331,7 +1329,7 @@ macro_rules! map {
             val_default: &V,
             tag: u32,
             values: &$map_ty<K, V>,
-            writer: &TagWriter<B>,
+            tw: &TagWriter,
         ) -> usize
         where
             K: Default + Eq + Hash + Ord,
@@ -1344,7 +1342,7 @@ macro_rules! map {
                 0
             } else {
                 // successive repeated keys always take up 1 byte
-                writer.key_len(tag) + values.len() - 1
+                tw.key_len(tag) + values.len() - 1
                     + values
                         .iter()
                         .map(|(key, val)| {
@@ -1391,37 +1389,38 @@ mod test {
         value: T,
         tag: u32,
         wire_type: WireType,
-        encode: fn(u32, &B, &mut TagWriter<BytesMut>),
+        encode: fn(u32, &B, &mut BytesMut, &mut TagWriter),
         merge: fn(WireType, &mut T, &mut Bytes, DecodeContext) -> Result<(), DecodeError>,
-        encoded_len: fn(u32, &B, &TagWriter<BytesMut>) -> usize,
+        encoded_len: fn(u32, &B, &TagWriter) -> usize,
     ) -> TestCaseResult
         where
             T: Debug + Default + PartialEq + Borrow<B>,
             B: ?Sized,
     {
-        let expected_len = encoded_len(tag, value.borrow(), &TagWriter::new(BytesMut::new()));
+        let mut tw = TagWriter::new();
+        let expected_len = encoded_len(tag, value.borrow(), &tw);
 
-        let buf = BytesMut::with_capacity(expected_len);
-        let mut writer = TagWriter::new(buf);
-        encode(tag, value.borrow(), &mut writer);
+        let mut buf = BytesMut::with_capacity(expected_len);
+        encode(tag, value.borrow(), &mut buf, &mut tw);
 
-        let mut reader = TagReader::new(writer.into_buf().freeze());
+        let mut buf = buf.freeze();
+        let mut tr = TagReader::new();
 
         prop_assert_eq!(
-            reader.remaining(),
+            buf.remaining(),
             expected_len,
             "encoded_len wrong; expected: {}, actual: {}",
             expected_len,
-            reader.remaining()
+            buf.remaining()
         );
 
-        if !reader.has_remaining() {
+        if !buf.has_remaining() {
             // Short circuit for empty packed values.
             return Ok(());
         }
 
         let (decoded_tag, decoded_wire_type) =
-            reader.decode_key().map_err(|error| TestCaseError::fail(error.to_string()))?;
+            tr.decode_key(&mut buf).map_err(|error| TestCaseError::fail(error.to_string()))?;
         prop_assert_eq!(
             tag,
             decoded_tag,
@@ -1439,14 +1438,14 @@ mod test {
         );
 
         match wire_type {
-            WireType::SixtyFourBit if reader.remaining() != 8 => Err(TestCaseError::fail(format!(
+            WireType::SixtyFourBit if buf.remaining() != 8 => Err(TestCaseError::fail(format!(
                 "64bit wire type illegal remaining: {}, tag: {}",
-                reader.remaining(),
+                buf.remaining(),
                 tag
             ))),
-            WireType::ThirtyTwoBit if reader.remaining() != 4 => Err(TestCaseError::fail(format!(
+            WireType::ThirtyTwoBit if buf.remaining() != 4 => Err(TestCaseError::fail(format!(
                 "32bit wire type illegal remaining: {}, tag: {}",
-                reader.remaining(),
+                buf.remaining(),
                 tag
             ))),
             _ => Ok(()),
@@ -1456,7 +1455,7 @@ mod test {
         merge(
             wire_type,
             &mut roundtrip_value,
-            &mut reader,
+            &mut buf,
             DecodeContext::default(),
         )
             .map_err(|error| TestCaseError::fail(error.to_string()))?;
@@ -1483,17 +1482,18 @@ mod test {
         where
             T: Debug + Default + PartialEq + Borrow<B>,
             B: ?Sized,
-            E: FnOnce(u32, &B, &mut TagWriter<BytesMut>),
+            E: FnOnce(u32, &B, &mut BytesMut, &mut TagWriter),
             M: FnMut(WireType, &mut T, &mut Bytes, DecodeContext) -> Result<(), DecodeError>,
-            L: FnOnce(u32, &B, &TagWriter<BytesMut>) -> usize,
+            L: FnOnce(u32, &B, &TagWriter) -> usize,
     {
-        let expected_len = encoded_len(tag, value.borrow(), &TagWriter::new(BytesMut::new()));
+        let mut tw = TagWriter::new();
+        let expected_len = encoded_len(tag, value.borrow(), &tw);
 
-        let buf = BytesMut::with_capacity(expected_len);
-        let mut writer = TagWriter::new(buf);
-        encode(tag, value.borrow(), &mut writer);
+        let mut buf = BytesMut::with_capacity(expected_len);
+        encode(tag, value.borrow(), &mut buf, &mut tw);
 
-        let mut reader = TagReader::new(writer.into_buf().freeze());
+        let mut tr = TagReader::new();
+        let mut buf = buf.freeze();
 
         prop_assert_eq!(
             reader.remaining(),
@@ -1504,9 +1504,9 @@ mod test {
         );
 
         let mut roundtrip_value = Default::default();
-        while reader.has_remaining() {
+        while buf.has_remaining() {
             let (decoded_tag, decoded_wire_type) =
-                reader.decode_key().map_err(|error| TestCaseError::fail(error.to_string()))?;
+                tr.decode_key(&mut buf).map_err(|error| TestCaseError::fail(error.to_string()))?;
 
             prop_assert_eq!(
                 tag,
@@ -1527,7 +1527,7 @@ mod test {
             merge(
                 wire_type,
                 &mut roundtrip_value,
-                &mut reader.buf(),
+                &mut buf,
                 DecodeContext::default(),
             )
                 .map_err(|error| TestCaseError::fail(error.to_string()))?;

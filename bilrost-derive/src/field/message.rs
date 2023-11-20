@@ -78,15 +78,15 @@ impl Field {
         match self.label {
             Label::Optional => quote! {
                 if let Some(ref msg) = #ident {
-                    ::bilrost::encoding::message::encode(#tag, msg, buf);
+                    ::bilrost::encoding::message::encode(#tag, msg, buf, tw);
                 }
             },
             Label::Required => quote! {
-                ::bilrost::encoding::message::encode(#tag, &#ident, buf);
+                ::bilrost::encoding::message::encode(#tag, &#ident, buf, tw);
             },
             Label::Repeated => quote! {
                 for msg in &#ident {
-                    ::bilrost::encoding::message::encode(#tag, msg, buf);
+                    ::bilrost::encoding::message::encode(#tag, msg, buf, tw);
                 }
             },
         }
@@ -113,13 +113,13 @@ impl Field {
         let tag = self.tag;
         match self.label {
             Label::Optional => quote! {
-                #ident.as_ref().map_or(0, |msg| ::bilrost::encoding::message::encoded_len(#tag, msg))
+                #ident.as_ref().map_or(0, |msg| ::bilrost::encoding::message::encoded_len(#tag, msg, tw))
             },
             Label::Required => quote! {
-                ::bilrost::encoding::message::encoded_len(#tag, &#ident)
+                ::bilrost::encoding::message::encoded_len(#tag, &#ident, tw)
             },
             Label::Repeated => quote! {
-                ::bilrost::encoding::message::encoded_len_repeated(#tag, &#ident)
+                ::bilrost::encoding::message::encoded_len_repeated(#tag, &#ident, tw)
             },
         }
     }

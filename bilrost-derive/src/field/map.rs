@@ -143,6 +143,7 @@ impl Field {
                         #tag,
                         &#ident,
                         buf,
+                        tw,
                     );
                 }
             }
@@ -159,6 +160,7 @@ impl Field {
                         #tag,
                         &#ident,
                         buf,
+                        tw,
                     );
                 }
             }
@@ -171,6 +173,7 @@ impl Field {
                     #tag,
                     &#ident,
                     buf,
+                    tw,
                 );
             },
         }
@@ -229,6 +232,7 @@ impl Field {
                         &(#default),
                         #tag,
                         &#ident,
+                        tw,
                     )
                 }
             }
@@ -243,6 +247,7 @@ impl Field {
                     ::bilrost::encoding::message::encoded_len,
                     #tag,
                     &#ident,
+                    tw,
                 )
             },
         }

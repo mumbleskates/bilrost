@@ -120,17 +120,17 @@ impl Field {
                 let default = default.typed();
                 quote! {
                     if #ident != #default {
-                        #encode_fn(#tag, &#ident, buf);
+                        #encode_fn(#tag, &#ident, buf, tw);
                     }
                 }
             }
             Kind::Optional(..) => quote! {
                 if let ::core::option::Option::Some(ref value) = #ident {
-                    #encode_fn(#tag, value, buf);
+                    #encode_fn(#tag, value, buf, tw);
                 }
             },
             Kind::Required(..) | Kind::Repeated | Kind::Packed => quote! {
-                #encode_fn(#tag, &#ident, buf);
+                #encode_fn(#tag, &#ident, buf, tw);
             },
         }
     }
@@ -174,17 +174,17 @@ impl Field {
                 let default = default.typed();
                 quote! {
                     if #ident != #default {
-                        #encoded_len_fn(#tag, &#ident)
+                        #encoded_len_fn(#tag, &#ident, tw)
                     } else {
                         0
                     }
                 }
             }
             Kind::Optional(..) => quote! {
-                #ident.as_ref().map_or(0, |value| #encoded_len_fn(#tag, value))
+                #ident.as_ref().map_or(0, |value| #encoded_len_fn(#tag, value, tw))
             },
             Kind::Required(..) | Kind::Repeated | Kind::Packed => quote! {
-                #encoded_len_fn(#tag, &#ident)
+                #encoded_len_fn(#tag, &#ident, tw)
             },
         }
     }
