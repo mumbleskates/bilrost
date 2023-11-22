@@ -312,7 +312,7 @@ impl TagWriter {
                 // Write the wire type as a single-byte varint.
                 buf.put_u8(wire_type as u8);
             }
-            Less => panic!("fields encoded out of order")
+            Less => panic!("fields encoded out of order: last was {:?}, new is {:?}", self.last_tag, tag)
         }
     }
 
@@ -339,7 +339,7 @@ impl TagMeasurer {
         let len = match tag.cmp(&self.last_tag) {
             Greater => encoded_len_varint(((tag - self.last_tag) as u64) << 2),
             Equal => 1,
-            Less => panic!("fields encoded out of order"),
+            Less => panic!("fields encoded out of order: last was {:?}, new is {:?}", self.last_tag, tag),
         };
         self.last_tag = tag;
         len
@@ -1148,10 +1148,7 @@ pub mod message {
     }
 
     #[inline]
-    pub fn encoded_len_repeated<M>(tag: u32, messages: &[M], tm: &mut TagMeasurer) -> usize
-        where
-            M: Message,
-    {
+    pub fn encoded_len_repeated<M: Message>(tag: u32, messages: &[M], tm: &mut TagMeasurer) -> usize {
         if messages.is_empty() {
             0
         } else {
@@ -1269,7 +1266,7 @@ macro_rules! map {
                 let skip_key = key == &K::default();
                 let skip_val = val == val_default;
                 let inner_tw = &mut TagWriter::new();
-                let inner_tm = &mut tw.measurer();
+                let inner_tm = &mut inner_tw.measurer();
 
                 let len = (if skip_key { 0 } else { key_encoded_len(1, key, inner_tm) })
                     + (if skip_val { 0 } else { val_encoded_len(2, val, inner_tm) });
@@ -1350,12 +1347,12 @@ macro_rules! map {
             if values.is_empty() {
                 0
             } else {
-                let inner_tm = &mut TagMeasurer::new();
                 // successive repeated keys always take up 1 byte
                 tm.key_len(tag) + values.len() - 1
                     + values
                         .iter()
                         .map(|(key, val)| {
+                            let inner_tm = &mut TagMeasurer::new();
                             let len = (if key == &K::default() {
                                 0
                             } else {
