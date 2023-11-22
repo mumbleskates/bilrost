@@ -1187,10 +1187,10 @@ macro_rules! map {
             K: Default + Eq + Hash + Ord,
             V: Default + PartialEq,
             B: BufMut,
-            KE: Fn(u32, &K, &mut B),
-            KL: Fn(u32, &K) -> usize,
-            VE: Fn(u32, &V, &mut B),
-            VL: Fn(u32, &V) -> usize,
+            KE: Fn(u32, &K, &mut B, &mut TagWriter),
+            KL: Fn(u32, &K, &mut TagMeasurer) -> usize,
+            VE: Fn(u32, &V, &mut B, &mut TagWriter),
+            VL: Fn(u32, &V, &mut TagMeasurer) -> usize,
         {
             encode_with_default(
                 key_encode,
@@ -1234,8 +1234,8 @@ macro_rules! map {
         where
             K: Default + Eq + Hash + Ord,
             V: Default + PartialEq,
-            KL: Fn(u32, &K) -> usize,
-            VL: Fn(u32, &V) -> usize,
+            KL: Fn(u32, &K, &mut TagMeasurer) -> usize,
+            VL: Fn(u32, &V, &mut TagMeasurer) -> usize,
         {
             encoded_len_with_default(key_encoded_len, val_encoded_len, &V::default(), tag, values, tm)
         }
@@ -1260,25 +1260,27 @@ macro_rules! map {
             K: Default + Eq + Hash + Ord,
             V: PartialEq,
             B: BufMut,
-            KE: Fn(u32, &K, &mut B),
-            KL: Fn(u32, &K) -> usize,
-            VE: Fn(u32, &V, &mut B),
-            VL: Fn(u32, &V) -> usize,
+            KE: Fn(u32, &K, &mut B, &mut TagWriter),
+            KL: Fn(u32, &K, &mut TagMeasurer) -> usize,
+            VE: Fn(u32, &V, &mut B, &mut TagWriter),
+            VL: Fn(u32, &V, &mut TagMeasurer) -> usize,
         {
             for (key, val) in values.iter() {
                 let skip_key = key == &K::default();
                 let skip_val = val == val_default;
+                let inner_tw = &mut TagWriter::new();
+                let inner_tm = &mut tw.measurer();
 
-                let len = (if skip_key { 0 } else { key_encoded_len(1, key) })
-                    + (if skip_val { 0 } else { val_encoded_len(2, val) });
+                let len = (if skip_key { 0 } else { key_encoded_len(1, key, inner_tm) })
+                    + (if skip_val { 0 } else { val_encoded_len(2, val, inner_tm) });
 
                 tw.encode_key(tag, WireType::LengthDelimited, buf);
                 encode_varint(len as u64, buf);
                 if !skip_key {
-                    key_encode(1, key, buf);
+                    key_encode(1, key, buf, inner_tw);
                 }
                 if !skip_val {
-                    val_encode(2, val, buf);
+                    val_encode(2, val, buf, inner_tw);
                 }
             }
         }
@@ -1342,12 +1344,13 @@ macro_rules! map {
         where
             K: Default + Eq + Hash + Ord,
             V: PartialEq,
-            KL: Fn(u32, &K) -> usize,
-            VL: Fn(u32, &V) -> usize,
+            KL: Fn(u32, &K, &mut TagMeasurer) -> usize,
+            VL: Fn(u32, &V, &mut TagMeasurer) -> usize,
         {
             if values.is_empty() {
                 0
             } else {
+                let inner_tm = &mut TagMeasurer::new();
                 // successive repeated keys always take up 1 byte
                 tm.key_len(tag) + values.len() - 1
                     + values
@@ -1356,11 +1359,11 @@ macro_rules! map {
                             let len = (if key == &K::default() {
                                 0
                             } else {
-                                key_encoded_len(1, key)
+                                key_encoded_len(1, key, inner_tm)
                             }) + (if val == val_default {
                                 0
                             } else {
-                                val_encoded_len(2, val)
+                                val_encoded_len(2, val, inner_tm)
                             });
                             encoded_len_varint(len as u64) + len
                         })
@@ -1469,9 +1472,9 @@ mod test {
             .map_err(|error| TestCaseError::fail(error.to_string()))?;
 
         prop_assert!(
-            !reader.has_remaining(),
+            !buf.has_remaining(),
             "expected buffer to be empty, remaining: {}",
-            reader.remaining()
+            buf.remaining()
         );
 
         prop_assert_eq!(value, roundtrip_value);
@@ -1505,11 +1508,11 @@ mod test {
         let mut buf = buf.freeze();
 
         prop_assert_eq!(
-            reader.remaining(),
             expected_len,
+            buf.remaining(),
             "encoded_len wrong; expected: {}, actual: {}",
             expected_len,
-            reader.remaining()
+            buf.remaining()
         );
 
         let mut roundtrip_value = Default::default();
@@ -1790,7 +1793,7 @@ mod test {
                     #[test]
                     fn $val_proto(values: $map_type<$key_ty, $val_ty>, tag: u32) {
                         check_collection_type(values, tag, WireType::LengthDelimited,
-                                              |tag, values, buf| {
+                                              |tag, values, buf, tw| {
                                                   $mod_name::encode($key_proto::encode,
                                                                     $key_proto::encoded_len,
                                                                     $val_proto::encode,
@@ -1808,7 +1811,7 @@ mod test {
                                                                    buf,
                                                                    ctx)
                                               },
-                                              |tag, values| {
+                                              |tag, values, tm| {
                                                   $mod_name::encoded_len($key_proto::encoded_len,
                                                                          $val_proto::encoded_len,
                                                                          tag,
