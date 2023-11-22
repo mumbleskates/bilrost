@@ -12,7 +12,7 @@ use ::bytes::{Buf, BufMut, Bytes};
 
 use crate::{
     encoding::{
-        bool, bytes, double, float, sint32, sint64, skip_field, string, uint32, uint64,
+        bool, bytes, float32, float64, sint32, sint64, skip_field, string, uint32, uint64,
         TagMeasurer, TagWriter, DecodeContext, WireType,
     },
     DecodeError, Message,
@@ -197,7 +197,7 @@ impl Message for i64 {
 impl Message for f32 {
     fn encode_raw<B: BufMut>(&self, buf: &mut B) {
         if *self != 0.0 {
-            float::encode(1, self, buf, &mut TagWriter::new())
+            float32::encode(1, self, buf, &mut TagWriter::new())
         }
     }
 
@@ -209,7 +209,7 @@ impl Message for f32 {
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         if tag == 1 {
-            float::merge(wire_type, self, buf, ctx)
+            float32::merge(wire_type, self, buf, ctx)
         } else {
             skip_field(wire_type, buf, ctx)
         }
@@ -217,7 +217,7 @@ impl Message for f32 {
 
     fn encoded_len(&self) -> usize {
         if *self != 0.0 {
-            float::encoded_len(1, self, &mut TagMeasurer::new())
+            float32::encoded_len(1, self, &mut TagMeasurer::new())
         } else {
             0
         }
@@ -232,7 +232,7 @@ impl Message for f32 {
 impl Message for f64 {
     fn encode_raw<B: BufMut>(&self, buf: &mut B) {
         if *self != 0.0 {
-            double::encode(1, self, buf, &mut TagWriter::new())
+            float64::encode(1, self, buf, &mut TagWriter::new())
         }
     }
 
@@ -244,7 +244,7 @@ impl Message for f64 {
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         if tag == 1 {
-            double::merge(wire_type, self, buf, ctx)
+            float64::merge(wire_type, self, buf, ctx)
         } else {
             skip_field(wire_type, buf, ctx)
         }
@@ -252,7 +252,7 @@ impl Message for f64 {
 
     fn encoded_len(&self) -> usize {
         if *self != 0.0 {
-            double::encoded_len(1, self, &mut TagMeasurer::new())
+            float64::encoded_len(1, self, &mut TagMeasurer::new())
         } else {
             0
         }

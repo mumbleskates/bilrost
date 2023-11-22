@@ -114,14 +114,14 @@ Scalar value types are converted as follows:
 
 | Protobuf Type | Rust Type |
 | --- | --- |
-| `double` | `f64` |
-| `float` | `f32` |
+| `float32` | `f32` |
+| `float64` | `f64` |
 | `uint32` | `u32` |
 | `uint64` | `u64` |
 | `sint32` | `i32` |
 | `sint64` | `i64` |
-| `fixed32` | `u32` |
-| `fixed64` | `u64` |
+| `ufixed32` | `u32` |
+| `ufixed64` | `u64` |
 | `sfixed32` | `i32` |
 | `sfixed64` | `i64` |
 | `bool` | `bool` |

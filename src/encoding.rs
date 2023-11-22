@@ -728,7 +728,7 @@ fixed_width!(
     f32,
     4,
     WireType::ThirtyTwoBit,
-    float,
+    float32,
     put_f32_le,
     get_f32_le
 );
@@ -736,7 +736,7 @@ fixed_width!(
     f64,
     8,
     WireType::SixtyFourBit,
-    double,
+    float64,
     put_f64_le,
     get_f64_le
 );
@@ -744,7 +744,7 @@ fixed_width!(
     u32,
     4,
     WireType::ThirtyTwoBit,
-    fixed32,
+    ufixed32,
     put_u32_le,
     get_u32_le
 );
@@ -752,7 +752,7 @@ fixed_width!(
     u64,
     8,
     WireType::SixtyFourBit,
-    fixed64,
+    ufixed64,
     put_u64_le,
     get_u64_le
 );
@@ -1827,22 +1827,22 @@ mod test {
         (u64, uint64),
         (i32, sint32),
         (i64, sint64),
-        (u32, fixed32),
-        (u64, fixed64),
+        (u32, ufixed32),
+        (u64, ufixed64),
         (i32, sfixed32),
         (i64, sfixed64),
         (bool, bool),
         (String, string)
     ],
     vals: [
-        (f32, float),
-        (f64, double),
+        (f32, float32),
+        (f64, float64),
         (u32, uint32),
         (u64, uint64),
         (i32, sint32),
         (i64, sint64),
-        (u32, fixed32),
-        (u64, fixed64),
+        (u32, ufixed32),
+        (u64, ufixed64),
         (i32, sfixed32),
         (i64, sfixed64),
         (bool, bool),

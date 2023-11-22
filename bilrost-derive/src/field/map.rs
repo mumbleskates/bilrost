@@ -373,8 +373,8 @@ fn key_ty_from_str(s: &str) -> Result<scalar::Ty, Error> {
         | scalar::Ty::Uint64
         | scalar::Ty::Sint32
         | scalar::Ty::Sint64
-        | scalar::Ty::Fixed32
-        | scalar::Ty::Fixed64
+        | scalar::Ty::Ufixed32
+        | scalar::Ty::Ufixed64
         | scalar::Ty::Sfixed32
         | scalar::Ty::Sfixed64
         | scalar::Ty::Bool

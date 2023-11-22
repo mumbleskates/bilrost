@@ -384,14 +384,14 @@ impl Field {
 /// A scalar protobuf field type.
 #[derive(Clone, PartialEq, Eq)]
 pub enum Ty {
-    Double,
-    Float,
+    Float32,
+    Float64,
     Uint32,
     Uint64,
     Sint32,
     Sint64,
-    Fixed32,
-    Fixed64,
+    Ufixed32,
+    Ufixed64,
     Sfixed32,
     Sfixed64,
     Bool,
@@ -426,14 +426,14 @@ impl BytesTy {
 impl Ty {
     pub fn from_attr(attr: &Meta) -> Result<Option<Ty>, Error> {
         let ty = match *attr {
-            Meta::Path(ref name) if name.is_ident("float") => Ty::Float,
-            Meta::Path(ref name) if name.is_ident("double") => Ty::Double,
+            Meta::Path(ref name) if name.is_ident("float32") => Ty::Float32,
+            Meta::Path(ref name) if name.is_ident("float64") => Ty::Float64,
             Meta::Path(ref name) if name.is_ident("uint32") => Ty::Uint32,
             Meta::Path(ref name) if name.is_ident("uint64") => Ty::Uint64,
             Meta::Path(ref name) if name.is_ident("sint32") => Ty::Sint32,
             Meta::Path(ref name) if name.is_ident("sint64") => Ty::Sint64,
-            Meta::Path(ref name) if name.is_ident("fixed32") => Ty::Fixed32,
-            Meta::Path(ref name) if name.is_ident("fixed64") => Ty::Fixed64,
+            Meta::Path(ref name) if name.is_ident("ufixed32") => Ty::Ufixed32,
+            Meta::Path(ref name) if name.is_ident("ufixed64") => Ty::Ufixed64,
             Meta::Path(ref name) if name.is_ident("sfixed32") => Ty::Sfixed32,
             Meta::Path(ref name) if name.is_ident("sfixed64") => Ty::Sfixed64,
             Meta::Path(ref name) if name.is_ident("bool") => Ty::Bool,
@@ -469,14 +469,14 @@ impl Ty {
         let enumeration_len = "enumeration".len();
         let error = Err(anyhow!("invalid type: {}", s));
         let ty = match s.trim() {
-            "float" => Ty::Float,
-            "double" => Ty::Double,
+            "float32" => Ty::Float32,
+            "float64" => Ty::Float64,
             "uint32" => Ty::Uint32,
             "uint64" => Ty::Uint64,
             "sint32" => Ty::Sint32,
             "sint64" => Ty::Sint64,
-            "fixed32" => Ty::Fixed32,
-            "fixed64" => Ty::Fixed64,
+            "ufixed32" => Ty::Ufixed32,
+            "ufixed64" => Ty::Ufixed64,
             "sfixed32" => Ty::Sfixed32,
             "sfixed64" => Ty::Sfixed64,
             "bool" => Ty::Bool,
@@ -503,14 +503,14 @@ impl Ty {
     /// Returns the type as it appears in protobuf field declarations.
     pub fn as_str(&self) -> &'static str {
         match *self {
-            Ty::Double => "double",
-            Ty::Float => "float",
+            Ty::Float32 => "float32",
+            Ty::Float64 => "float64",
             Ty::Uint32 => "uint32",
             Ty::Uint64 => "uint64",
             Ty::Sint32 => "sint32",
             Ty::Sint64 => "sint64",
-            Ty::Fixed32 => "fixed32",
-            Ty::Fixed64 => "fixed64",
+            Ty::Ufixed32 => "ufixed32",
+            Ty::Ufixed64 => "ufixed64",
             Ty::Sfixed32 => "sfixed32",
             Ty::Sfixed64 => "sfixed64",
             Ty::Bool => "bool",
@@ -532,14 +532,14 @@ impl Ty {
     // TODO: rename to 'ref_type'
     pub fn rust_ref_type(&self) -> TokenStream {
         match *self {
-            Ty::Double => quote!(f64),
-            Ty::Float => quote!(f32),
+            Ty::Float32 => quote!(f32),
+            Ty::Float64 => quote!(f64),
             Ty::Uint32 => quote!(u32),
             Ty::Uint64 => quote!(u64),
             Ty::Sint32 => quote!(i32),
             Ty::Sint64 => quote!(i64),
-            Ty::Fixed32 => quote!(u32),
-            Ty::Fixed64 => quote!(u64),
+            Ty::Ufixed32 => quote!(u32),
+            Ty::Ufixed64 => quote!(u64),
             Ty::Sfixed32 => quote!(i32),
             Ty::Sfixed64 => quote!(i64),
             Ty::Bool => quote!(bool),
@@ -624,8 +624,8 @@ impl DefaultValue {
         let is_i32 = *ty == Ty::Sint32 || *ty == Ty::Sfixed32;
         let is_i64 = *ty == Ty::Sint64 || *ty == Ty::Sfixed64;
 
-        let is_u32 = *ty == Ty::Uint32 || *ty == Ty::Fixed32;
-        let is_u64 = *ty == Ty::Uint64 || *ty == Ty::Fixed64;
+        let is_u32 = *ty == Ty::Uint32 || *ty == Ty::Ufixed32;
+        let is_u64 = *ty == Ty::Uint64 || *ty == Ty::Ufixed64;
 
         let empty_or_is = |expected, actual: &str| expected == actual || actual.is_empty();
 
@@ -643,15 +643,15 @@ impl DefaultValue {
                 DefaultValue::U64(lit.base10_parse()?)
             }
 
-            Lit::Float(ref lit) if *ty == Ty::Float && empty_or_is("f32", lit.suffix()) => {
+            Lit::Float(ref lit) if *ty == Ty::Float32 && empty_or_is("f32", lit.suffix()) => {
                 DefaultValue::F32(lit.base10_parse()?)
             }
-            Lit::Int(ref lit) if *ty == Ty::Float => DefaultValue::F32(lit.base10_parse()?),
+            Lit::Int(ref lit) if *ty == Ty::Float32 => DefaultValue::F32(lit.base10_parse()?),
 
-            Lit::Float(ref lit) if *ty == Ty::Double && empty_or_is("f64", lit.suffix()) => {
+            Lit::Float(ref lit) if *ty == Ty::Float64 && empty_or_is("f64", lit.suffix()) => {
                 DefaultValue::F64(lit.base10_parse()?)
             }
-            Lit::Int(ref lit) if *ty == Ty::Double => DefaultValue::F64(lit.base10_parse()?),
+            Lit::Int(ref lit) if *ty == Ty::Float64 => DefaultValue::F64(lit.base10_parse()?),
 
             Lit::Bool(ref lit) if *ty == Ty::Bool => DefaultValue::Bool(lit.value),
             Lit::Str(ref lit) if *ty == Ty::String => DefaultValue::String(lit.value()),
@@ -671,7 +671,7 @@ impl DefaultValue {
                 }
 
                 // Parse special floating point values.
-                if *ty == Ty::Float {
+                if *ty == Ty::Float32 {
                     match value {
                         "inf" => {
                             return Ok(DefaultValue::Path(parse_str::<Path>(
@@ -689,7 +689,7 @@ impl DefaultValue {
                         _ => (),
                     }
                 }
-                if *ty == Ty::Double {
+                if *ty == Ty::Float64 {
                     match value {
                         "inf" => {
                             return Ok(DefaultValue::Path(parse_str::<Path>(
@@ -722,19 +722,19 @@ impl DefaultValue {
                             return Ok(i64::try_from(value).map(DefaultValue::I64)?);
                         }
                         Lit::Float(ref lit)
-                            if *ty == Ty::Float && empty_or_is("f32", lit.suffix()) =>
+                            if *ty == Ty::Float32 && empty_or_is("f32", lit.suffix()) =>
                         {
                             return Ok(DefaultValue::F32(-lit.base10_parse()?));
                         }
                         Lit::Float(ref lit)
-                            if *ty == Ty::Double && empty_or_is("f64", lit.suffix()) =>
+                            if *ty == Ty::Float64 && empty_or_is("f64", lit.suffix()) =>
                         {
                             return Ok(DefaultValue::F64(-lit.base10_parse()?));
                         }
-                        Lit::Int(ref lit) if *ty == Ty::Float && lit.suffix().is_empty() => {
+                        Lit::Int(ref lit) if *ty == Ty::Float32 && lit.suffix().is_empty() => {
                             return Ok(DefaultValue::F32(-lit.base10_parse()?));
                         }
-                        Lit::Int(ref lit) if *ty == Ty::Double && lit.suffix().is_empty() => {
+                        Lit::Int(ref lit) if *ty == Ty::Float64 && lit.suffix().is_empty() => {
                             return Ok(DefaultValue::F64(-lit.base10_parse()?));
                         }
                         _ => (),
@@ -755,12 +755,12 @@ impl DefaultValue {
 
     pub fn new(ty: &Ty) -> DefaultValue {
         match *ty {
-            Ty::Float => DefaultValue::F32(0.0),
-            Ty::Double => DefaultValue::F64(0.0),
+            Ty::Float32 => DefaultValue::F32(0.0),
+            Ty::Float64 => DefaultValue::F64(0.0),
             Ty::Sint32 | Ty::Sfixed32 => DefaultValue::I32(0),
             Ty::Sint64 | Ty::Sfixed64 => DefaultValue::I64(0),
-            Ty::Uint32 | Ty::Fixed32 => DefaultValue::U32(0),
-            Ty::Uint64 | Ty::Fixed64 => DefaultValue::U64(0),
+            Ty::Uint32 | Ty::Ufixed32 => DefaultValue::U32(0),
+            Ty::Uint64 | Ty::Ufixed64 => DefaultValue::U64(0),
 
             Ty::Bool => DefaultValue::Bool(false),
             Ty::String => DefaultValue::String(String::new()),

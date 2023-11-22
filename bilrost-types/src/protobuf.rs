@@ -252,8 +252,8 @@ pub mod value {
         /// Represents a null value.
         #[bilrost(enumeration = "super::NullValue", tag = "1")]
         NullValue(u32),
-        /// Represents a double value.
-        #[bilrost(double, tag = "2")]
+        /// Represents a float64 value.
+        #[bilrost(float64, tag = "2")]
         NumberValue(f64),
         /// Represents a string value.
         #[bilrost(string, tag = "3")]
