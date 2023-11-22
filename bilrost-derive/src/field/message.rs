@@ -113,13 +113,13 @@ impl Field {
         let tag = self.tag;
         match self.label {
             Label::Optional => quote! {
-                #ident.as_ref().map_or(0, |msg| ::bilrost::encoding::message::encoded_len(#tag, msg, tw))
+                #ident.as_ref().map_or(0, |msg| ::bilrost::encoding::message::encoded_len(#tag, msg, tm))
             },
             Label::Required => quote! {
-                ::bilrost::encoding::message::encoded_len(#tag, &#ident, tw)
+                ::bilrost::encoding::message::encoded_len(#tag, &#ident, tm)
             },
             Label::Repeated => quote! {
-                ::bilrost::encoding::message::encoded_len_repeated(#tag, &#ident, tw)
+                ::bilrost::encoding::message::encoded_len_repeated(#tag, &#ident, tm)
             },
         }
     }

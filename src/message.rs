@@ -128,16 +128,16 @@ pub trait Message: Debug + Send + Sync {
     /// Decodes an instance of the message from a buffer, and merges it into `self`.
     ///
     /// The entire buffer will be consumed.
-    fn merge<B>(&mut self, buf: B) -> Result<(), DecodeError>
+    fn merge<B>(&mut self, mut buf: B) -> Result<(), DecodeError>
     where
         B: Buf,
         Self: Sized,
     {
         let ctx = DecodeContext::default();
-        let mut reader = TagReader::new(buf);
-        while reader.has_remaining() {
-            let (tag, wire_type) = reader.decode_key()?;
-            self.merge_field(tag, wire_type, reader.buf(), ctx.clone())?;
+        let tr = &mut TagReader::new();
+        while buf.has_remaining() {
+            let (tag, wire_type) = tr.decode_key(&mut buf)?;
+            self.merge_field(tag, wire_type, &mut buf, ctx.clone())?;
         }
         Ok(())
     }

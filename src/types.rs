@@ -13,37 +13,33 @@ use ::bytes::{Buf, BufMut, Bytes};
 use crate::{
     encoding::{
         bool, bytes, double, float, sint32, sint64, skip_field, string, uint32, uint64,
-        TagWriter, DecodeContext, WireType,
+        TagMeasurer, TagWriter, DecodeContext, WireType,
     },
     DecodeError, Message,
 };
 
 /// `google.protobuf.BoolValue`
 impl Message for bool {
-    fn encode_raw<B>(&self, buf: &mut B)
-    where
-        B: BufMut,
-    {
+    fn encode_raw<B: BufMut>(&self, buf: &mut B) {
         if *self {
-            bool::encode(1, self, &mut TagWriter::new(buf))
+            bool::encode(1, self, buf, &mut TagWriter::new());
         }
     }
-    fn merge_field<B>(
+
+    fn merge_field<B: Buf>(
         &mut self,
         tag: u32,
         wire_type: WireType,
         buf: &mut B,
         ctx: DecodeContext,
-    ) -> Result<(), DecodeError>
-    where
-        B: Buf,
-    {
+    ) -> Result<(), DecodeError> {
         if tag == 1 {
             bool::merge(wire_type, self, buf, ctx)
         } else {
             skip_field(wire_type, buf, ctx)
         }
     }
+
     fn encoded_len(&self) -> usize {
         if *self {
             2
@@ -51,6 +47,7 @@ impl Message for bool {
             0
         }
     }
+
     fn clear(&mut self) {
         *self = false;
     }
@@ -58,37 +55,34 @@ impl Message for bool {
 
 /// `google.protobuf.UInt32Value`
 impl Message for u32 {
-    fn encode_raw<B>(&self, buf: &mut B)
-    where
-        B: BufMut,
-    {
+    fn encode_raw<B: BufMut>(&self, buf: &mut B) {
         if *self != 0 {
-            uint32::encode(1, self, &mut TagWriter::new(buf))
+            uint32::encode(1, self, buf, &mut TagWriter::new())
         }
     }
-    fn merge_field<B>(
+
+    fn merge_field<B: Buf>(
         &mut self,
         tag: u32,
         wire_type: WireType,
         buf: &mut B,
         ctx: DecodeContext,
-    ) -> Result<(), DecodeError>
-    where
-        B: Buf,
-    {
+    ) -> Result<(), DecodeError> {
         if tag == 1 {
             uint32::merge(wire_type, self, buf, ctx)
         } else {
             skip_field(wire_type, buf, ctx)
         }
     }
+
     fn encoded_len(&self) -> usize {
         if *self != 0 {
-            uint32::encoded_len(1, self, &mut TagWriter::new(&mut [] as &mut [u8]))
+            uint32::encoded_len(1, self, &mut TagMeasurer::new())
         } else {
             0
         }
     }
+
     fn clear(&mut self) {
         *self = 0;
     }
@@ -96,37 +90,34 @@ impl Message for u32 {
 
 /// `google.protobuf.UInt64Value`
 impl Message for u64 {
-    fn encode_raw<B>(&self, buf: &mut B)
-    where
-        B: BufMut,
-    {
+    fn encode_raw<B: BufMut>(&self, buf: &mut B) {
         if *self != 0 {
-            uint64::encode(1, self, &mut TagWriter::new(buf))
+            uint64::encode(1, self, buf, &mut TagWriter::new())
         }
     }
-    fn merge_field<B>(
+
+    fn merge_field<B: Buf>(
         &mut self,
         tag: u32,
         wire_type: WireType,
         buf: &mut B,
         ctx: DecodeContext,
-    ) -> Result<(), DecodeError>
-    where
-        B: Buf,
-    {
+    ) -> Result<(), DecodeError> {
         if tag == 1 {
             uint64::merge(wire_type, self, buf, ctx)
         } else {
             skip_field(wire_type, buf, ctx)
         }
     }
+
     fn encoded_len(&self) -> usize {
         if *self != 0 {
-            uint64::encoded_len(1, self, &mut TagWriter::new(&mut [] as &mut [u8]))
+            uint64::encoded_len(1, self, &mut TagMeasurer::new())
         } else {
             0
         }
     }
+
     fn clear(&mut self) {
         *self = 0;
     }
@@ -134,37 +125,34 @@ impl Message for u64 {
 
 /// `google.protobuf.Int32Value`
 impl Message for i32 {
-    fn encode_raw<B>(&self, buf: &mut B)
-    where
-        B: BufMut,
-    {
+    fn encode_raw<B: BufMut>(&self, buf: &mut B) {
         if *self != 0 {
-            sint32::encode(1, self, &mut TagWriter::new(buf))
+            sint32::encode(1, self, buf, &mut TagWriter::new())
         }
     }
-    fn merge_field<B>(
+
+    fn merge_field<B: Buf>(
         &mut self,
         tag: u32,
         wire_type: WireType,
         buf: &mut B,
         ctx: DecodeContext,
-    ) -> Result<(), DecodeError>
-    where
-        B: Buf,
-    {
+    ) -> Result<(), DecodeError> {
         if tag == 1 {
             sint32::merge(wire_type, self, buf, ctx)
         } else {
             skip_field(wire_type, buf, ctx)
         }
     }
+
     fn encoded_len(&self) -> usize {
         if *self != 0 {
-            sint32::encoded_len(1, self, &mut TagWriter::new(&mut [] as &mut [u8]))
+            sint32::encoded_len(1, self, &mut TagMeasurer::new())
         } else {
             0
         }
     }
+
     fn clear(&mut self) {
         *self = 0;
     }
@@ -172,37 +160,34 @@ impl Message for i32 {
 
 /// `google.protobuf.Int64Value`
 impl Message for i64 {
-    fn encode_raw<B>(&self, buf: &mut B)
-    where
-        B: BufMut,
-    {
+    fn encode_raw<B: BufMut>(&self, buf: &mut B) {
         if *self != 0 {
-            sint64::encode(1, self, &mut TagWriter::new(buf))
+            sint64::encode(1, self, buf, &mut TagWriter::new())
         }
     }
-    fn merge_field<B>(
+
+    fn merge_field<B: Buf>(
         &mut self,
         tag: u32,
         wire_type: WireType,
         buf: &mut B,
         ctx: DecodeContext,
-    ) -> Result<(), DecodeError>
-    where
-        B: Buf,
-    {
+    ) -> Result<(), DecodeError> {
         if tag == 1 {
             sint64::merge(wire_type, self, buf, ctx)
         } else {
             skip_field(wire_type, buf, ctx)
         }
     }
+
     fn encoded_len(&self) -> usize {
         if *self != 0 {
-            sint64::encoded_len(1, self, &mut TagWriter::new(&mut [] as &mut [u8]))
+            sint64::encoded_len(1, self, &mut TagMeasurer::new())
         } else {
             0
         }
     }
+
     fn clear(&mut self) {
         *self = 0;
     }
@@ -210,37 +195,34 @@ impl Message for i64 {
 
 /// `google.protobuf.FloatValue`
 impl Message for f32 {
-    fn encode_raw<B>(&self, buf: &mut B)
-    where
-        B: BufMut,
-    {
+    fn encode_raw<B: BufMut>(&self, buf: &mut B) {
         if *self != 0.0 {
-            float::encode(1, self, &mut TagWriter::new(buf))
+            float::encode(1, self, buf, &mut TagWriter::new())
         }
     }
-    fn merge_field<B>(
+
+    fn merge_field<B: Buf>(
         &mut self,
         tag: u32,
         wire_type: WireType,
         buf: &mut B,
         ctx: DecodeContext,
-    ) -> Result<(), DecodeError>
-    where
-        B: Buf,
-    {
+    ) -> Result<(), DecodeError> {
         if tag == 1 {
             float::merge(wire_type, self, buf, ctx)
         } else {
             skip_field(wire_type, buf, ctx)
         }
     }
+
     fn encoded_len(&self) -> usize {
         if *self != 0.0 {
-            float::encoded_len(1, self, &mut TagWriter::new(&mut [] as &mut [u8]))
+            float::encoded_len(1, self, &mut TagMeasurer::new())
         } else {
             0
         }
     }
+
     fn clear(&mut self) {
         *self = 0.0;
     }
@@ -248,37 +230,34 @@ impl Message for f32 {
 
 /// `google.protobuf.DoubleValue`
 impl Message for f64 {
-    fn encode_raw<B>(&self, buf: &mut B)
-    where
-        B: BufMut,
-    {
+    fn encode_raw<B: BufMut>(&self, buf: &mut B) {
         if *self != 0.0 {
-            double::encode(1, self, &mut TagWriter::new(buf))
+            double::encode(1, self, buf, &mut TagWriter::new())
         }
     }
-    fn merge_field<B>(
+
+    fn merge_field<B: Buf>(
         &mut self,
         tag: u32,
         wire_type: WireType,
         buf: &mut B,
         ctx: DecodeContext,
-    ) -> Result<(), DecodeError>
-    where
-        B: Buf,
-    {
+    ) -> Result<(), DecodeError> {
         if tag == 1 {
             double::merge(wire_type, self, buf, ctx)
         } else {
             skip_field(wire_type, buf, ctx)
         }
     }
+
     fn encoded_len(&self) -> usize {
         if *self != 0.0 {
-            double::encoded_len(1, self, &mut TagWriter::new(&mut [] as &mut [u8]))
+            double::encoded_len(1, self, &mut TagMeasurer::new())
         } else {
             0
         }
     }
+
     fn clear(&mut self) {
         *self = 0.0;
     }
@@ -286,37 +265,34 @@ impl Message for f64 {
 
 /// `google.protobuf.StringValue`
 impl Message for String {
-    fn encode_raw<B>(&self, buf: &mut B)
-    where
-        B: BufMut,
-    {
+    fn encode_raw<B: BufMut>(&self, buf: &mut B) {
         if !self.is_empty() {
-            string::encode(1, self, &mut TagWriter::new(buf))
+            string::encode(1, self, buf, &mut TagWriter::new())
         }
     }
-    fn merge_field<B>(
+
+    fn merge_field<B: Buf>(
         &mut self,
         tag: u32,
         wire_type: WireType,
         buf: &mut B,
         ctx: DecodeContext,
-    ) -> Result<(), DecodeError>
-    where
-        B: Buf,
-    {
+    ) -> Result<(), DecodeError> {
         if tag == 1 {
             string::merge(wire_type, self, buf, ctx)
         } else {
             skip_field(wire_type, buf, ctx)
         }
     }
+
     fn encoded_len(&self) -> usize {
         if !self.is_empty() {
-            string::encoded_len(1, self, &mut TagWriter::new(&mut [] as &mut [u8]))
+            string::encoded_len(1, self, &mut TagMeasurer::new())
         } else {
             0
         }
     }
+
     fn clear(&mut self) {
         self.clear();
     }
@@ -324,37 +300,34 @@ impl Message for String {
 
 /// `google.protobuf.BytesValue`
 impl Message for Vec<u8> {
-    fn encode_raw<B>(&self, buf: &mut B)
-    where
-        B: BufMut,
-    {
+    fn encode_raw<B: BufMut>(&self, buf: &mut B) {
         if !self.is_empty() {
-            bytes::encode(1, self, &mut TagWriter::new(buf))
+            bytes::encode(1, self, buf, &mut TagWriter::new())
         }
     }
-    fn merge_field<B>(
+
+    fn merge_field<B: Buf>(
         &mut self,
         tag: u32,
         wire_type: WireType,
         buf: &mut B,
         ctx: DecodeContext,
-    ) -> Result<(), DecodeError>
-    where
-        B: Buf,
-    {
+    ) -> Result<(), DecodeError> {
         if tag == 1 {
             bytes::merge(wire_type, self, buf, ctx)
         } else {
             skip_field(wire_type, buf, ctx)
         }
     }
+
     fn encoded_len(&self) -> usize {
         if !self.is_empty() {
-            bytes::encoded_len(1, self, &mut TagWriter::new(&mut [] as &mut [u8]))
+            bytes::encoded_len(1, self, &mut TagMeasurer::new())
         } else {
             0
         }
     }
+
     fn clear(&mut self) {
         self.clear();
     }
@@ -362,37 +335,34 @@ impl Message for Vec<u8> {
 
 /// `google.protobuf.BytesValue`
 impl Message for Bytes {
-    fn encode_raw<B>(&self, buf: &mut B)
-    where
-        B: BufMut,
-    {
+    fn encode_raw<B: BufMut>(&self, buf: &mut B) {
         if !self.is_empty() {
-            bytes::encode(1, self, &mut TagWriter::new(buf))
+            bytes::encode(1, self, buf, &mut TagWriter::new())
         }
     }
-    fn merge_field<B>(
+
+    fn merge_field<B: Buf>(
         &mut self,
         tag: u32,
         wire_type: WireType,
         buf: &mut B,
         ctx: DecodeContext,
-    ) -> Result<(), DecodeError>
-    where
-        B: Buf,
-    {
+    ) -> Result<(), DecodeError> {
         if tag == 1 {
             bytes::merge(wire_type, self, buf, ctx)
         } else {
             skip_field(wire_type, buf, ctx)
         }
     }
+
     fn encoded_len(&self) -> usize {
         if !self.is_empty() {
-            bytes::encoded_len(1, self, &mut TagWriter::new(&mut [] as &mut [u8]))
+            bytes::encoded_len(1, self, &mut TagMeasurer::new())
         } else {
             0
         }
     }
+
     fn clear(&mut self) {
         self.clear();
     }
@@ -400,25 +370,21 @@ impl Message for Bytes {
 
 /// `google.protobuf.Empty`
 impl Message for () {
-    fn encode_raw<B>(&self, _buf: &mut B)
-    where
-        B: BufMut,
-    {
-    }
-    fn merge_field<B>(
+    fn encode_raw<B: BufMut>(&self, _buf: &mut B) {}
+
+    fn merge_field<B: Buf>(
         &mut self,
         _tag: u32,
         wire_type: WireType,
         buf: &mut B,
         ctx: DecodeContext,
-    ) -> Result<(), DecodeError>
-    where
-        B: Buf,
-    {
+    ) -> Result<(), DecodeError> {
         skip_field(wire_type, buf, ctx)
     }
+
     fn encoded_len(&self) -> usize {
         0
     }
+
     fn clear(&mut self) {}
 }

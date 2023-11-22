@@ -174,17 +174,17 @@ impl Field {
                 let default = default.typed();
                 quote! {
                     if #ident != #default {
-                        #encoded_len_fn(#tag, &#ident, tw)
+                        #encoded_len_fn(#tag, &#ident, tm)
                     } else {
                         0
                     }
                 }
             }
             Kind::Optional(..) => quote! {
-                #ident.as_ref().map_or(0, |value| #encoded_len_fn(#tag, value, tw))
+                #ident.as_ref().map_or(0, |value| #encoded_len_fn(#tag, value, tm))
             },
             Kind::Required(..) | Kind::Repeated | Kind::Packed => quote! {
-                #encoded_len_fn(#tag, &#ident, tw)
+                #encoded_len_fn(#tag, &#ident, tm)
             },
         }
     }

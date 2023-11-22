@@ -82,7 +82,7 @@ impl Field {
     pub fn encoded_len(&self, ident: TokenStream) -> TokenStream {
         let ty = &self.ty;
         quote! {
-            #ident.as_ref().map_or(0, #ty::encoded_len)
+            #ident.as_ref().map_or(0, #ty::encoded_len, tm)
         }
     }
 

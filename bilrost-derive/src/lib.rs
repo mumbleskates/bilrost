@@ -196,8 +196,8 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
             }
 
             #[inline]
-            fn encoded_len<B: ::bilrost::bytes::BufMut>(&self, tw: &TagWriter) -> usize {
-                // TODO(widders): this doesn't work unless we fully track our would-be-encoded tags
+            fn encoded_len(&self) -> usize {
+                let tm = &mut ::bilrost::encoding::TagMeasurer::new();
                 0 #(+ #encoded_len)*
             }
 
