@@ -239,7 +239,15 @@ impl Field {
             ValueTy::Scalar(value_ty) => {
                 let val_mod = value_ty.module();
                 let vl = quote!(::bilrost::encoding::#val_mod::encoded_len);
-                quote!(::bilrost::encoding::#module::encoded_len(#kl, #vl, #tag, &#ident))
+                quote!(
+                    ::bilrost::encoding::#module::encoded_len(
+                        #kl,
+                        #vl,
+                        #tag,
+                        &#ident,
+                        tm,
+                    )
+                )
             }
             ValueTy::Message => quote! {
                 ::bilrost::encoding::#module::encoded_len(
