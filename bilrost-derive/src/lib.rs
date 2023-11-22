@@ -5,18 +5,21 @@
 extern crate alloc;
 extern crate proc_macro;
 
+use proc_macro::TokenStream;
+use std::collections::{btree_map::Entry::Vacant, BTreeMap};
+
 use anyhow::{bail, Error};
 use itertools::Itertools;
-use proc_macro::TokenStream;
-use proc_macro2::Span;
+use proc_macro2::{Span, TokenStream as TokenStream2};
 use quote::quote;
 use syn::{
-    punctuated::Punctuated, Data, DataEnum, DataStruct, DeriveInput, Expr, Fields, FieldsNamed,
-    FieldsUnnamed, Ident, Index, Variant,
+    Data, DataEnum, DataStruct, DeriveInput, Expr, Fields, FieldsNamed, FieldsUnnamed,
+    Ident, Index, punctuated::Punctuated, Variant,
 };
 
-mod field;
 use crate::field::Field;
+
+mod field;
 
 fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     let input: DeriveInput = syn::parse(input)?;
@@ -38,16 +41,16 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     let generics = &input.generics;
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
-    let (is_struct, fields) = match variant_data {
+    let (is_struct, fields): (bool, Vec<syn::Field>) = match variant_data {
         DataStruct {
             fields: Fields::Named(FieldsNamed { named: fields, .. }),
             ..
         } => (true, fields.into_iter().collect()),
         DataStruct {
             fields:
-                Fields::Unnamed(FieldsUnnamed {
-                    unnamed: fields, ..
-                }),
+            Fields::Unnamed(FieldsUnnamed {
+                                unnamed: fields, ..
+                            }),
             ..
         } => (false, fields.into_iter().collect()),
         DataStruct {
@@ -57,7 +60,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     };
 
     let mut next_tag: u32 = 1;
-    let mut fields = fields
+    let fields: Vec<(TokenStream2, Field)> = fields
         .into_iter()
         .enumerate()
         .flat_map(|(i, field)| {
@@ -81,26 +84,25 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         })
         .collect::<Result<Vec<_>, _>>()?;
 
-    // We want Debug to be in declaration order
-    let unsorted_fields = fields.clone();
-
-    // Sort the fields by tag number so that fields will be encoded in tag order.
-    // TODO: This encodes oneof fields in the position of their lowest tag,
-    // regardless of the currently occupied variant, is that consequential?
-    // See: https://developers.google.com/protocol-buffers/docs/encoding#order
-    fields.sort_by_key(|&(_, ref field)| field.tags().into_iter().min().unwrap());
-    let fields = fields;
-
-    let mut tags = fields
-        .iter()
-        .flat_map(|&(_, ref field)| field.tags())
-        .collect::<Vec<_>>();
-    let num_tags = tags.len();
-    tags.sort_unstable();
-    tags.dedup();
-    if tags.len() != num_tags {
-        bail!("message {} has fields with duplicate tags", ident);
+    struct TagInfo<'a> {
+        field: &'a Field,
+        is_oneof: bool,
     }
+    let mut tag_info = BTreeMap::<u32, TagInfo>::new();
+    for (_, field) in fields.iter() {
+        let is_oneof = field.tags().len() > 1;
+        for tag in field.tags() {
+            let Vacant(entry) = tag_info.entry(tag) else {
+                bail!("message {} has fields with duplicate tags", ident);
+            };
+            entry.insert(TagInfo { field, is_oneof });
+        }
+    }
+
+    // TODO(widders): group fields by their tags -- runs of fields that always have tags colocated
+    //  in contiguous blocks not broken up by oneof variants from a different field. how do we do
+    //  this?
+    todo!("asdf");
 
     let encoded_len = fields
         .iter()
@@ -215,7 +217,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     let expanded = if skip_debug {
         expanded
     } else {
-        let debugs = unsorted_fields.iter().map(|&(ref field_ident, ref field)| {
+        let debugs = fields.iter().map(|&(ref field_ident, ref field)| {
             let wrapper = field.debug(quote!(self.#field_ident));
             let call = if is_struct {
                 quote!(builder.field(stringify!(#field_ident), &wrapper))
