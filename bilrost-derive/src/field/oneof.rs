@@ -80,9 +80,8 @@ impl Field {
 
     /// Returns an expression which evaluates to the encoded length of the oneof field.
     pub fn encoded_len(&self, ident: TokenStream) -> TokenStream {
-        let ty = &self.ty;
         quote! {
-            #ident.as_ref().map_or(0, #ty::encoded_len, tm)
+            #ident.as_ref().map_or(0, |v| v.encoded_len(tm))
         }
     }
 
