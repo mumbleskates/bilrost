@@ -232,7 +232,7 @@ impl Field {
                         &(#default),
                         #tag,
                         &#ident,
-                        tw,
+                        tm,
                     )
                 }
             }
@@ -255,7 +255,7 @@ impl Field {
                     ::bilrost::encoding::message::encoded_len,
                     #tag,
                     &#ident,
-                    tw,
+                    tm,
                 )
             },
         }
