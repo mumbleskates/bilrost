@@ -2,87 +2,41 @@
 
 `bilrost` is a [Protocol Buffers](https://developers.google.com/protocol-buffers/)-alike
 fork for the [Rust Language](https://www.rust-lang.org/). It is a direct fork of
-[`prost`](https://github.com/tokio-rs/prost). Like `prost`, `bilrost` can generate
-simple, idiomatic Rust code from `proto3` files that serializes and deserializes
-data similar to protocol buffers but in a slightly different, incompatible way:
+[`prost`](https://github.com/tokio-rs/prost). Like `prost`, `bilrost` can
+generate simple, idiomatic Rust code with `derive` macros that serializes and
+deserializes data similar to protocol buffers but in a slightly different,
+incompatible way:
 
 * All varints (including tag fields and lengths) use
   [bijective numeration](https://en.wikipedia.org/wiki/Bijective_numeration),
   which cannot be length-extended with trailing zeros the way protobuf varints
-  can (and are more compact, if negligibly so).
-* "Groups" are completely deprecated as a wire-type, reducing the number of wire
+  can (and are slightly more compact, especially at the 64bit limit where they
+  take up 9 bytes instead of 10).
+* "Groups" are completely omitted as a wire-type, reducing the number of wire
   types from 6 to 4.
-* These four wire types are packed into 2 bits instead of 3, allowing for 31
-  different one-byte field IDs instead of only 15.
+* These four wire types are packed into 2 bits instead of 3.
+* Fields are obligated to be encoded in order, and fields' tag numbers are
+  encoded as the difference from the previous field. This means that
+  out-of-order fields cannot be represented in the encoding, and messages with
+  many different fields consume relatively fewer bytes encoding their tags. The
+  only time a field's tag is more than 1 byte is when more than 31 tag ids have
+  been skipped.
+* Field tags can be any `u32` value, without restriction.
+* Signed varint types that aren't encoded with their sign bit in the LSB ("zig
+  zag encoding") are omitted. There are no "gotcha" integer types whose negative
+  values always take up the maximum amount of space.
+* Enumerations are unsigned `u32`-typed, not `i32`.
 
 Compared to other Protocol Buffers implementations, `bilrost`
 
 * Generates simple, idiomatic, and readable Rust types by taking advantage of
   Rust `derive` attributes.
-* Retains comments from `.proto` files in generated Rust code.
-* Allows existing Rust types (not generated from a `.proto`) to be serialized
-  and deserialized by adding attributes.
+* Allows existing Rust types to be serialized and deserialized by adding
+  attributes.
 * Uses the [`bytes::{Buf, BufMut}`](https://github.com/carllerche/bytes)
   abstractions for serialization instead of `std::io::{Read, Write}`.
-* Respects the Protobuf `package` specifier when organizing generated code
-  into Rust modules.
 * Preserves unknown enum values during deserialization.
 * Does not include support for runtime reflection or message descriptors.
-
-## Using `bilrost` in a Cargo Project
-
-First, add `bilrost` and its public dependencies to your `Cargo.toml`:
-
-```ignore
-[dependencies]
-bilrost = "0.12"
-# Only necessary if using Protobuf well-known types:
-bilrost-types = "0.12"
-```
-
-The recommended way to add `.proto` compilation to a Cargo project is to use the
-`bilrost-build` library. See the [`bilrost-build` documentation](bilrost-build) for
-more details and examples.
-
-See the [snazzy repository](https://github.com/danburkert/snazzy) for a simple
-start-to-finish example.
-
-### MSRV
-
-`bilrost` follows the `tokio-rs` projects MSRV model and supports 1.60. For more
-information on the tokio msrv policy you can check it out [here][tokio msrv]
-
-[tokio msrv]: https://github.com/tokio-rs/tokio/#supported-rust-versions
-
-## Generated Code
-
-`bilrost` generates Rust code from source `.proto` files using the `proto2` or
-`proto3` syntax. `bilrost`'s goal is to make the generated code as simple as
-possible.
-
-### `protoc`
-
-With `bilrost-build` v0.11 release, `protoc` will be required to invoke
-`compile_protos` (unless `skip_protoc` is enabled). Bilrost will no longer provide
-bundled a `protoc` or attempt to compile `protoc` for users. For install
-instructions for `protoc` please check out the [protobuf install] instructions.
-
-[protobuf install]: https://github.com/protocolbuffers/protobuf#protobuf-compiler-installation
-
-
-### Packages
-
-Bilrost can now generate code for `.proto` files that don't have a package spec.
-`bilrost` will translate the Protobuf package into
-a Rust module. For example, given the `package` specifier:
-
-[package]: https://developers.google.com/protocol-buffers/docs/proto#packages
-
-```protobuf,ignore
-package foo.bar;
-```
-
-All Rust types generated from the file will be in the `foo::bar` module.
 
 ### Messages
 
@@ -287,12 +241,6 @@ pub mod foo {
 `oneof` fields are always wrapped in an `Option`.
 
 [^3]: Annotations have been elided for clarity. See below for a full example.
-
-### Services
-
-`bilrost-build` allows a custom code-generator to be used for processing `service`
-definitions. This can be used to output Rust traits according to an
-application's specific needs.
 
 ### Generated Code Example
 
