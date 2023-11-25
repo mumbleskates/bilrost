@@ -93,7 +93,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         let is_oneof = field.tags().len() > 1;
         for tag in field.tags() {
             let Vacant(entry) = tag_info.entry(tag) else {
-                bail!("message {} has fields with duplicate tags", ident);
+                bail!("message {} has multiple fields with tag {}", ident, tag);
             };
             entry.insert(TagInfo { field, is_oneof });
         }
