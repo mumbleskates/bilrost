@@ -450,6 +450,11 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         quote!(#ident::#variant_ident(ref value) => #encoded_len)
     });
 
+    let current_tag = fields.iter().map(|&(ref variant_ident, ref field)| {
+        let tag = field.tags()[0];
+        quote!(#ident::#variant_ident(_) => #tag)
+    });
+
     let expanded = quote! {
         impl #impl_generics #ident #ty_generics #where_clause {
             /// Encodes the message to a buffer.
@@ -483,6 +488,14 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
             pub fn encoded_len(&self, tm: &mut ::bilrost::encoding::TagMeasurer) -> usize {
                 match *self {
                     #(#encoded_len,)*
+                }
+            }
+
+            /// Returns the tag id that will be encoded by the current value.
+            #[inline]
+            pub fn current_tag(&self) -> u32 {
+                match *self {
+                    #(#current_tag,)*
                 }
             }
         }
