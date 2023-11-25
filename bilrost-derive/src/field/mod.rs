@@ -167,7 +167,7 @@ pub enum Label {
     /// An optional field.
     Optional,
     /// A required field.
-    Required,
+    Required,  // TODO(widders): consider removing or renaming this
     /// A repeated field.
     Repeated,
 }

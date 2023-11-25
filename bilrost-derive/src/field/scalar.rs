@@ -575,6 +575,7 @@ impl fmt::Display for Ty {
 }
 
 /// Scalar Protobuf field types.
+// TODO(widders): re-explain or refactor how these work
 #[derive(Clone)]
 pub enum Kind {
     /// A plain proto3 scalar field.

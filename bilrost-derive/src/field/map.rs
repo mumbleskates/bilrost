@@ -9,7 +9,7 @@ use crate::field::{scalar, set_option, tag_attr};
 #[derive(Clone, Debug)]
 pub enum MapTy {
     HashMap,
-    BTreeMap,
+    BTreeMap, // TODO(widders): option to enforce key ordering
 }
 
 impl MapTy {
@@ -182,6 +182,7 @@ impl Field {
     /// Returns an expression which evaluates to the result of merging a decoded key value pair
     /// into the map.
     pub fn merge(&self, ident: TokenStream) -> TokenStream {
+        // TODO(widders): enforce against key collisions as a decode error
         let key_mod = self.key_ty.module();
         let km = quote!(::bilrost::encoding::#key_mod::merge);
         let module = self.map_ty.module();
