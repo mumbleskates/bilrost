@@ -6,7 +6,6 @@ extern crate alloc;
 extern crate proc_macro;
 
 use proc_macro::TokenStream;
-use std::collections::{btree_map::Entry::Vacant, BTreeMap};
 
 use anyhow::{bail, Error};
 use itertools::Itertools;
@@ -60,7 +59,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     };
 
     let mut next_tag: u32 = 1;
-    let fields: Vec<(TokenStream2, Field)> = fields
+    let mut fields: Vec<(TokenStream2, Field)> = fields
         .into_iter()
         .enumerate()
         .flat_map(|(i, field)| {
@@ -88,10 +87,12 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         bail!("message {} has duplicate tag {}", ident, dup)
     };
 
-    // TODO(widders): group fields by their tags -- runs of fields that always have tags colocated
-    //  in contiguous blocks not broken up by oneof variants from a different field. how do we do
-    //  this?
-    todo!("asdf");
+    // We want Debug to be in declaration order
+    let unsorted_fields = fields.clone();
+    fields.sort_unstable_by_key(|(_, field)| field.tags().iter().min());
+    let fields = fields;
+
+    // TODO(widders): emit code to process the fields ordered
 
     let encoded_len = fields
         .iter()
@@ -206,7 +207,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     let expanded = if skip_debug {
         expanded
     } else {
-        let debugs = fields.iter().map(|&(ref field_ident, ref field)| {
+        let debugs = unsorted_fields.iter().map(|&(ref field_ident, ref field)| {
             let wrapper = field.debug(quote!(self.#field_ident));
             let call = if is_struct {
                 quote!(builder.field(stringify!(#field_ident), &wrapper))
