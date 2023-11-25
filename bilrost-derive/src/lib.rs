@@ -83,8 +83,13 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         })
         .collect::<Result<Vec<_>, _>>()?;
 
-    if let Some(duplicate) = fields.iter().flat_map(|(_, field)| field.tags()).duplicates().next() {
-        bail!("message {} has duplicate tag {}", ident, duplicate)
+    if let Some((duplicate_tag, _)) = fields
+        .iter()
+        .flat_map(|(_, field)| field.tags())
+        .sorted_unstable()
+        .tuple_windows()
+        .find(|(a, b)| a == b) {
+        bail!("message {} has duplicate tag {}", ident, duplicate_tag)
     };
 
     // We want Debug to be in declaration order
@@ -399,8 +404,13 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
             invalid_variant
         );
     }
-    if let Some(duplicate) = fields.iter().flat_map(|(_, field)| field.tags()).duplicates().next() {
-        bail!("invalid oneof {}: multiple variants have tag {}", ident, duplicate);
+    if let Some((duplicate_tag, _)) = fields
+        .iter()
+        .flat_map(|(_, field)| field.tags())
+        .sorted_unstable()
+        .tuple_windows()
+        .find(|(a, b)| a == b) {
+        bail!("invalid oneof {}: multiple variants have tag {}", ident, duplicate_tag);
     }
 
     let encode = fields.iter().map(|&(ref variant_ident, ref field)| {
