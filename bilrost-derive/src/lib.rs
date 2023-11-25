@@ -84,20 +84,9 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         })
         .collect::<Result<Vec<_>, _>>()?;
 
-    struct TagInfo<'a> {
-        field: &'a Field,
-        is_oneof: bool,
-    }
-    let mut tag_info = BTreeMap::<u32, TagInfo>::new();
-    for (_, field) in fields.iter() {
-        let is_oneof = field.tags().len() > 1;
-        for tag in field.tags() {
-            let Vacant(entry) = tag_info.entry(tag) else {
-                bail!("message {} has multiple fields with tag {}", ident, tag);
-            };
-            entry.insert(TagInfo { field, is_oneof });
-        }
-    }
+    if let Some(dup) = fields.iter().flat_map(|(_, field)| field.tags()).duplicates().next() {
+        bail!("message {} has duplicate tag {}", ident, dup)
+    };
 
     // TODO(widders): group fields by their tags -- runs of fields that always have tags colocated
     //  in contiguous blocks not broken up by oneof variants from a different field. how do we do
@@ -402,23 +391,15 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         }
     }
 
-    let mut tags = fields
-        .iter()
-        .flat_map(|&(ref variant_ident, ref field)| -> Result<u32, Error> {
-            if field.tags().len() > 1 {
-                bail!(
-                    "invalid oneof variant {}::{}: oneof variants may only have a single tag",
-                    ident,
-                    variant_ident
-                );
-            }
-            Ok(field.tags()[0])
-        })
-        .collect::<Vec<_>>();
-    tags.sort_unstable();
-    tags.dedup();
-    if tags.len() != fields.len() {
-        panic!("invalid oneof {}: variants have duplicate tags", ident);
+    if let Some((variant_ident, _)) = fields.iter().find(|(_, field)| field.tags().len() > 1) {
+        bail!(
+            "invalid oneof variant {}::{}: oneof variants may only have a single tag",
+            ident,
+            variant_ident
+        );
+    }
+    if let Some(dup) = fields.iter().flat_map(|(_, field)| field.tags()).duplicates().next() {
+        bail!("invalid oneof {}: multiple variants have tag {}", ident, dup);
     }
 
     let encode = fields.iter().map(|&(ref variant_ident, ref field)| {
