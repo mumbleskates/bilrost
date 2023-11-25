@@ -13,7 +13,7 @@ use ::bytes::{Buf, BufMut, Bytes};
 use crate::{
     encoding::{
         bool, bytes, float32, float64, sint32, sint64, skip_field, string, uint32, uint64,
-        TagMeasurer, TagWriter, DecodeContext, WireType,
+        DecodeContext, TagMeasurer, TagWriter, WireType,
     },
     DecodeError, Message,
 };

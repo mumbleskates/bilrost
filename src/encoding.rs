@@ -9,10 +9,10 @@ use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::cmp::min;
+use core::cmp::Ordering::{Equal, Greater, Less};
 use core::convert::TryFrom;
 use core::mem;
 use core::str;
-use core::cmp::Ordering::{Equal, Greater, Less};
 
 use ::bytes::{Buf, BufMut, Bytes};
 
@@ -135,8 +135,8 @@ fn decode_varint_slice(bytes: &[u8]) -> Result<(u64, usize), DecodeError> {
 #[inline(never)]
 #[cold]
 fn decode_varint_slow<B>(buf: &mut B) -> Result<u64, DecodeError>
-    where
-        B: Buf,
+where
+    B: Buf,
 {
     let mut value = 0;
     for count in 0..min(8, buf.remaining()) {
@@ -249,7 +249,10 @@ pub fn encoded_len_varint(value: u64) -> usize {
         0x408_1020_4080,
         0x2_0408_1020_4080,
         0x102_0408_1020_4080,
-    ].into_iter().enumerate() {
+    ]
+    .into_iter()
+    .enumerate()
+    {
         if value < limit {
             return i + 1;
         }
@@ -312,13 +315,18 @@ impl TagWriter {
                 // Write the wire type as a single-byte varint.
                 buf.put_u8(wire_type as u8);
             }
-            Less => panic!("fields encoded out of order: last was {:?}, new is {:?}", self.last_tag, tag)
+            Less => panic!(
+                "fields encoded out of order: last was {:?}, new is {:?}",
+                self.last_tag, tag
+            ),
         }
     }
 
     #[inline]
     pub fn measurer(&self) -> TagMeasurer {
-        TagMeasurer{last_tag: self.last_tag}
+        TagMeasurer {
+            last_tag: self.last_tag,
+        }
     }
 }
 
@@ -329,7 +337,7 @@ pub struct TagMeasurer {
 
 impl TagMeasurer {
     pub fn new() -> Self {
-        Self{last_tag: 0}
+        Self { last_tag: 0 }
     }
 
     /// Returns the number of bytes that would be written if the given tag was encoded next, and
@@ -339,7 +347,10 @@ impl TagMeasurer {
         let len = match tag.cmp(&self.last_tag) {
             Greater => encoded_len_varint(((tag - self.last_tag) as u64) << 2),
             Equal => 1,
-            Less => panic!("fields encoded out of order: last was {:?}, new is {:?}", self.last_tag, tag),
+            Less => panic!(
+                "fields encoded out of order: last was {:?}, new is {:?}",
+                self.last_tag, tag
+            ),
         };
         self.last_tag = tag;
         len
@@ -390,9 +401,9 @@ pub fn merge_loop<T, M, B>(
     ctx: DecodeContext,
     mut merge: M,
 ) -> Result<(), DecodeError>
-    where
-        M: FnMut(&mut T, &mut B, DecodeContext) -> Result<(), DecodeError>,
-        B: Buf,
+where
+    M: FnMut(&mut T, &mut B, DecodeContext) -> Result<(), DecodeError>,
+    B: Buf,
 {
     let len = decode_varint(buf)?;
     let remaining = buf.remaining();
@@ -435,7 +446,12 @@ pub fn skip_field<B: Buf>(
 /// Helper macro which emits an `encode_repeated` function for the type.
 macro_rules! encode_repeated {
     ($ty:ty) => {
-        pub fn encode_repeated<B: BufMut>(tag: u32, values: &[$ty], buf: &mut B, tw: &mut TagWriter) {
+        pub fn encode_repeated<B: BufMut>(
+            tag: u32,
+            values: &[$ty],
+            buf: &mut B,
+            tw: &mut TagWriter,
+        ) {
             for value in values {
                 encode(tag, value, buf, tw);
             }
@@ -653,7 +669,12 @@ macro_rules! fixed_width {
 
             encode_repeated!($ty);
 
-            pub fn encode_packed<B: BufMut>(tag: u32, values: &[$ty], buf: &mut B, tw: &mut TagWriter) {
+            pub fn encode_packed<B: BufMut>(
+                tag: u32,
+                values: &[$ty],
+                buf: &mut B,
+                tw: &mut TagWriter,
+            ) {
                 if values.is_empty() {
                     return;
                 }
@@ -819,8 +840,8 @@ pub mod string {
     use super::*;
 
     pub fn encode<B>(tag: u32, value: &String, buf: &mut B, tw: &mut TagWriter)
-        where
-            B: BufMut,
+    where
+        B: BufMut,
     {
         tw.encode_key(tag, WireType::LengthDelimited, buf);
         encode_varint(value.len() as u64, buf);
@@ -833,8 +854,8 @@ pub mod string {
         buf: &mut B,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError>
-        where
-            B: Buf,
+    where
+        B: Buf,
     {
         // ## Unsafety
         //
@@ -908,13 +929,13 @@ mod sealed {
 
         /// Replace contents of this buffer with the contents of another buffer.
         fn replace_with<B>(&mut self, buf: B)
-            where
-                B: Buf;
+        where
+            B: Buf;
 
         /// Appends this buffer to the (contents of) other buffer.
         fn append_to<B>(&self, buf: &mut B)
-            where
-                B: BufMut;
+        where
+            B: BufMut;
 
         fn is_empty(&self) -> bool {
             self.len() == 0
@@ -930,15 +951,15 @@ impl sealed::BytesAdapter for Bytes {
     }
 
     fn replace_with<B>(&mut self, mut buf: B)
-        where
-            B: Buf,
+    where
+        B: Buf,
     {
         *self = buf.copy_to_bytes(buf.remaining());
     }
 
     fn append_to<B>(&self, buf: &mut B)
-        where
-            B: BufMut,
+    where
+        B: BufMut,
     {
         buf.put(self.clone())
     }
@@ -952,8 +973,8 @@ impl sealed::BytesAdapter for Vec<u8> {
     }
 
     fn replace_with<B>(&mut self, buf: B)
-        where
-            B: Buf,
+    where
+        B: Buf,
     {
         self.clear();
         self.reserve(buf.remaining());
@@ -961,8 +982,8 @@ impl sealed::BytesAdapter for Vec<u8> {
     }
 
     fn append_to<B>(&self, buf: &mut B)
-        where
-            B: BufMut,
+    where
+        B: BufMut,
     {
         buf.put(self.as_slice())
     }
@@ -972,9 +993,9 @@ pub mod bytes {
     use super::*;
 
     pub fn encode<A, B>(tag: u32, value: &A, buf: &mut B, tw: &mut TagWriter)
-        where
-            A: BytesAdapter,
-            B: BufMut,
+    where
+        A: BytesAdapter,
+        B: BufMut,
     {
         tw.encode_key(tag, WireType::LengthDelimited, buf);
         encode_varint(value.len() as u64, buf);
@@ -987,9 +1008,9 @@ pub mod bytes {
         buf: &mut B,
         _ctx: DecodeContext,
     ) -> Result<(), DecodeError>
-        where
-            A: BytesAdapter,
-            B: Buf,
+    where
+        A: BytesAdapter,
+        B: Buf,
     {
         check_wire_type(WireType::LengthDelimited, wire_type)?;
         let len = decode_varint(buf)?;
@@ -1020,9 +1041,9 @@ pub mod bytes {
         buf: &mut B,
         _ctx: DecodeContext,
     ) -> Result<(), DecodeError>
-        where
-            A: BytesAdapter,
-            B: Buf,
+    where
+        A: BytesAdapter,
+        B: Buf,
     {
         check_wire_type(WireType::LengthDelimited, wire_type)?;
         let len = decode_varint(buf)?;
@@ -1081,9 +1102,9 @@ pub mod message {
     use super::*;
 
     pub fn encode<M, B>(tag: u32, msg: &M, buf: &mut B, tw: &mut TagWriter)
-        where
-            M: Message,
-            B: BufMut,
+    where
+        M: Message,
+        B: BufMut,
     {
         tw.encode_key(tag, WireType::LengthDelimited, buf);
         encode_varint(msg.encoded_len() as u64, buf);
@@ -1096,28 +1117,23 @@ pub mod message {
         buf: &mut B,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError>
-        where
-            M: Message,
-            B: Buf,
+    where
+        M: Message,
+        B: Buf,
     {
         check_wire_type(WireType::LengthDelimited, wire_type)?;
         ctx.limit_reached()?;
         let mut tr = TagReader::new();
-        merge_loop(
-            msg,
-            buf,
-            ctx.enter_recursion(),
-            |msg, buf, ctx| {
-                let (tag, wire_type) = tr.decode_key(buf)?;
-                msg.merge_field(tag, wire_type, buf, ctx)
-            },
-        )
+        merge_loop(msg, buf, ctx.enter_recursion(), |msg, buf, ctx| {
+            let (tag, wire_type) = tr.decode_key(buf)?;
+            msg.merge_field(tag, wire_type, buf, ctx)
+        })
     }
 
     pub fn encode_repeated<M, B>(tag: u32, messages: &[M], buf: &mut B, tw: &mut TagWriter)
-        where
-            M: Message,
-            B: BufMut,
+    where
+        M: Message,
+        B: BufMut,
     {
         for msg in messages {
             encode(tag, msg, buf, tw);
@@ -1130,9 +1146,9 @@ pub mod message {
         buf: &mut B,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError>
-        where
-            M: Message + Default,
-            B: Buf,
+    where
+        M: Message + Default,
+        B: Buf,
     {
         check_wire_type(WireType::LengthDelimited, wire_type)?;
         let mut msg = M::default();
@@ -1148,17 +1164,21 @@ pub mod message {
     }
 
     #[inline]
-    pub fn encoded_len_repeated<M: Message>(tag: u32, messages: &[M], tm: &mut TagMeasurer) -> usize {
+    pub fn encoded_len_repeated<M: Message>(
+        tag: u32,
+        messages: &[M],
+        tm: &mut TagMeasurer,
+    ) -> usize {
         if messages.is_empty() {
             0
         } else {
             // successive repeated keys always take up 1 byte
             tm.key_len(tag) + messages.len() - 1
                 + messages
-                .iter()
-                .map(Message::encoded_len)
-                .map(|len| len + encoded_len_varint(len as u64))
-                .sum::<usize>()
+                    .iter()
+                    .map(Message::encoded_len)
+                    .map(|len| len + encoded_len_varint(len as u64))
+                    .sum::<usize>()
         }
     }
 }
@@ -1234,7 +1254,14 @@ macro_rules! map {
             KL: Fn(u32, &K, &mut TagMeasurer) -> usize,
             VL: Fn(u32, &V, &mut TagMeasurer) -> usize,
         {
-            encoded_len_with_default(key_encoded_len, val_encoded_len, &V::default(), tag, values, tm)
+            encoded_len_with_default(
+                key_encoded_len,
+                val_encoded_len,
+                &V::default(),
+                tag,
+                values,
+                tm,
+            )
         }
 
         /// Generic protobuf map encode function with an overridden value default.
@@ -1268,8 +1295,15 @@ macro_rules! map {
                 let inner_tw = &mut TagWriter::new();
                 let inner_tm = &mut inner_tw.measurer();
 
-                let len = (if skip_key { 0 } else { key_encoded_len(1, key, inner_tm) })
-                    + (if skip_val { 0 } else { val_encoded_len(2, val, inner_tm) });
+                let len = (if skip_key {
+                    0
+                } else {
+                    key_encoded_len(1, key, inner_tm)
+                }) + (if skip_val {
+                    0
+                } else {
+                    val_encoded_len(2, val, inner_tm)
+                });
 
                 tw.encode_key(tag, WireType::LengthDelimited, buf);
                 encode_varint(len as u64, buf);
@@ -1400,9 +1434,9 @@ mod test {
         merge: fn(WireType, &mut T, &mut Bytes, DecodeContext) -> Result<(), DecodeError>,
         encoded_len: fn(u32, &B, &mut TagMeasurer) -> usize,
     ) -> TestCaseResult
-        where
-            T: Debug + Default + PartialEq + Borrow<B>,
-            B: ?Sized,
+    where
+        T: Debug + Default + PartialEq + Borrow<B>,
+        B: ?Sized,
     {
         let mut tw = TagWriter::new();
         let mut tm = tw.measurer();
@@ -1427,8 +1461,9 @@ mod test {
             return Ok(());
         }
 
-        let (decoded_tag, decoded_wire_type) =
-            tr.decode_key(&mut buf).map_err(|error| TestCaseError::fail(error.to_string()))?;
+        let (decoded_tag, decoded_wire_type) = tr
+            .decode_key(&mut buf)
+            .map_err(|error| TestCaseError::fail(error.to_string()))?;
         prop_assert_eq!(
             tag,
             decoded_tag,
@@ -1466,7 +1501,7 @@ mod test {
             &mut buf,
             DecodeContext::default(),
         )
-            .map_err(|error| TestCaseError::fail(error.to_string()))?;
+        .map_err(|error| TestCaseError::fail(error.to_string()))?;
 
         prop_assert!(
             !buf.has_remaining(),
@@ -1487,12 +1522,12 @@ mod test {
         mut merge: M,
         encoded_len: L,
     ) -> TestCaseResult
-        where
-            T: Debug + Default + PartialEq + Borrow<B>,
-            B: ?Sized,
-            E: FnOnce(u32, &B, &mut BytesMut, &mut TagWriter),
-            M: FnMut(WireType, &mut T, &mut Bytes, DecodeContext) -> Result<(), DecodeError>,
-            L: FnOnce(u32, &B, &mut TagMeasurer) -> usize,
+    where
+        T: Debug + Default + PartialEq + Borrow<B>,
+        B: ?Sized,
+        E: FnOnce(u32, &B, &mut BytesMut, &mut TagWriter),
+        M: FnMut(WireType, &mut T, &mut Bytes, DecodeContext) -> Result<(), DecodeError>,
+        L: FnOnce(u32, &B, &mut TagMeasurer) -> usize,
     {
         let mut tw = TagWriter::new();
         let mut tm = tw.measurer();
@@ -1514,8 +1549,9 @@ mod test {
 
         let mut roundtrip_value = Default::default();
         while buf.has_remaining() {
-            let (decoded_tag, decoded_wire_type) =
-                tr.decode_key(&mut buf).map_err(|error| TestCaseError::fail(error.to_string()))?;
+            let (decoded_tag, decoded_wire_type) = tr
+                .decode_key(&mut buf)
+                .map_err(|error| TestCaseError::fail(error.to_string()))?;
 
             prop_assert_eq!(
                 tag,
@@ -1539,7 +1575,7 @@ mod test {
                 &mut buf,
                 DecodeContext::default(),
             )
-                .map_err(|error| TestCaseError::fail(error.to_string()))?;
+            .map_err(|error| TestCaseError::fail(error.to_string()))?;
         }
 
         prop_assert_eq!(value, roundtrip_value);
@@ -1632,15 +1668,9 @@ mod test {
             2u64.pow(49) - 1,
             &[0xFF, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0x7E],
         );
-        check(
-            2u64.pow(49),
-            &[0x80, 0xFF, 0xFE, 0xFE, 0xFE, 0xFE, 0x7E],
-        );
+        check(2u64.pow(49), &[0x80, 0xFF, 0xFE, 0xFE, 0xFE, 0xFE, 0x7E]);
 
-        check(
-            0x204081020407f,
-            &[0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x7F],
-        );
+        check(0x204081020407f, &[0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x7F]);
         check(
             0x2040810204080,
             &[0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x00],
@@ -1706,44 +1736,38 @@ mod test {
 
     #[test]
     fn varint_overflow() {
-        let mut u64_max_plus_one: &[u8] =
-            &[0x80, 0xFF, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE];
+        let mut u64_max_plus_one: &[u8] = &[0x80, 0xFF, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE];
 
         decode_varint(&mut u64_max_plus_one).expect_err("decoding u64::MAX + 1 succeeded");
         decode_varint_slow(&mut u64_max_plus_one)
             .expect_err("slow decoding u64::MAX + 1 succeeded");
 
-        let mut u64_over_max: &[u8] =
-            &[0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF];
+        let mut u64_over_max: &[u8] = &[0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF];
 
         decode_varint(&mut u64_over_max).expect_err("decoding over-max succeeded");
-        decode_varint_slow(&mut u64_over_max)
-            .expect_err("slow decoding over-max succeeded");
+        decode_varint_slow(&mut u64_over_max).expect_err("slow decoding over-max succeeded");
     }
 
     #[test]
     fn varint_truncated() {
-        let mut truncated_one_byte: &[u8] =
-            &[0x80];
+        let mut truncated_one_byte: &[u8] = &[0x80];
         decode_varint(&mut truncated_one_byte).expect_err("decoding truncated 1 byte succeeded");
         decode_varint_slow(&mut truncated_one_byte)
             .expect_err("slow decoding truncated 1 byte succeeded");
 
-        let mut truncated_two_bytes: &[u8] =
-            &[0x80, 0xFF];
+        let mut truncated_two_bytes: &[u8] = &[0x80, 0xFF];
         decode_varint(&mut truncated_two_bytes).expect_err("decoding truncated 6 bytes succeeded");
         decode_varint_slow(&mut truncated_two_bytes)
             .expect_err("slow decoding truncated 6 bytes succeeded");
 
-        let mut truncated_six_bytes: &[u8] =
-            &[0x80, 0x81, 0x82, 0x8A, 0x8B, 0x8C];
+        let mut truncated_six_bytes: &[u8] = &[0x80, 0x81, 0x82, 0x8A, 0x8B, 0x8C];
         decode_varint(&mut truncated_six_bytes).expect_err("decoding truncated 6 bytes succeeded");
         decode_varint_slow(&mut truncated_six_bytes)
             .expect_err("slow decoding truncated 6 bytes succeeded");
 
-        let mut truncated_eight_bytes: &[u8] =
-            &[0x80, 0x81, 0x82, 0x8A, 0x8B, 0x8C, 0xBE, 0xEF];
-        decode_varint(&mut truncated_eight_bytes).expect_err("decoding truncated 8 bytes succeeded");
+        let mut truncated_eight_bytes: &[u8] = &[0x80, 0x81, 0x82, 0x8A, 0x8B, 0x8C, 0xBE, 0xEF];
+        decode_varint(&mut truncated_eight_bytes)
+            .expect_err("decoding truncated 8 bytes succeeded");
         decode_varint_slow(&mut truncated_eight_bytes)
             .expect_err("slow decoding truncated 8 bytes succeeded");
     }

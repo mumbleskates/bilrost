@@ -6,7 +6,9 @@ use core::usize;
 
 use bytes::{Buf, BufMut};
 
-use crate::encoding::{encode_varint, encoded_len_varint, message, DecodeContext, TagReader, WireType};
+use crate::encoding::{
+    encode_varint, encoded_len_varint, message, DecodeContext, TagReader, WireType,
+};
 use crate::DecodeError;
 use crate::EncodeError;
 

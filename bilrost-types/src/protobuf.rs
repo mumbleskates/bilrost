@@ -223,10 +223,7 @@ pub struct Duration {
 pub struct Struct {
     /// Unordered map of dynamically typed values.
     #[bilrost(btree_map = "string, message", tag = "1")]
-    pub fields: ::bilrost::alloc::collections::BTreeMap<
-        ::bilrost::alloc::string::String,
-        Value,
-    >,
+    pub fields: ::bilrost::alloc::collections::BTreeMap<::bilrost::alloc::string::String, Value>,
 }
 
 /// `Value` represents a dynamically typed value which can be either
@@ -425,4 +422,3 @@ pub struct Timestamp {
     #[bilrost(sfixed32, tag = "2")]
     pub nanos: i32,
 }
-

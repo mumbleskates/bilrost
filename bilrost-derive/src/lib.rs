@@ -10,8 +10,8 @@ use itertools::Itertools;
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use syn::{
-    Data, DataEnum, DataStruct, DeriveInput, Expr, Fields, FieldsNamed, FieldsUnnamed,
-    Ident, Index, punctuated::Punctuated, Variant,
+    punctuated::Punctuated, Data, DataEnum, DataStruct, DeriveInput, Expr, Fields, FieldsNamed,
+    FieldsUnnamed, Ident, Index, Variant,
 };
 
 use crate::field::Field;
@@ -45,9 +45,9 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         } => (true, fields.into_iter().collect()),
         DataStruct {
             fields:
-            Fields::Unnamed(FieldsUnnamed {
-                                unnamed: fields, ..
-                            }),
+                Fields::Unnamed(FieldsUnnamed {
+                    unnamed: fields, ..
+                }),
             ..
         } => (false, fields.into_iter().collect()),
         DataStruct {
@@ -86,7 +86,8 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         .flat_map(|(_, field)| field.tags())
         .sorted_unstable()
         .tuple_windows()
-        .find(|(a, b)| a == b) {
+        .find(|(a, b)| a == b)
+    {
         bail!("message {} has duplicate tag {}", ident, duplicate_tag)
     };
 
@@ -383,8 +384,8 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
             Fields::Unit => Punctuated::new(),
             Fields::Named(FieldsNamed { named: fields, .. })
             | Fields::Unnamed(FieldsUnnamed {
-                                  unnamed: fields, ..
-                              }) => fields,
+                unnamed: fields, ..
+            }) => fields,
         };
         if variant_fields.len() != 1 {
             bail!("Oneof enum variants must have a single field");
@@ -403,8 +404,13 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         .flat_map(|(_, field)| field.tags())
         .sorted_unstable()
         .tuple_windows()
-        .find(|(a, b)| a == b) {
-        bail!("invalid oneof {}: multiple variants have tag {}", ident, duplicate_tag);
+        .find(|(a, b)| a == b)
+    {
+        bail!(
+            "invalid oneof {}: multiple variants have tag {}",
+            ident,
+            duplicate_tag
+        );
     }
 
     let encode = fields.iter().map(|&(ref variant_ident, ref field)| {
@@ -527,31 +533,41 @@ mod test {
 
     #[test]
     fn test_rejects_colliding_message_fields() {
-        let output = try_message(quote!(
-            struct Invalid {
-                #[bilrost(bool, tag = "1")]
-                a: bool,
-                #[bilrost(oneof = "super::Whatever", tags = "4, 5, 1")]
-                b: Option<super::Whatever>,
-            }
-        ).into());
+        let output = try_message(
+            quote!(
+                struct Invalid {
+                    #[bilrost(bool, tag = "1")]
+                    a: bool,
+                    #[bilrost(oneof = "super::Whatever", tags = "4, 5, 1")]
+                    b: Option<super::Whatever>,
+                }
+            )
+            .into(),
+        );
         assert!(output.is_err());
-        assert_eq!(output.unwrap_err().to_string(),
-                   "message Invalid has duplicate tag 1");
+        assert_eq!(
+            output.unwrap_err().to_string(),
+            "message Invalid has duplicate tag 1"
+        );
     }
 
     #[test]
     fn test_rejects_colliding_oneof_variants() {
-        let output = try_oneof(quote!(
-            pub enum Invalid {
-                #[bilrost(bool, tag = "1")]
-                A(bool),
-                #[bilrost(bool, tag = "1")]
-                B(bool),
-            }
-        ).into());
+        let output = try_oneof(
+            quote!(
+                pub enum Invalid {
+                    #[bilrost(bool, tag = "1")]
+                    A(bool),
+                    #[bilrost(bool, tag = "1")]
+                    B(bool),
+                }
+            )
+            .into(),
+        );
         assert!(output.is_err());
-        assert_eq!(output.unwrap_err().to_string(),
-                   "invalid oneof Invalid: multiple variants have tag 1");
+        assert_eq!(
+            output.unwrap_err().to_string(),
+            "invalid oneof Invalid: multiple variants have tag 1"
+        );
     }
 }
