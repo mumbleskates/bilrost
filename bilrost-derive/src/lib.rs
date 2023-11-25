@@ -94,7 +94,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
 
     // We want Debug to be in declaration order
     let unsorted_fields = fields.clone();
-    fields.sort_unstable_by_key(|(_, field)| field.tags().iter().min());
+    fields.sort_unstable_by_key(|(_, field)| field.tags().into_iter().min().unwrap());
     let fields = fields;
 
     // TODO(widders): emit code to process the fields ordered
