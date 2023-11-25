@@ -5,11 +5,9 @@
 extern crate alloc;
 extern crate proc_macro;
 
-use proc_macro::TokenStream;
-
 use anyhow::{bail, Error};
 use itertools::Itertools;
-use proc_macro2::{Span, TokenStream as TokenStream2};
+use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use syn::{
     Data, DataEnum, DataStruct, DeriveInput, Expr, Fields, FieldsNamed, FieldsUnnamed,
@@ -21,7 +19,7 @@ use crate::field::Field;
 mod field;
 
 fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
-    let input: DeriveInput = syn::parse(input)?;
+    let input: DeriveInput = syn::parse2(input)?;
 
     let ident = input.ident;
 
@@ -59,7 +57,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     };
 
     let mut next_tag: u32 = 1;
-    let mut fields: Vec<(TokenStream2, Field)> = fields
+    let mut fields: Vec<(TokenStream, Field)> = fields
         .into_iter()
         .enumerate()
         .flat_map(|(i, field)| {
@@ -254,12 +252,12 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
 }
 
 #[proc_macro_derive(Message, attributes(bilrost))]
-pub fn message(input: TokenStream) -> TokenStream {
-    try_message(input).unwrap()
+pub fn message(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    try_message(input.into()).unwrap().into()
 }
 
 fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
-    let input: DeriveInput = syn::parse(input)?;
+    let input: DeriveInput = syn::parse2(input)?;
     let ident = input.ident;
 
     let generics = &input.generics;
@@ -348,12 +346,12 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
 }
 
 #[proc_macro_derive(Enumeration, attributes(bilrost))]
-pub fn enumeration(input: TokenStream) -> TokenStream {
-    try_enumeration(input).unwrap()
+pub fn enumeration(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    try_enumeration(input.into()).unwrap().into()
 }
 
 fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
-    let input: DeriveInput = syn::parse(input)?;
+    let input: DeriveInput = syn::parse2(input)?;
 
     let ident = input.ident;
 
@@ -397,12 +395,8 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         }
     }
 
-    if let Some((invalid_variant, _)) = fields.iter().find(|(_, field)| field.tags().len() > 1) {
-        bail!(
-            "invalid oneof variant {}::{}: oneof variants may only have a single tag",
-            ident,
-            invalid_variant
-        );
+    if fields.iter().any(|(_, field)| field.tags().len() > 1) {
+        panic!("variant with multiple tags");
     }
     if let Some((duplicate_tag, _)) = fields
         .iter()
@@ -522,6 +516,42 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
 }
 
 #[proc_macro_derive(Oneof, attributes(bilrost))]
-pub fn oneof(input: TokenStream) -> TokenStream {
-    try_oneof(input).unwrap()
+pub fn oneof(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    try_oneof(input.into()).unwrap().into()
+}
+
+#[cfg(test)]
+mod test {
+    use crate::{try_message, try_oneof};
+    use quote::quote;
+
+    #[test]
+    fn test_rejects_colliding_message_fields() {
+        let output = try_message(quote!(
+            struct Invalid {
+                #[bilrost(bool, tag = "1")]
+                a: bool,
+                #[bilrost(oneof = "super::Whatever", tags = "4, 5, 1")]
+                b: Option<super::Whatever>,
+            }
+        ).into());
+        assert!(output.is_err());
+        assert_eq!(output.unwrap_err().to_string(),
+                   "message Invalid has duplicate tag 1");
+    }
+
+    #[test]
+    fn test_rejects_colliding_oneof_variants() {
+        let output = try_oneof(quote!(
+            pub enum Invalid {
+                #[bilrost(bool, tag = "1")]
+                A(bool),
+                #[bilrost(bool, tag = "1")]
+                B(bool),
+            }
+        ).into());
+        assert!(output.is_err());
+        assert_eq!(output.unwrap_err().to_string(),
+                   "invalid oneof Invalid: multiple variants have tag 1");
+    }
 }
