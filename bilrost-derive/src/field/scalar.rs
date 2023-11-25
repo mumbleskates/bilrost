@@ -276,7 +276,7 @@ impl Field {
         }
 
         // Prepend `get_` for getter methods of tuple structs.
-        let get = match syn::parse_str::<Index>(&ident_str) {
+        let get = match parse_str::<Index>(&ident_str) {
             Ok(index) => {
                 let get = Ident::new(&format!("get_{}", index.index), Span::call_site());
                 quote!(#get)
@@ -710,7 +710,7 @@ impl DefaultValue {
                 }
 
                 // Rust doesn't have a negative literals, so they have to be parsed specially.
-                if let Some(Ok(lit)) = value.strip_prefix('-').map(syn::parse_str::<Lit>) {
+                if let Some(Ok(lit)) = value.strip_prefix('-').map(parse_str::<Lit>) {
                     match lit {
                         Lit::Int(ref lit) if is_i32 && empty_or_is("i32", lit.suffix()) => {
                             // Initially parse into an i64, so that i32::MIN does not overflow.
@@ -741,7 +741,7 @@ impl DefaultValue {
                         _ => (),
                     }
                 }
-                match syn::parse_str::<Lit>(value) {
+                match parse_str::<Lit>(value) {
                     Ok(Lit::Str(_)) => (),
                     Ok(lit) => return DefaultValue::from_lit(ty, lit),
                     _ => (),
