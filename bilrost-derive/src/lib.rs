@@ -10,8 +10,8 @@ use itertools::Itertools;
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use syn::{
-    punctuated::Punctuated, Data, DataEnum, DataStruct, DeriveInput, Expr, Fields, FieldsNamed,
-    FieldsUnnamed, Ident, Index, Variant,
+    Data, DataEnum, DataStruct, DeriveInput, Expr, Fields, FieldsNamed, FieldsUnnamed, Ident,
+    Index, Variant,
 };
 
 use crate::field::Field;
@@ -380,14 +380,14 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         ..
     } in variants
     {
-        let variant_fields = match variant_fields {
-            Fields::Unit => Punctuated::new(),
+        if match variant_fields {
+            Fields::Unit => 0,
             Fields::Named(FieldsNamed { named: fields, .. })
             | Fields::Unnamed(FieldsUnnamed {
                 unnamed: fields, ..
-            }) => fields,
-        };
-        if variant_fields.len() != 1 {
+            }) => fields.len(),
+        } != 1
+        {
             bail!("Oneof enum variants must have a single field");
         }
         match Field::new_oneof(attrs)? {
