@@ -129,12 +129,14 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         // A oneof field that needs to be sorted based on its current value's tag
         Oneof((TokenStream, Field)),
     }
+    use SortGroupPart::*;
     enum FieldChunk {
         // A field that does not need to be sorted
         AlwaysOrdered((TokenStream, Field)),
         // A set of fields that must be sorted before emitting
         SortGroup(Vec<SortGroupPart>),
     }
+    use FieldChunk::*;
     let mut chunks = Vec::<FieldChunk>::new();
     let mut fields = unsorted_fields
         .iter()
@@ -167,12 +169,10 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
                 // This field overlaps others and must always be emitted independently.
                 // Emit any current ordered group, then emit this field as another part on its own.
                 if !current_contiguous_group.is_empty() {
-                    current_sort_group.push(SortGroupPart::Contiguous(take(
-                        &mut current_contiguous_group,
-                    )));
+                    current_sort_group.push(Contiguous(take(&mut current_contiguous_group)));
                 }
                 sort_group_oneof_tags.extend(field.tags());
-                current_sort_group.push(SortGroupPart::Oneof(this_field.into_inner()));
+                current_sort_group.push(Oneof(this_field.into_inner()));
             } else if sort_group_oneof_tags
                 .range(first_tag..=last_tag)
                 .next()
@@ -182,14 +182,12 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
                 // be emitted independently. Emit any current ordered group, then emit this field as
                 // another part on its own.
                 if !current_contiguous_group.is_empty() {
-                    current_sort_group.push(SortGroupPart::Contiguous(take(
-                        &mut current_contiguous_group,
-                    )));
+                    current_sort_group.push(Contiguous(take(&mut current_contiguous_group)));
                 }
                 // In this case we don't need to add this field's tags to `sort_group_oneof_tags`,
                 // because it doesn't itself overlap (we know that every field after this has a tag
                 // greater than this field's last tag).
-                current_sort_group.push(SortGroupPart::Oneof(this_field.into_inner()));
+                current_sort_group.push(Oneof(this_field.into_inner()));
             } else {
                 // This field doesn't overlap with anything so we just add it to the current group
                 // of already-ordered fields.
@@ -202,9 +200,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
                         // One of the overlapping oneofs in this sort group may emit a tag between
                         // the previous field in the ordered group and this one, so split the
                         // ordered group here.
-                        current_sort_group.push(SortGroupPart::Contiguous(take(
-                            &mut current_contiguous_group,
-                        )));
+                        current_sort_group.push(Contiguous(take(&mut current_contiguous_group)));
                     }
                 }
                 current_contiguous_group.push(this_field.into_inner());
@@ -214,10 +210,10 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
             if overlaps {
                 // This field requires sorting with others. Begin a new sort group.
                 sort_group_oneof_tags = field.tags().into_iter().collect();
-                current_sort_group.push(SortGroupPart::Oneof(this_field.into_inner()));
+                current_sort_group.push(Oneof(this_field.into_inner()));
             } else {
                 // This field doesn't need to be sorted.
-                chunks.push(FieldChunk::AlwaysOrdered(this_field.into_inner()));
+                chunks.push(AlwaysOrdered(this_field.into_inner()));
             }
         }
 
@@ -225,19 +221,27 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
             if !next_field.is_some_and(|(_, next_field)| next_field.first_tag() < sort_group_end) {
                 // We've been building a sort group, but we just reached the end.
                 if !current_contiguous_group.is_empty() {
-                    current_sort_group.push(SortGroupPart::Contiguous(take(
-                        &mut current_contiguous_group,
-                    )));
+                    current_sort_group.push(Contiguous(take(&mut current_contiguous_group)));
                 }
                 assert!(
                     !current_sort_group.is_empty(),
                     "emitting a sort group but there are no fields"
                 );
-                chunks.push(FieldChunk::SortGroup(take(&mut current_sort_group)));
+                chunks.push(SortGroup(take(&mut current_sort_group)));
                 sort_group_oneof_tags.clear();
             }
         }
     }
+    assert!(
+        current_sort_group.into_iter().next().is_none(),
+        "fields left over after chunking"
+    );
+    assert!(
+        current_contiguous_group.into_iter().next().is_none(),
+        "fields left over after chunking"
+    );
+    drop(sort_group_oneof_tags);
+    let fields = chunks;
 
     // TODO(widders): both encoded_len and encode need to process fields in tag order
     let encoded_len = fields
@@ -248,7 +252,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         .iter()
         .map(|&(ref field_ident, ref field)| field.encode(quote!(self.#field_ident)));
 
-    let merge = fields.iter().map(|&(ref field_ident, ref field)| {
+    let merge = unsorted_fields.iter().map(|&(ref field_ident, ref field)| {
         let merge = field.merge(quote!(value));
         let tags = field.tags().into_iter().map(|tag| quote!(#tag));
         let tags = Itertools::intersperse(tags, quote!(|));
@@ -272,12 +276,12 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         )
     };
 
-    let clear = fields
+    let clear = unsorted_fields
         .iter()
         .map(|&(ref field_ident, ref field)| field.clear(quote!(self.#field_ident)));
 
     let default = if is_struct {
-        let default = fields.iter().map(|(field_ident, field)| {
+        let default = unsorted_fields.iter().map(|(field_ident, field)| {
             let value = field.default();
             quote!(#field_ident: #value,)
         });
@@ -285,7 +289,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
             #(#default)*
         }}
     } else {
-        let default = fields.iter().map(|(_, field)| {
+        let default = unsorted_fields.iter().map(|(_, field)| {
             let value = field.default();
             quote!(#value,)
         });
@@ -294,7 +298,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         )}
     };
 
-    let methods = fields
+    let methods = unsorted_fields
         .iter()
         .flat_map(|&(ref field_ident, ref field)| field.methods(field_ident))
         .collect::<Vec<_>>();
