@@ -56,8 +56,8 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         } => (false, Vec::new()),
     };
 
-    let mut next_tag: u32 = 1;
-    let mut fields: Vec<(TokenStream, Field)> = fields
+    let mut next_tag: u32 = 0;
+    let unsorted_fields: Vec<(TokenStream, Field)> = fields
         .into_iter()
         .enumerate()
         .flat_map(|(i, field)| {
@@ -81,7 +81,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         })
         .collect::<Result<Vec<_>, _>>()?;
 
-    if let Some((duplicate_tag, _)) = fields
+    if let Some((duplicate_tag, _)) = unsorted_fields
         .iter()
         .flat_map(|(_, field)| field.tags())
         .sorted_unstable()
@@ -91,13 +91,20 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         bail!("message {} has duplicate tag {}", ident, duplicate_tag)
     };
 
-    // We want Debug to be in declaration order
-    let unsorted_fields = fields.clone();
-    fields.sort_unstable_by_key(|(_, field)| field.tags().into_iter().min().unwrap());
-    let fields = fields;
+    enum FieldChunk {
+        AlwaysOrdered(Field),
+        NeedsSorting(Vec<Vec<Field>>),
+    }
+    let chunks = Vec::<FieldChunk>::new();
+    let mut fields = unsorted_fields
+        .iter()
+        .sorted_unstable_by_key(|(_, field)| field.tags().into_iter().min().unwrap()).peekable();
+    // TODO(widders): keep track of largest field tag in the current needs-sorting chunk
+    while let (Some((field_ident, field)), next_field) = (fields.next(), fields.peek()) {
+        // TODO(widders): build the chunks
+    }
 
-    // TODO(widders): emit code to process the fields ordered
-
+    // TODO(widders): both encoded_len and encode need to process fields in tag order
     let encoded_len = fields
         .iter()
         .map(|&(ref field_ident, ref field)| field.encoded_len(quote!(self.#field_ident)));
@@ -122,7 +129,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         }
     });
 
-    let struct_name = if fields.is_empty() {
+    let struct_name = if unsorted_fields.is_empty() {
         quote!()
     } else {
         quote!(
