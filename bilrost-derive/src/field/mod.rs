@@ -80,6 +80,14 @@ impl Field {
         }
     }
 
+    pub fn first_tag(&self) -> u32 {
+        self.tags().into_iter().min().unwrap()
+    }
+
+    pub fn last_tag(&self) -> u32 {
+        self.tags().into_iter().max().unwrap()
+    }
+
     /// Returns a statement which encodes the field.
     pub fn encode(&self, ident: TokenStream) -> TokenStream {
         match *self {

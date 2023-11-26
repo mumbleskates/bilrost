@@ -5,6 +5,10 @@
 extern crate alloc;
 extern crate proc_macro;
 
+use alloc::collections::BTreeSet;
+use core::mem::{take, ManuallyDrop};
+use core::ops::Deref;
+
 use anyhow::{bail, Error};
 use itertools::Itertools;
 use proc_macro2::{Span, TokenStream};
@@ -17,6 +21,34 @@ use syn::{
 use crate::field::Field;
 
 mod field;
+
+/// Helper type to ensure a value is used at runtime.
+#[repr(transparent)]
+struct MustMove<T>(ManuallyDrop<T>);
+
+impl<T> MustMove<T> {
+    fn new(t: T) -> Self {
+        Self(ManuallyDrop::new(t))
+    }
+
+    fn into_inner(mut self) -> T {
+        unsafe { ManuallyDrop::take(&mut self.0) }
+    }
+}
+
+impl<T> Drop for MustMove<T> {
+    fn drop(&mut self) {
+        panic!("a must-use value was dropped!");
+    }
+}
+
+impl<T> Deref for MustMove<T> {
+    type Target = T;
+
+    fn deref(&self) -> &T {
+        self.0.deref()
+    }
+}
 
 fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     let input: DeriveInput = syn::parse2(input)?;
@@ -91,17 +123,120 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         bail!("message {} has duplicate tag {}", ident, duplicate_tag)
     };
 
-    enum FieldChunk {
-        AlwaysOrdered(Field),
-        NeedsSorting(Vec<Vec<Field>>),
+    enum SortGroupPart {
+        // A set of fields that can be sorted by any of their tags, as they are always contiguous
+        Contiguous(Vec<(TokenStream, Field)>),
+        // A oneof field that needs to be sorted based on its current value's tag
+        Oneof((TokenStream, Field)),
     }
-    let chunks = Vec::<FieldChunk>::new();
+    enum FieldChunk {
+        // A field that does not need to be sorted
+        AlwaysOrdered((TokenStream, Field)),
+        // A set of fields that must be sorted before emitting
+        SortGroup(Vec<SortGroupPart>),
+    }
+    let mut chunks = Vec::<FieldChunk>::new();
     let mut fields = unsorted_fields
         .iter()
-        .sorted_unstable_by_key(|(_, field)| field.tags().into_iter().min().unwrap()).peekable();
-    // TODO(widders): keep track of largest field tag in the current needs-sorting chunk
-    while let (Some((field_ident, field)), next_field) = (fields.next(), fields.peek()) {
-        // TODO(widders): build the chunks
+        .cloned()
+        .sorted_unstable_by_key(|(_, field)| field.first_tag())
+        .peekable();
+    // Current vecs we are building for FieldChunk::SortGroup and SortGroupPart::Contiguous
+    let mut current_contiguous_group: Vec<(TokenStream, Field)> = vec![];
+    let mut current_sort_group: Vec<SortGroupPart> = vec![];
+    // Set of oneof tags that are interspersed with other fields, so we know when we're able to
+    // put multiple fields into the same ordered group.
+    let mut sort_group_oneof_tags = BTreeSet::<u32>::new();
+    while let (Some(this_field), next_field) = (fields.next(), fields.peek()) {
+        // The following logic is a bit involved, so ensure that we can't forget to use the values.
+        let this_field = MustMove::new(this_field);
+        let (_, field) = this_field.deref();
+        let first_tag = field.first_tag();
+        let last_tag = field.last_tag();
+        // Check if this field is a oneof with tags interleaved with other fields' tags. If true,
+        // this field must always be emitted into a sort group.
+        let overlaps = next_field.is_some_and(|(_, next_field)| last_tag > next_field.first_tag());
+        // Check if this field is already in a range we know requires runtime sorting.
+        let in_current_sort_group = sort_group_oneof_tags
+            .last()
+            .is_some_and(|end| *end > first_tag);
+
+        if in_current_sort_group {
+            // We're still building a sort group.
+            if overlaps {
+                // This field overlaps others and must always be emitted independently.
+                // Emit any current ordered group, then emit this field as another part on its own.
+                if !current_contiguous_group.is_empty() {
+                    current_sort_group.push(SortGroupPart::Contiguous(take(
+                        &mut current_contiguous_group,
+                    )));
+                }
+                sort_group_oneof_tags.extend(field.tags());
+                current_sort_group.push(SortGroupPart::Oneof(this_field.into_inner()));
+            } else if sort_group_oneof_tags
+                .range(first_tag..=last_tag)
+                .next()
+                .is_some()
+            {
+                // This field is a oneof that is itself interleaved by other oneofs and must always
+                // be emitted independently. Emit any current ordered group, then emit this field as
+                // another part on its own.
+                if !current_contiguous_group.is_empty() {
+                    current_sort_group.push(SortGroupPart::Contiguous(take(
+                        &mut current_contiguous_group,
+                    )));
+                }
+                // In this case we don't need to add this field's tags to `sort_group_oneof_tags`,
+                // because it doesn't itself overlap (we know that every field after this has a tag
+                // greater than this field's last tag).
+                current_sort_group.push(SortGroupPart::Oneof(this_field.into_inner()));
+            } else {
+                // This field doesn't overlap with anything so we just add it to the current group
+                // of already-ordered fields.
+                if let Some((_, previous_field)) = current_contiguous_group.last() {
+                    if sort_group_oneof_tags
+                        .range(previous_field.last_tag()..=first_tag)
+                        .next()
+                        .is_some()
+                    {
+                        // One of the overlapping oneofs in this sort group may emit a tag between
+                        // the previous field in the ordered group and this one, so split the
+                        // ordered group here.
+                        current_sort_group.push(SortGroupPart::Contiguous(take(
+                            &mut current_contiguous_group,
+                        )));
+                    }
+                }
+                current_contiguous_group.push(this_field.into_inner());
+            }
+        } else {
+            // We are not already in a sort group.
+            if overlaps {
+                // This field requires sorting with others. Begin a new sort group.
+                sort_group_oneof_tags = field.tags().into_iter().collect();
+                current_sort_group.push(SortGroupPart::Oneof(this_field.into_inner()));
+            } else {
+                // This field doesn't need to be sorted.
+                chunks.push(FieldChunk::AlwaysOrdered(this_field.into_inner()));
+            }
+        }
+
+        if let Some(sort_group_end) = sort_group_oneof_tags.last().copied() {
+            if !next_field.is_some_and(|(_, next_field)| next_field.first_tag() < sort_group_end) {
+                // We've been building a sort group, but we just reached the end.
+                if !current_contiguous_group.is_empty() {
+                    current_sort_group.push(SortGroupPart::Contiguous(take(
+                        &mut current_contiguous_group,
+                    )));
+                }
+                assert!(
+                    !current_sort_group.is_empty(),
+                    "emitting a sort group but there are no fields"
+                );
+                chunks.push(FieldChunk::SortGroup(take(&mut current_sort_group)));
+                sort_group_oneof_tags.clear();
+            }
+        }
     }
 
     // TODO(widders): both encoded_len and encode need to process fields in tag order
