@@ -3,8 +3,8 @@
 `bilrost` is a [Protocol Buffers](https://developers.google.com/protocol-buffers/)-alike
 fork for the [Rust Language](https://www.rust-lang.org/). It is a direct fork of
 [`prost`](https://github.com/tokio-rs/prost). Like `prost`, `bilrost` can
-generate simple, idiomatic Rust code with `derive` macros that serializes and
-deserializes data similar to protocol buffers but in a slightly different,
+enable writing simple, idiomatic Rust code with `derive` macros that serializes
+and deserializes data similar to protocol buffers but in a slightly different,
 incompatible way:
 
 * All varints (including tag fields and lengths) use
@@ -84,7 +84,7 @@ Scalar value types are converted as follows:
 
 #### Enumerations
 
-All `.proto` enumeration types convert to the Rust `i32` type. Additionally,
+All enumeration types convert to and from the Rust `u32` type. Additionally,
 each enumeration type gets a corresponding Rust `enum` type. For example, this
 `proto` enum:
 
@@ -125,8 +125,8 @@ impl PhoneType {
 }
 ```
 
-It also adds an `impl TryFrom<i32> for PhoneType`, so you can convert an `i32` to its corresponding `PhoneType` value by doing,
-for example:
+It also adds an `impl TryFrom<i32> for PhoneType`, so you can convert an `i32`
+to its corresponding `PhoneType` value by doing, for example:
 
 ```rust,ignore
 let phone_type = 2i32;
@@ -315,13 +315,6 @@ pub struct AddressBook {
 }
 ```
 
-## Accessing the `protoc` `FileDescriptorSet`
-
-The `bilrost_build::Config::file_descriptor_set_path` option can be used to emit a file descriptor set
-during the build & code generation step. When used in conjunction with the `std::include_bytes`
-macro and the `bilrost_types::FileDescriptorSet` type, applications and libraries using Bilrost can
-implement introspection capabilities requiring details from the original `.proto` files.
-
 ## Using `bilrost` in a `no_std` Crate
 
 `bilrost` is compatible with `no_std` crates. To enable `no_std` support, disable
@@ -333,17 +326,6 @@ bilrost = { version = "0.6", default-features = false, features = ["bilrost-deri
 # Only necessary if using Protobuf well-known types:
 bilrost-types = { version = "0.6", default-features = false }
 ```
-
-Additionally, configure `bilrost-build` to output `BTreeMap`s instead of `HashMap`s
-for all Protobuf `map` fields in your `build.rs`:
-
-```rust,ignore
-let mut config = bilrost_build::Config::new();
-config.btree_map(&["."]);
-```
-
-When using edition 2015, it may be necessary to add an `extern crate core;`
-directive to the crate which includes `bilrost`-generated code.
 
 ## Serializing Existing Types
 
