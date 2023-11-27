@@ -255,24 +255,23 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
                             panic!("empty contiguous field group");
                         };
                         let first_tag = first_field.first_tag();
-                        let each_field = fields
+                        let each_len = fields
                             .iter()
                             .cloned()
                             .map(|(field_ident, field)| {
                                 field.encoded_len(quote!(instance.#field_ident))
                             });
-                        let each_field = Itertools::intersperse(each_field, quote!(+));
                         quote! {
-                            *parts[nparts] = (#first_tag, Some(|instance, tm| {
-                                #(#each_field)*
+                            parts[nparts] = (#first_tag, Some(|instance, tm| {
+                                0 #(+ #each_len)*
                             }));
                             nparts += 1;
                         }
                     }
                     Oneof((field_ident, _)) => quote! {
                         if let Some(oneof) = self.#field_ident.as_ref() {
-                            *parts[nparts] = (oneof.current_tag(), Some(|instance, tm| {
-                                instance.#field_ident.unwrap().encoded_len(tm)
+                            parts[nparts] = (oneof.current_tag(), Some(|instance, tm| {
+                                instance.#field_ident.as_ref().unwrap().encoded_len(tm)
                             }));
                             nparts += 1;
                         }
@@ -282,13 +281,15 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
             let max_parts = parts.len();
             quote! {
                 {
-                    let mut parts: [(u32, Option<fn(&Self, &mut TagMeasurer) -> usize>);
-                        #max_parts] = ::core::default::Default::default();
+                    let mut parts: [(
+                        u32,
+                        Option<fn(&Self, &mut ::bilrost::encoding::TagMeasurer) -> usize>,
+                    ); #max_parts] = ::core::default::Default::default();
                     let mut nparts = 0usize;
                     #(#parts)*
                     let parts = &mut parts[..nparts];
-                    parts.sort_unstable_by_key(|(tag, _)| tag);
-                    parts.iter().map(|(_, len_func)| (len_func.unwrap())(self, tm)).sum()
+                    parts.sort_unstable_by_key(|(tag, _)| *tag);
+                    parts.iter().map(|(_, len_func)| (len_func.unwrap())(self, tm)).sum::<usize>()
                 }
             }
         }
@@ -312,7 +313,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
                                 field.encode(quote!(instance.#field_ident))
                             });
                         quote! {
-                            *parts[nparts] = (#first_tag, Some(|instance, buf, tw| {
+                            parts[nparts] = (#first_tag, Some(|instance, buf, tw| {
                                 #(#each_field)*
                             }));
                             nparts += 1;
@@ -320,8 +321,8 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
                     }
                     Oneof((field_ident, _)) => quote! {
                         if let Some(oneof) = self.#field_ident.as_ref() {
-                            *parts[nparts] = (oneof.current_tag(), Some(|instance, buf, tw| {
-                                instance.#field_ident.unwrap().encode(buf, tw)
+                            parts[nparts] = (oneof.current_tag(), Some(|instance, buf, tw| {
+                                instance.#field_ident.as_ref().unwrap().encode(buf, tw)
                             }));
                             nparts += 1;
                         }
@@ -331,13 +332,15 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
             let max_parts = parts.len();
             quote! {
                 {
-                    let mut parts: [(u32, Option<fn(&Self, &mut B, &mut TagWriter)>);
-                        #max_parts] = ::core::default::Default::default();
+                    let mut parts: [(
+                        u32,
+                        Option<fn(&Self, &mut __B, &mut ::bilrost::encoding::TagWriter)>,
+                    ); #max_parts] = ::core::default::Default::default();
                     let mut nparts = 0usize;
                     #(#parts)*
                     let parts = &mut parts[..nparts];
-                    parts.sort_unstable_by_key(|(tag, _)| tag);
-                    parts.iter().foreach(|(_, encode_func)| (encode_func.unwrap())(self, buf, tw));
+                    parts.sort_unstable_by_key(|(tag, _)| *tag);
+                    parts.iter().for_each(|(_, encode_func)| (encode_func.unwrap())(self, buf, tw));
                 }
             }
         }
@@ -407,20 +410,22 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     let expanded = quote! {
         impl #impl_generics ::bilrost::Message for #ident #ty_generics #where_clause {
             #[allow(unused_variables)]
-            fn encode_raw<B>(&self, buf: &mut B) where B: ::bilrost::bytes::BufMut {
+            fn encode_raw<__B>(&self, buf: &mut __B) where __B: ::bilrost::bytes::BufMut {
                 let tw = &mut ::bilrost::encoding::TagWriter::new();
                 #(#encode)*
             }
 
             #[allow(unused_variables)]
-            fn merge_field<B>(
+            fn merge_field<__B>(
                 &mut self,
                 tag: u32,
                 wire_type: ::bilrost::encoding::WireType,
-                buf: &mut B,
+                buf: &mut __B,
                 ctx: ::bilrost::encoding::DecodeContext,
             ) -> ::core::result::Result<(), ::bilrost::DecodeError>
-            where B: ::bilrost::bytes::Buf {
+            where
+                __B: ::bilrost::bytes::Buf
+            {
                 #struct_name
                 match tag {
                     #(#merge)*
@@ -687,25 +692,30 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
     let expanded = quote! {
         impl #impl_generics #ident #ty_generics #where_clause {
             /// Encodes the message to a buffer.
-            pub fn encode<B>(
+            pub fn encode<__B>(
                 &self,
-                buf: &mut B,
+                buf: &mut __B,
                 tw: &mut ::bilrost::encoding::TagWriter,
-            ) where B: ::bilrost::bytes::BufMut {
+            )
+            where
+                __B: ::bilrost::bytes::BufMut
+            {
                 match *self {
                     #(#encode,)*
                 }
             }
 
             /// Decodes an instance of the message from a buffer, and merges it into self.
-            pub fn merge<B>(
+            pub fn merge<__B>(
                 field: &mut ::core::option::Option<#ident #ty_generics>,
                 tag: u32,
                 wire_type: ::bilrost::encoding::WireType,
-                buf: &mut B,
+                buf: &mut __B,
                 ctx: ::bilrost::encoding::DecodeContext,
             ) -> ::core::result::Result<(), ::bilrost::DecodeError>
-            where B: ::bilrost::bytes::Buf {
+            where
+                __B: ::bilrost::bytes::Buf
+            {
                 match tag {
                     #(#merge,)*
                     _ => unreachable!(concat!("invalid ", stringify!(#ident), " tag: {}"), tag),
@@ -822,5 +832,29 @@ mod test {
                 pub baz: bool,
             }
         });
+        output.unwrap();
+    }
+
+    #[test]
+    fn test_overlapping_message() {
+        let output = try_message(quote! {
+            pub struct Struct {
+                #[bilrost(bool, tag = 0)]
+                zero: bool,
+                #[bilrost(oneof = "A", tags = "1, 10, 20")]
+                a: Option<A>,
+                #[bilrost(bool, tag = 4)]
+                four: bool,
+                #[bilrost(bool, tag = 5)]
+                five: bool,
+                #[bilrost(oneof = "B", tags = "9, 11")]
+                b: Option<B>,
+                #[bilrost(bool, tag = 12)]
+                twelve: bool,
+                #[bilrost(bool, tag = 30)]
+                thirty: bool,
+            }
+        });
+        output.unwrap();
     }
 }
