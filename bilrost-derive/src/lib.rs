@@ -6,7 +6,7 @@ extern crate alloc;
 extern crate proc_macro;
 
 use alloc::collections::BTreeSet;
-use core::mem::{take, ManuallyDrop};
+use core::mem::take;
 use core::ops::Deref;
 
 use anyhow::{bail, Error};
@@ -23,22 +23,23 @@ use crate::field::Field;
 mod field;
 
 /// Helper type to ensure a value is used at runtime.
-#[repr(transparent)]
-struct MustMove<T>(ManuallyDrop<T>);
+struct MustMove<T>(Option<T>);
 
 impl<T> MustMove<T> {
     fn new(t: T) -> Self {
-        Self(ManuallyDrop::new(t))
+        Self(Some(t))
     }
 
     fn into_inner(mut self) -> T {
-        unsafe { ManuallyDrop::take(&mut self.0) }
+        take(&mut self.0).unwrap()
     }
 }
 
 impl<T> Drop for MustMove<T> {
     fn drop(&mut self) {
-        panic!("a must-use value was dropped!");
+        if self.0.is_some() {
+            panic!("a must-use value was dropped!");
+        }
     }
 }
 
@@ -46,7 +47,7 @@ impl<T> Deref for MustMove<T> {
     type Target = T;
 
     fn deref(&self) -> &T {
-        self.0.deref()
+        self.0.as_ref().unwrap()
     }
 }
 
@@ -770,14 +771,14 @@ mod test {
     #[test]
     fn test_rejects_colliding_message_fields() {
         let output = try_message(
-            quote!(
+            quote! {
                 struct Invalid {
                     #[bilrost(bool, tag = "1")]
                     a: bool,
                     #[bilrost(oneof = "super::Whatever", tags = "4, 5, 1")]
                     b: Option<super::Whatever>,
                 }
-            )
+            }
             .into(),
         );
         assert!(output.is_err());
@@ -790,14 +791,14 @@ mod test {
     #[test]
     fn test_rejects_colliding_oneof_variants() {
         let output = try_oneof(
-            quote!(
+            quote! {
                 pub enum Invalid {
                     #[bilrost(bool, tag = "1")]
                     A(bool),
                     #[bilrost(bool, tag = "1")]
                     B(bool),
                 }
-            )
+            }
             .into(),
         );
         assert!(output.is_err());
@@ -805,5 +806,21 @@ mod test {
             output.unwrap_err().to_string(),
             "invalid oneof Invalid: multiple variants have tag 1"
         );
+    }
+
+    #[test]
+    fn test_basic_message() {
+        let output = try_message(quote! {
+            pub struct Struct {
+                #[bilrost(btree_map = "string, sint64", tag = 3)]
+                pub fields: BTreeMap<String, i64>,
+                #[bilrost(string, tag = 0)]
+                pub foo: String,
+                #[bilrost(sint64, tag = 1)]
+                pub bar: i64,
+                #[bilrost(bool, tag = 2)]
+                pub baz: bool,
+            }
+        });
     }
 }
