@@ -26,7 +26,7 @@ test:
 test-no-default-features:
   stage: test
   script:
-    - cargo test -p bilrost-build -p bilrost-derive -p bilrost-types --all-targets --no-default-features
+    - cargo test --workspace --all-targets --no-default-features
 
 doctest:
   stage: test
@@ -36,4 +36,4 @@ doctest:
 doctest-no-default-features:
   stage: test
   script:
-    - cargo test -p bilrost-build -p bilrost-derive -p bilrost-types --doc --no-default-features
+    - cargo test --workspace --doc --no-default-features
