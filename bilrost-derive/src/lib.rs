@@ -243,14 +243,104 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     drop(sort_group_oneof_tags);
     let fields = chunks;
 
-    // TODO(widders): both encoded_len and encode need to process fields in tag order
-    let encoded_len = fields
-        .iter()
-        .map(|&(ref field_ident, ref field)| field.encoded_len(quote!(self.#field_ident)));
+    let encoded_len = fields.iter().map(|chunk| match chunk {
+        AlwaysOrdered((field_ident, field)) => field.encoded_len(quote!(self.#field_ident)),
+        SortGroup(parts) => {
+            let parts: Vec<TokenStream> = parts
+                .iter()
+                .map(|part| match part {
+                    Contiguous(fields) => {
+                        let Some((_, first_field)) = fields.first() else {
+                            panic!("empty contiguous field group");
+                        };
+                        let first_tag = first_field.first_tag();
+                        let each_field = fields
+                            .iter()
+                            .cloned()
+                            .map(|(field_ident, field)| {
+                                field.encoded_len(quote!(instance.#field_ident))
+                            });
+                        let each_field = Itertools::intersperse(each_field, quote!(+));
+                        quote! {
+                            *parts[nparts] = (#first_tag, Some(|instance, tm| {
+                                #(#each_field)*
+                            }));
+                            nparts += 1;
+                        }
+                    }
+                    Oneof((field_ident, _)) => quote! {
+                        if let Some(oneof) = self.#field_ident.as_ref() {
+                            *parts[nparts] = (oneof.current_tag(), Some(|instance, tm| {
+                                instance.#field_ident.unwrap().encoded_len(tm)
+                            }));
+                            nparts += 1;
+                        }
+                    },
+                })
+                .collect();
+            let max_parts = parts.len();
+            quote! {
+                {
+                    let mut parts: [(u32, Option<fn(&Self, &mut TagMeasurer) -> usize>);
+                        #max_parts] = ::core::default::Default::default();
+                    let mut nparts = 0usize;
+                    #(#parts)*
+                    let parts = &mut parts[..nparts];
+                    parts.sort_unstable_by_key(|(tag, _)| tag);
+                    parts.iter().map(|(_, len_func)| (len_func.unwrap())(self, tm)).sum()
+                }
+            }
+        }
+    });
 
-    let encode = fields
-        .iter()
-        .map(|&(ref field_ident, ref field)| field.encode(quote!(self.#field_ident)));
+    let encode = fields.iter().map(|chunk| match chunk {
+        AlwaysOrdered((field_ident, field)) => field.encode(quote!(self.#field_ident)),
+        SortGroup(parts) => {
+            let parts: Vec<TokenStream> = parts
+                .iter()
+                .map(|part| match part {
+                    Contiguous(fields) => {
+                        let Some((_, first_field)) = fields.first() else {
+                            panic!("empty contiguous field group");
+                        };
+                        let first_tag = first_field.first_tag();
+                        let each_field = fields
+                            .iter()
+                            .cloned()
+                            .map(|(field_ident, field)| {
+                                field.encode(quote!(instance.#field_ident))
+                            });
+                        quote! {
+                            *parts[nparts] = (#first_tag, Some(|instance, buf, tw| {
+                                #(#each_field)*
+                            }));
+                            nparts += 1;
+                        }
+                    }
+                    Oneof((field_ident, _)) => quote! {
+                        if let Some(oneof) = self.#field_ident.as_ref() {
+                            *parts[nparts] = (oneof.current_tag(), Some(|instance, buf, tw| {
+                                instance.#field_ident.unwrap().encode(buf, tw)
+                            }));
+                            nparts += 1;
+                        }
+                    },
+                })
+                .collect();
+            let max_parts = parts.len();
+            quote! {
+                {
+                    let mut parts: [(u32, Option<fn(&Self, &mut B, &mut TagWriter)>);
+                        #max_parts] = ::core::default::Default::default();
+                    let mut nparts = 0usize;
+                    #(#parts)*
+                    let parts = &mut parts[..nparts];
+                    parts.sort_unstable_by_key(|(tag, _)| tag);
+                    parts.iter().foreach(|(_, encode_func)| (encode_func.unwrap())(self, buf, tw));
+                }
+            }
+        }
+    });
 
     let merge = unsorted_fields.iter().map(|&(ref field_ident, ref field)| {
         let merge = field.merge(quote!(value));
