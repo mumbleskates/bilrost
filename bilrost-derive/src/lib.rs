@@ -279,6 +279,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
                 })
                 .collect();
             let max_parts = parts.len();
+            // TODO(widders): when there are many parts, use Vec instead of array
             quote! {
                 {
                     let mut parts: [(
@@ -330,6 +331,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
                 })
                 .collect();
             let max_parts = parts.len();
+            // TODO(widders): when there are many parts, use Vec instead of array
             quote! {
                 {
                     let mut parts: [(
