@@ -1,6 +1,6 @@
 [package]
 name = "bilrost-types"
-version = "0.12.2"
+version = "0.12.3"
 authors = [
     "Dan Burkert <dan@danburkert.com>",
     "Lucio Franco <luciofranco14@gmail.com",
@@ -22,7 +22,7 @@ default = ["std"]
 std = ["bilrost/std"]
 
 [dependencies]
-bilrost = { version = "0.12.2", path = "..", default-features = false, features = ["bilrost-derive"] }
+bilrost = { version = "0.12.3", path = "..", default-features = false, features = ["bilrost-derive"] }
 
 [dev-dependencies]
 proptest = "1"
