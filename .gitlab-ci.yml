@@ -1,0 +1,39 @@
+default:
+  image:
+    name: rust:latest
+
+variables:
+  CARGO_HOME: ${CI_PROJECT_DIR}/.cargo
+
+cache:
+  key: ${CI_COMMIT_REF_SLUG}
+  paths:
+    - .cargo/bin
+    - .cargo/registry/index
+    - .cargo/registry/cache
+    - target/debug/deps
+    - target/debug/build
+  policy: pull-push
+
+stages:
+  - test
+
+test:
+  stage: test
+  script:
+    - cargo test --workspace --all-targets
+
+test-no-default-features:
+  stage: test
+  script:
+    - cargo test -p bilrost-build -p bilrost-derive -p bilrost-types --all-targets --no-default-features
+
+doctest:
+  stage: test
+  script:
+    - cargo test --workspace --doc
+
+doctest-no-default-features:
+  stage: test
+  script:
+    - cargo test -p bilrost-build -p bilrost-derive -p bilrost-types --doc --no-default-features
