@@ -240,7 +240,8 @@ impl DecodeContext {
 /// The returned value will be between 1 and 10, inclusive.
 #[inline]
 pub fn encoded_len_varint(value: u64) -> usize {
-    for (i, limit) in [
+    const LIMIT: [u64; 9] = [
+        0,
         0x80,
         0x4080,
         0x20_4080,
@@ -249,15 +250,32 @@ pub fn encoded_len_varint(value: u64) -> usize {
         0x408_1020_4080,
         0x2_0408_1020_4080,
         0x102_0408_1020_4080,
-    ]
-    .into_iter()
-    .enumerate()
-    {
-        if value < limit {
-            return i + 1;
+    ];
+    if value < LIMIT[2] {
+        if value < LIMIT[1] {
+            1
+        } else {
+            2
         }
+    } else if value < LIMIT[5] {
+        if value < LIMIT[3] {
+            3
+        } else if value < LIMIT[4] {
+            4
+        } else {
+            5
+        }
+    } else if value < LIMIT[7] {
+        if value < LIMIT[6] {
+            6
+        } else {
+            7
+        }
+    } else if value < LIMIT[8] {
+        8
+    } else {
+        9
     }
-    return 9;
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
