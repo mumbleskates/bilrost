@@ -837,10 +837,22 @@ mod test {
         output.unwrap();
     }
 
+        #[test]
+    fn test_tuple_message() {
+        let output = try_message(quote! {
+            struct Tuple(
+                #[bilrost(bool, tag = 5)] bool,
+                #[bilrost(string, tag = 0)] String,
+                #[bilrost(sint64)] i64,
+            );
+        });
+        output.unwrap();
+    }
+
     #[test]
     fn test_overlapping_message() {
         let output = try_message(quote! {
-            pub struct Struct {
+            struct Struct {
                 #[bilrost(bool, tag = 0)]
                 zero: bool,
                 #[bilrost(oneof = "A", tags = "1, 10, 20")]
@@ -851,10 +863,22 @@ mod test {
                 five: bool,
                 #[bilrost(oneof = "B", tags = "9, 11")]
                 b: Option<B>,
-                #[bilrost(bool, tag = 12)]
+                #[bilrost(bool)] // implicitly tagged 12
                 twelve: bool,
-                #[bilrost(bool, tag = 30)]
-                thirty: bool,
+                #[bilrost(oneof = "C", tags = "13, 16, 22")]
+                c: Option<C>,
+                #[bilrost(bool, tag = 14)]
+                fourteen: bool,
+                #[bilrost(bool)] // implicitly tagged 15
+                fifteen: bool,
+                #[bilrost(bool, tag = 17)]
+                seventeen: bool,
+                #[bilrost(oneof = "D", tags = "18, 19")]
+                d: Option<D>,
+                #[bilrost(bool, tag = 21)]
+                twentyone: bool,
+                #[bilrost(bool, tag = 50)]
+                fifty: bool,
             }
         });
         output.unwrap();
