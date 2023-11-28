@@ -251,15 +251,15 @@ pub fn encoded_len_varint(value: u64) -> usize {
         0x2_0408_1020_4080,
         0x102_0408_1020_4080,
     ];
-    if value < LIMIT[2] {
-        if value < LIMIT[1] {
-            1
-        } else {
-            2
-        }
+    if value < LIMIT[1] {
+        1
     } else if value < LIMIT[5] {
         if value < LIMIT[3] {
-            3
+            if value < LIMIT[2] {
+                2
+            } else {
+                3
+            }
         } else if value < LIMIT[4] {
             4
         } else {

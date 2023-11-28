@@ -80,7 +80,7 @@ fn main() {
     // Benchmark encoding and decoding 100 medium (5 byte) varints.
     benchmark_varint(&mut criterion, "medium", (1 << 28..).take(100).collect());
 
-    // Benchmark encoding and decoding 100 large (10 byte) varints.
+    // Benchmark encoding and decoding 100 large (9 byte) varints.
     benchmark_varint(&mut criterion, "large", (1 << 63..).take(100).collect());
 
     // Benchmark encoding and decoding 100 varints of mixed width (average 5.5 bytes).
