@@ -236,8 +236,8 @@ impl DecodeContext {
     }
 }
 
-/// Returns the encoded length of the value in LEB128 variable length format.
-/// The returned value will be between 1 and 10, inclusive.
+/// Returns the encoded length of the value in LEB128-bijective variable length format.
+/// The returned value will be between 1 and 9, inclusive.
 #[inline]
 pub fn encoded_len_varint(value: u64) -> usize {
     const LIMIT: [u64; 9] = [
