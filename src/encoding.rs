@@ -254,10 +254,12 @@ pub fn encoded_len_varint(value: u64) -> usize {
     if value < LIMIT[1] {
         1
     } else if value < LIMIT[5] {
-        if value < LIMIT[2] {
-            2
-        } else if value < LIMIT[3] {
-            3
+        if value < LIMIT[3] {
+            if value < LIMIT[2] {
+                2
+            } else {
+                3
+            }
         } else if value < LIMIT[4] {
             4
         } else {
