@@ -22,18 +22,6 @@ test:
   stage: test
   script:
     - cargo test --workspace --all-targets
-
-test-no-default-features:
-  stage: test
-  script:
-    - cargo test --workspace --all-targets --no-default-features
-
-doctest:
-  stage: test
-  script:
     - cargo test --workspace --doc
-
-doctest-no-default-features:
-  stage: test
-  script:
+    - cargo test --workspace --all-targets --no-default-features
     - cargo test --workspace --doc --no-default-features
