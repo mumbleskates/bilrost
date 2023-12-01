@@ -1437,7 +1437,6 @@ mod test {
     use alloc::string::ToString;
     use core::borrow::Borrow;
     use core::fmt::Debug;
-    use core::u64;
 
     use ::bytes::{Bytes, BytesMut};
     use proptest::{prelude::*, test_runner::TestCaseResult};
