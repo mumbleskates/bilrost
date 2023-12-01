@@ -1,8 +1,9 @@
 use std::mem;
 
+use bilrost::encoding::{decode_varint, encode_varint, encoded_len_varint, TagReader, WireType};
+use bilrost::DecodeError;
 use bytes::Buf;
 use criterion::{Criterion, Throughput};
-use bilrost::encoding::{decode_varint, encode_varint, encoded_len_varint};
 use rand::{rngs::StdRng, seq::SliceRandom, SeedableRng};
 
 fn benchmark_varint(criterion: &mut Criterion, name: &str, mut values: Vec<u64>) {
@@ -71,6 +72,38 @@ fn benchmark_varint(criterion: &mut Criterion, name: &str, mut values: Vec<u64>)
         .throughput(Throughput::Bytes(decoded_len));
 }
 
+fn benchmark_decode_key(criterion: &mut Criterion, name: &str, mut values: Vec<u64>) {
+    // Shuffle the values in a stable order.
+    values.shuffle(&mut StdRng::seed_from_u64(0));
+    let name = format!("field/{}", name);
+
+    let decoded_len =
+        (values.len() * mem::size_of::<Result<(u32, WireType), DecodeError>>()) as u64;
+
+    criterion
+        .benchmark_group(&name)
+        .bench_function("decode_key", {
+            let decode_values = values.clone();
+
+            move |b| {
+                let mut buf = Vec::with_capacity(decode_values.len() * 10);
+                for &value in &decode_values {
+                    encode_varint(value, &mut buf);
+                }
+
+                b.iter(|| {
+                    let mut buf = &mut buf.as_slice();
+                    while buf.has_remaining() {
+                        let result = TagReader::new().decode_key(&mut buf);
+                        debug_assert!(result.is_ok());
+                        criterion::black_box(&result);
+                    }
+                })
+            }
+        })
+        .throughput(Throughput::Bytes(decoded_len));
+}
+
 fn main() {
     let mut criterion = Criterion::default().configure_from_args();
 
@@ -94,6 +127,12 @@ fn main() {
             })
             .collect(),
     );
+
+    // Benchmark encoding and decoding 100 small (1 byte) field keys.
+    benchmark_decode_key(&mut criterion, "small", (0..100).collect());
+
+    // Benchmark encoding and decoding 100 medium (5 byte) field keys.
+    benchmark_decode_key(&mut criterion, "medium", (1 << 28..).take(100).collect());
 
     criterion.final_summary();
 }
