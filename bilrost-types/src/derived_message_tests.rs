@@ -1,8 +1,8 @@
 #[cfg(test)]
 mod tests {
-    use crate::{Message, Oneof};
-    use itertools::Itertools;
-    use std::default::Default;
+    use bilrost::{Message, Oneof};
+    use core::default::Default;
+    use itertools::{repeat_n, Itertools};
 
     #[derive(Clone, PartialEq, Oneof)]
     enum A {
@@ -77,9 +77,12 @@ mod tests {
 
     #[test]
     fn derived_message_field_ordering() {
-        assert!(false);
-        let bools = [[false, true]].repeat_n(9).multi_cartesian_product();
-        let abcd = [One(true), Ten(true), Twenty(true)]
+        // This must be the same as the number of fields we're putting into the struct...
+        let bools = repeat_n([false, true], 9)
+            .multi_cartesian_product()
+            .flatten()
+            .tuples();
+        let abcd = [None, Some(One(true)), Some(Ten(true)), Some(Twenty(true))]
             .into_iter()
             .cartesian_product([None, Some(Nine(true)), Some(Eleven(true))])
             .cartesian_product([
@@ -91,24 +94,23 @@ mod tests {
             .cartesian_product([None, Some(Eighteen(true)), Some(Nineteen(true))]);
         for (bools, oneofs) in bools.cartesian_product(abcd) {
             let mut out: Struct = Default::default();
-            [
-                *out.zero,
-                *out.four,
-                *out.five,
-                *out.twelve,
-                *out.fourteen,
-                *out.fifteen,
-                *out.seventeen,
-                *out.twentyone,
-                *out.fifty,
-            ] = bools;
-            [*out.a, *out.b, *out.c, *out.d] = oneofs;
+            (
+                out.zero,
+                out.four,
+                out.five,
+                out.twelve,
+                out.fourteen,
+                out.fifteen,
+                out.seventeen,
+                out.twentyone,
+                out.fifty,
+            ) = bools;
+            (((out.a, out.b), out.c), out.d) = oneofs;
 
             let encoded_len = out.encoded_len();
             let encoded = out.encode_to_vec();
-            assert_eq!(encoded.len(), encoded_len());
-
-            let re = Struct::decode(encoded);
+            assert_eq!(encoded.len(), encoded_len);
+            let re = Struct::decode(&encoded[..]).unwrap();
             assert_eq!(out, re);
         }
     }

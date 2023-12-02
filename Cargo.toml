@@ -18,16 +18,16 @@ rust-version = "1.65"
 
 [workspace]
 members = [
-    "bilrost-derive",
-    "bilrost-types",
+  "bilrost-derive",
+  "bilrost-types",
 ]
 
 exclude = [
-    # The fuzz crate can't be compiled or tested without the 'cargo fuzz' command,
-    # so exclude it from normal builds.
-    "fuzz",
-    # Same counts for the afl fuzz targets
-    "afl",
+  # The fuzz crate can't be compiled or tested without the 'cargo fuzz' command,
+  # so exclude it from normal builds.
+  "fuzz",
+  # Same counts for the afl fuzz targets
+  "afl",
 ]
 
 [lib]
@@ -46,7 +46,6 @@ bilrost-derive = { version = "0.12.3", path = "bilrost-derive", optional = true 
 [dev-dependencies]
 criterion = { version = "0.5", default-features = false }
 env_logger = { version = "0.10", default-features = false }
-itertools = { version = ">=0.10, <0.13", default-features = false, features = ["use_alloc"] }
 log = "0.4"
 proptest = "1"
 rand = "0.8"

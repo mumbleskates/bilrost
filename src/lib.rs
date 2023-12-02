@@ -14,8 +14,6 @@ mod message;
 mod name;
 mod types;
 
-mod derived_message_tests;
-
 #[doc(hidden)]
 pub mod encoding;
 
