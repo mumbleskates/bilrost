@@ -53,7 +53,7 @@ where
 /// Returns the encoded length of a length delimiter.
 ///
 /// Applications may use this method to ensure sufficient buffer capacity before calling
-/// `encode_length_delimiter`. The returned size will be between 1 and 10, inclusive.
+/// `encode_length_delimiter`. The returned size will be between 1 and 9, inclusive.
 pub fn length_delimiter_len(length: usize) -> usize {
     encoded_len_varint(length as u64)
 }
@@ -65,21 +65,14 @@ pub fn length_delimiter_len(length: usize) -> usize {
 ///
 /// An error may be returned in two cases:
 ///
-///  * If the supplied buffer contains fewer than 10 bytes, then an error indicates that more
+///  * If the supplied buffer contains fewer than 9 bytes, then an error indicates that more
 ///    input is required to decode the full delimiter.
-///  * If the supplied buffer contains more than 10 bytes, then the buffer contains an invalid
+///  * If the supplied buffer contains 9 or more bytes, then the buffer contains an invalid
 ///    delimiter, and typically the buffer should be considered corrupt.
-pub fn decode_length_delimiter<B>(mut buf: B) -> Result<usize, DecodeError>
-where
-    B: Buf,
-{
-    let length = decode_varint(&mut buf)?;
-    if length > usize::max_value() as u64 {
-        return Err(DecodeError::new(
-            "length delimiter exceeds maximum usize value",
-        ));
-    }
-    Ok(length as usize)
+pub fn decode_length_delimiter<B: Buf>(mut buf: B) -> Result<usize, DecodeError> {
+    decode_varint(&mut buf)?
+        .try_into()
+        .map_err(|_| DecodeError::new("length delimiter exceeds maximum usize value"))
 }
 
 // Re-export #[derive(Message, Enumeration, Oneof)].
