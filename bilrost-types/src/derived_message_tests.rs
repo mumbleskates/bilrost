@@ -75,13 +75,34 @@ mod tests {
         fifty: bool,
     }
 
+    impl TryFrom<Vec<bool>> for Struct {
+        type Error = ();
+
+        fn try_from(value: Vec<bool>) -> Result<Self, ()> {
+            match value[..] {
+                [zero, four, five, twelve, fourteen, fifteen, seventeen, twentyone, fifty] => {
+                    Ok(Self {
+                        zero,
+                        four,
+                        five,
+                        twelve,
+                        fourteen,
+                        fifteen,
+                        seventeen,
+                        twentyone,
+                        fifty,
+                        ..Default::default()
+                    })
+                }
+                _ => Err(()),
+            }
+        }
+    }
+
     #[test]
     fn derived_message_field_ordering() {
         // This must be the same as the number of fields we're putting into the struct...
-        let bools = repeat_n([false, true], 9)
-            .multi_cartesian_product()
-            .flatten()
-            .tuples();
+        let bools = repeat_n([false, true], 9).multi_cartesian_product();
         let abcd = [None, Some(One(true)), Some(Ten(true)), Some(Twenty(true))]
             .into_iter()
             .cartesian_product([None, Some(Nine(true)), Some(Eleven(true))])
@@ -93,18 +114,7 @@ mod tests {
             ])
             .cartesian_product([None, Some(Eighteen(true)), Some(Nineteen(true))]);
         for (bools, oneofs) in bools.cartesian_product(abcd) {
-            let mut out: Struct = Default::default();
-            (
-                out.zero,
-                out.four,
-                out.five,
-                out.twelve,
-                out.fourteen,
-                out.fifteen,
-                out.seventeen,
-                out.twentyone,
-                out.fifty,
-            ) = bools;
+            let mut out: Struct = bools.try_into().unwrap();
             (((out.a, out.b), out.c), out.d) = oneofs;
 
             let encoded_len = out.encoded_len();
