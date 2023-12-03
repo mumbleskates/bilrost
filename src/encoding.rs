@@ -570,7 +570,8 @@ macro_rules! merge_repeated_numeric {
                 capped.consume_to_cap(|buf| {
                     let mut value = Default::default();
                     $merge($wire_type, &mut value, buf, ctx.clone())?;
-                    Ok(values.push(value))
+                    values.push(value);
+                    Ok(())
                 })
             } else {
                 // Unpacked.
