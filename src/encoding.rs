@@ -8,15 +8,15 @@ use alloc::collections::BTreeMap;
 use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
-use core::cmp::min;
-use core::cmp::Ordering::{Equal, Greater, Less};
+use core::cmp::{min, Ordering::{Equal, Greater, Less}};
 use core::convert::TryFrom;
 use core::mem;
+use core::ops::{Deref, DerefMut};
 use core::str;
 
 use ::bytes::{Buf, BufMut, Bytes};
 
-use crate::DecodeError;
+use crate::{decode_length_delimiter, DecodeError};
 use crate::Message;
 
 /// Encodes an integer value into LEB128-bijective variable length format, and writes it to the
@@ -305,6 +305,17 @@ impl TryFrom<u64> for WireType {
     }
 }
 
+impl WireType {
+    const fn encoded_size_alignment(self) -> usize {
+        match self {
+            WireType::Varint => 1,
+            WireType::LengthDelimited => 1,
+            WireType::SixtyFourBit => 8,
+            WireType::ThirtyTwoBit => 4,
+        }
+    }
+}
+
 pub struct TagWriter {
     last_tag: u32,
 }
@@ -411,33 +422,88 @@ pub fn check_wire_type(expected: WireType, actual: WireType) -> Result<(), Decod
     Ok(())
 }
 
-/// Helper function which abstracts reading a length delimiter prefix followed
-/// by decoding values until the length of bytes is exhausted.
-#[inline]
-pub fn merge_loop<M, B>(
-    buf: &mut B,
-    ctx: DecodeContext,
-    mut merge: M,
-) -> Result<(), DecodeError>
-where
-    M: FnMut(&mut B, DecodeContext) -> Result<(), DecodeError>,
-    B: Buf,
-{
-    let len = decode_varint(buf)?;
-    let remaining = buf.remaining();
-    if len > remaining as u64 {
-        return Err(DecodeError::new("field truncated"));
+/// A soft-limited wrapper for `impl Buf` that doesn't invoke extra work whenever the buffer is read
+/// from, only when the remaining bytes are checked. This means it can be nested arbitrarily without
+/// adding extra work every time.
+struct Capped<'a, B: Buf> {
+    buf: &'a mut B,
+    extra_bytes_remaining: usize,
+}
+
+impl<'a, B: Buf> Capped<'a, B> {
+    /// Reads a length delimiter from the beginning of the wrapped buffer, then returns a  Capped
+    /// instance for the delineated bytes if it does not overrun the underlying buffer.
+    fn from_length_delimited(buf: &'a mut B) -> Result<Self, DecodeError> {
+        let len = decode_length_delimiter(&mut *buf)?;
+        let remaining = buf.remaining();
+        if len > remaining {
+            return Err(DecodeError::new("field truncated"));
+        }
+        Ok(Capped {
+            buf,
+            extra_bytes_remaining: remaining - len,
+        })
     }
 
-    let limit = remaining - len as usize;
-    while buf.remaining() > limit {
-        merge(buf, ctx.clone())?;
+    /// Reads a length delimiter from the beginning of the wrapped buffer, then returns a subsidiary
+    /// Capped instance for the delineated bytes if it does not overrun the underlying buffer or
+    /// this instance's cap.
+    // TODO(widders): pass this down, perhaps. when we don't do this it's possible for a single
+    //  invocation of the loop in consume_to_cap() to wildly overrun its welcome purely because its
+    //  inner function has to use the cap from the buf rather than the cap from the instance.
+    fn take_length_delimited(&mut self) -> Result<Capped<B>, DecodeError> {
+        let len = decode_length_delimiter(&mut *self.buf)?;
+        let remaining = self.buf.remaining();
+        if len > remaining {
+            return Err(DecodeError::new("field truncated"));
+        }
+        let extra_bytes_remaining = remaining - len;
+        if extra_bytes_remaining < self.extra_bytes_remaining {
+            return Err(DecodeError::new("field truncated"));
+        }
+        Ok(Capped {
+            buf: self.buf,
+            extra_bytes_remaining,
+        })
     }
 
-    if buf.remaining() != limit {
-        return Err(DecodeError::new("delimited length exceeded"));
+    /// Passes the wrapped buffer to the provided continuation until an error occurs, the buffer
+    /// is consumed up to the cap, or the buffer is consumed *beyond* the cap (which is an error).
+    #[inline]
+    fn consume_to_cap<F>(&mut self, mut read_with: F) -> Result<(), DecodeError>
+    where
+        F: FnMut(&mut B) -> Result<(), DecodeError>,
+    {
+        while self.buf.remaining() > self.extra_bytes_remaining {
+            read_with(self.buf)?;
+        }
+        if self.buf.remaining() < self.extra_bytes_remaining {
+            return Err(DecodeError::new("delimited length exceeded"));
+        }
+        Ok(())
     }
-    Ok(())
+
+    /// Returns the number of bytes left before the cap.
+    #[inline]
+    fn remaining_before_cap(&self) -> usize {
+        self.buf
+            .remaining()
+            .saturating_sub(self.extra_bytes_remaining)
+    }
+}
+
+impl<'a, B: Buf> Deref for Capped<'a, B> {
+    type Target = B;
+
+    fn deref(&self) -> &B {
+        self.buf
+    }
+}
+
+impl<'a, B: Buf> DerefMut for Capped<'a, B> {
+    fn deref_mut(&mut self) -> &mut B {
+        self.buf
+    }
 }
 
 pub fn skip_field<B: Buf>(
@@ -494,15 +560,14 @@ macro_rules! merge_repeated_numeric {
         {
             if wire_type == WireType::LengthDelimited {
                 // Packed.
-                // TODO(widders): check that the length is possibly valid. it's possible that a
-                //  lower-cost wrapper for Buf that knows its target remaining, rather than tracking
-                //  its limit constantly like Take does, would be much better (since it doesn't
-                //  involve updating one additional counter per level of nesting)
-                merge_loop(buf, ctx, |buf, ctx| {
+                let mut capped = Capped::from_length_delimited(buf)?;
+                if capped.remaining_before_cap() % $wire_type.encoded_size_alignment() != 0 {
+                    return Err(DecodeError::new("packed field is not "))
+                }
+                capped.consume_to_cap(|buf| {
                     let mut value = Default::default();
-                    $merge($wire_type, &mut value, buf, ctx)?;
-                    values.push(value);
-                    Ok(())
+                    $merge($wire_type, &mut value, buf, ctx.clone())?;
+                    Ok(values.push(value))
                 })
             } else {
                 // Unpacked.
@@ -1146,14 +1211,11 @@ pub mod message {
         check_wire_type(WireType::LengthDelimited, wire_type)?;
         ctx.limit_reached()?;
         let mut tr = TagReader::new();
-        merge_loop(
-            buf,
-            ctx.enter_recursion(),
-            |buf, ctx| {
-                let (tag, wire_type) = tr.decode_key(buf)?;
-                msg.merge_field(tag, wire_type, buf, ctx)
-            },
-        )
+        let inner_ctx = ctx.enter_recursion();
+        Capped::from_length_delimited(buf)?.consume_to_cap(|buf| {
+            let (tag, wire_type) = tr.decode_key(buf)?;
+            msg.merge_field(tag, wire_type, buf, inner_ctx.clone())
+        })
     }
 
     pub fn encode_repeated<M, B>(tag: u32, messages: &[M], buf: &mut B, tw: &mut TagWriter)
@@ -1366,20 +1428,16 @@ macro_rules! map {
             let mut val = val_default;
             ctx.limit_reached()?;
             let mut tr = TagReader::new();
-            merge_loop(
-                buf,
-                ctx.enter_recursion(),
-                |buf, ctx| {
-                    let (tag, wire_type) = tr.decode_key(buf)?;
-                    // TODO(widders): does this have correct behavior if k or v are incorrectly
-                    //  repeated?
-                    match tag {
-                        1 => key_merge(wire_type, &mut key, buf, ctx),
-                        2 => val_merge(wire_type, &mut val, buf, ctx),
-                        _ => skip_field(wire_type, buf, ctx),
-                    }
-                },
-            )?;
+            Capped::from_length_delimited(buf)?.consume_to_cap(|buf| {
+                let (tag, wire_type) = tr.decode_key(buf)?;
+                // TODO(widders): does this have correct behavior if k or v are incorrectly
+                //  repeated?
+                match tag {
+                    1 => key_merge(wire_type, &mut key, buf, ctx.clone()),
+                    2 => val_merge(wire_type, &mut val, buf, ctx.clone()),
+                    _ => skip_field(wire_type, buf, ctx.clone()),
+                }
+            })?;
             values.insert(key, val);
 
             Ok(())
