@@ -413,14 +413,14 @@ pub fn check_wire_type(expected: WireType, actual: WireType) -> Result<(), Decod
 
 /// Helper function which abstracts reading a length delimiter prefix followed
 /// by decoding values until the length of bytes is exhausted.
-pub fn merge_loop<T, M, B>(
-    value: &mut T,
+#[inline]
+pub fn merge_loop<M, B>(
     buf: &mut B,
     ctx: DecodeContext,
     mut merge: M,
 ) -> Result<(), DecodeError>
 where
-    M: FnMut(&mut T, &mut B, DecodeContext) -> Result<(), DecodeError>,
+    M: FnMut(&mut B, DecodeContext) -> Result<(), DecodeError>,
     B: Buf,
 {
     let len = decode_varint(buf)?;
@@ -431,7 +431,7 @@ where
 
     let limit = remaining - len as usize;
     while buf.remaining() > limit {
-        merge(value, buf, ctx.clone())?;
+        merge(buf, ctx.clone())?;
     }
 
     if buf.remaining() != limit {
@@ -494,7 +494,11 @@ macro_rules! merge_repeated_numeric {
         {
             if wire_type == WireType::LengthDelimited {
                 // Packed.
-                merge_loop(values, buf, ctx, |values, buf, ctx| {
+                // TODO(widders): check that the length is possibly valid. it's possible that a
+                //  lower-cost wrapper for Buf that knows its target remaining, rather than tracking
+                //  its limit constantly like Take does, would be much better (since it doesn't
+                //  involve updating one additional counter per level of nesting)
+                merge_loop(buf, ctx, |buf, ctx| {
                     let mut value = Default::default();
                     $merge($wire_type, &mut value, buf, ctx)?;
                     values.push(value);
@@ -1142,10 +1146,14 @@ pub mod message {
         check_wire_type(WireType::LengthDelimited, wire_type)?;
         ctx.limit_reached()?;
         let mut tr = TagReader::new();
-        merge_loop(msg, buf, ctx.enter_recursion(), |msg, buf, ctx| {
-            let (tag, wire_type) = tr.decode_key(buf)?;
-            msg.merge_field(tag, wire_type, buf, ctx)
-        })
+        merge_loop(
+            buf,
+            ctx.enter_recursion(),
+            |buf, ctx| {
+                let (tag, wire_type) = tr.decode_key(buf)?;
+                msg.merge_field(tag, wire_type, buf, ctx)
+            },
+        )
     }
 
     pub fn encode_repeated<M, B>(tag: u32, messages: &[M], buf: &mut B, tw: &mut TagWriter)
@@ -1354,21 +1362,20 @@ macro_rules! map {
             KM: Fn(WireType, &mut K, &mut B, DecodeContext) -> Result<(), DecodeError>,
             VM: Fn(WireType, &mut V, &mut B, DecodeContext) -> Result<(), DecodeError>,
         {
-            let mut key = Default::default();
+            let mut key: K = Default::default();
             let mut val = val_default;
             ctx.limit_reached()?;
             let mut tr = TagReader::new();
             merge_loop(
-                &mut (&mut key, &mut val),
                 buf,
                 ctx.enter_recursion(),
-                |&mut (ref mut key, ref mut val), buf, ctx| {
+                |buf, ctx| {
                     let (tag, wire_type) = tr.decode_key(buf)?;
                     // TODO(widders): does this have correct behavior if k or v are incorrectly
                     //  repeated?
                     match tag {
-                        1 => key_merge(wire_type, key, buf, ctx),
-                        2 => val_merge(wire_type, val, buf, ctx),
+                        1 => key_merge(wire_type, &mut key, buf, ctx),
+                        2 => val_merge(wire_type, &mut val, buf, ctx),
                         _ => skip_field(wire_type, buf, ctx),
                     }
                 },
