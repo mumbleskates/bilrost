@@ -1671,7 +1671,7 @@ mod test {
     #[test]
     fn unaligned_fixed64_packed() {
         // Construct a length-delineated field that is not a multiple of 8 bytes.
-        let mut buf: Vec<u8> = vec![];
+        let mut buf = Vec::<u8>::new();
         let vals = [0u64, 1, 2, 3];
         encode_varint((vals.len() * 8 + 1) as u64, &mut buf);
         for val in vals {
@@ -1679,7 +1679,7 @@ mod test {
         }
         buf.put_u8(42); // Write an extra byte as part of the field
 
-        let mut parsed: Vec<u64> = vec![];
+        let mut parsed = Vec::<u64>::new();
         let res = ufixed64::merge_repeated(
             WireType::LengthDelimited,
             &mut parsed,
@@ -1696,7 +1696,7 @@ mod test {
     #[test]
     fn unaligned_fixed32_packed() {
         // Construct a length-delineated field that is not a multiple of 8 bytes.
-        let mut buf: Vec<u8> = vec![];
+        let mut buf = Vec::<u8>::new();
         let vals = [0u32, 1, 2, 3];
         encode_varint((vals.len() * 4 + 1) as u64, &mut buf);
         for val in vals {
@@ -1704,7 +1704,7 @@ mod test {
         }
         buf.put_u8(42); // Write an extra byte as part of the field
 
-        let mut parsed: Vec<u32> = vec![];
+        let mut parsed = Vec::<u32>::new();
         let res = ufixed32::merge_repeated(
             WireType::LengthDelimited,
             &mut parsed,
