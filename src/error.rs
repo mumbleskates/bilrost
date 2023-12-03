@@ -1,4 +1,4 @@
-//! Protobuf encoding and decoding errors.
+//! Bilrost encoding and decoding errors.
 
 use alloc::borrow::Cow;
 use alloc::boxed::Box;
@@ -6,10 +6,10 @@ use alloc::vec::Vec;
 
 use core::fmt;
 
-/// A Protobuf message decoding error.
+/// A Bilrost message decoding error.
 ///
 /// `DecodeError` indicates that the input buffer does not contain a valid
-/// Protobuf message. The error details should be considered 'best effort': in
+/// Bilrost message. The error details should be considered 'best effort': in
 /// general it is not possible to exactly pinpoint why data is malformed.
 #[derive(Clone, PartialEq, Eq)]
 pub struct DecodeError {
@@ -61,7 +61,7 @@ impl fmt::Debug for DecodeError {
 
 impl fmt::Display for DecodeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("failed to decode Protobuf message: ")?;
+        f.write_str("failed to decode Bilrost message: ")?;
         for &(message, field) in &self.inner.stack {
             write!(f, "{}.{}: ", message, field)?;
         }
@@ -79,7 +79,7 @@ impl From<DecodeError> for std::io::Error {
     }
 }
 
-/// A Protobuf message encoding error.
+/// A Bilrost message encoding error.
 ///
 /// `EncodeError` always indicates that a message failed to encode because the
 /// provided buffer had insufficient capacity. Message encoding is otherwise
@@ -114,7 +114,7 @@ impl fmt::Display for EncodeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "failed to encode Protobuf message; insufficient buffer capacity (required: {}, remaining: {})",
+            "failed to encode Bilrost message; insufficient buffer capacity (required: {}, remaining: {})",
             self.required, self.remaining
         )
     }
