@@ -1695,7 +1695,7 @@ mod test {
 
     #[test]
     fn unaligned_fixed32_packed() {
-        // Construct a length-delineated field that is not a multiple of 8 bytes.
+        // Construct a length-delineated field that is not a multiple of 4 bytes.
         let mut buf = Vec::<u8>::new();
         let vals = [0u32, 1, 2, 3];
         encode_varint((vals.len() * 4 + 1) as u64, &mut buf);
