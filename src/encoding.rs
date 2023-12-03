@@ -8,7 +8,10 @@ use alloc::collections::BTreeMap;
 use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
-use core::cmp::{min, Ordering::{Equal, Greater, Less}};
+use core::cmp::{
+    min,
+    Ordering::{Equal, Greater, Less},
+};
 use core::convert::TryFrom;
 use core::mem;
 use core::ops::{Deref, DerefMut};
@@ -16,8 +19,8 @@ use core::str;
 
 use ::bytes::{Buf, BufMut, Bytes};
 
-use crate::{decode_length_delimiter, DecodeError};
 use crate::Message;
+use crate::{decode_length_delimiter, DecodeError};
 
 /// Encodes an integer value into LEB128-bijective variable length format, and writes it to the
 /// buffer. The buffer must have enough remaining space (maximum 9 bytes).
@@ -562,7 +565,7 @@ macro_rules! merge_repeated_numeric {
                 // Packed.
                 let mut capped = Capped::from_length_delimited(buf)?;
                 if capped.remaining_before_cap() % $wire_type.encoded_size_alignment() != 0 {
-                    return Err(DecodeError::new("packed field is not "))
+                    return Err(DecodeError::new("packed field is not a valid length"));
                 }
                 capped.consume_to_cap(|buf| {
                     let mut value = Default::default();
@@ -1663,6 +1666,56 @@ mod test {
         prop_assert_eq!(value, roundtrip_value);
 
         Ok(())
+    }
+
+    #[test]
+    fn unaligned_fixed64_packed() {
+        // Construct a length-delineated field that is not a multiple of 8 bytes.
+        let mut buf: Vec<u8> = vec![];
+        let vals = [0u64, 1, 2, 3];
+        encode_varint((vals.len() * 8 + 1) as u64, &mut buf);
+        for val in vals {
+            buf.put_u64_le(val);
+        }
+        buf.put_u8(42); // Write an extra byte as part of the field
+
+        let mut parsed: Vec<u64> = vec![];
+        let res = ufixed64::merge_repeated(
+            WireType::LengthDelimited,
+            &mut parsed,
+            &mut &buf[..],
+            DecodeContext::default(),
+        );
+        assert!(res.is_err());
+        assert_eq!(
+            res.unwrap_err().to_string(),
+            "failed to decode Bilrost message: packed field is not a valid length"
+        );
+    }
+
+    #[test]
+    fn unaligned_fixed32_packed() {
+        // Construct a length-delineated field that is not a multiple of 8 bytes.
+        let mut buf: Vec<u8> = vec![];
+        let vals = [0u32, 1, 2, 3];
+        encode_varint((vals.len() * 4 + 1) as u64, &mut buf);
+        for val in vals {
+            buf.put_u32_le(val);
+        }
+        buf.put_u8(42); // Write an extra byte as part of the field
+
+        let mut parsed: Vec<u32> = vec![];
+        let res = ufixed32::merge_repeated(
+            WireType::LengthDelimited,
+            &mut parsed,
+            &mut &buf[..],
+            DecodeContext::default(),
+        );
+        assert!(res.is_err());
+        assert_eq!(
+            res.unwrap_err().to_string(),
+            "failed to decode Bilrost message: packed field is not a valid length"
+        );
     }
 
     #[test]
