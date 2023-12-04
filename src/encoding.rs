@@ -709,7 +709,7 @@ macro_rules! varint {
 varint!(bool, bool,
         to_uint64(value) u64::from(*value),
         from_uint64(value) value != 0);
-varint!(u32, uint32);
+varint!(u32, uint32); // TODO(widders): do not just as-slam these, check them! and bool & fixed32!
 varint!(u64, uint64);
 varint!(i32, sint32,
 to_uint64(value) {
