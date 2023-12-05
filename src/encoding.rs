@@ -707,16 +707,31 @@ macro_rules! varint {
     );
 }
 varint!(bool, bool,
-        to_uint64(value) u64::from(*value),
-        from_uint64(value) value != 0);
-varint!(u32, uint32); // TODO(widders): do not just as-slam these, check them! and bool & fixed32!
+to_uint64(value) {
+    u64::from(*value)
+},
+from_uint64(value) {
+    match value {
+        0 => false,
+        1 => true,
+        _ => return Err(DecodeError::new("invalid varint value for bool"))
+    }
+});
+varint!(u32, uint32,
+to_uint64(value) {
+    *value as u64
+},
+from_uint64(value) {
+    u32::try_from(value).map_err(|_| DecodeError::new("varint overflows range of uint32"))?
+});
 varint!(u64, uint64);
 varint!(i32, sint32,
 to_uint64(value) {
     ((value << 1) ^ (value >> 31)) as u32 as u64
 },
 from_uint64(value) {
-    let value = value as u32;
+    let value = u32::try_from(value)
+        .map_err(|_| DecodeError::new("varint overflows range of sint32"))?;
     ((value >> 1) as i32) ^ (-((value & 1) as i32))
 });
 varint!(i64, sint64,

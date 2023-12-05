@@ -26,6 +26,11 @@ incompatible way:
   zag encoding") are omitted. There are no "gotcha" integer types whose negative
   values always take up the maximum amount of space.
 * Enumerations are unsigned `u32`-typed, not `i32`.
+* Narrow integral types that encode as a varint field, such as `i32` and `bool`,
+  are checked and will cause decoding to err if their encoded range is
+  overflowed rather than coercing to a valid value (such as any nonzero value
+  becoming `true` in a `bool` field, or `u64::MAX` silently coercing to
+  `u32::MAX`).
 
 Compared to other Protocol Buffers implementations, `bilrost`
 
@@ -66,21 +71,21 @@ corresponding type.
 
 Scalar value types are converted as follows:
 
-| Protobuf Type | Rust Type |
-| --- | --- |
-| `float32` | `f32` |
-| `float64` | `f64` |
-| `uint32` | `u32` |
-| `uint64` | `u64` |
-| `sint32` | `i32` |
-| `sint64` | `i64` |
-| `ufixed32` | `u32` |
-| `ufixed64` | `u64` |
-| `sfixed32` | `i32` |
-| `sfixed64` | `i64` |
-| `bool` | `bool` |
-| `string` | `String` |
-| `bytes` | `Vec<u8>` |
+| Bilrost type | Rust type |
+|--------------|-----------|
+| `float32`    | `f32`     |
+| `float64`    | `f64`     |
+| `uint32`     | `u32`     |
+| `uint64`     | `u64`     |
+| `sint32`     | `i32`     |
+| `sint64`     | `i64`     |
+| `ufixed32`   | `u32`     |
+| `ufixed64`   | `u64`     |
+| `sfixed32`   | `i32`     |
+| `sfixed64`   | `i64`     |
+| `bool`       | `bool`    |
+| `string`     | `String`  |
+| `bytes`      | `Vec<u8>` |
 
 #### Enumerations
 
