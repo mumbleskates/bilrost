@@ -56,6 +56,8 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
 
     let ident = input.ident;
 
+    // TODO(widders): distinguished structs
+
     syn::custom_keyword!(skip_debug);
     let skip_debug = input
         .attrs
