@@ -2007,7 +2007,8 @@ mod test {
         (i32, sfixed32),
         (i64, sfixed64),
         (bool, bool),
-        (String, string)
+        (String, string),
+        (Vec<u8>, bytes)
     ],
     vals: [
         (f32, float32),
