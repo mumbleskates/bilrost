@@ -432,6 +432,7 @@ configured with the required dependencies to compile the whole project.
 
 `bilrost` is distributed under the terms of the Apache License (Version 2.0).
 
-See [LICENSE](https://github.com/mumbleskates/bilrost/blob/master/LICENSE) for details.
+See [LICENSE](./LICENSE) & [NOTICE](./NOTICE) for details.
 
 Copyright 2022 Dan Burkert & Tokio Contributors
+Copyright 2023 Kent Ross

@@ -5,6 +5,7 @@ authors = [
     "Dan Burkert <dan@danburkert.com>",
     "Lucio Franco <luciofranco14@gmail.com>",
     "Tokio Contributors <team@tokio.rs>",
+    "Kent Ross <k@mad.cash>",
 ]
 license = "Apache-2.0"
 repository = "https://github.com/mumbleskates/bilrost"
