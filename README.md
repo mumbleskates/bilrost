@@ -11,7 +11,8 @@ incompatible way:
   [bijective numeration](https://en.wikipedia.org/wiki/Bijective_numeration),
   which cannot be length-extended with trailing zeros the way protobuf varints
   can (and are slightly more compact, especially at the 64bit limit where they
-  take up 9 bytes instead of 10).
+  take up 9 bytes instead of 10). Varint encodings which would represent a value
+  greater than `u64::MAX` are invalid.
 * "Groups" are completely omitted as a wire-type, reducing the number of wire
   types from 6 to 4.
 * These four wire types are packed into 2 bits instead of 3.
@@ -32,39 +33,9 @@ incompatible way:
   becoming `true` in a `bool` field, or `u64::MAX` silently coercing to
   `u32::MAX`).
 
-Compared to other Protocol Buffers implementations, `bilrost`
-
-* Generates simple, idiomatic, and readable Rust types by taking advantage of
-  Rust `derive` attributes.
-* Allows existing Rust types to be serialized and deserialized by adding
-  attributes.
-* Uses the [`bytes::{Buf, BufMut}`](https://github.com/carllerche/bytes)
-  abstractions for serialization instead of `std::io::{Read, Write}`.
-* Preserves unknown enum values during deserialization.
-* Does not include support for runtime reflection or message descriptors.
-
-### Messages
-
-Given a simple message declaration:
-
-```protobuf,ignore
-// Sample message.
-message Foo {
-}
-```
-
-`bilrost` will generate the following Rust struct:
-
-```rust,ignore
-/// Sample message.
-#[derive(Clone, Debug, PartialEq, Message)]
-pub struct Foo {
-}
-```
-
 ### Fields
 
-Fields in Protobuf messages are translated into Rust as public struct fields of the
+Fields in Bilrost messages are translated into Rust as public struct fields of the
 corresponding type.
 
 #### Scalar Values
