@@ -61,8 +61,28 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     syn::custom_keyword!(skip_debug);
     let skip_debug = input
         .attrs
-        .into_iter()
+        .iter()
         .any(|a| a.path().is_ident("bilrost") && a.parse_args::<skip_debug>().is_ok());
+
+    syn::custom_keyword!(distinguished);
+    let _distinguished = input
+        .attrs
+        .iter()
+        .any(|a| a.path().is_ident("bilrost") && a.parse_args::<distinguished>().is_ok());
+
+    // TODO(widders): universal features
+    //  * non-repeated fields must only occur once
+    //  * there must be a mode to embed enum values directly inside an option
+    //  * map keys must not recur
+
+    // TODO(widders): distinguished features
+    //  * unknown fields are forbidden
+    //  * "required" is forbidden
+    //  * present standard (non-optional) fields with default values are forbidden
+    //  * HashMap is forbidden
+    //  * map keys must be sorted ascending
+    //  * repeated fields must have matching packed-ness
+    //  * message typed fields must also be distinguished (unsafe trait?)
 
     let variant_data = match input.data {
         Data::Struct(variant_data) => variant_data,
