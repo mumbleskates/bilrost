@@ -1922,14 +1922,16 @@ mod test {
     /// This big bowl o' macro soup generates an encoding property test for each combination of map
     /// type, scalar map key, and value type.
     /// TODO: these tests take a long time to compile, can this be improved?
-    #[cfg(feature = "std")]
     macro_rules! map_tests {
         (keys: $keys:tt,
          vals: $vals:tt) => {
+            #[cfg(feature = "std")]
             mod hash_map {
+                use ::std::collections::HashMap;
                 map_tests!(@private HashMap, hash_map, $keys, $vals);
             }
             mod btree_map {
+                use ::alloc::collections::BTreeMap;
                 map_tests!(@private BTreeMap, btree_map, $keys, $vals);
             }
         };
@@ -1940,7 +1942,7 @@ mod test {
                   $vals:tt) => {
             $(
                 mod $key_proto {
-                    use std::collections::$map_type;
+                    use super::$map_type;
 
                     use proptest::prelude::*;
 
@@ -1992,7 +1994,6 @@ mod test {
         };
     }
 
-    #[cfg(feature = "std")]
     map_tests!(keys: [
         (u32, uint32),
         (u64, uint64),
