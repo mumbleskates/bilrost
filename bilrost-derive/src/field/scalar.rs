@@ -238,7 +238,7 @@ impl Field {
     /// Returns a fragment for formatting the field `ident` in `Debug`.
     pub fn debug(&self, wrapper_name: TokenStream) -> TokenStream {
         let wrapper = self.debug_inner(quote!(Inner));
-        let inner_ty = self.ty.rust_type();
+        let inner_ty = self.ty.owned_type();
         match self.kind {
             Kind::Plain(_) | Kind::Required(_) => self.debug_inner(wrapper_name),
             Kind::Optional(_) => quote! {
@@ -353,7 +353,7 @@ impl Field {
                 }
             })
         } else if let Kind::Optional(ref default) = self.kind {
-            let ty = self.ty.rust_ref_type();
+            let ty = self.ty.ref_type();
 
             let match_some = if self.ty.is_numeric() {
                 quote!(::core::option::Option::Some(val) => val,)
@@ -520,17 +520,15 @@ impl Ty {
         }
     }
 
-    // TODO: rename to 'owned_type'.
-    pub fn rust_type(&self) -> TokenStream {
+    pub fn owned_type(&self) -> TokenStream {
         match self {
             Ty::String => quote!(::bilrost::alloc::string::String),
             Ty::Bytes(ty) => ty.rust_type(),
-            _ => self.rust_ref_type(),
+            _ => self.ref_type(),
         }
     }
 
-    // TODO: rename to 'ref_type'
-    pub fn rust_ref_type(&self) -> TokenStream {
+    pub fn ref_type(&self) -> TokenStream {
         match *self {
             Ty::Float32 => quote!(f32),
             Ty::Float64 => quote!(f64),

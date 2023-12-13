@@ -269,8 +269,8 @@ impl Field {
     /// Returns methods to embed in the message.
     pub fn methods(&self, ident: &TokenStream) -> Option<TokenStream> {
         if let ValueTy::Scalar(scalar::Ty::Enumeration(ty)) = &self.value_ty {
-            let key_ty = self.key_ty.rust_type();
-            let key_ref_ty = self.key_ty.rust_ref_type();
+            let key_ty = self.key_ty.owned_type();
+            let key_ref_ty = self.key_ty.ref_type();
 
             let get = Ident::new(&format!("get_{}", ident), Span::call_site());
             let insert = Ident::new(&format!("insert_{}", ident), Span::call_site());
@@ -319,7 +319,7 @@ impl Field {
 
         // A fake field for generating the debug wrapper
         let key_wrapper = fake_scalar(self.key_ty.clone()).debug(quote!(KeyWrapper));
-        let key = self.key_ty.rust_type();
+        let key = self.key_ty.owned_type();
         let value_wrapper = self.value_ty.debug();
         let libname = self.map_ty.lib();
         let fmt = quote! {
@@ -346,7 +346,7 @@ impl Field {
                     };
                 }
 
-                let value = ty.rust_type();
+                let value = ty.owned_type();
                 quote! {
                     struct #wrapper_name<'a>(&'a ::#libname::collections::#type_name<#key, #value>);
                     impl<'a> ::core::fmt::Debug for #wrapper_name<'a> {
