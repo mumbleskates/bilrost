@@ -1,11 +1,12 @@
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 use core::fmt::Debug;
+use std::ops::DerefMut;
 
 use bytes::{Buf, BufMut};
 
 use crate::encoding::{
-    encode_varint, encoded_len_varint, message, DecodeContext, TagReader, WireType,
+    encode_varint, encoded_len_varint, message, Capped, DecodeContext, TagReader, WireType,
 };
 use crate::DecodeError;
 use crate::EncodeError;
@@ -31,7 +32,7 @@ pub trait Message: Debug + Send + Sync {
         &mut self,
         tag: u32,
         wire_type: WireType,
-        buf: &mut B,
+        buf: &mut Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError>
     where
@@ -135,8 +136,9 @@ pub trait Message: Debug + Send + Sync {
     {
         let ctx = DecodeContext::default();
         let tr = &mut TagReader::new();
+        let mut buf = Capped::new(&mut buf);
         while buf.has_remaining() {
-            let (tag, wire_type) = tr.decode_key(&mut buf)?;
+            let (tag, wire_type) = tr.decode_key(buf.deref_mut())?;
             self.merge_field(tag, wire_type, &mut buf, ctx.clone())?;
         }
         Ok(())
@@ -152,7 +154,7 @@ pub trait Message: Debug + Send + Sync {
         message::merge(
             WireType::LengthDelimited,
             self,
-            &mut buf,
+            &mut Capped::new(&mut buf),
             DecodeContext::default(),
         )
     }
@@ -175,7 +177,7 @@ where
         &mut self,
         tag: u32,
         wire_type: WireType,
-        buf: &mut B,
+        buf: &mut Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError>
     where

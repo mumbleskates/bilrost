@@ -13,7 +13,7 @@ use ::bytes::{Buf, BufMut, Bytes};
 use crate::{
     encoding::{
         bool, bytes, float32, float64, sint32, sint64, skip_field, string, uint32, uint64,
-        DecodeContext, TagMeasurer, TagWriter, WireType,
+        Capped, DecodeContext, TagMeasurer, TagWriter, WireType,
     },
     DecodeError, Message,
 };
@@ -30,13 +30,13 @@ impl Message for bool {
         &mut self,
         tag: u32,
         wire_type: WireType,
-        buf: &mut B,
+        buf: &mut Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         if tag == 1 {
             bool::merge(wire_type, self, buf, ctx)
         } else {
-            skip_field(wire_type, buf, ctx)
+            skip_field(wire_type, buf)
         }
     }
 
@@ -65,13 +65,13 @@ impl Message for u32 {
         &mut self,
         tag: u32,
         wire_type: WireType,
-        buf: &mut B,
+        buf: &mut Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         if tag == 1 {
             uint32::merge(wire_type, self, buf, ctx)
         } else {
-            skip_field(wire_type, buf, ctx)
+            skip_field(wire_type, buf)
         }
     }
 
@@ -100,13 +100,13 @@ impl Message for u64 {
         &mut self,
         tag: u32,
         wire_type: WireType,
-        buf: &mut B,
+        buf: &mut Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         if tag == 1 {
             uint64::merge(wire_type, self, buf, ctx)
         } else {
-            skip_field(wire_type, buf, ctx)
+            skip_field(wire_type, buf)
         }
     }
 
@@ -135,13 +135,13 @@ impl Message for i32 {
         &mut self,
         tag: u32,
         wire_type: WireType,
-        buf: &mut B,
+        buf: &mut Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         if tag == 1 {
             sint32::merge(wire_type, self, buf, ctx)
         } else {
-            skip_field(wire_type, buf, ctx)
+            skip_field(wire_type, buf)
         }
     }
 
@@ -170,13 +170,13 @@ impl Message for i64 {
         &mut self,
         tag: u32,
         wire_type: WireType,
-        buf: &mut B,
+        buf: &mut Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         if tag == 1 {
             sint64::merge(wire_type, self, buf, ctx)
         } else {
-            skip_field(wire_type, buf, ctx)
+            skip_field(wire_type, buf)
         }
     }
 
@@ -205,13 +205,13 @@ impl Message for f32 {
         &mut self,
         tag: u32,
         wire_type: WireType,
-        buf: &mut B,
+        buf: &mut Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         if tag == 1 {
             float32::merge(wire_type, self, buf, ctx)
         } else {
-            skip_field(wire_type, buf, ctx)
+            skip_field(wire_type, buf)
         }
     }
 
@@ -240,13 +240,13 @@ impl Message for f64 {
         &mut self,
         tag: u32,
         wire_type: WireType,
-        buf: &mut B,
+        buf: &mut Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         if tag == 1 {
             float64::merge(wire_type, self, buf, ctx)
         } else {
-            skip_field(wire_type, buf, ctx)
+            skip_field(wire_type, buf)
         }
     }
 
@@ -275,13 +275,13 @@ impl Message for String {
         &mut self,
         tag: u32,
         wire_type: WireType,
-        buf: &mut B,
+        buf: &mut Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         if tag == 1 {
             string::merge(wire_type, self, buf, ctx)
         } else {
-            skip_field(wire_type, buf, ctx)
+            skip_field(wire_type, buf)
         }
     }
 
@@ -310,13 +310,13 @@ impl Message for Vec<u8> {
         &mut self,
         tag: u32,
         wire_type: WireType,
-        buf: &mut B,
+        buf: &mut Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         if tag == 1 {
             bytes::merge(wire_type, self, buf, ctx)
         } else {
-            skip_field(wire_type, buf, ctx)
+            skip_field(wire_type, buf)
         }
     }
 
@@ -345,13 +345,13 @@ impl Message for Bytes {
         &mut self,
         tag: u32,
         wire_type: WireType,
-        buf: &mut B,
+        buf: &mut Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         if tag == 1 {
             bytes::merge(wire_type, self, buf, ctx)
         } else {
-            skip_field(wire_type, buf, ctx)
+            skip_field(wire_type, buf)
         }
     }
 
@@ -376,10 +376,10 @@ impl Message for () {
         &mut self,
         _tag: u32,
         wire_type: WireType,
-        buf: &mut B,
-        ctx: DecodeContext,
+        buf: &mut Capped<B>,
+        _ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
-        skip_field(wire_type, buf, ctx)
+        skip_field(wire_type, buf)
     }
 
     fn encoded_len(&self) -> usize {

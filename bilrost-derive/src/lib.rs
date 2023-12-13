@@ -424,7 +424,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
                 &mut self,
                 tag: u32,
                 wire_type: ::bilrost::encoding::WireType,
-                buf: &mut __B,
+                buf: &mut ::bilrost::encoding::Capped<__B>,
                 ctx: ::bilrost::encoding::DecodeContext,
             ) -> ::core::result::Result<(), ::bilrost::DecodeError>
             where
@@ -433,7 +433,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
                 #struct_name
                 match tag {
                     #(#merge)*
-                    _ => ::bilrost::encoding::skip_field(wire_type, buf, ctx),
+                    _ => ::bilrost::encoding::skip_field(wire_type, buf),
                 }
             }
 
@@ -714,7 +714,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
                 field: &mut ::core::option::Option<#ident #ty_generics>,
                 tag: u32,
                 wire_type: ::bilrost::encoding::WireType,
-                buf: &mut __B,
+                buf: &mut ::bilrost::encoding::Capped<__B>,
                 ctx: ::bilrost::encoding::DecodeContext,
             ) -> ::core::result::Result<(), ::bilrost::DecodeError>
             where
