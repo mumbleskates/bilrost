@@ -484,6 +484,11 @@ impl<'a, B: Buf> Capped<'a, B> {
     }
 
     #[inline]
+    pub fn buf(&mut self) -> &mut B {
+        self.buf
+    }
+
+    #[inline]
     fn take_all(self) -> Take<&'a mut B> {
         let len = self.remaining_before_cap();
         self.buf.take(len)
@@ -1221,7 +1226,7 @@ pub mod message {
         let mut tr = TagReader::new();
         let inner_ctx = ctx.enter_recursion();
         buf.take_length_delimited()?.consume_to_cap(|buf| {
-            let (tag, wire_type) = tr.decode_key(buf.deref_mut())?;
+            let (tag, wire_type) = tr.decode_key(buf.buf())?;
             msg.merge_field(tag, wire_type, buf, inner_ctx.clone())
         })
     }
@@ -1437,7 +1442,7 @@ macro_rules! map {
             ctx.limit_reached()?;
             let mut tr = TagReader::new();
             buf.take_length_delimited()?.consume_to_cap(|buf| {
-                let (tag, wire_type) = tr.decode_key(buf.deref_mut())?;
+                let (tag, wire_type) = tr.decode_key(buf.buf())?;
                 // TODO(widders): does this have correct behavior if k or v are incorrectly
                 //  repeated?
                 match tag {
@@ -1553,7 +1558,7 @@ mod test {
         }
 
         let (decoded_tag, decoded_wire_type) = tr
-            .decode_key(buf.deref_mut())
+            .decode_key(buf.buf())
             .map_err(|error| TestCaseError::fail(error.to_string()))?;
         prop_assert_eq!(
             tag,
@@ -1642,7 +1647,7 @@ mod test {
         let mut roundtrip_value = Default::default();
         while buf.has_remaining() {
             let (decoded_tag, decoded_wire_type) = tr
-                .decode_key(buf.deref_mut())
+                .decode_key(buf.buf())
                 .map_err(|error| TestCaseError::fail(error.to_string()))?;
 
             prop_assert_eq!(

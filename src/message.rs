@@ -138,7 +138,7 @@ pub trait Message: Debug + Send + Sync {
         let tr = &mut TagReader::new();
         let mut buf = Capped::new(&mut buf);
         while buf.has_remaining() {
-            let (tag, wire_type) = tr.decode_key(buf.deref_mut())?;
+            let (tag, wire_type) = tr.decode_key(buf.buf())?;
             self.merge_field(tag, wire_type, &mut buf, ctx.clone())?;
         }
         Ok(())
