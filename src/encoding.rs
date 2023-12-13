@@ -446,11 +446,6 @@ impl<'a, B: Buf> Capped<'a, B> {
     /// Reads a length delimiter from the beginning of the wrapped buffer, then returns a subsidiary
     /// Capped instance for the delineated bytes if it does not overrun the underlying buffer or
     /// this instance's cap.
-    // TODO(widders): pass this down, perhaps. when we don't do this it's possible for a single
-    //  invocation of the loop in consume_to_cap() to wildly overrun its welcome purely because its
-    //  inner function has to use the cap from the buf rather than the cap from the instance. This
-    //  can happen whenever the repeating function is decoding length-delimited fields, so therefore
-    //  only when parsing submessages.
     fn take_length_delimited(&mut self) -> Result<Capped<B>, DecodeError> {
         let len = decode_length_delimiter(&mut *self.buf)?;
         let remaining = self.buf.remaining();
