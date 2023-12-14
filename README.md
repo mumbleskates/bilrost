@@ -31,7 +31,14 @@ incompatible way:
   are checked and will cause decoding to err if their encoded range is
   overflowed rather than coercing to a valid value (such as any nonzero value
   becoming `true` in a `bool` field, or `u64::MAX` silently coercing to
-  `u32::MAX`).
+  `u32::MAX`). Another way to spell this behavior is that values that would not
+  round-trip are rejected during decoding.
+* Generally, varint fields can always be upgraded to a wider type with the same
+  representation and keep backwards compatibility. Likewise, fields can be
+  "widened" from optional to repeated, but the encoded values are never
+  backwards compatible when known fields' values would be altered or truncated
+  to fit: decoding a bilrost message that has multiple occurrences of a non-
+  repeated field in it is also an error.
 
 ### Fields
 
@@ -57,6 +64,24 @@ Scalar value types are converted as follows:
 | `bool`       | `bool`    |
 | `string`     | `String`  |
 | `bytes`      | `Vec<u8>` |
+
+#### Compatible Widening
+
+Widening fields along these routes is always supported in the following way:
+Old message data will always decode to an equivalent/corresponding value, and
+those corresponding values will of course re-encode from the new widened struct
+into the same representation.
+
+* `bool` --> `uint32` --> `uint64` (`true`/`false` becomes 1/0)
+* `bool` --> `sint32` --> `sint64` (`true`/`false` becomes -1/0)
+* `string` --> `bytes` (the latter need not be valid UTF-8)
+* `optional` --> `repeated` (but not `packed`)
+
+In expedient decoding mode (as opposed to `distinguished`), the following
+additional widenings are similarly supported:
+
+* adding new fields
+* `optional` --> `repeated` + `packed`
 
 #### Enumerations
 
