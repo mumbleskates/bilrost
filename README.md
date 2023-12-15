@@ -424,6 +424,16 @@ configured with the required dependencies to compile the whole project.
   brew install libtool
   ```
 
+## Why *Bilrost?*
+
+Protocol Buffers, originating at Google, took on the portmanteau "protobuf". In
+turn, Protobuf for Rust became "prost".
+
+To fork that library, one might call it... "Frost"? But that name is taken.
+"Bifrost" is a nice name, and a sort of pun on "frost, 2"; but that is also
+taken. "Bilrost" is another name for the original Norse "Bifrost", and it is 
+quite nice, so here we are.
+
 ## License
 
 `bilrost` is distributed under the terms of the Apache License (Version 2.0).
