@@ -1220,9 +1220,12 @@ pub mod message {
         ctx.limit_reached()?;
         let mut tr = TagReader::new();
         let inner_ctx = ctx.enter_recursion();
+        let mut last_tag = None::<u32>;
         buf.take_length_delimited()?.consume_to_cap(|buf| {
             let (tag, wire_type) = tr.decode_key(buf.buf())?;
-            msg.merge_field(tag, wire_type, buf, inner_ctx.clone())
+            let duplicated = last_tag == Some(tag);
+            last_tag = Some(tag);
+            msg.merge_field(tag, wire_type, duplicated, buf, inner_ctx.clone())
         })
     }
 

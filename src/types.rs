@@ -12,8 +12,8 @@ use ::bytes::{Buf, BufMut, Bytes};
 
 use crate::{
     encoding::{
-        bool, bytes, float32, float64, sint32, sint64, skip_field, string, uint32, uint64,
-        Capped, DecodeContext, TagMeasurer, TagWriter, WireType,
+        bool, bytes, float32, float64, sint32, sint64, skip_field, string, uint32, uint64, Capped,
+        DecodeContext, TagMeasurer, TagWriter, WireType,
     },
     DecodeError, Message,
 };
@@ -30,10 +30,16 @@ impl Message for bool {
         &mut self,
         tag: u32,
         wire_type: WireType,
+        duplicated: bool,
         buf: &mut Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         if tag == 1 {
+            if duplicated {
+                return Err(DecodeError::new(
+                    "multiple occurrences of non-repeated field",
+                ));
+            }
             bool::merge(wire_type, self, buf, ctx)
         } else {
             skip_field(wire_type, buf)
@@ -65,10 +71,16 @@ impl Message for u32 {
         &mut self,
         tag: u32,
         wire_type: WireType,
+        duplicated: bool,
         buf: &mut Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         if tag == 1 {
+            if duplicated {
+                return Err(DecodeError::new(
+                    "multiple occurrences of non-repeated field",
+                ));
+            }
             uint32::merge(wire_type, self, buf, ctx)
         } else {
             skip_field(wire_type, buf)
@@ -100,10 +112,16 @@ impl Message for u64 {
         &mut self,
         tag: u32,
         wire_type: WireType,
+        duplicated: bool,
         buf: &mut Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         if tag == 1 {
+            if duplicated {
+                return Err(DecodeError::new(
+                    "multiple occurrences of non-repeated field",
+                ));
+            }
             uint64::merge(wire_type, self, buf, ctx)
         } else {
             skip_field(wire_type, buf)
@@ -135,10 +153,16 @@ impl Message for i32 {
         &mut self,
         tag: u32,
         wire_type: WireType,
+        duplicated: bool,
         buf: &mut Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         if tag == 1 {
+            if duplicated {
+                return Err(DecodeError::new(
+                    "multiple occurrences of non-repeated field",
+                ));
+            }
             sint32::merge(wire_type, self, buf, ctx)
         } else {
             skip_field(wire_type, buf)
@@ -170,10 +194,16 @@ impl Message for i64 {
         &mut self,
         tag: u32,
         wire_type: WireType,
+        duplicated: bool,
         buf: &mut Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         if tag == 1 {
+            if duplicated {
+                return Err(DecodeError::new(
+                    "multiple occurrences of non-repeated field",
+                ));
+            }
             sint64::merge(wire_type, self, buf, ctx)
         } else {
             skip_field(wire_type, buf)
@@ -205,10 +235,16 @@ impl Message for f32 {
         &mut self,
         tag: u32,
         wire_type: WireType,
+        duplicated: bool,
         buf: &mut Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         if tag == 1 {
+            if duplicated {
+                return Err(DecodeError::new(
+                    "multiple occurrences of non-repeated field",
+                ));
+            }
             float32::merge(wire_type, self, buf, ctx)
         } else {
             skip_field(wire_type, buf)
@@ -240,10 +276,16 @@ impl Message for f64 {
         &mut self,
         tag: u32,
         wire_type: WireType,
+        duplicated: bool,
         buf: &mut Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         if tag == 1 {
+            if duplicated {
+                return Err(DecodeError::new(
+                    "multiple occurrences of non-repeated field",
+                ));
+            }
             float64::merge(wire_type, self, buf, ctx)
         } else {
             skip_field(wire_type, buf)
@@ -275,10 +317,16 @@ impl Message for String {
         &mut self,
         tag: u32,
         wire_type: WireType,
+        duplicated: bool,
         buf: &mut Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         if tag == 1 {
+            if duplicated {
+                return Err(DecodeError::new(
+                    "multiple occurrences of non-repeated field",
+                ));
+            }
             string::merge(wire_type, self, buf, ctx)
         } else {
             skip_field(wire_type, buf)
@@ -310,10 +358,16 @@ impl Message for Vec<u8> {
         &mut self,
         tag: u32,
         wire_type: WireType,
+        duplicated: bool,
         buf: &mut Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         if tag == 1 {
+            if duplicated {
+                return Err(DecodeError::new(
+                    "multiple occurrences of non-repeated field",
+                ));
+            }
             bytes::merge(wire_type, self, buf, ctx)
         } else {
             skip_field(wire_type, buf)
@@ -345,10 +399,16 @@ impl Message for Bytes {
         &mut self,
         tag: u32,
         wire_type: WireType,
+        duplicated: bool,
         buf: &mut Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         if tag == 1 {
+            if duplicated {
+                return Err(DecodeError::new(
+                    "multiple occurrences of non-repeated field",
+                ));
+            }
             bytes::merge(wire_type, self, buf, ctx)
         } else {
             skip_field(wire_type, buf)
@@ -376,6 +436,7 @@ impl Message for () {
         &mut self,
         _tag: u32,
         wire_type: WireType,
+        _duplicated: bool,
         buf: &mut Capped<B>,
         _ctx: DecodeContext,
     ) -> Result<(), DecodeError> {

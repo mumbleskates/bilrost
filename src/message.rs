@@ -31,6 +31,7 @@ pub trait Message: Debug + Send + Sync {
         &mut self,
         tag: u32,
         wire_type: WireType,
+        duplicated: bool,
         buf: &mut Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError>
@@ -136,9 +137,12 @@ pub trait Message: Debug + Send + Sync {
         let ctx = DecodeContext::default();
         let tr = &mut TagReader::new();
         let mut buf = Capped::new(&mut buf);
+        let mut last_tag = None::<u32>;
         while buf.has_remaining() {
             let (tag, wire_type) = tr.decode_key(buf.buf())?;
-            self.merge_field(tag, wire_type, &mut buf, ctx.clone())?;
+            let duplicated = last_tag == Some(tag);
+            last_tag = Some(tag);
+            self.merge_field(tag, wire_type, duplicated, &mut buf, ctx.clone())?;
         }
         Ok(())
     }
@@ -176,13 +180,14 @@ where
         &mut self,
         tag: u32,
         wire_type: WireType,
+        duplicated: bool,
         buf: &mut Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError>
     where
         B: Buf,
     {
-        (**self).merge_field(tag, wire_type, buf, ctx)
+        (**self).merge_field(tag, wire_type, duplicated, buf, ctx)
     }
     fn encoded_len(&self) -> usize {
         (**self).encoded_len()

@@ -71,9 +71,11 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         .any(|a| a.path().is_ident("bilrost") && a.parse_args::<distinguished>().is_ok());
 
     // TODO(widders): universal features
-    //  * non-repeated fields must only occur once
     //  * there must be a mode to embed enum values directly inside an option
     //  * map keys must not recur
+
+    // TODO(widders): test coverage for completed features:
+    //  * non-repeated fields must only occur once
 
     // TODO(widders): distinguished features
     //  * unknown fields are forbidden
@@ -444,6 +446,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
                 &mut self,
                 tag: u32,
                 wire_type: ::bilrost::encoding::WireType,
+                duplicated: bool,
                 buf: &mut ::bilrost::encoding::Capped<__B>,
                 ctx: ::bilrost::encoding::DecodeContext,
             ) -> ::core::result::Result<(), ::bilrost::DecodeError>
@@ -734,12 +737,18 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
                 field: &mut ::core::option::Option<#ident #ty_generics>,
                 tag: u32,
                 wire_type: ::bilrost::encoding::WireType,
+                duplicated: bool,
                 buf: &mut ::bilrost::encoding::Capped<__B>,
                 ctx: ::bilrost::encoding::DecodeContext,
             ) -> ::core::result::Result<(), ::bilrost::DecodeError>
             where
                 __B: ::bilrost::bytes::Buf
             {
+                if duplicated {
+                    return Err(::bilrost::DecodeError::new(
+                        "multiple occurrences of non-repeated field"
+                    ));
+                }
                 match tag {
                     #(#merge,)*
                     _ => unreachable!(concat!("invalid ", stringify!(#ident), " tag: {}"), tag),
