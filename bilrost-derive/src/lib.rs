@@ -530,6 +530,12 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
     let input: DeriveInput = syn::parse2(input)?;
     let ident = input.ident;
 
+    syn::custom_keyword!(skip_debug);
+    let skip_debug = input
+        .attrs
+        .into_iter()
+        .any(|a| a.path().is_ident("bilrost") && a.parse_args::<skip_debug>().is_ok());
+
     let generics = &input.generics;
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
@@ -607,6 +613,25 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
                 match value {
                     #(#try_from,)*
                     _ => ::core::result::Result::Err(::bilrost::DecodeError::new("invalid enumeration value")),
+                }
+            }
+        }
+    };
+
+    let expanded = if skip_debug {
+        expanded
+    } else {
+        let debug = variants.iter().map(|(variant_ident, _)| {
+            quote!(#ident::#variant_ident => stringify!(#variant_ident))
+        });
+        quote! {
+            #expanded
+
+            impl #impl_generics ::core::fmt::Debug for #ident #ty_generics #where_clause {
+                fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
+                    f.write_str(match self {
+                        #(#debug,)*
+                    })
                 }
             }
         }
