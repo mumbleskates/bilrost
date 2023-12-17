@@ -307,7 +307,9 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
             quote! {
                 {
                     let mut parts = [
-                        (0u32, None::<fn(&Self, &mut ::bilrost::encoding::TagMeasurer) -> usize>);
+                        (0u32, ::core::option::Option::None::<
+                                   fn(&Self, &mut ::bilrost::encoding::TagMeasurer) -> usize
+                               >);
                         #max_parts
                     ];
                     let mut nparts = 0usize;
@@ -359,7 +361,9 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
             quote! {
                 {
                     let mut parts = [
-                        (0u32, None::<fn(&Self, &mut __B, &mut ::bilrost::encoding::TagWriter)>);
+                        (0u32, ::core::option::Option::None::<
+                                   fn(&Self, &mut __B, &mut ::bilrost::encoding::TagWriter)
+                               >);
                         #max_parts
                     ];
                     let mut nparts = 0usize;
