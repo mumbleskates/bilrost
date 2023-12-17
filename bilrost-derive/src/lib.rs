@@ -372,7 +372,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         }
     });
 
-    let merge = unsorted_fields.iter().map(|&(ref field_ident, ref field)| {
+    let merge = unsorted_fields.iter().map(|(field_ident, field)| {
         let merge = field.merge(quote!(value));
         let tags = field.tags().into_iter().map(|tag| quote!(#tag));
         let tags = Itertools::intersperse(tags, quote!(|));
@@ -398,7 +398,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
 
     let clear = unsorted_fields
         .iter()
-        .map(|&(ref field_ident, ref field)| field.clear(quote!(self.#field_ident)));
+        .map(|(field_ident, field)| field.clear(quote!(self.#field_ident)));
 
     let default = if is_struct {
         let default = unsorted_fields.iter().map(|(field_ident, field)| {
@@ -420,7 +420,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
 
     let methods = unsorted_fields
         .iter()
-        .flat_map(|&(ref field_ident, ref field)| field.methods(field_ident))
+        .flat_map(|(field_ident, field)| field.methods(field_ident))
         .collect::<Vec<_>>();
     let methods = if methods.is_empty() {
         quote!()
@@ -480,7 +480,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     let expanded = if skip_debug {
         expanded
     } else {
-        let debugs = unsorted_fields.iter().map(|&(ref field_ident, ref field)| {
+        let debugs = unsorted_fields.iter().map(|(field_ident, field)| {
             let wrapper = field.debug(quote!(self.#field_ident));
             let call = if is_struct {
                 quote!(builder.field(stringify!(#field_ident), &wrapper))
@@ -575,10 +575,10 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
 
     let is_valid = variants
         .iter()
-        .map(|&(_, ref value)| quote!(#value => true));
+        .map(|(_, value)| quote!(#value => true));
 
     let try_from = variants.iter().map(
-        |&(ref variant, ref value)| quote!(#value => ::core::result::Result::Ok(#ident::#variant)),
+        |(variant, value)| quote!(#value => ::core::result::Result::Ok(#ident::#variant)),
     );
 
     let is_valid_doc = format!("Returns `true` if `value` is a variant of `{}`.", ident);
@@ -707,12 +707,12 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         );
     }
 
-    let encode = fields.iter().map(|&(ref variant_ident, ref field)| {
+    let encode = fields.iter().map(|(variant_ident, field)| {
         let encode = field.encode(quote!(*value));
         quote!(#ident::#variant_ident(ref value) => { #encode })
     });
 
-    let merge = fields.iter().map(|&(ref variant_ident, ref field)| {
+    let merge = fields.iter().map(|(variant_ident, field)| {
         let tag = field.tags()[0];
         let merge = field.merge(quote!(value));
         quote! {
@@ -731,12 +731,12 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         }
     });
 
-    let encoded_len = fields.iter().map(|&(ref variant_ident, ref field)| {
+    let encoded_len = fields.iter().map(|(variant_ident, field)| {
         let encoded_len = field.encoded_len(quote!(*value));
         quote!(#ident::#variant_ident(ref value) => #encoded_len)
     });
 
-    let current_tag = fields.iter().map(|&(ref variant_ident, ref field)| {
+    let current_tag = fields.iter().map(|(variant_ident, field)| {
         let tag = field.tags()[0];
         quote!(#ident::#variant_ident(_) => #tag)
     });
@@ -801,7 +801,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
     let expanded = if skip_debug {
         expanded
     } else {
-        let debug = fields.iter().map(|&(ref variant_ident, ref field)| {
+        let debug = fields.iter().map(|(variant_ident, field)| {
             let wrapper = field.debug(quote!(*value));
             quote!(#ident::#variant_ident(ref value) => {
                 let wrapper = #wrapper;
