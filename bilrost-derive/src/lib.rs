@@ -304,10 +304,10 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
             // TODO(widders): when there are many parts, use Vec instead of array
             quote! {
                 {
-                    let mut parts: [(
-                        u32,
-                        Option<fn(&Self, &mut ::bilrost::encoding::TagMeasurer) -> usize>,
-                    ); #max_parts] = ::core::default::Default::default();
+                    let mut parts = [
+                        (0u32, None::<fn(&Self, &mut ::bilrost::encoding::TagMeasurer) -> usize>);
+                        #max_parts
+                    ];
                     let mut nparts = 0usize;
                     #(#parts)*
                     let parts = &mut parts[..nparts];
@@ -356,10 +356,10 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
             // TODO(widders): when there are many parts, use Vec instead of array
             quote! {
                 {
-                    let mut parts: [(
-                        u32,
-                        Option<fn(&Self, &mut __B, &mut ::bilrost::encoding::TagWriter)>,
-                    ); #max_parts] = ::core::default::Default::default();
+                    let mut parts = [
+                        (0u32, None::<fn(&Self, &mut __B, &mut ::bilrost::encoding::TagWriter)>);
+                        #max_parts
+                    ];
                     let mut nparts = 0usize;
                     #(#parts)*
                     let parts = &mut parts[..nparts];
