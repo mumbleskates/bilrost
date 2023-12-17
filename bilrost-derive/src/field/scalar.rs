@@ -312,7 +312,7 @@ impl Field {
 
                         #[doc=#set_doc]
                         pub fn #set(&mut self, value: #ty) {
-                            self.#ident = value as i32;
+                            self.#ident = value as u32;
                         }
                     }
                 }
@@ -333,7 +333,7 @@ impl Field {
 
                         #[doc=#set_doc]
                         pub fn #set(&mut self, value: #ty) {
-                            self.#ident = ::core::option::Option::Some(value as i32);
+                            self.#ident = ::core::option::Option::Some(value as u32);
                         }
                     }
                 }
@@ -347,8 +347,8 @@ impl Field {
                     quote! {
                         #[doc=#iter_doc]
                         pub fn #get(&self) -> ::core::iter::FilterMap<
-                            ::core::iter::Cloned<::core::slice::Iter<i32>>,
-                            fn(i32) -> ::core::option::Option<#ty>,
+                            ::core::iter::Cloned<::core::slice::Iter<u32>>,
+                            fn(u32) -> ::core::option::Option<#ty>,
                         > {
                             self.#ident.iter().cloned().filter_map(|x| {
                                 let result: ::core::result::Result<#ty, _> = ::core::convert::TryFrom::try_from(x);
@@ -357,7 +357,7 @@ impl Field {
                         }
                         #[doc=#push_doc]
                         pub fn #push(&mut self, value: #ty) {
-                            self.#ident.push(value as i32);
+                            self.#ident.push(value as u32);
                         }
                     }
                 }
@@ -798,7 +798,7 @@ impl DefaultValue {
 
     pub fn typed(&self) -> TokenStream {
         if let DefaultValue::Enumeration(_) = *self {
-            quote!(#self as i32)
+            quote!(#self as u32)
         } else {
             quote!(#self)
         }

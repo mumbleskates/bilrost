@@ -296,7 +296,7 @@ impl Field {
                 }
                 #[doc=#insert_doc]
                 pub fn #insert(&mut self, key: #key_ty, value: #ty) -> ::core::option::Option<#ty> {
-                    self.#ident.insert(key, value as i32).and_then(|x| {
+                    self.#ident.insert(key, value as u32).and_then(|x| {
                         let result: ::core::result::Result<#ty, _> = ::core::convert::TryFrom::try_from(x);
                         result.ok()
                     })
