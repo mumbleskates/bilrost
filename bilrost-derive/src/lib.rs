@@ -713,7 +713,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
 
     let encode = fields.iter().map(|(variant_ident, field)| {
         let encode = field.encode(quote!(*value));
-        quote!(#ident::#variant_ident(ref value) => { #encode })
+        quote!(#ident::#variant_ident(value) => { #encode })
     });
 
     let merge = fields.iter().map(|(variant_ident, field)| {
@@ -722,7 +722,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         quote! {
             #tag => {
                 match field {
-                    ::core::option::Option::Some(#ident::#variant_ident(ref mut value)) => {
+                    ::core::option::Option::Some(#ident::#variant_ident(value)) => {
                         #merge
                     },
                     _ => {
@@ -737,7 +737,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
 
     let encoded_len = fields.iter().map(|(variant_ident, field)| {
         let encoded_len = field.encoded_len(quote!(*value));
-        quote!(#ident::#variant_ident(ref value) => #encoded_len)
+        quote!(#ident::#variant_ident(value) => #encoded_len)
     });
 
     let current_tag = fields.iter().map(|(variant_ident, field)| {
@@ -756,7 +756,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
             where
                 __B: ::bilrost::bytes::BufMut
             {
-                match *self {
+                match self {
                     #(#encode,)*
                 }
             }
@@ -787,7 +787,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
             /// Returns the encoded length of the message without a length delimiter.
             #[inline]
             pub fn encoded_len(&self, tm: &mut ::bilrost::encoding::TagMeasurer) -> usize {
-                match *self {
+                match self {
                     #(#encoded_len,)*
                 }
             }
@@ -807,7 +807,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
     } else {
         let debug = fields.iter().map(|(variant_ident, field)| {
             let wrapper = field.debug(quote!(*value));
-            quote!(#ident::#variant_ident(ref value) => {
+            quote!(#ident::#variant_ident(value) => {
                 let wrapper = #wrapper;
                 f.debug_tuple(stringify!(#variant_ident))
                     .field(&wrapper)
@@ -819,7 +819,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
 
             impl #impl_generics ::core::fmt::Debug for #ident #ty_generics #where_clause {
                 fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
-                    match *self {
+                    match self {
                         #(#debug,)*
                     }
                 }
