@@ -282,7 +282,7 @@ pub struct ListValue {
 /// `Value` type union.
 ///
 /// The JSON representation for `NullValue` is JSON `null`.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::bilrost::Enumeration)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, ::bilrost::Enumeration)]
 #[repr(u32)]
 pub enum NullValue {
     /// Null value.
