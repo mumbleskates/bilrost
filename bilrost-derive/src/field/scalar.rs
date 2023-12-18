@@ -145,7 +145,7 @@ impl Field {
         };
         let merge_fn = quote!(::bilrost::encoding::#module::#merge_fn);
 
-        let do_merge = match self.kind {
+        match self.kind {
             Kind::Plain(..) | Kind::Required(..) | Kind::Repeated | Kind::Packed => quote! {
                 #merge_fn(wire_type, #ident, buf, ctx)
             },
@@ -154,16 +154,6 @@ impl Field {
                           #ident.get_or_insert_with(::core::default::Default::default),
                           buf,
                           ctx)
-            },
-        };
-        match self.kind {
-            Kind::Repeated | Kind::Packed => do_merge,
-            _ => quote! {
-                if duplicated {
-                    Err(::bilrost::DecodeError::new("multiple occurrences of non-repeated field"))
-                } else {
-                    #do_merge
-                }
             },
         }
     }

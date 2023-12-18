@@ -6,6 +6,7 @@ mod scalar;
 use std::fmt;
 use std::slice;
 
+use crate::field::scalar::Kind;
 use anyhow::{bail, Error};
 use proc_macro2::TokenStream;
 use quote::quote;
@@ -86,6 +87,23 @@ impl Field {
 
     pub fn last_tag(&self) -> u32 {
         self.tags().into_iter().max().unwrap()
+    }
+
+    pub fn requires_duplication_guard(&self) -> bool {
+        match self {
+            // Maps are inherently repeated, and Oneofs have their own guard
+            Field::Map(..)
+            | Field::Oneof(..)
+            | Field::Scalar(scalar::Field {
+                kind: Kind::Repeated,
+                ..
+            })
+            | Field::Message(message::Field {
+                label: Label::Repeated,
+                ..
+            }) => false,
+            _ => true,
+        }
     }
 
     /// Returns a statement which encodes the field.
