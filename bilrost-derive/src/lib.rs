@@ -73,6 +73,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     // TODO(widders): universal features
     //  * there must be a mode to embed enum values directly inside an option
     //  * map keys must not recur
+    //  * maps should be packed!
 
     // TODO(widders): test coverage for completed features:
     //  * non-repeated fields must only occur once
