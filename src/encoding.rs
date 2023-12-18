@@ -1285,6 +1285,11 @@ pub mod message {
 /// Rust doesn't have a `Map` trait, so macros are currently the best way to be
 /// generic over `HashMap` and `BTreeMap`.
 macro_rules! map {
+    // TODO(widders): change map configurations
+    //  * map keys must not recur
+    //  * maps should be packed! keys and values should directly alternate within a length-
+    //    delineated field
+
     ($map_ty:ident) => {
         use crate::encoding::*;
         use core::hash::Hash;
