@@ -73,11 +73,11 @@ impl Field {
     }
 
     pub fn tags(&self) -> Vec<u32> {
-        match *self {
-            Field::Scalar(ref scalar) => vec![scalar.tag],
-            Field::Message(ref message) => vec![message.tag],
-            Field::Map(ref map) => vec![map.tag],
-            Field::Oneof(ref oneof) => oneof.tags.clone(),
+        match self {
+            Field::Scalar(scalar) => vec![scalar.tag],
+            Field::Message(message) => vec![message.tag],
+            Field::Map(map) => vec![map.tag],
+            Field::Oneof(oneof) => oneof.tags.clone(),
         }
     }
 
@@ -108,56 +108,56 @@ impl Field {
 
     /// Returns a statement which encodes the field.
     pub fn encode(&self, ident: TokenStream) -> TokenStream {
-        match *self {
-            Field::Scalar(ref scalar) => scalar.encode(ident),
-            Field::Message(ref message) => message.encode(ident),
-            Field::Map(ref map) => map.encode(ident),
-            Field::Oneof(ref oneof) => oneof.encode(ident),
+        match self {
+            Field::Scalar(scalar) => scalar.encode(ident),
+            Field::Message(message) => message.encode(ident),
+            Field::Map(map) => map.encode(ident),
+            Field::Oneof(oneof) => oneof.encode(ident),
         }
     }
 
     /// Returns an expression which evaluates to the result of merging a decoded
     /// value into the field.
     pub fn merge(&self, ident: TokenStream) -> TokenStream {
-        match *self {
-            Field::Scalar(ref scalar) => scalar.merge(ident),
-            Field::Message(ref message) => message.merge(ident),
-            Field::Map(ref map) => map.merge(ident),
-            Field::Oneof(ref oneof) => oneof.merge(ident),
+        match self {
+            Field::Scalar(scalar) => scalar.merge(ident),
+            Field::Message(message) => message.merge(ident),
+            Field::Map(map) => map.merge(ident),
+            Field::Oneof(oneof) => oneof.merge(ident),
         }
     }
 
     /// Returns an expression which evaluates to the encoded length of the field.
     pub fn encoded_len(&self, ident: TokenStream) -> TokenStream {
-        match *self {
-            Field::Scalar(ref scalar) => scalar.encoded_len(ident),
-            Field::Map(ref map) => map.encoded_len(ident),
-            Field::Message(ref msg) => msg.encoded_len(ident),
-            Field::Oneof(ref oneof) => oneof.encoded_len(ident),
+        match self {
+            Field::Scalar(scalar) => scalar.encoded_len(ident),
+            Field::Map(map) => map.encoded_len(ident),
+            Field::Message(msg) => msg.encoded_len(ident),
+            Field::Oneof(oneof) => oneof.encoded_len(ident),
         }
     }
 
     /// Returns a statement which clears the field.
     pub fn clear(&self, ident: TokenStream) -> TokenStream {
-        match *self {
-            Field::Scalar(ref scalar) => scalar.clear(ident),
-            Field::Message(ref message) => message.clear(ident),
-            Field::Map(ref map) => map.clear(ident),
-            Field::Oneof(ref oneof) => oneof.clear(ident),
+        match self {
+            Field::Scalar(scalar) => scalar.clear(ident),
+            Field::Message(message) => message.clear(ident),
+            Field::Map(map) => map.clear(ident),
+            Field::Oneof(oneof) => oneof.clear(ident),
         }
     }
 
     pub fn default(&self) -> TokenStream {
-        match *self {
-            Field::Scalar(ref scalar) => scalar.default(),
+        match self {
+            Field::Scalar(scalar) => scalar.default(),
             _ => quote!(::core::default::Default::default()),
         }
     }
 
     /// Produces the fragment implementing debug for the given field.
     pub fn debug(&self, ident: TokenStream) -> TokenStream {
-        match *self {
-            Field::Scalar(ref scalar) => {
+        match self {
+            Field::Scalar(scalar) => {
                 let wrapper = scalar.debug(quote!(ScalarWrapper));
                 quote! {
                     {
@@ -166,7 +166,7 @@ impl Field {
                     }
                 }
             }
-            Field::Map(ref map) => {
+            Field::Map(map) => {
                 let wrapper = map.debug(quote!(MapWrapper));
                 quote! {
                     {
@@ -180,9 +180,9 @@ impl Field {
     }
 
     pub fn methods(&self, ident: &TokenStream) -> Option<TokenStream> {
-        match *self {
-            Field::Scalar(ref scalar) => scalar.methods(ident),
-            Field::Map(ref map) => map.methods(ident),
+        match self {
+            Field::Scalar(scalar) => scalar.methods(ident),
+            Field::Map(map) => map.methods(ident),
             _ => None,
         }
     }
@@ -215,7 +215,7 @@ impl Label {
     /// Parses a string into a field label.
     /// If the string doesn't match a field label, `None` is returned.
     fn from_attr(attr: &Meta) -> Option<Label> {
-        if let Meta::Path(ref path) = *attr {
+        if let Meta::Path(path) = attr {
             for &label in Label::variants() {
                 if path.is_ident(label.as_str()) {
                     return Some(label);
@@ -259,7 +259,7 @@ pub fn set_option<T>(option: &mut Option<T>, value: T, message: &str) -> Result<
 where
     T: fmt::Debug,
 {
-    if let Some(ref existing) = *option {
+    if let Some(existing) = option {
         bail!("{}: {:?} and {:?}", message, existing, value);
     }
     *option = Some(value);
@@ -281,15 +281,15 @@ fn bool_attr(key: &str, attr: &Meta) -> Result<Option<bool>, Error> {
     if !attr.path().is_ident(key) {
         return Ok(None);
     }
-    match *attr {
+    match attr {
         Meta::Path(..) => Ok(Some(true)),
-        Meta::List(ref meta_list) => {
+        Meta::List(meta_list) => {
             return Ok(Some(meta_list.parse_args::<LitBool>()?.value()));
         }
         Meta::NameValue(MetaNameValue {
             value:
                 Expr::Lit(ExprLit {
-                    lit: Lit::Str(ref lit),
+                    lit: Lit::Str(lit),
                     ..
                 }),
             ..
@@ -305,14 +305,14 @@ fn bool_attr(key: &str, attr: &Meta) -> Result<Option<bool>, Error> {
                     ..
                 }),
             ..
-        }) => Ok(Some(value)),
+        }) => Ok(Some(*value)),
         _ => bail!("invalid {} attribute", key),
     }
 }
 
 /// Checks if an attribute matches a word.
 fn word_attr(key: &str, attr: &Meta) -> bool {
-    if let Meta::Path(ref path) = *attr {
+    if let Meta::Path(path) = attr {
         path.is_ident(key)
     } else {
         false
@@ -323,20 +323,20 @@ pub(super) fn tag_attr(attr: &Meta) -> Result<Option<u32>, Error> {
     if !attr.path().is_ident("tag") {
         return Ok(None);
     }
-    match *attr {
-        Meta::List(ref meta_list) => {
+    match attr {
+        Meta::List(meta_list) => {
             return Ok(Some(meta_list.parse_args::<LitInt>()?.base10_parse()?));
         }
         Meta::NameValue(MetaNameValue {
-            value: Expr::Lit(ref expr),
+            value: Expr::Lit(expr),
             ..
-        }) => match expr.lit {
-            Lit::Str(ref lit) => lit
+        }) => match &expr.lit {
+            Lit::Str(lit) => lit
                 .value()
                 .parse::<u32>()
                 .map_err(Error::from)
                 .map(Option::Some),
-            Lit::Int(ref lit) => Ok(Some(lit.base10_parse()?)),
+            Lit::Int(lit) => Ok(Some(lit.base10_parse()?)),
             _ => bail!("invalid tag attribute: {:?}", attr),
         },
         _ => bail!("invalid tag attribute: {:?}", attr),
@@ -347,8 +347,8 @@ fn tags_attr(attr: &Meta) -> Result<Option<Vec<u32>>, Error> {
     if !attr.path().is_ident("tags") {
         return Ok(None);
     }
-    match *attr {
-        Meta::List(ref meta_list) => Ok(Some(
+    match attr {
+        Meta::List(meta_list) => Ok(Some(
             meta_list
                 .parse_args_with(Punctuated::<LitInt, Token![,]>::parse_terminated)?
                 .iter()
@@ -358,7 +358,7 @@ fn tags_attr(attr: &Meta) -> Result<Option<Vec<u32>>, Error> {
         Meta::NameValue(MetaNameValue {
             value:
                 Expr::Lit(ExprLit {
-                    lit: Lit::Str(ref lit),
+                    lit: Lit::Str(lit),
                     ..
                 }),
             ..
