@@ -77,7 +77,7 @@ impl Field {
         let tag = self.tag;
         match self.label {
             Label::Optional => quote! {
-                if let Some(ref msg) = #ident {
+                if let Some(msg) = &#ident {
                     ::bilrost::encoding::message::encode(#tag, msg, buf, tw);
                 }
             },

@@ -19,16 +19,16 @@ impl Field {
 
         for attr in attrs {
             if attr.path().is_ident("oneof") {
-                let t = match *attr {
+                let t = match attr {
                     Meta::NameValue(MetaNameValue {
                         value:
                             Expr::Lit(ExprLit {
-                                lit: Lit::Str(ref lit),
+                                lit: Lit::Str(lit),
                                 ..
                             }),
                         ..
                     }) => parse_str::<Path>(&lit.value())?,
-                    Meta::List(ref list) => list.parse_args::<Ident>()?.into(),
+                    Meta::List(list) => list.parse_args::<Ident>()?.into(),
                     _ => bail!("invalid oneof attribute: {:?}", attr),
                 };
                 set_option(&mut ty, t, "duplicate oneof attribute")?;
@@ -64,7 +64,7 @@ impl Field {
     /// Returns a statement which encodes the oneof field.
     pub fn encode(&self, ident: TokenStream) -> TokenStream {
         quote! {
-            if let Some(ref oneof) = #ident {
+            if let Some(oneof) = &#ident {
                 oneof.encode(buf, tw)
             }
         }
