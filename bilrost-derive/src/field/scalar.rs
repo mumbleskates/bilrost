@@ -1,9 +1,8 @@
-use std::convert::TryFrom;
 use std::fmt;
 
 use anyhow::{anyhow, bail, Error};
 use proc_macro2::{Span, TokenStream};
-use quote::{quote, ToTokens};
+use quote::quote;
 use syn::{parse_str, Expr, ExprLit, Ident, Index, Lit, Meta, MetaNameValue, Path};
 
 use crate::field::{bool_attr, set_option, tag_attr, Label};
@@ -75,7 +74,7 @@ impl Field {
     }
 
     pub fn new_oneof(attrs: &[Meta]) -> Result<Option<Field>, Error> {
-        if let Some(mut field) = Field::new(attrs, None)? {
+        if let Some(field) = Field::new(attrs, None)? {
             match field.kind {
                 Kind::Plain => Ok(Some(field)),
                 Kind::Optional => bail!("invalid optional attribute on oneof field"),
