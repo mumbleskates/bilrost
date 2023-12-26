@@ -66,7 +66,6 @@ impl Field {
                     attr.path().into_token_stream()
                 );
             }
-            field.label = Label::Required;
             Ok(Some(field))
         } else {
             Ok(None)
@@ -80,9 +79,6 @@ impl Field {
                 if let Some(msg) = &#ident {
                     ::bilrost::encoding::message::encode(#tag, msg, buf, tw);
                 }
-            },
-            Label::Required => quote! {
-                ::bilrost::encoding::message::encode(#tag, &#ident, buf, tw);
             },
             Label::Repeated => quote! {
                 for msg in &#ident {
@@ -100,9 +96,6 @@ impl Field {
                                                  buf,
                                                  ctx)
             },
-            Label::Required => quote! {
-                ::bilrost::encoding::message::merge(wire_type, #ident, buf, ctx)
-            },
             Label::Repeated => quote! {
                 ::bilrost::encoding::message::merge_repeated(wire_type, #ident, buf, ctx)
             },
@@ -115,9 +108,6 @@ impl Field {
             Label::Optional => quote! {
                 #ident.as_ref().map_or(0, |msg| ::bilrost::encoding::message::encoded_len(#tag, msg, tm))
             },
-            Label::Required => quote! {
-                ::bilrost::encoding::message::encoded_len(#tag, &#ident, tm)
-            },
             Label::Repeated => quote! {
                 ::bilrost::encoding::message::encoded_len_repeated(#tag, &#ident, tm)
             },
@@ -127,7 +117,6 @@ impl Field {
     pub fn clear(&self, ident: TokenStream) -> TokenStream {
         match self.label {
             Label::Optional => quote!(#ident = ::core::option::Option::None),
-            Label::Required => quote!(#ident.clear()),
             Label::Repeated => quote!(#ident.clear()),
         }
     }

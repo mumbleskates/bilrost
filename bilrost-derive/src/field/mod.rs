@@ -192,8 +192,6 @@ impl Field {
 pub enum Label {
     /// An optional field.
     Optional,
-    /// A required field.
-    Required, // TODO(widders): consider removing or renaming this
     /// A repeated field.
     Repeated,
 }
@@ -202,13 +200,12 @@ impl Label {
     fn as_str(self) -> &'static str {
         match self {
             Label::Optional => "optional",
-            Label::Required => "required",
             Label::Repeated => "repeated",
         }
     }
 
     fn variants() -> slice::Iter<'static, Label> {
-        const VARIANTS: &[Label] = &[Label::Optional, Label::Required, Label::Repeated];
+        const VARIANTS: &[Label] = &[Label::Optional, Label::Repeated];
         VARIANTS.iter()
     }
 

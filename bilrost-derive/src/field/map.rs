@@ -37,10 +37,9 @@ impl MapTy {
 }
 
 fn fake_scalar(ty: scalar::Ty) -> scalar::Field {
-    let kind = scalar::Kind::Plain(scalar::DefaultValue::new(&ty));
     scalar::Field {
         ty,
-        kind,
+        kind: scalar::Kind::Plain,
         tag: 0, // Not used here
     }
 }

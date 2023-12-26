@@ -3,8 +3,8 @@ use std::fmt;
 
 use anyhow::{anyhow, bail, Error};
 use proc_macro2::{Span, TokenStream};
-use quote::{quote, ToTokens, TokenStreamExt};
-use syn::{parse_str, Expr, ExprLit, Ident, Index, Lit, LitByteStr, Meta, MetaNameValue, Path};
+use quote::{quote, ToTokens};
+use syn::{parse_str, Expr, ExprLit, Ident, Index, Lit, Meta, MetaNameValue, Path};
 
 use crate::field::{bool_attr, set_option, tag_attr, Label};
 
@@ -21,7 +21,6 @@ impl Field {
         let mut ty = None;
         let mut label = None;
         let mut packed = None;
-        let mut default = None;
         let mut tag = None;
 
         let mut unknown_attrs = Vec::new();
@@ -35,8 +34,6 @@ impl Field {
                 set_option(&mut tag, t, "duplicate tag attributes")?;
             } else if let Some(l) = Label::from_attr(attr) {
                 set_option(&mut label, l, "duplicate label attributes")?;
-            } else if let Some(d) = DefaultValue::from_attr(attr)? {
-                set_option(&mut default, d, "duplicate default attributes")?;
             } else {
                 unknown_attrs.push(attr);
             }
@@ -58,32 +55,20 @@ impl Field {
             None => bail!("missing tag attribute"),
         };
 
-        let has_default = default.is_some();
-        let default = default.map_or_else(
-            || Ok(DefaultValue::new(&ty)),
-            |lit| DefaultValue::from_lit(&ty, lit),
-        )?;
-
-        let kind = match (label, packed, has_default) {
+        let kind = match (label, packed, ty.is_numeric()) {
             (None, Some(true), _)
-            | (Some(Label::Optional), Some(true), _)
-            | (Some(Label::Required), Some(true), _) => {
+            | (Some(Label::Optional), Some(true), _) => {
                 bail!("packed attribute may only be applied to repeated fields");
             }
-            (Some(Label::Repeated), Some(true), _) if !ty.is_numeric() => {
+            (_, Some(true), false) => {
                 bail!("packed attribute may only be applied to numeric types");
             }
-            (Some(Label::Repeated), _, true) => {
-                bail!("repeated fields may not have a default value");
-            }
 
-            (None, _, _) => Kind::Plain(default),
-            (Some(Label::Optional), _, _) => Kind::Optional(default),
-            (Some(Label::Required), _, _) => Kind::Required(default),
-            (Some(Label::Repeated), packed, false) if packed.unwrap_or_else(|| ty.is_numeric()) => {
-                Kind::Packed
-            }
-            (Some(Label::Repeated), _, false) => Kind::Repeated,
+            (None, _, _) => Kind::Plain,
+            (Some(Label::Optional), _, _) => Kind::Optional,
+            (Some(Label::Repeated), Some(true), _)
+            | (Some(Label::Repeated), None, true) => Kind::Packed,
+            (Some(Label::Repeated), _, _) => Kind::Repeated,
         };
 
         Ok(Some(Field { ty, kind, tag }))
@@ -92,12 +77,8 @@ impl Field {
     pub fn new_oneof(attrs: &[Meta]) -> Result<Option<Field>, Error> {
         if let Some(mut field) = Field::new(attrs, None)? {
             match field.kind {
-                Kind::Plain(default) => {
-                    field.kind = Kind::Required(default);
-                    Ok(Some(field))
-                }
-                Kind::Optional(..) => bail!("invalid optional attribute on oneof field"),
-                Kind::Required(..) => bail!("invalid required attribute on oneof field"),
+                Kind::Plain => Ok(Some(field)),
+                Kind::Optional => bail!("invalid optional attribute on oneof field"),
                 Kind::Packed | Kind::Repeated => bail!("invalid repeated attribute on oneof field"),
             }
         } else {
@@ -108,7 +89,7 @@ impl Field {
     pub fn encode(&self, ident: TokenStream) -> TokenStream {
         let module = self.ty.module();
         let encode_fn = match self.kind {
-            Kind::Plain(..) | Kind::Optional(..) | Kind::Required(..) => quote!(encode),
+            Kind::Plain | Kind::Optional => quote!(encode),
             Kind::Repeated => quote!(encode_repeated),
             Kind::Packed => quote!(encode_packed),
         };
@@ -116,20 +97,20 @@ impl Field {
         let tag = self.tag;
 
         match &self.kind {
-            Kind::Plain(default) => {
-                let default = default.typed();
+            Kind::Plain => {
+                let zero = self.ty.zero_value();
                 quote! {
-                    if #ident != #default {
+                    if #ident != #zero {
                         #encode_fn(#tag, &#ident, buf, tw);
                     }
                 }
             }
-            Kind::Optional(..) => quote! {
+            Kind::Optional => quote! {
                 if let ::core::option::Option::Some(value) = &#ident {
                     #encode_fn(#tag, value, buf, tw);
                 }
             },
-            Kind::Required(..) | Kind::Repeated | Kind::Packed => quote! {
+            Kind::Repeated | Kind::Packed => quote! {
                 #encode_fn(#tag, &#ident, buf, tw);
             },
         }
@@ -140,16 +121,16 @@ impl Field {
     pub fn merge(&self, ident: TokenStream) -> TokenStream {
         let module = self.ty.module();
         let merge_fn = match self.kind {
-            Kind::Plain(..) | Kind::Optional(..) | Kind::Required(..) => quote!(merge),
+            Kind::Plain | Kind::Optional => quote!(merge),
             Kind::Repeated | Kind::Packed => quote!(merge_repeated),
         };
         let merge_fn = quote!(::bilrost::encoding::#module::#merge_fn);
 
         match self.kind {
-            Kind::Plain(..) | Kind::Required(..) | Kind::Repeated | Kind::Packed => quote! {
+            Kind::Plain | Kind::Repeated | Kind::Packed => quote! {
                 #merge_fn(wire_type, #ident, buf, ctx)
             },
-            Kind::Optional(..) => quote! {
+            Kind::Optional => quote! {
                 #merge_fn(wire_type,
                           #ident.get_or_insert_with(::core::default::Default::default),
                           buf,
@@ -162,7 +143,7 @@ impl Field {
     pub fn encoded_len(&self, ident: TokenStream) -> TokenStream {
         let module = self.ty.module();
         let encoded_len_fn = match self.kind {
-            Kind::Plain(..) | Kind::Optional(..) | Kind::Required(..) => quote!(encoded_len),
+            Kind::Plain | Kind::Optional => quote!(encoded_len),
             Kind::Repeated => quote!(encoded_len_repeated),
             Kind::Packed => quote!(encoded_len_packed),
         };
@@ -170,20 +151,20 @@ impl Field {
         let tag = self.tag;
 
         match &self.kind {
-            Kind::Plain(default) => {
-                let default = default.typed();
+            Kind::Plain => {
+                let zero = self.ty.zero_value();
                 quote! {
-                    if #ident != #default {
+                    if #ident != #zero {
                         #encoded_len_fn(#tag, &#ident, tm)
                     } else {
                         0
                     }
                 }
             }
-            Kind::Optional(..) => quote! {
+            Kind::Optional => quote! {
                 #ident.as_ref().map_or(0, |value| #encoded_len_fn(#tag, value, tm))
             },
-            Kind::Required(..) | Kind::Repeated | Kind::Packed => quote! {
+            Kind::Repeated | Kind::Packed => quote! {
                 #encoded_len_fn(#tag, &#ident, tm)
             },
         }
@@ -191,23 +172,23 @@ impl Field {
 
     pub fn clear(&self, ident: TokenStream) -> TokenStream {
         match &self.kind {
-            Kind::Plain(default) | Kind::Required(default) => {
-                let default = default.typed();
+            Kind::Plain => {
+                let zero = self.ty.zero_value();
                 match self.ty {
                     Ty::String | Ty::Bytes(..) => quote!(#ident.clear()),
-                    _ => quote!(#ident = #default),
+                    _ => quote!(#ident = #zero),
                 }
             }
-            Kind::Optional(_) => quote!(#ident = ::core::option::Option::None),
+            Kind::Optional => quote!(#ident = ::core::option::Option::None),
             Kind::Repeated | Kind::Packed => quote!(#ident.clear()),
         }
     }
 
     /// Returns an expression which evaluates to the default value of the field.
     pub fn default(&self) -> TokenStream {
-        match &self.kind {
-            Kind::Plain(value) | Kind::Required(value) => value.owned(),
-            Kind::Optional(_) => quote!(::core::option::Option::None),
+        match self.kind {
+            Kind::Plain => self.ty.zero_value(),
+            Kind::Optional => quote!(::core::option::Option::None),
             Kind::Repeated | Kind::Packed => quote!(::bilrost::alloc::vec::Vec::new()),
         }
     }
@@ -240,8 +221,8 @@ impl Field {
         let wrapper = self.debug_inner(quote!(Inner));
         let inner_ty = self.ty.owned_type();
         match self.kind {
-            Kind::Plain(_) | Kind::Required(_) => self.debug_inner(wrapper_name),
-            Kind::Optional(_) => quote! {
+            Kind::Plain => self.debug_inner(wrapper_name),
+            Kind::Optional => quote! {
                 struct #wrapper_name<'a>(&'a ::core::option::Option<#inner_ty>);
                 impl<'a> ::core::fmt::Debug for #wrapper_name<'a> {
                     fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
@@ -288,16 +269,18 @@ impl Field {
             let set = Ident::new(&format!("set_{}", ident_str), Span::call_site());
             let set_doc = format!("Sets `{}` to the provided enum value.", ident_str);
             Some(match &self.kind {
-                Kind::Plain(default) | Kind::Required(default) => {
+                Kind::Plain => {
+                    // TODO(widders): wtf do we do with this. just don't make a method right idk
                     let get_doc = format!(
                         "Returns the enum value of `{}`, \
                          or the default if the field is set to an invalid enum value.",
                         ident_str,
                     );
+                    let zero = self.ty.zero_value();
                     quote! {
                         #[doc=#get_doc]
                         pub fn #get(&self) -> #ty {
-                            ::core::convert::TryFrom::try_from(self.#ident).unwrap_or(#default)
+                            ::core::convert::TryFrom::try_from(self.#ident).unwrap_or(#zero)
                         }
 
                         #[doc=#set_doc]
@@ -306,19 +289,21 @@ impl Field {
                         }
                     }
                 }
-                Kind::Optional(default) => {
+                Kind::Optional => {
+                    // TODO(widders): exact same thing here
                     let get_doc = format!(
                         "Returns the enum value of `{}`, \
                          or the default if the field is unset or set to an invalid enum value.",
                         ident_str,
                     );
+                    let zero = self.ty.zero_value();
                     quote! {
                         #[doc=#get_doc]
-                        pub fn #get(&self) -> #ty {
+                        pub fn #get(&self) -> ::core::option::Option<#ty {
                             self.#ident.and_then(|x| {
                                 let result: ::core::result::Result<#ty, _> = ::core::convert::TryFrom::try_from(x);
                                 result.ok()
-                            }).unwrap_or(#default)
+                            }).unwrap_or(#zero)
                         }
 
                         #[doc=#set_doc]
@@ -352,7 +337,7 @@ impl Field {
                     }
                 }
             })
-        } else if let Kind::Optional(default) = &self.kind {
+        } else if let Kind::Optional = &self.kind {
             let ty = self.ty.ref_type();
 
             let match_some = if self.ty.is_numeric() {
@@ -361,18 +346,12 @@ impl Field {
                 quote!(::core::option::Option::Some(val) => &val[..],)
             };
 
-            let get_doc = format!(
-                "Returns the value of `{0}`, or the default value if `{0}` is unset.",
-                ident_str,
-            );
+            let get_doc = format!("Returns the value of `{ident_str}`.");
 
             Some(quote! {
                 #[doc=#get_doc]
-                pub fn #get(&self) -> #ty {
-                    match &self.#ident {
-                        #match_some
-                        ::core::option::Option::None => #default,
-                    }
+                pub fn #get(&self) -> ::core::option::Option<#ty> {
+                    self.#ident.as_ref().map(|val| #match_some)
                 }
             })
         } else {
@@ -398,6 +377,8 @@ pub enum Ty {
     String,
     Bytes(BytesTy),
     Enumeration(Path),
+    // TODO(widders): implement this as in-place enum value that impls TryFrom<u32>
+    // ExactEnumeration,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -529,21 +510,30 @@ impl Ty {
     }
 
     pub fn ref_type(&self) -> TokenStream {
-        match *self {
+        match self {
             Ty::Float32 => quote!(f32),
             Ty::Float64 => quote!(f64),
-            Ty::Uint32 => quote!(u32),
-            Ty::Uint64 => quote!(u64),
-            Ty::Sint32 => quote!(i32),
-            Ty::Sint64 => quote!(i64),
-            Ty::Ufixed32 => quote!(u32),
-            Ty::Ufixed64 => quote!(u64),
-            Ty::Sfixed32 => quote!(i32),
-            Ty::Sfixed64 => quote!(i64),
+            Ty::Uint32 | Ty::Ufixed32 | Ty::Enumeration(..) => quote!(u32),
+            Ty::Uint64 | Ty::Ufixed64 => quote!(u64),
+            Ty::Sint32 | Ty::Sfixed32 => quote!(i32),
+            Ty::Sint64 | Ty::Sfixed64 => quote!(i64),
             Ty::Bool => quote!(bool),
             Ty::String => quote!(&str),
             Ty::Bytes(..) => quote!(&[u8]),
-            Ty::Enumeration(..) => quote!(i32),
+        }
+    }
+
+    pub fn zero_value(&self) -> TokenStream {
+        match self {
+            Ty::Float32 => quote!(0f32),
+            Ty::Float64 => quote!(0f64),
+            Ty::Uint32 | Ty::Ufixed32 | Ty::Enumeration(..) => quote!(0u32),
+            Ty::Uint64 | Ty::Ufixed64 => quote!(0u64),
+            Ty::Sint32 | Ty::Sfixed32 => quote!(0i32),
+            Ty::Sint64 | Ty::Sfixed64 => quote!(0i64),
+            Ty::Bool => quote!(false),
+            Ty::String => quote!(""),
+            Ty::Bytes(..) => quote!(b"" as &[u8]),
         }
     }
 
@@ -573,245 +563,14 @@ impl fmt::Display for Ty {
 }
 
 /// Scalar Protobuf field types.
-// TODO(widders): re-explain or refactor how these work
 #[derive(Clone)]
 pub enum Kind {
     /// A plain proto3 scalar field.
-    Plain(DefaultValue),
+    Plain,
     /// An optional scalar field.
-    Optional(DefaultValue),
-    /// A required proto2 scalar field.
-    Required(DefaultValue),
+    Optional,
     /// A repeated scalar field.
     Repeated,
     /// A packed repeated scalar field.
     Packed,
-}
-
-/// Scalar Protobuf field default value.
-#[derive(Clone, Debug)]
-pub enum DefaultValue {
-    F64(f64),
-    F32(f32),
-    I32(i32),
-    I64(i64),
-    U32(u32),
-    U64(u64),
-    Bool(bool),
-    String(String),
-    Bytes(Vec<u8>),
-    Enumeration(TokenStream),
-    Path(Path),
-}
-
-impl DefaultValue {
-    pub fn from_attr(attr: &Meta) -> Result<Option<Lit>, Error> {
-        if !attr.path().is_ident("default") {
-            Ok(None)
-        } else if let Meta::NameValue(MetaNameValue {
-            value: Expr::Lit(ExprLit { lit, .. }),
-            ..
-        }) = attr
-        {
-            Ok(Some(lit.clone()))
-        } else {
-            bail!("invalid default value attribute: {:?}", attr)
-        }
-    }
-
-    pub fn from_lit(ty: &Ty, lit: Lit) -> Result<DefaultValue, Error> {
-        let is_i32 = *ty == Ty::Sint32 || *ty == Ty::Sfixed32;
-        let is_i64 = *ty == Ty::Sint64 || *ty == Ty::Sfixed64;
-
-        let is_u32 = *ty == Ty::Uint32 || *ty == Ty::Ufixed32;
-        let is_u64 = *ty == Ty::Uint64 || *ty == Ty::Ufixed64;
-
-        let empty_or_is = |expected, actual: &str| expected == actual || actual.is_empty();
-
-        let default = match &lit {
-            Lit::Int(lit) if is_i32 && empty_or_is("i32", lit.suffix()) => {
-                DefaultValue::I32(lit.base10_parse()?)
-            }
-            Lit::Int(lit) if is_i64 && empty_or_is("i64", lit.suffix()) => {
-                DefaultValue::I64(lit.base10_parse()?)
-            }
-            Lit::Int(lit) if is_u32 && empty_or_is("u32", lit.suffix()) => {
-                DefaultValue::U32(lit.base10_parse()?)
-            }
-            Lit::Int(lit) if is_u64 && empty_or_is("u64", lit.suffix()) => {
-                DefaultValue::U64(lit.base10_parse()?)
-            }
-
-            Lit::Float(lit) if *ty == Ty::Float32 && empty_or_is("f32", lit.suffix()) => {
-                DefaultValue::F32(lit.base10_parse()?)
-            }
-            Lit::Int(lit) if *ty == Ty::Float32 => DefaultValue::F32(lit.base10_parse()?),
-
-            Lit::Float(lit) if *ty == Ty::Float64 && empty_or_is("f64", lit.suffix()) => {
-                DefaultValue::F64(lit.base10_parse()?)
-            }
-            Lit::Int(lit) if *ty == Ty::Float64 => DefaultValue::F64(lit.base10_parse()?),
-
-            Lit::Bool(lit) if *ty == Ty::Bool => DefaultValue::Bool(lit.value),
-            Lit::Str(lit) if *ty == Ty::String => DefaultValue::String(lit.value()),
-            Lit::ByteStr(lit)
-                if *ty == Ty::Bytes(BytesTy::Bytes) || *ty == Ty::Bytes(BytesTy::Vec) =>
-            {
-                DefaultValue::Bytes(lit.value())
-            }
-
-            Lit::Str(lit) => {
-                let value = lit.value();
-                let value = value.trim();
-
-                if let Ty::Enumeration(path) = ty {
-                    let variant = Ident::new(value, Span::call_site());
-                    return Ok(DefaultValue::Enumeration(quote!(#path::#variant)));
-                }
-
-                // Parse special floating point values.
-                if *ty == Ty::Float32 {
-                    match value {
-                        "inf" => {
-                            return Ok(DefaultValue::Path(parse_str::<Path>(
-                                "::core::f32::INFINITY",
-                            )?));
-                        }
-                        "-inf" => {
-                            return Ok(DefaultValue::Path(parse_str::<Path>(
-                                "::core::f32::NEG_INFINITY",
-                            )?));
-                        }
-                        "nan" => {
-                            return Ok(DefaultValue::Path(parse_str::<Path>("::core::f32::NAN")?));
-                        }
-                        _ => (),
-                    }
-                }
-                if *ty == Ty::Float64 {
-                    match value {
-                        "inf" => {
-                            return Ok(DefaultValue::Path(parse_str::<Path>(
-                                "::core::f64::INFINITY",
-                            )?));
-                        }
-                        "-inf" => {
-                            return Ok(DefaultValue::Path(parse_str::<Path>(
-                                "::core::f64::NEG_INFINITY",
-                            )?));
-                        }
-                        "nan" => {
-                            return Ok(DefaultValue::Path(parse_str::<Path>("::core::f64::NAN")?));
-                        }
-                        _ => (),
-                    }
-                }
-
-                // Rust doesn't have a negative literals, so they have to be parsed specially.
-                if let Some(Ok(lit)) = value.strip_prefix('-').map(parse_str::<Lit>) {
-                    match &lit {
-                        Lit::Int(lit) if is_i32 && empty_or_is("i32", lit.suffix()) => {
-                            // Initially parse into an i64, so that i32::MIN does not overflow.
-                            let value: i64 = -lit.base10_parse()?;
-                            return Ok(i32::try_from(value).map(DefaultValue::I32)?);
-                        }
-                        Lit::Int(lit) if is_i64 && empty_or_is("i64", lit.suffix()) => {
-                            // Initially parse into an i128, so that i64::MIN does not overflow.
-                            let value: i128 = -lit.base10_parse()?;
-                            return Ok(i64::try_from(value).map(DefaultValue::I64)?);
-                        }
-                        Lit::Float(lit)
-                            if *ty == Ty::Float32 && empty_or_is("f32", lit.suffix()) =>
-                        {
-                            return Ok(DefaultValue::F32(-lit.base10_parse()?));
-                        }
-                        Lit::Float(lit)
-                            if *ty == Ty::Float64 && empty_or_is("f64", lit.suffix()) =>
-                        {
-                            return Ok(DefaultValue::F64(-lit.base10_parse()?));
-                        }
-                        Lit::Int(lit) if *ty == Ty::Float32 && lit.suffix().is_empty() => {
-                            return Ok(DefaultValue::F32(-lit.base10_parse()?));
-                        }
-                        Lit::Int(lit) if *ty == Ty::Float64 && lit.suffix().is_empty() => {
-                            return Ok(DefaultValue::F64(-lit.base10_parse()?));
-                        }
-                        _ => (),
-                    }
-                }
-                match parse_str::<Lit>(value) {
-                    Ok(Lit::Str(_)) => (),
-                    Ok(lit) => return DefaultValue::from_lit(ty, lit),
-                    _ => (),
-                }
-                bail!("invalid default value: {}", quote!(#value));
-            }
-            _ => bail!("invalid default value: {}", quote!(#lit)),
-        };
-
-        Ok(default)
-    }
-
-    pub fn new(ty: &Ty) -> DefaultValue {
-        match ty {
-            Ty::Float32 => DefaultValue::F32(0.0),
-            Ty::Float64 => DefaultValue::F64(0.0),
-            Ty::Sint32 | Ty::Sfixed32 => DefaultValue::I32(0),
-            Ty::Sint64 | Ty::Sfixed64 => DefaultValue::I64(0),
-            Ty::Uint32 | Ty::Ufixed32 => DefaultValue::U32(0),
-            Ty::Uint64 | Ty::Ufixed64 => DefaultValue::U64(0),
-
-            Ty::Bool => DefaultValue::Bool(false),
-            Ty::String => DefaultValue::String(String::new()),
-            Ty::Bytes(..) => DefaultValue::Bytes(Vec::new()),
-            Ty::Enumeration(path) => DefaultValue::Enumeration(quote!(#path::default())),
-        }
-    }
-
-    pub fn owned(&self) -> TokenStream {
-        match self {
-            DefaultValue::String(value) if value.is_empty() => {
-                quote!(::bilrost::alloc::string::String::new())
-            }
-            DefaultValue::String(value) => quote!(#value.into()),
-            DefaultValue::Bytes(value) if value.is_empty() => {
-                quote!(::core::default::Default::default())
-            }
-            DefaultValue::Bytes(value) => {
-                let lit = LitByteStr::new(value, Span::call_site());
-                quote!(#lit.as_ref().into())
-            }
-
-            other => other.typed(),
-        }
-    }
-
-    pub fn typed(&self) -> TokenStream {
-        if let DefaultValue::Enumeration(_) = *self {
-            quote!(#self as u32)
-        } else {
-            quote!(#self)
-        }
-    }
-}
-
-impl ToTokens for DefaultValue {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
-        match self {
-            DefaultValue::F64(value) => value.to_tokens(tokens),
-            DefaultValue::F32(value) => value.to_tokens(tokens),
-            DefaultValue::I32(value) => value.to_tokens(tokens),
-            DefaultValue::I64(value) => value.to_tokens(tokens),
-            DefaultValue::U32(value) => value.to_tokens(tokens),
-            DefaultValue::U64(value) => value.to_tokens(tokens),
-            DefaultValue::Bool(value) => value.to_tokens(tokens),
-            DefaultValue::String(value) => value.to_tokens(tokens),
-            DefaultValue::Bytes(value) => {
-                let byte_str = LitByteStr::new(value, Span::call_site());
-                tokens.append_all(quote!(#byte_str as &[u8]));
-            }
-            DefaultValue::Enumeration(value) => value.to_tokens(tokens),
-            DefaultValue::Path(value) => value.to_tokens(tokens),
-        }
-    }
 }
