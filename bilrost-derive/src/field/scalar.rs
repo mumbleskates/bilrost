@@ -172,11 +172,8 @@ impl Field {
     pub fn clear(&self, ident: TokenStream) -> TokenStream {
         match &self.kind {
             Kind::Plain => {
-                let zero = self.ty.zero_value();
-                match self.ty {
-                    Ty::String | Ty::Bytes(..) => quote!(#ident.clear()),
-                    _ => quote!(#ident = #zero),
-                }
+                let default = self.ty.default_value();
+                quote!(#ident = #default)
             }
             Kind::Optional => quote!(#ident = ::core::option::Option::None),
             Kind::Repeated | Kind::Packed => quote!(#ident.clear()),
@@ -186,7 +183,7 @@ impl Field {
     /// Returns an expression which evaluates to the default value of the field.
     pub fn default(&self) -> TokenStream {
         match self.kind {
-            Kind::Plain => self.ty.zero_value(),
+            Kind::Plain => self.ty.default_value(),
             Kind::Optional => quote!(::core::option::Option::None),
             Kind::Repeated | Kind::Packed => quote!(::bilrost::alloc::vec::Vec::new()),
         }
@@ -269,17 +266,15 @@ impl Field {
             let set_doc = format!("Sets `{}` to the provided enum value.", ident_str);
             Some(match &self.kind {
                 Kind::Plain => {
-                    // TODO(widders): wtf do we do with this. just don't make a method right idk
                     let get_doc = format!(
                         "Returns the enum value of `{}`, \
                          or the default if the field is set to an invalid enum value.",
                         ident_str,
                     );
-                    let zero = self.ty.zero_value();
                     quote! {
                         #[doc=#get_doc]
-                        pub fn #get(&self) -> #ty {
-                            ::core::convert::TryFrom::try_from(self.#ident).unwrap_or(#zero)
+                        pub fn #get(&self) -> ::core::option::Option<#ty> {
+                            ::core::convert::TryFrom::try_from(self.#ident).ok()
                         }
 
                         #[doc=#set_doc]
@@ -289,7 +284,6 @@ impl Field {
                     }
                 }
                 Kind::Optional => {
-                    // TODO(widders): exact same thing here
                     let get_doc = format!(
                         "Returns the enum value of `{}`, \
                          or the default if the field is unset or set to an invalid enum value.",
@@ -298,11 +292,10 @@ impl Field {
                     let zero = self.ty.zero_value();
                     quote! {
                         #[doc=#get_doc]
-                        pub fn #get(&self) -> ::core::option::Option<#ty {
+                        pub fn #get(&self) -> ::core::option::Option<#ty> {
                             self.#ident.and_then(|x| {
-                                let result: ::core::result::Result<#ty, _> = ::core::convert::TryFrom::try_from(x);
-                                result.ok()
-                            }).unwrap_or(#zero)
+                                ::core::convert::TryFrom::try_from(x).ok()
+                            })
                         }
 
                         #[doc=#set_doc]
@@ -325,8 +318,7 @@ impl Field {
                             fn(u32) -> ::core::option::Option<#ty>,
                         > {
                             self.#ident.iter().cloned().filter_map(|x| {
-                                let result: ::core::result::Result<#ty, _> = ::core::convert::TryFrom::try_from(x);
-                                result.ok()
+                                ::core::convert::TryFrom::try_from(x).ok()
                             })
                         }
                         #[doc=#push_doc]
@@ -334,23 +326,6 @@ impl Field {
                             self.#ident.push(value as u32);
                         }
                     }
-                }
-            })
-        } else if let Kind::Optional = &self.kind {
-            let ty = self.ty.ref_type();
-
-            let match_some = if self.ty.is_numeric() {
-                quote!(::core::option::Option::Some(&val) => val,)
-            } else {
-                quote!(::core::option::Option::Some(val) => &val[..],)
-            };
-
-            let get_doc = format!("Returns the value of `{ident_str}`.");
-
-            Some(quote! {
-                #[doc=#get_doc]
-                pub fn #get(&self) -> ::core::option::Option<#ty> {
-                    self.#ident.as_ref().map(|val| #match_some)
                 }
             })
         } else {
@@ -533,6 +508,13 @@ impl Ty {
             Ty::Bool => quote!(false),
             Ty::String => quote!(""),
             Ty::Bytes(..) => quote!(b"" as &[u8]),
+        }
+    }
+
+    pub fn default_value(&self) -> TokenStream {
+        match self {
+            Ty::String | Ty::Bytes(..) => quote!(::core::default::Default::default()),
+            _ => self.zero_value(),
         }
     }
 
