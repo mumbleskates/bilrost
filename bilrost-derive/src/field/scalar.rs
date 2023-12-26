@@ -289,7 +289,6 @@ impl Field {
                          or the default if the field is unset or set to an invalid enum value.",
                         ident_str,
                     );
-                    let zero = self.ty.zero_value();
                     quote! {
                         #[doc=#get_doc]
                         pub fn #get(&self) -> ::core::option::Option<#ty> {
