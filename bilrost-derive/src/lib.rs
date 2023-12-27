@@ -76,7 +76,8 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     //    to become quadratic at encoding time
 
     // TODO(widders): test coverage for completed features:
-    //  * non-repeated fields must only occur once
+    //  * do prop-testing for stronger round-trip guarantees now that the encoding is better
+    //    distinguished
 
     // TODO(widders): distinguished features
     //  * unknown fields are forbidden
