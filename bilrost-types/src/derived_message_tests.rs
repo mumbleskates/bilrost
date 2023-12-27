@@ -127,4 +127,65 @@ mod tests {
             assert_eq!(out, re);
         }
     }
+
+    #[test]
+    fn duplicated_field_decoding() {
+        #[derive(Message)]
+        struct Foo {
+            #[bilrost(bool, repeated, packed = false, tag = 1)]
+            a: Vec<bool>,
+            #[bilrost(bool, repeated, packed = false, tag = 2)]
+            b: Vec<bool>,
+        }
+
+        #[derive(PartialEq, Message)]
+        struct Bar {
+            #[bilrost(bool, optional, tag = 1)]
+            a: Option<bool>,
+            #[bilrost(bool, tag = 2)]
+            b: bool,
+        }
+
+        let a_single = Foo{a: vec![true], b: vec![]}.encode_to_vec();
+        let a_duplicated = Foo{a: vec![true, false], b: vec![]}.encode_to_vec();
+        let b_single = Foo{a: vec![], b: vec![true]}.encode_to_vec();
+        let b_duplicated = Foo{a: vec![], b: vec![true, false]}.encode_to_vec();
+
+        assert_eq!(Bar::decode(&a_single[..]), Ok(Bar{ a: Some(true), b: false}));
+        assert!(Bar::decode(&a_duplicated[..]).is_err());
+        assert_eq!(Bar::decode(&b_single[..]), Ok(Bar{ a: None, b: true}));
+        assert!(Bar::decode(&b_duplicated[..]).is_err());
+    }
+
+    #[test]
+    fn oneof_field_decoding() {
+        #[derive(Message)]
+        struct Foo {
+            #[bilrost(bool, optional, tag = 1)]
+            a: Option<bool>,
+            #[bilrost(bool, optional, tag = 2)]
+            b: Option<bool>,
+        }
+
+        #[derive(PartialEq, Oneof)]
+        enum AB {
+            #[bilrost(bool, tag = 1)] A(bool),
+            #[bilrost(bool, tag = 2)] B(bool),
+        }
+        use AB::*;
+
+        #[derive(PartialEq, Message)]
+        struct Bar {
+            #[bilrost(oneof = "AB", tags = "1, 2")]
+            ab: Option<AB>,
+        }
+
+        let a_only = Foo{a: Some(true), b: None}.encode_to_vec();
+        let b_only = Foo{a: None, b: Some(true)}.encode_to_vec();
+        let both = Foo{a: Some(true), b: Some(true)}.encode_to_vec();
+
+        assert_eq!(Bar::decode(&a_only[..]), Ok(Bar{ab: Some(A(true))}));
+        assert_eq!(Bar::decode(&b_only[..]), Ok(Bar{ab: Some(B(true))}));
+        assert!(Bar::decode(&both[..]).is_err());
+    }
 }
