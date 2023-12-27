@@ -6,8 +6,24 @@ use syn::Meta;
 use crate::field::{set_bool, set_option, tag_attr, word_attr, Label};
 
 #[derive(Clone)]
+pub enum Kind {
+    Optional,
+    AlwaysEncode,
+    Repeated,
+}
+
+impl From<Label> for Kind {
+    fn from(value: Label) -> Self {
+        match value {
+            Label::Optional => Kind::Optional,
+            Label::Repeated => Kind::Repeated,
+        }
+    }
+}
+
+#[derive(Clone)]
 pub struct Field {
-    pub label: Label,
+    pub kind: Kind,
     pub tag: u32,
 }
 
@@ -53,7 +69,7 @@ impl Field {
         };
 
         Ok(Some(Field {
-            label: label.unwrap_or(Label::Optional),
+            kind: label.unwrap_or(Label::Optional).into(),
             tag,
         }))
     }
@@ -66,7 +82,7 @@ impl Field {
                     attr.path().into_token_stream()
                 );
             }
-            field.label = Label::Required;
+            field.kind = Kind::AlwaysEncode;
             Ok(Some(field))
         } else {
             Ok(None)
@@ -75,16 +91,16 @@ impl Field {
 
     pub fn encode(&self, ident: TokenStream) -> TokenStream {
         let tag = self.tag;
-        match self.label {
-            Label::Optional => quote! {
+        match self.kind {
+            Kind::Optional => quote! {
                 if let Some(msg) = &#ident {
                     ::bilrost::encoding::message::encode(#tag, msg, buf, tw);
                 }
             },
-            Label::Required => quote! {
+            Kind::AlwaysEncode => quote! {
                 ::bilrost::encoding::message::encode(#tag, &#ident, buf, tw);
             },
-            Label::Repeated => quote! {
+            Kind::Repeated => quote! {
                 for msg in &#ident {
                     ::bilrost::encoding::message::encode(#tag, msg, buf, tw);
                 }
@@ -93,17 +109,17 @@ impl Field {
     }
 
     pub fn merge(&self, ident: TokenStream) -> TokenStream {
-        match self.label {
-            Label::Optional => quote! {
+        match self.kind {
+            Kind::Optional => quote! {
                 ::bilrost::encoding::message::merge(wire_type,
                                                  #ident.get_or_insert_with(::core::default::Default::default),
                                                  buf,
                                                  ctx)
             },
-            Label::Required => quote! {
+            Kind::AlwaysEncode => quote! {
                 ::bilrost::encoding::message::merge(wire_type, #ident, buf, ctx)
             },
-            Label::Repeated => quote! {
+            Kind::Repeated => quote! {
                 ::bilrost::encoding::message::merge_repeated(wire_type, #ident, buf, ctx)
             },
         }
@@ -111,24 +127,24 @@ impl Field {
 
     pub fn encoded_len(&self, ident: TokenStream) -> TokenStream {
         let tag = self.tag;
-        match self.label {
-            Label::Optional => quote! {
+        match self.kind {
+            Kind::Optional => quote! {
                 #ident.as_ref().map_or(0, |msg| ::bilrost::encoding::message::encoded_len(#tag, msg, tm))
             },
-            Label::Required => quote! {
+            Kind::AlwaysEncode => quote! {
                 ::bilrost::encoding::message::encoded_len(#tag, &#ident, tm)
             },
-            Label::Repeated => quote! {
+            Kind::Repeated => quote! {
                 ::bilrost::encoding::message::encoded_len_repeated(#tag, &#ident, tm)
             },
         }
     }
 
     pub fn clear(&self, ident: TokenStream) -> TokenStream {
-        match self.label {
-            Label::Optional => quote!(#ident = ::core::option::Option::None),
-            Label::Required => quote!(#ident.clear()),
-            Label::Repeated => quote!(#ident.clear()),
+        match self.kind {
+            Kind::Optional => quote!(#ident = ::core::option::Option::None),
+            Kind::AlwaysEncode => panic!("oneof message field should not require clearing"),
+            Kind::Repeated => quote!(#ident.clear()),
         }
     }
 }

@@ -785,6 +785,9 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
             where
                 __B: ::bilrost::bytes::Buf
             {
+                // TODO(widders): it's possible we could support repeated oneof members, but the
+                //  most important thing that needs to change is that we must ALWAYS err here when
+                //  there are conflicting decoded values
                 if duplicated {
                     return Err(::bilrost::DecodeError::new(
                         "multiple occurrences of non-repeated field"
