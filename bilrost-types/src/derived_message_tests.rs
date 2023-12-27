@@ -3,7 +3,7 @@ mod tests {
     extern crate alloc;
 
     use alloc::vec::Vec;
-    use bilrost::{Message, Oneof};
+    use bilrost::{alloc::{string::ToString, vec}, Message, Oneof};
     use core::default::Default;
     use itertools::{repeat_n, Itertools};
 
