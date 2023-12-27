@@ -74,10 +74,14 @@ impl Field {
     }
 
     pub fn new_oneof(attrs: &[Meta]) -> Result<Option<Field>, Error> {
-        if let Some(field) = Field::new(attrs, None)? {
+        if let Some(mut field) = Field::new(attrs, None)? {
             match field.kind {
-                Kind::Plain => Ok(Some(field)),
+                Kind::Plain => {
+                    field.kind = Kind::AlwaysEncode;
+                    Ok(Some(field))
+                },
                 Kind::Optional => bail!("invalid optional attribute on oneof field"),
+                Kind::AlwaysEncode => bail!("field is already AlwaysEncode, which shouldn't happen"),
                 Kind::Packed | Kind::Repeated => bail!("invalid repeated attribute on oneof field"),
             }
         } else {
@@ -88,7 +92,7 @@ impl Field {
     pub fn encode(&self, ident: TokenStream) -> TokenStream {
         let module = self.ty.module();
         let encode_fn = match self.kind {
-            Kind::Plain | Kind::Optional => quote!(encode),
+            Kind::Plain | Kind::AlwaysEncode | Kind::Optional => quote!(encode),
             Kind::Repeated => quote!(encode_repeated),
             Kind::Packed => quote!(encode_packed),
         };
@@ -109,7 +113,7 @@ impl Field {
                     #encode_fn(#tag, value, buf, tw);
                 }
             },
-            Kind::Repeated | Kind::Packed => quote! {
+            Kind::AlwaysEncode | Kind::Repeated | Kind::Packed => quote! {
                 #encode_fn(#tag, &#ident, buf, tw);
             },
         }
@@ -120,13 +124,13 @@ impl Field {
     pub fn merge(&self, ident: TokenStream) -> TokenStream {
         let module = self.ty.module();
         let merge_fn = match self.kind {
-            Kind::Plain | Kind::Optional => quote!(merge),
+            Kind::Plain | Kind::AlwaysEncode | Kind::Optional => quote!(merge),
             Kind::Repeated | Kind::Packed => quote!(merge_repeated),
         };
         let merge_fn = quote!(::bilrost::encoding::#module::#merge_fn);
 
         match self.kind {
-            Kind::Plain | Kind::Repeated | Kind::Packed => quote! {
+            Kind::Plain | Kind::AlwaysEncode | Kind::Repeated | Kind::Packed => quote! {
                 #merge_fn(wire_type, #ident, buf, ctx)
             },
             Kind::Optional => quote! {
@@ -142,7 +146,7 @@ impl Field {
     pub fn encoded_len(&self, ident: TokenStream) -> TokenStream {
         let module = self.ty.module();
         let encoded_len_fn = match self.kind {
-            Kind::Plain | Kind::Optional => quote!(encoded_len),
+            Kind::Plain | Kind::AlwaysEncode | Kind::Optional => quote!(encoded_len),
             Kind::Repeated => quote!(encoded_len_repeated),
             Kind::Packed => quote!(encoded_len_packed),
         };
@@ -163,7 +167,7 @@ impl Field {
             Kind::Optional => quote! {
                 #ident.as_ref().map_or(0, |value| #encoded_len_fn(#tag, value, tm))
             },
-            Kind::Repeated | Kind::Packed => quote! {
+            Kind::AlwaysEncode | Kind::Repeated | Kind::Packed => quote! {
                 #encoded_len_fn(#tag, &#ident, tm)
             },
         }
@@ -171,8 +175,8 @@ impl Field {
 
     pub fn clear(&self, ident: TokenStream) -> TokenStream {
         match &self.kind {
-            Kind::Plain => {
-                let default = self.ty.default_value();
+            Kind::Plain | Kind::AlwaysEncode => {
+                let default = self.ty.owned_zero_value();
                 quote!(#ident = #default)
             }
             Kind::Optional => quote!(#ident = ::core::option::Option::None),
@@ -183,7 +187,7 @@ impl Field {
     /// Returns an expression which evaluates to the default value of the field.
     pub fn default(&self) -> TokenStream {
         match self.kind {
-            Kind::Plain => self.ty.default_value(),
+            Kind::Plain |Kind::AlwaysEncode => self.ty.owned_zero_value(),
             Kind::Optional => quote!(::core::option::Option::None),
             Kind::Repeated | Kind::Packed => quote!(::bilrost::alloc::vec::Vec::new()),
         }
@@ -217,7 +221,7 @@ impl Field {
         let wrapper = self.debug_inner(quote!(Inner));
         let inner_ty = self.ty.owned_type();
         match self.kind {
-            Kind::Plain => self.debug_inner(wrapper_name),
+            Kind::Plain | Kind::AlwaysEncode => self.debug_inner(wrapper_name),
             Kind::Optional => quote! {
                 struct #wrapper_name<'a>(&'a ::core::option::Option<#inner_ty>);
                 impl<'a> ::core::fmt::Debug for #wrapper_name<'a> {
@@ -265,7 +269,7 @@ impl Field {
             let set = Ident::new(&format!("set_{}", ident_str), Span::call_site());
             let set_doc = format!("Sets `{}` to the provided enum value.", ident_str);
             Some(match &self.kind {
-                Kind::Plain => {
+                Kind::Plain | Kind::AlwaysEncode => {
                     let get_doc = format!(
                         "Returns the enum value of `{}`, \
                          or the default if the field is set to an invalid enum value.",
@@ -510,7 +514,7 @@ impl Ty {
         }
     }
 
-    pub fn default_value(&self) -> TokenStream {
+    pub fn owned_zero_value(&self) -> TokenStream {
         match self {
             Ty::String | Ty::Bytes(..) => quote!(::core::default::Default::default()),
             _ => self.zero_value(),
@@ -545,8 +549,10 @@ impl fmt::Display for Ty {
 /// Scalar Protobuf field types.
 #[derive(Clone)]
 pub enum Kind {
-    /// A plain proto3 scalar field.
+    /// A plain scalar field, only encoded when it is non-zero.
     Plain,
+    /// A field that is always encoded.
+    AlwaysEncode,
     /// An optional scalar field.
     Optional,
     /// A repeated scalar field.

@@ -6,7 +6,6 @@ mod scalar;
 use std::fmt;
 use std::slice;
 
-use crate::field::scalar::Kind;
 use anyhow::{bail, Error};
 use proc_macro2::TokenStream;
 use quote::quote;
@@ -95,11 +94,11 @@ impl Field {
             Field::Map(..)
             | Field::Oneof(..)
             | Field::Scalar(scalar::Field {
-                kind: Kind::Repeated,
+                kind: scalar::Kind::Repeated,
                 ..
             })
             | Field::Message(message::Field {
-                label: Label::Repeated,
+                kind: message::Kind::Repeated,
                 ..
             }) => false,
             _ => true,
