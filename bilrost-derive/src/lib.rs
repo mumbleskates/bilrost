@@ -379,10 +379,10 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
 
     let merge = unsorted_fields.iter().map(|(field_ident, field)| {
         let merge = field.merge(quote!(value));
-        let merge = if field.requires_duplication_guard() {
+        let merge = if let Some(error_message) = field.requires_duplication_guard() {
             quote! {
                 if duplicated {
-                    Err(::bilrost::DecodeError::new("multiple occurrences of non-repeated field"))
+                    Err(::bilrost::DecodeError::new(#error_message))
                 } else {
                     #merge
                 }

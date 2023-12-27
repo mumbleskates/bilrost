@@ -146,15 +146,83 @@ mod tests {
             b: bool,
         }
 
-        let a_single = Foo{a: vec![true], b: vec![]}.encode_to_vec();
-        let a_duplicated = Foo{a: vec![true, false], b: vec![]}.encode_to_vec();
-        let b_single = Foo{a: vec![], b: vec![true]}.encode_to_vec();
-        let b_duplicated = Foo{a: vec![], b: vec![true, false]}.encode_to_vec();
+        let a_single = Foo {
+            a: vec![true],
+            b: vec![],
+        }
+        .encode_to_vec();
+        let a_duplicated = Foo {
+            a: vec![true, false],
+            b: vec![],
+        }
+        .encode_to_vec();
+        let b_single = Foo {
+            a: vec![],
+            b: vec![true],
+        }
+        .encode_to_vec();
+        let b_duplicated = Foo {
+            a: vec![],
+            b: vec![true, false],
+        }
+        .encode_to_vec();
 
-        assert_eq!(Bar::decode(&a_single[..]), Ok(Bar{ a: Some(true), b: false}));
-        assert!(Bar::decode(&a_duplicated[..]).is_err());
-        assert_eq!(Bar::decode(&b_single[..]), Ok(Bar{ a: None, b: true}));
-        assert!(Bar::decode(&b_duplicated[..]).is_err());
+        assert_eq!(
+            Bar::decode(&a_single[..]),
+            Ok(Bar {
+                a: Some(true),
+                b: false
+            })
+        );
+        assert_eq!(
+            Bar::decode(&a_duplicated[..]).unwrap_err().to_string(),
+            "failed to decode Bilrost message: \
+            Bar.a: multiple occurrences of non-repeated field"
+        );
+        assert_eq!(Bar::decode(&b_single[..]), Ok(Bar { a: None, b: true }));
+        assert_eq!(
+            Bar::decode(&b_duplicated[..]).unwrap_err().to_string(),
+            "failed to decode Bilrost message: \
+            Bar.b: multiple occurrences of non-repeated field"
+        );
+    }
+
+    #[test]
+    fn duplicated_packed_decoding() {
+        #[derive(Message)]
+        struct Foo {
+            #[bilrost(bytes = "vec", repeated, tag = 1)]
+            a: Vec<Vec<u8>>,
+        }
+
+        #[derive(PartialEq, Message)]
+        struct Bar {
+            #[bilrost(bool, repeated, packed = true, tag = 1)]
+            a: Vec<bool>,
+        }
+
+        let single = Foo { a: vec![vec![1]] }.encode_to_vec();
+        let multiple = Foo {
+            a: vec![vec![1, 0]],
+        }
+        .encode_to_vec();
+        let duplicated = Foo {
+            a: vec![vec![1], vec![0]],
+        }
+        .encode_to_vec();
+
+        assert_eq!(Bar::decode(&single[..]), Ok(Bar { a: vec![true] }));
+        assert_eq!(
+            Bar::decode(&multiple[..]),
+            Ok(Bar {
+                a: vec![true, false]
+            })
+        );
+        assert_eq!(
+            Bar::decode(&duplicated[..]).unwrap_err().to_string(),
+            "failed to decode Bilrost message: \
+            Bar.a: multiple occurrences of packed repeated field"
+        );
     }
 
     #[test]
@@ -169,8 +237,10 @@ mod tests {
 
         #[derive(PartialEq, Oneof)]
         enum AB {
-            #[bilrost(bool, tag = 1)] A(bool),
-            #[bilrost(bool, tag = 2)] B(bool),
+            #[bilrost(bool, tag = 1)]
+            A(bool),
+            #[bilrost(bool, tag = 2)]
+            B(bool),
         }
         use AB::*;
 
@@ -180,12 +250,27 @@ mod tests {
             ab: Option<AB>,
         }
 
-        let a_only = Foo{a: Some(true), b: None}.encode_to_vec();
-        let b_only = Foo{a: None, b: Some(true)}.encode_to_vec();
-        let both = Foo{a: Some(true), b: Some(true)}.encode_to_vec();
+        let a_only = Foo {
+            a: Some(true),
+            b: None,
+        }
+        .encode_to_vec();
+        let b_only = Foo {
+            a: None,
+            b: Some(true),
+        }
+        .encode_to_vec();
+        let both = Foo {
+            a: Some(true),
+            b: Some(true),
+        }
+        .encode_to_vec();
 
-        assert_eq!(Bar::decode(&a_only[..]), Ok(Bar{ab: Some(A(true))}));
-        assert_eq!(Bar::decode(&b_only[..]), Ok(Bar{ab: Some(B(true))}));
-        assert!(Bar::decode(&both[..]).is_err());
+        assert_eq!(Bar::decode(&a_only[..]), Ok(Bar { ab: Some(A(true)) }));
+        assert_eq!(Bar::decode(&b_only[..]), Ok(Bar { ab: Some(B(true)) }));
+        assert_eq!(
+            Bar::decode(&both[..]).unwrap_err().to_string(),
+            "failed to decode Bilrost message: Bar.ab: conflicting or repeating fields in oneof"
+        );
     }
 }

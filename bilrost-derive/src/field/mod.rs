@@ -88,7 +88,7 @@ impl Field {
         self.tags().into_iter().max().unwrap()
     }
 
-    pub fn requires_duplication_guard(&self) -> bool {
+    pub fn requires_duplication_guard(&self) -> Option<&'static str> {
         match self {
             // Maps are inherently repeated, and Oneofs have their own guard
             Field::Map(..)
@@ -100,8 +100,12 @@ impl Field {
             | Field::Message(message::Field {
                 kind: message::Kind::Repeated,
                 ..
-            }) => false,
-            _ => true,
+            }) => None,
+            Field::Scalar(scalar::Field {
+                kind: scalar::Kind::Packed,
+                ..
+            }) => Some("multiple occurrences of packed repeated field"),
+            _ => Some("multiple occurrences of non-repeated field"),
         }
     }
 
