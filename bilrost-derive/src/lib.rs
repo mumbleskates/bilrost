@@ -81,12 +81,12 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
 
     // TODO(widders): distinguished features
     //  * unknown fields are forbidden
-    //  * "required" is forbidden
     //  * present standard (non-optional) fields with default values are forbidden
-    //  * HashMap is forbidden
+    //  * HashMap is forbidden (simply not implemented)
     //  * map keys must be sorted ascending
     //  * repeated fields must have matching packed-ness
-    //  * message typed fields must also be distinguished (unsafe trait?)
+    //  * distinguished encoding only implemented when nested types also support distinguished
+    //    encoding
 
     let variant_data = match input.data {
         Data::Struct(variant_data) => variant_data,
@@ -710,10 +710,8 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
     if fields.iter().any(|(_, field)| field.tags().len() > 1) {
         panic!("variant with multiple tags");
     }
-    if let Some((duplicate_tag, _)) = fields
-        .iter()
-        .flat_map(|(_, field)| field.tags())
-        .sorted_unstable()
+    let sorted_tags = fields.iter().flat_map(|(_, field)| field.tags()).sorted_unstable();
+    if let Some((duplicate_tag, _)) = sorted_tags
         .tuple_windows()
         .find(|(a, b)| a == b)
     {
@@ -760,6 +758,8 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
 
     let expanded = quote! {
         impl #impl_generics #ident #ty_generics #where_clause {
+            const FIELD_IDS: &[u32] = [#(#sorted_tags,)*]
+
             /// Encodes the message to a buffer.
             pub fn encode<__B>(
                 &self,

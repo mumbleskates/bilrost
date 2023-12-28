@@ -109,6 +109,20 @@ impl Field {
         }
     }
 
+    pub fn tag_list_guard(&self) -> Option<TokenStream> {
+        match &self {
+            Field::Oneof(field) => {
+                let tags = self.tags();
+                let oneof_ty = &field.ty;
+                // TODO(widders): depend on this
+                Some(quote!(
+                    ::static_assertions::const_assert_eq!(#oneof_ty::FIELD_IDS, [#(#tags,)*]);
+                ))
+            }
+            _ => None,
+        }
+    }
+
     /// Returns a statement which encodes the field.
     pub fn encode(&self, ident: TokenStream) -> TokenStream {
         match self {

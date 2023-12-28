@@ -13,12 +13,13 @@ use core::cmp::{
     Ordering::{Equal, Greater, Less},
 };
 use core::convert::TryFrom;
+use core::iter::Extend;
 use core::mem;
 use core::ops::{Deref, DerefMut};
 use core::str;
 
-use ::bytes::{Buf, BufMut, Bytes};
 use ::bytes::buf::Take;
+use ::bytes::{Buf, BufMut, Bytes};
 
 use crate::Message;
 use crate::{decode_length_delimiter, DecodeError};
@@ -517,10 +518,7 @@ impl<'a, B: Buf> DerefMut for Capped<'a, B> {
     }
 }
 
-pub fn skip_field<B: Buf>(
-    wire_type: WireType,
-    buf: &mut Capped<B>,
-) -> Result<(), DecodeError> {
+pub fn skip_field<B: Buf>(wire_type: WireType, buf: &mut Capped<B>) -> Result<(), DecodeError> {
     let len = match wire_type {
         WireType::Varint => buf.decode_varint().map(|_| 0)?,
         WireType::ThirtyTwoBit => 4,
@@ -534,6 +532,28 @@ pub fn skip_field<B: Buf>(
 
     buf.advance(len as usize);
     Ok(())
+}
+
+pub trait Encoder<T> {
+    fn encode<B: BufMut>(tag: u32, value: &T, buf: &mut B, tw: &mut TagWriter);
+    // TODO(widders): change to (or augment with) build-in-reverse-then-emit-forward and
+    //  emit-reversed
+    fn encoded_len(tag: u32, value: &T, tm: &mut TagMeasurer) -> usize;
+    fn decode<B: Buf>(
+        wire_type: WireType,
+        value: &mut T,
+        buf: &mut Capped<B>,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError>;
+}
+
+pub trait DistinguishedEncoder<T>: Encoder<T> {
+    fn decode_distinguished<B: Buf>(
+        wire_type: WireType,
+        value: &mut T,
+        buf: &mut Capped<B>,
+        ctx: DecodeContext,
+    )-> Result<(), DecodeError>;
 }
 
 /// Helper macro which emits an `encode_repeated` function for the type.
@@ -1130,6 +1150,8 @@ pub mod bytes {
         // This is intended for A and B both being Bytes so it is zero-copy.
         // Some combinations of A and B types may cause a double-copy,
         // in which case merge_one_copy() should be used instead.
+        // TODO(widders): never do this. we are blowing this away entirely. this will not happen in
+        //  bilrost at all, because we can trivially detect incorrectly duplicated fields.
         let len = buf.remaining_before_cap();
         value.replace_with(buf.copy_to_bytes(len));
         Ok(())
