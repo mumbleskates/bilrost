@@ -56,8 +56,6 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
 
     let ident = input.ident;
 
-    // TODO(widders): distinguished structs
-
     syn::custom_keyword!(skip_debug);
     let skip_debug = input
         .attrs
@@ -83,6 +81,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     //  * unknown fields are forbidden
     //  * present standard (non-optional) fields with default values are forbidden
     //  * HashMap is forbidden (simply not implemented)
+    //  * floating point values probably aren't implemented either
     //  * map keys must be sorted ascending
     //  * repeated fields must have matching packed-ness
     //  * distinguished encoding only implemented when nested types also support distinguished
