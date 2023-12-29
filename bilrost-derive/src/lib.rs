@@ -281,12 +281,9 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
                             panic!("empty contiguous field group");
                         };
                         let first_tag = first_field.first_tag();
-                        let each_len = fields
-                            .iter()
-                            .cloned()
-                            .map(|(field_ident, field)| {
-                                field.encoded_len(quote!(instance.#field_ident))
-                            });
+                        let each_len = fields.iter().cloned().map(|(field_ident, field)| {
+                            field.encoded_len(quote!(instance.#field_ident))
+                        });
                         quote! {
                             parts[nparts] = (#first_tag, Some(|instance, tm| {
                                 0 #(+ #each_len)*
@@ -335,12 +332,9 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
                             panic!("empty contiguous field group");
                         };
                         let first_tag = first_field.first_tag();
-                        let each_field = fields
-                            .iter()
-                            .cloned()
-                            .map(|(field_ident, field)| {
-                                field.encode(quote!(instance.#field_ident))
-                            });
+                        let each_field = fields.iter().cloned().map(|(field_ident, field)| {
+                            field.encode(quote!(instance.#field_ident))
+                        });
                         quote! {
                             parts[nparts] = (#first_tag, Some(|instance, buf, tw| {
                                 #(#each_field)*
@@ -450,7 +444,13 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         }
     };
 
+    let static_guards = unsorted_fields
+        .iter()
+        .filter_map(|(_, field)| field.tag_list_guard());
+
     let expanded = quote! {
+        #(#static_guards)*
+
         impl #impl_generics ::bilrost::Message for #ident #ty_generics #where_clause {
             #[allow(unused_variables)]
             fn encode_raw<__B>(&self, buf: &mut __B) where __B: ::bilrost::bytes::BufMut {
@@ -590,13 +590,11 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
 
     let default = variants[0].0.clone();
 
-    let is_valid = variants
-        .iter()
-        .map(|(_, value)| quote!(#value => true));
+    let is_valid = variants.iter().map(|(_, value)| quote!(#value => true));
 
-    let try_from = variants.iter().map(
-        |(variant, value)| quote!(#value => ::core::result::Result::Ok(#ident::#variant)),
-    );
+    let try_from = variants
+        .iter()
+        .map(|(variant, value)| quote!(#value => ::core::result::Result::Ok(#ident::#variant)));
 
     let is_valid_doc = format!("Returns `true` if `value` is a variant of `{}`.", ident);
 
@@ -638,9 +636,9 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
     let expanded = if skip_debug {
         expanded
     } else {
-        let debug = variants.iter().map(|(variant_ident, _)| {
-            quote!(#ident::#variant_ident => stringify!(#variant_ident))
-        });
+        let debug = variants
+            .iter()
+            .map(|(variant_ident, _)| quote!(#ident::#variant_ident => stringify!(#variant_ident)));
         quote! {
             #expanded
 
@@ -710,11 +708,12 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
     if fields.iter().any(|(_, field)| field.tags().len() > 1) {
         panic!("variant with multiple tags");
     }
-    let sorted_tags = fields.iter().flat_map(|(_, field)| field.tags()).sorted_unstable();
-    if let Some((duplicate_tag, _)) = sorted_tags
-        .tuple_windows()
-        .find(|(a, b)| a == b)
-    {
+    let sorted_tags: Vec<u32> = fields
+        .iter()
+        .flat_map(|(_, field)| field.tags())
+        .sorted_unstable()
+        .collect();
+    if let Some((duplicate_tag, _)) = sorted_tags.iter().tuple_windows().find(|(a, b)| a == b) {
         bail!(
             "invalid oneof {}: multiple variants have tag {}",
             ident,
@@ -756,9 +755,11 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         quote!(#ident::#variant_ident(_) => #tag)
     });
 
+    let tags_count = sorted_tags.len();
+
     let expanded = quote! {
         impl #impl_generics #ident #ty_generics #where_clause {
-            const FIELD_IDS: &[u32] = [#(#sorted_tags,)*]
+            pub const FIELD_TAGS: [u32; #tags_count] = [#(#sorted_tags,)*];
 
             /// Encodes the message to a buffer.
             pub fn encode<__B>(
@@ -911,7 +912,7 @@ mod test {
         output.unwrap();
     }
 
-        #[test]
+    #[test]
     fn test_tuple_message() {
         let output = try_message(quote! {
             struct Tuple(

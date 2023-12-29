@@ -8,7 +8,7 @@ use std::slice;
 
 use anyhow::{bail, Error};
 use proc_macro2::TokenStream;
-use quote::quote;
+use quote::{quote, ToTokens};
 use syn::punctuated::Punctuated;
 use syn::{Attribute, Expr, ExprLit, Lit, LitBool, LitInt, Meta, MetaNameValue, Token};
 
@@ -112,11 +112,19 @@ impl Field {
     pub fn tag_list_guard(&self) -> Option<TokenStream> {
         match &self {
             Field::Oneof(field) => {
-                let tags = self.tags();
+                let mut tags = self.tags();
+                tags.sort();
                 let oneof_ty = &field.ty;
-                // TODO(widders): depend on this
+                let oneof_ty_name = oneof_ty.to_token_stream().to_string();
+                let description = format!("oneof field with type {oneof_ty_name}");
+                let description = description.as_str();
+                // Static assertion pattern borrowed from static_assertions crate.
                 Some(quote!(
-                    ::static_assertions::const_assert_eq!(#oneof_ty::FIELD_IDS, [#(#tags,)*]);
+                    const _: () = ::bilrost::assert_tags_are_equal(
+                        #description,
+                        #oneof_ty::FIELD_TAGS,
+                        [#(#tags,)*]
+                    );
                 ))
             }
             _ => None,

@@ -35,13 +35,15 @@ exclude = [
 bench = false
 
 [features]
-default = ["bilrost-derive", "std"]
+default = ["dep:bilrost-derive", "std"]
+compile-time-diagnostics = ["dep:const_panic"]
 no-recursion-limit = []
 std = []
 
 [dependencies]
 bytes = { version = "1", default-features = false }
 bilrost-derive = { version = "0.12.3", path = "bilrost-derive", optional = true }
+const_panic = { version = "0.2", optional = true }
 
 [dev-dependencies]
 criterion = { version = "0.5", default-features = false }

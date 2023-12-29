@@ -22,6 +22,8 @@ pub use crate::message::Message;
 pub use crate::name::Name;
 
 use bytes::{Buf, BufMut};
+#[cfg(feature = "compile-time-diagnostics")]
+use const_panic::concat_panic;
 
 use crate::encoding::{decode_varint, encode_varint, encoded_len_varint};
 
@@ -73,6 +75,30 @@ pub fn decode_length_delimiter<B: Buf>(mut buf: B) -> Result<usize, DecodeError>
     decode_varint(&mut buf)?
         .try_into()
         .map_err(|_| DecodeError::new("length delimiter exceeds maximum usize value"))
+}
+
+/// Helper function for derived types, asserting that lists of tags are equal at compile time.
+pub const fn assert_tags_are_equal<const A: usize, const B: usize>(
+    description: &str,
+    a: [u32; A],
+    b: [u32; B],
+) {
+    if A != B {
+        #[cfg(feature = "compile-time-diagnostics")]
+        concat_panic!("tags don't match for ", description, ": expected ", a, " but got ", b);
+        #[cfg(not(feature = "compile-time-diagnostics"))]
+        panic!("tags do not match");
+    }
+    let mut i = 0;
+    while i < A {
+        if a[i] != b[i] {
+            #[cfg(feature = "compile-time-diagnostics")]
+            concat_panic!("tags don't match for ", description, ": expected ", a, " but got ", b);
+            #[cfg(not(feature = "compile-time-diagnostics"))]
+            panic!("tags do not match");
+        }
+        i += 1;
+    }
 }
 
 // Re-export #[derive(Message, Enumeration, Oneof)].
