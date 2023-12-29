@@ -37,7 +37,7 @@ bench = false
 [features]
 default = ["derive", "std"]
 derive = ["dep:bilrost-derive"]
-compile-time-diagnostics = ["dep:const_panic"]
+extended-diagnostics = ["dep:const_panic"]
 no-recursion-limit = []
 std = []
 

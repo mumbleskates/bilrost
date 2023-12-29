@@ -22,7 +22,7 @@ pub use crate::message::Message;
 pub use crate::name::Name;
 
 use bytes::{Buf, BufMut};
-#[cfg(feature = "compile-time-diagnostics")]
+#[cfg(feature = "extended-diagnostics")]
 use const_panic::concat_panic;
 
 use crate::encoding::{decode_varint, encode_varint, encoded_len_varint};
@@ -84,17 +84,17 @@ pub const fn assert_tags_are_equal<const A: usize, const B: usize>(
     b: [u32; B],
 ) {
     if A != B {
-        #[cfg(feature = "compile-time-diagnostics")]
+        #[cfg(feature = "extended-diagnostics")]
         concat_panic!({}: failure_description, ": expected ", a, " but got ", b);
-        #[cfg(not(feature = "compile-time-diagnostics"))]
+        #[cfg(not(feature = "extended-diagnostics"))]
         panic!("{}", failure_description);
     }
     let mut i = 0;
     while i < A {
         if a[i] != b[i] {
-            #[cfg(feature = "compile-time-diagnostics")]
+            #[cfg(feature = "extended-diagnostics")]
             concat_panic!({}: failure_description, ": expected ", a, " but got ", b);
-            #[cfg(not(feature = "compile-time-diagnostics"))]
+            #[cfg(not(feature = "extended-diagnostics"))]
             panic!("{}", failure_description);
         }
         i += 1;
