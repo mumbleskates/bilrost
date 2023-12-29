@@ -21,11 +21,6 @@ use core::fmt;
 use core::str::FromStr;
 use core::time;
 
-use bilrost::alloc::format;
-use bilrost::alloc::string::String;
-use bilrost::alloc::vec::Vec;
-use bilrost::{DecodeError, EncodeError, Message, Name};
-
 pub use protobuf::*;
 
 // The Protobuf `Duration` and `Timestamp` types can't delegate to the standard library equivalents
@@ -34,58 +29,6 @@ pub use protobuf::*;
 
 const NANOS_PER_SECOND: i32 = 1_000_000_000;
 const NANOS_MAX: i32 = NANOS_PER_SECOND - 1;
-
-const PACKAGE: &str = "google.protobuf";
-
-impl Any {
-    /// Serialize the given message type `M` as [`Any`].
-    pub fn from_msg<M>(msg: &M) -> Result<Self, EncodeError>
-    where
-        M: Name,
-    {
-        let type_url = M::type_url();
-        let mut value = Vec::new();
-        Message::encode(msg, &mut value)?;
-        Ok(Any { type_url, value })
-    }
-
-    /// Decode the given message type `M` from [`Any`], validating that it has
-    /// the expected type URL.
-    pub fn to_msg<M>(&self) -> Result<M, DecodeError>
-    where
-        M: Default + Name + Sized,
-    {
-        let expected_type_url = M::type_url();
-
-        match (
-            TypeUrl::new(&expected_type_url),
-            TypeUrl::new(&self.type_url),
-        ) {
-            (Some(expected), Some(actual)) => {
-                if expected == actual {
-                    return Ok(M::decode(&*self.value)?);
-                }
-            }
-            _ => (),
-        }
-
-        let mut err = DecodeError::new(format!(
-            "expected type URL: \"{}\" (got: \"{}\")",
-            expected_type_url, &self.type_url
-        ));
-        err.push("unexpected type URL", "type_url");
-        Err(err)
-    }
-}
-
-impl Name for Any {
-    const PACKAGE: &'static str = PACKAGE;
-    const NAME: &'static str = "Any";
-
-    fn type_url() -> String {
-        type_url_for::<Self>()
-    }
-}
 
 #[cfg(feature = "std")]
 impl std::hash::Hash for Duration {
@@ -144,15 +87,6 @@ impl Duration {
         // TODO: should this be checked?
         // debug_assert!(self.seconds >= -315_576_000_000 && self.seconds <= 315_576_000_000,
         //               "invalid duration: {:?}", self);
-    }
-}
-
-impl Name for Duration {
-    const PACKAGE: &'static str = PACKAGE;
-    const NAME: &'static str = "Duration";
-
-    fn type_url() -> String {
-        type_url_for::<Self>()
     }
 }
 
@@ -366,15 +300,6 @@ impl Timestamp {
         } else {
             Err(TimestampError::InvalidDateTime)
         }
-    }
-}
-
-impl Name for Timestamp {
-    const PACKAGE: &'static str = PACKAGE;
-    const NAME: &'static str = "Timestamp";
-
-    fn type_url() -> String {
-        type_url_for::<Self>()
     }
 }
 
@@ -823,21 +748,5 @@ mod tests {
                 case.0,
             );
         }
-    }
-
-    #[test]
-    fn check_any_serialization() {
-        let message = Timestamp::date(2000, 01, 01).unwrap();
-        let any = Any::from_msg(&message).unwrap();
-        assert_eq!(
-            &any.type_url,
-            "type.googleapis.com/google.protobuf.Timestamp"
-        );
-
-        let message2 = any.to_msg::<Timestamp>().unwrap();
-        assert_eq!(message, message2);
-
-        // Wrong type URL
-        assert!(any.to_msg::<Duration>().is_err());
     }
 }
