@@ -11,7 +11,7 @@ license = "Apache-2.0"
 repository = "https://github.com/mumbleskates/bilrost"
 documentation = "https://docs.rs/bilrost-derive"
 readme = "README.md"
-description = "A Protocol Buffers implementation for the Rust Language."
+description = "A compact protobuf-like serializer and deserializer for the Rust Language."
 edition = "2021"
 rust-version = "1.65"
 
