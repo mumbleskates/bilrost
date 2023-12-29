@@ -323,7 +323,7 @@ the `std` features in `bilrost` and `bilrost-types`:
 
 ```ignore
 [dependencies]
-bilrost = { version = "0.6", default-features = false, features = ["bilrost-derive"] }
+bilrost = { version = "0.6", default-features = false, features = ["derive"] }
 # Only necessary if using Protobuf well-known types:
 bilrost-types = { version = "0.6", default-features = false }
 ```

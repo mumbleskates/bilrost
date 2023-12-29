@@ -109,14 +109,16 @@ impl Field {
         }
     }
 
-    pub fn tag_list_guard(&self) -> Option<TokenStream> {
+    pub fn tag_list_guard(&self, field_name: String) -> Option<TokenStream> {
         match &self {
             Field::Oneof(field) => {
                 let mut tags = self.tags();
                 tags.sort();
                 let oneof_ty = &field.ty;
                 let oneof_ty_name = oneof_ty.to_token_stream().to_string();
-                let description = format!("oneof field with type {oneof_ty_name}");
+                let description = format!(
+                    "tags don't match for oneof field {field_name} with type {oneof_ty_name}"
+                );
                 let description = description.as_str();
                 // Static assertion pattern borrowed from static_assertions crate.
                 Some(quote!(
@@ -309,11 +311,9 @@ fn bool_attr(key: &str, attr: &Meta) -> Result<Option<bool>, Error> {
             return Ok(Some(meta_list.parse_args::<LitBool>()?.value()));
         }
         Meta::NameValue(MetaNameValue {
-            value:
-                Expr::Lit(ExprLit {
-                    lit: Lit::Str(lit),
-                    ..
-                }),
+            value: Expr::Lit(ExprLit {
+                lit: Lit::Str(lit), ..
+            }),
             ..
         }) => lit
             .value()
@@ -378,11 +378,9 @@ fn tags_attr(attr: &Meta) -> Result<Option<Vec<u32>>, Error> {
                 .collect::<Result<Vec<_>, _>>()?,
         )),
         Meta::NameValue(MetaNameValue {
-            value:
-                Expr::Lit(ExprLit {
-                    lit: Lit::Str(lit),
-                    ..
-                }),
+            value: Expr::Lit(ExprLit {
+                lit: Lit::Str(lit), ..
+            }),
             ..
         }) => lit
             .value()

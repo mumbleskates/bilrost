@@ -446,7 +446,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
 
     let static_guards = unsorted_fields
         .iter()
-        .filter_map(|(_, field)| field.tag_list_guard());
+        .filter_map(|(field_ident, field)| field.tag_list_guard(field_ident.to_string()));
 
     let expanded = quote! {
         #(#static_guards)*

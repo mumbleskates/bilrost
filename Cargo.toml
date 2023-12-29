@@ -35,7 +35,8 @@ exclude = [
 bench = false
 
 [features]
-default = ["dep:bilrost-derive", "std"]
+default = ["derive", "std"]
+derive = ["dep:bilrost-derive"]
 compile-time-diagnostics = ["dep:const_panic"]
 no-recursion-limit = []
 std = []

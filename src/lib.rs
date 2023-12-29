@@ -79,23 +79,23 @@ pub fn decode_length_delimiter<B: Buf>(mut buf: B) -> Result<usize, DecodeError>
 
 /// Helper function for derived types, asserting that lists of tags are equal at compile time.
 pub const fn assert_tags_are_equal<const A: usize, const B: usize>(
-    description: &str,
+    #[allow(unused_variables)] description: &str,
     a: [u32; A],
     b: [u32; B],
 ) {
     if A != B {
         #[cfg(feature = "compile-time-diagnostics")]
-        concat_panic!("tags don't match for ", description, ": expected ", a, " but got ", b);
+        concat_panic!({}: description, ": expected ", a, " but got ", b);
         #[cfg(not(feature = "compile-time-diagnostics"))]
-        panic!("tags do not match");
+        panic!("{}", description);
     }
     let mut i = 0;
     while i < A {
         if a[i] != b[i] {
             #[cfg(feature = "compile-time-diagnostics")]
-            concat_panic!("tags don't match for ", description, ": expected ", a, " but got ", b);
+            concat_panic!({}: description, ": expected ", a, " but got ", b);
             #[cfg(not(feature = "compile-time-diagnostics"))]
-            panic!("tags do not match");
+            panic!("{}", description);
         }
         i += 1;
     }
@@ -105,10 +105,10 @@ pub const fn assert_tags_are_equal<const A: usize, const B: usize>(
 // Based on serde's equivalent re-export [1], but enabled by default.
 //
 // [1]: https://github.com/serde-rs/serde/blob/v1.0.89/serde/src/lib.rs#L245-L256
-#[cfg(feature = "bilrost-derive")]
+#[cfg(feature = "derive")]
 #[allow(unused_imports)]
 #[macro_use]
 extern crate bilrost_derive;
-#[cfg(feature = "bilrost-derive")]
+#[cfg(feature = "derive")]
 #[doc(hidden)]
 pub use bilrost_derive::*;
