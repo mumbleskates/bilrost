@@ -1585,7 +1585,7 @@ macro_rules! fixed_width_float {
             #[inline]
             fn encode<B: BufMut>(tag: u32, value: &$ty, buf: &mut B, tw: &mut TagWriter) {
                 // Preserve -0.0
-                if *value.to_bits() != 0 {
+                if value.to_bits() != 0 {
                     Self::encode_field(tag, value, buf, tw);
                 }
             }
@@ -1593,7 +1593,7 @@ macro_rules! fixed_width_float {
             #[inline]
             fn encoded_len(tag: u32, value: &$ty, tm: &mut TagMeasurer) -> usize {
                 // Preserve -0.0
-                if *value.to_bits() != 0 {
+                if value.to_bits() != 0 {
                     Self::field_encoded_len(tag, value, tm)
                 } else {
                     0
