@@ -657,7 +657,7 @@ trait ValueEncoder<T>: Wiretyped<T> {
     /// Returns the number of bytes the given value would be encoded as.
     fn value_encoded_len(value: &T) -> usize;
     /// Returns the number of total bytes to encode all the values in the given container.
-    fn many_values_encoded_len(values: &Vec<T>) -> usize {
+    fn many_values_encoded_len<C: Veclike<Item = T>>(values: &C) -> usize {
         values.iter().map(Self::value_encoded_len).sum()
     }
     /// Decodes a field assuming the encoder's wire type directly from the buffer.
@@ -747,6 +747,48 @@ where
     ) -> Result<(), DecodeError> {
         check_wire_type(Self::WIRE_TYPE, wire_type)?;
         Self::decode_value_distinguished(value, buf, ctx)
+    }
+}
+
+/// Trait for containers that store their values in a consistent order.
+pub trait Veclike: Extend<Self::Item> {
+    type Item;
+    type Iter<'a>: Iterator<Item = &'a Self::Item>
+    where
+        Self::Item: 'a,
+        Self: 'a;
+
+    fn len(&self) -> usize;
+    fn iter(&self) -> Self::Iter<'_>;
+    fn push(&mut self, item: Self::Item);
+    fn is_empty(&self) -> bool;
+}
+
+impl<T> Veclike for Vec<T> {
+    type Item = T;
+    type Iter<'a> = core::slice::Iter<'a, T>
+    where
+        T: 'a,
+        Self: 'a;
+
+    #[inline]
+    fn len(&self) -> usize {
+        Vec::len(self)
+    }
+
+    #[inline]
+    fn iter(&self) -> Self::Iter<'_> {
+        Vec::iter(self)
+    }
+
+    #[inline]
+    fn push(&mut self, item: T) {
+        Vec::push(self, item)
+    }
+
+    #[inline]
+    fn is_empty(&self) -> bool {
+        Vec::is_empty(self)
     }
 }
 
@@ -890,23 +932,24 @@ where
 
 /// Unpacked encodes vecs as repeated fields and in relaxed decoding will accept both packed
 /// and un-packed encodings.
-impl<T> Encoder<Vec<T>> for General
+impl<C, T, E> Encoder<C> for Unpacked<E>
 where
-    General: ValueEncoder<T>,
+    C: Veclike<Item = T>,
+    E: ValueEncoder<T>,
     T: Default,
 {
     #[inline]
-    fn encode<B: BufMut>(tag: u32, value: &Vec<T>, buf: &mut B, tw: &mut TagWriter) {
+    fn encode<B: BufMut>(tag: u32, value: &C, buf: &mut B, tw: &mut TagWriter) {
         for val in value.iter() {
-            General::encode_field(tag, val, buf, tw);
+            E::encode_field(tag, val, buf, tw);
         }
     }
 
     #[inline]
-    fn encoded_len(tag: u32, value: &Vec<T>, tm: &mut TagMeasurer) -> usize {
+    fn encoded_len(tag: u32, value: &C, tm: &mut TagMeasurer) -> usize {
         if !value.is_empty() {
             // Each *additional* field encoded after the first needs only 1 byte for the field key.
-            tm.key_len(tag) + Self::many_values_encoded_len(value) + value.len() - 1
+            tm.key_len(tag) + E::many_values_encoded_len(value) + value.len() - 1
         } else {
             0
         }
@@ -916,17 +959,15 @@ where
     fn decode<B: Buf>(
         wire_type: WireType,
         _duplicated: bool,
-        value: &mut Vec<T>,
+        value: &mut C,
         buf: &mut Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
-        if wire_type == WireType::LengthDelimited
-            && <Self as Wiretyped<T>>::WIRE_TYPE != WireType::LengthDelimited
-        {
-            Packed::<Self>::decode_value(value, buf, ctx)
+        if wire_type == WireType::LengthDelimited && E::WIRE_TYPE != WireType::LengthDelimited {
+            Packed::<E>::decode_value(value, buf, ctx)
         } else {
             let mut new_val = Default::default();
-            Self::decode_field(wire_type, &mut new_val, buf, ctx)?;
+            E::decode_field(wire_type, &mut new_val, buf, ctx)?;
             value.push(new_val);
             Ok(())
         }
@@ -934,9 +975,10 @@ where
 }
 
 /// Distinguished encoding for General enforces only the repeated field representation is allowed.
-impl<T, E> DistinguishedEncoder<Vec<T>> for Unpacked<E>
+impl<C, T, E> DistinguishedEncoder<C> for Unpacked<E>
 where
-    Unpacked<E>: Encoder<Vec<T>>,
+    Self: Encoder<C>,
+    C: Veclike<Item = T>,
     E: DistinguishedValueEncoder<T>,
     T: Default + Eq,
 {
@@ -944,7 +986,7 @@ where
     fn decode_distinguished<B: Buf>(
         wire_type: WireType,
         _duplicated: bool,
-        value: &mut Vec<T>,
+        value: &mut C,
         buf: &mut Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
@@ -955,18 +997,63 @@ where
     }
 }
 
+/// General delegates encoding Vec<T> to Unpacked.
+impl<T> Encoder<Vec<T>> for General
+where
+    Unpacked<General>: Encoder<Vec<T>>,
+{
+    #[inline]
+    fn encode<B: BufMut>(tag: u32, value: &Vec<T>, buf: &mut B, tw: &mut TagWriter) {
+        Unpacked::<General>::encode(tag, value, buf, tw)
+    }
+
+    #[inline]
+    fn encoded_len(tag: u32, value: &Vec<T>, tm: &mut TagMeasurer) -> usize {
+        Unpacked::<General>::encoded_len(tag, value, tm)
+    }
+
+    #[inline]
+    fn decode<B: Buf>(
+        wire_type: WireType,
+        duplicated: bool,
+        value: &mut Vec<T>,
+        buf: &mut Capped<B>,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError> {
+        Unpacked::<General>::decode(wire_type, duplicated, value, buf, ctx)
+    }
+}
+
+/// General delegates encoding Vec<T> to Unpacked.
+impl<T> DistinguishedEncoder<Vec<T>> for General
+where
+    Unpacked<General>: DistinguishedEncoder<Vec<T>>,
+{
+    #[inline]
+    fn decode_distinguished<B: Buf>(
+        wire_type: WireType,
+        duplicated: bool,
+        value: &mut Vec<T>,
+        buf: &mut Capped<B>,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError> {
+        Unpacked::<General>::decode_distinguished(wire_type, duplicated, value, buf, ctx)
+    }
+}
+
 /// Packed encodings are always length delimited.
 impl<T, E> Wiretyped<T> for Packed<E> {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
 }
 
-impl<T, E> ValueEncoder<Vec<T>> for Packed<E>
+impl<C, T, E> ValueEncoder<C> for Packed<E>
 where
+    C: Veclike<Item = T>,
     E: ValueEncoder<T>,
     T: Default,
 {
     #[inline]
-    fn encode_value<B: BufMut>(value: &Vec<T>, buf: &mut B) {
+    fn encode_value<B: BufMut>(value: &C, buf: &mut B) {
         encode_varint(E::many_values_encoded_len(value) as u64, buf);
         for val in value.iter() {
             E::encode_value(val, buf);
@@ -974,22 +1061,19 @@ where
     }
 
     #[inline]
-    fn value_encoded_len(value: &Vec<T>) -> usize {
+    fn value_encoded_len(value: &C) -> usize {
         let inner_len = E::many_values_encoded_len(value);
         encoded_len_varint(inner_len as u64) + inner_len
     }
 
     #[inline]
     fn decode_value<B: Buf>(
-        value: &mut Vec<T>,
+        value: &mut C,
         buf: &mut Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         let capped = buf.take_length_delimited()?;
-        if capped.remaining_before_cap()
-            % <Self as Wiretyped<T>>::WIRE_TYPE.encoded_size_alignment()
-            != 0
-        {
+        if capped.remaining_before_cap() % E::WIRE_TYPE.encoded_size_alignment() != 0 {
             return Err(DecodeError::new("packed field is not a valid length"));
         }
         let mut consumer = FallibleIter::new(capped.consume(|buf| {
@@ -1002,21 +1086,19 @@ where
     }
 }
 
-impl<T, E> DistinguishedValueEncoder<Vec<T>> for Packed<E>
+impl<C, T, E> DistinguishedValueEncoder<C> for Packed<E>
 where
+    C: Veclike<Item = T> + Eq,
     E: DistinguishedValueEncoder<T>,
     T: Default + Eq,
 {
     fn decode_value_distinguished<B: Buf>(
-        value: &mut Vec<T>,
+        value: &mut C,
         buf: &mut Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         let capped = buf.take_length_delimited()?;
-        if capped.remaining_before_cap()
-            % <Self as Wiretyped<T>>::WIRE_TYPE.encoded_size_alignment()
-            != 0
-        {
+        if capped.remaining_before_cap() % E::WIRE_TYPE.encoded_size_alignment() != 0 {
             return Err(DecodeError::new("packed field is not a valid length"));
         }
         let mut consumer = FallibleIter::new(capped.consume(|buf| {
@@ -1030,21 +1112,22 @@ where
 }
 
 // TODO(widders): is it impossible to nest Vec<Vec<T>> as repeated fields of packed? we might want
-//  an "Unpacked" encoder for vecs, we can delegate to it from General
+//  an "Unpacked" encoder for veclikes, we can delegate to it from General
 /// ValueEncoder for packed repeated encodings lets this value type nest.
-impl<T, E> Encoder<Vec<T>> for Packed<E>
+impl<C, T, E> Encoder<C> for Packed<E>
 where
-    Packed<E>: ValueEncoder<Vec<T>>,
+    C: Veclike<Item = T>,
+    Packed<E>: ValueEncoder<C>,
 {
     #[inline]
-    fn encode<B: BufMut>(tag: u32, value: &Vec<T>, buf: &mut B, tw: &mut TagWriter) {
+    fn encode<B: BufMut>(tag: u32, value: &C, buf: &mut B, tw: &mut TagWriter) {
         if !value.is_empty() {
             Self::encode_field(tag, value, buf, tw);
         }
     }
 
     #[inline]
-    fn encoded_len(tag: u32, value: &Vec<T>, tm: &mut TagMeasurer) -> usize {
+    fn encoded_len(tag: u32, value: &C, tm: &mut TagMeasurer) -> usize {
         if !value.is_empty() {
             Self::field_encoded_len(tag, value, tm)
         } else {
@@ -1056,7 +1139,7 @@ where
     fn decode<B: Buf>(
         wire_type: WireType,
         duplicated: bool,
-        value: &mut Vec<T>,
+        value: &mut C,
         buf: &mut Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
@@ -1069,16 +1152,16 @@ where
     }
 }
 
-impl<T, E> DistinguishedEncoder<Vec<T>> for Packed<E>
+impl<C, T, E> DistinguishedEncoder<C> for Packed<E>
 where
-    Packed<E>: DistinguishedValueEncoder<Vec<T>> + Encoder<Vec<T>>,
-    T: Eq,
+    C: Veclike<Item = T> + Eq,
+    Packed<E>: DistinguishedValueEncoder<C> + Encoder<C>,
 {
     #[inline]
     fn decode_distinguished<B: Buf>(
         wire_type: WireType,
         duplicated: bool,
-        value: &mut Vec<T>,
+        value: &mut C,
         buf: &mut Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
@@ -1230,7 +1313,7 @@ macro_rules! fixed_width {
                 $wire_type.fixed_size()
             }
 
-            fn many_values_encoded_len(values: &Vec<$ty>) -> usize {
+            fn many_values_encoded_len<C: Veclike<Item = $ty>>(values: &C) -> usize {
                 $wire_type.fixed_size() * values.len()
             }
 
