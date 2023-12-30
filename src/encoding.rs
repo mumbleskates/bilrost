@@ -1114,9 +1114,9 @@ where
 // TODO(widders): is it impossible to nest Vec<Vec<T>> as repeated fields of packed? we might want
 //  an "Unpacked" encoder for veclikes, we can delegate to it from General
 /// ValueEncoder for packed repeated encodings lets this value type nest.
-impl<C, T, E> Encoder<C> for Packed<E>
+impl<C, E> Encoder<C> for Packed<E>
 where
-    C: Veclike<Item = T>,
+    C: Veclike,
     Packed<E>: ValueEncoder<C>,
 {
     #[inline]
@@ -1152,9 +1152,9 @@ where
     }
 }
 
-impl<C, T, E> DistinguishedEncoder<C> for Packed<E>
+impl<C, E> DistinguishedEncoder<C> for Packed<E>
 where
-    C: Veclike<Item = T> + Eq,
+    C: Veclike + Eq,
     Packed<E>: DistinguishedValueEncoder<C> + Encoder<C>,
 {
     #[inline]
