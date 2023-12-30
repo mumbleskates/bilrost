@@ -109,6 +109,8 @@ pub const fn assert_tags_are_equal<const A: usize, const B: usize>(
 #[allow(unused_imports)]
 #[macro_use]
 extern crate bilrost_derive;
+extern crate core;
+
 #[cfg(feature = "derive")]
 #[doc(hidden)]
 pub use bilrost_derive::*;

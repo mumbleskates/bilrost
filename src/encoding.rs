@@ -11,9 +11,11 @@ use alloc::vec::Vec;
 use core::cmp::{
     min,
     Ordering::{Equal, Greater, Less},
+    PartialEq,
 };
 use core::convert::TryFrom;
-use core::iter::Extend;
+use core::default::Default;
+use core::iter::{Extend, IntoIterator, Iterator};
 use core::mem;
 use core::ops::{Deref, DerefMut};
 use core::str;
@@ -463,20 +465,10 @@ impl<'a, B: Buf> Capped<'a, B> {
         })
     }
 
-    /// Passes the wrapped buffer to the provided continuation until an error occurs, the buffer
-    /// is consumed up to the cap, or the buffer is consumed *beyond* the cap (which is an error).
+    /// Consume the buffer as an iterator.
     #[inline]
-    fn consume_to_cap<F>(&mut self, mut read_with: F) -> Result<(), DecodeError>
-    where
-        F: FnMut(&mut Self) -> Result<(), DecodeError>,
-    {
-        while self.buf.remaining() > self.extra_bytes_remaining {
-            read_with(self)?;
-        }
-        if self.buf.remaining() < self.extra_bytes_remaining {
-            return Err(DecodeError::new("delimited length exceeded"));
-        }
-        Ok(())
+    fn consume<T, F>(self, read_with: F) -> CappedConsumer<'a, B, F> {
+        CappedConsumer::new(self, read_with)
     }
 
     #[inline]
@@ -501,6 +493,76 @@ impl<'a, B: Buf> Capped<'a, B> {
         self.buf
             .remaining()
             .saturating_sub(self.extra_bytes_remaining)
+    }
+}
+
+struct CappedConsumer<'a, B: Buf, F> {
+    capped: Capped<'a, B>,
+    reader: F,
+}
+
+impl<'a, B: Buf, F> CappedConsumer<'a, B, F> {
+    fn new(capped: Capped<'a, B>, reader: F) -> Self {
+        Self { capped, reader }
+    }
+}
+
+impl<'a, B: Buf, T, F> Iterator for CappedConsumer<'a, B, F>
+where
+    F: FnMut(&mut Capped<B>) -> Result<T, DecodeError>,
+{
+    type Item = Result<T, DecodeError>;
+
+    fn next(&mut self) -> Option<Result<T, DecodeError>> {
+        if self.capped.buf.remaining() == self.capped.extra_bytes_remaining {
+            return None;
+        }
+        let res: Result<T, DecodeError> = (self.reader)(&mut self.capped);
+        if res.is_ok() {
+            if self.capped.buf.remaining() < self.capped.extra_bytes_remaining {
+                return Some(Err(DecodeError::new("delimited length exceeded")));
+            }
+        }
+        Some(res)
+    }
+}
+
+// TODO(widders): move this elsewhere?
+struct FallibleIter<T, E> {
+    iter: T,
+    outcome: Result<(), E>,
+}
+
+impl<T, R, E> FallibleIter<T, E>
+where
+    T: Iterator<Item = Result<R, E>>,
+{
+    fn new(iter: T) -> Self {
+        Self {
+            iter,
+            outcome: Ok(()),
+        }
+    }
+
+    fn check(self) -> Result<(), E> {
+        self.outcome
+    }
+}
+
+impl<T, R, E> Iterator for FallibleIter<T, E>
+where
+    T: Iterator<Item = Result<R, E>>,
+{
+    type Item = R;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.iter.next()? {
+            Err(err) => {
+                self.outcome = Err(err);
+                None
+            }
+            Ok(res) => Some(res),
+        }
     }
 }
 
@@ -534,13 +596,19 @@ pub fn skip_field<B: Buf>(wire_type: WireType, buf: &mut Capped<B>) -> Result<()
     Ok(())
 }
 
+/// The core trait for encoding and decoding bilrost data.
 pub trait Encoder<T> {
+    /// Encodes the a field with the given tag and value.
     fn encode<B: BufMut>(tag: u32, value: &T, buf: &mut B, tw: &mut TagWriter);
     // TODO(widders): change to (or augment with) build-in-reverse-then-emit-forward and
     //  emit-reversed
+    /// Returns the encoded length of the field, including the key.
     fn encoded_len(tag: u32, value: &T, tm: &mut TagMeasurer) -> usize;
+    /// Decodes a field with the given wire type; the field's key should have already been consumed
+    /// from the buffer.
     fn decode<B: Buf>(
         wire_type: WireType,
+        duplicated: bool,
         value: &mut T,
         buf: &mut Capped<B>,
         ctx: DecodeContext,
@@ -548,188 +616,559 @@ pub trait Encoder<T> {
 }
 
 pub trait DistinguishedEncoder<T>: Encoder<T> {
+    /// Decodes a field for the value, returning an error if it is not precisely the encoding that
+    /// would have been emitted for the value.
     fn decode_distinguished<B: Buf>(
         wire_type: WireType,
+        duplicated: bool,
         value: &mut T,
         buf: &mut Capped<B>,
         ctx: DecodeContext,
-    )-> Result<(), DecodeError>;
+    ) -> Result<(), DecodeError>;
 }
 
-/// Helper macro which emits an `encode_repeated` function for the type.
-macro_rules! encode_repeated {
-    ($ty:ty) => {
-        pub fn encode_repeated<B: BufMut>(
-            tag: u32,
-            values: &[$ty],
-            buf: &mut B,
-            tw: &mut TagWriter,
-        ) {
-            for value in values {
-                encode(tag, value, buf, tw);
-            }
+/// Encoders' wire-type is relied upon by both relaxed and distinguished encoders, but it is written
+/// to be a separate trait so that distinguished encoders don't necessarily implement relaxed
+/// decoding. This isn't important in general; it's very unlikely anything would implement this, but
+/// this means that it can become a typo to use the relaxed decoding functions by accident when
+/// implementing the distinguished encoders, which could cause serious mishaps.
+trait Wiretyped<T> {
+    const WIRE_TYPE: WireType;
+}
+
+/// Trait for encoding implementations for raw values that always encode to a single value. Used as
+/// the basis for all the other plain, optional, and repeated encodings.
+trait ValueEncoder<T>: Wiretyped<T> {
+    /// Encodes the given value unconditionally. This is guaranteed to emit data to the buffer.
+    fn encode_value<B: BufMut>(value: &T, buf: &mut B);
+    // TODO(widders): change to (or augment with) build-in-reverse-then-emit-forward and
+    //  emit-reversed
+    /// Returns the number of bytes the given value would be encoded as.
+    fn value_encoded_len(value: &T) -> usize;
+    /// Decodes a field assuming the encoder's wire type directly from the buffer.
+    fn decode_value<B: Buf>(
+        value: &mut T,
+        buf: &mut Capped<B>,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError>;
+}
+
+trait DistinguishedValueEncoder<T>: Wiretyped<T>
+where
+    T: Eq,
+{
+    /// Decodes a field assuming the encoder's wire type directly from the buffer, also performing
+    /// any additional validation required to guarantee that the value would be re-encoded into the
+    /// exact same bytes.
+    fn decode_value_distinguished<B: Buf>(
+        value: &mut T,
+        buf: &mut Capped<B>,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError>;
+}
+
+/// Affiliated helper trait for ValueEncoder that provides obligate implementations for handling
+/// field keys and wire types.
+trait FieldEncoder<T> {
+    /// Encodes exactly one field with the given tag and value into the buffer.
+    fn encode_field<B: BufMut>(tag: u32, value: &T, buf: &mut B, tw: &mut TagWriter);
+    /// Returns the encoded length of the field including its key.
+    fn field_encoded_len(tag: u32, value: &T, tm: &mut TagMeasurer) -> usize;
+    /// Decodes a field directly from the buffer, also checking the wire type.
+    fn decode_field<B: Buf>(
+        wire_type: WireType,
+        value: &mut T,
+        buf: &mut B,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError>;
+}
+impl<T, E> FieldEncoder<T> for E
+where
+    E: ValueEncoder<T>,
+{
+    #[inline]
+    fn encode_field<B: BufMut>(tag: u32, value: &T, buf: &mut B, tw: &mut TagWriter) {
+        tw.encode_key(tag, Self::WIRE_TYPE, buf);
+        Self::encode_value(value, buf);
+    }
+    #[inline]
+    fn field_encoded_len(tag: u32, value: &T, tm: &mut TagMeasurer) -> usize {
+        tm.key_len(tag) + Self::value_encoded_len(value)
+    }
+    #[inline]
+    fn decode_field<B: Buf>(
+        wire_type: WireType,
+        value: &mut T,
+        buf: &mut B,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError> {
+        check_wire_type(Self::WIRE_TYPE, wire_type)?;
+        Self::decode_value(value, buf, ctx)
+    }
+}
+
+/// Affiliated helper trait for DistinguishedValueEncoder that provides obligate implementations for
+/// handling field keys and wire types.
+trait DistinguishedFieldEncoder<T> {
+    /// Decodes a field directly from the buffer, also checking the wire type.
+    fn decode_field_distinguished<B: Buf>(
+        wire_type: WireType,
+        value: &mut T,
+        buf: &mut B,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError>;
+}
+impl<T, E> DistinguishedFieldEncoder<T> for E
+where
+    E: DistinguishedValueEncoder<T>,
+{
+    #[inline]
+    fn decode_field_distinguished<B: Buf>(
+        wire_type: WireType,
+        value: &mut T,
+        buf: &mut B,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError> {
+        check_wire_type(Self::WIRE_TYPE, wire_type)?;
+        Self::decode_value_distinguished(value, buf, ctx)
+    }
+}
+
+/// Trait for containers that store their values in a consistent order.
+pub trait Veclike: Extend<Self::Item> {
+    type Item;
+    type Iter<'a>: Iterator<Item = &'a Self::Item>;
+
+    fn iter(&self) -> Self::Iter<'_>;
+    fn push(&mut self, item: Self::Item);
+    fn is_empty(&self) -> bool;
+}
+
+impl<T> Veclike for Vec<T> {
+    type Item = T;
+    type Iter<'a> = core::slice::Iter<'a, T>;
+
+    #[inline]
+    fn iter(&self) -> Self::Iter<'_> {
+        Vec::iter(self)
+    }
+
+    #[inline]
+    fn push(&mut self, item: T) {
+        Vec::push(self, item)
+    }
+
+    #[inline]
+    fn is_empty(&self) -> bool {
+        Vec::is_empty(self)
+    }
+}
+
+/// General encoder. Encodes numbers as varints and repeated types un-packed.
+pub struct General;
+/// Fixed-size encoder. Encodes integers in fixed-size format.
+pub struct Fixed;
+/// Packed encoder. Encodes numeric types in packed format.
+pub struct Packed<E = General>;
+
+// TODO(widders): is any ValueEncoder usable as a Plain Encoder? what's the counterexample?
+impl<T> Encoder<T> for General
+where
+    General: ValueEncoder<T>,
+    T: Default + PartialEq,
+{
+    #[inline]
+    fn encode<B: BufMut>(tag: u32, value: &T, buf: &mut B, tw: &mut TagWriter) {
+        if value != T::default() {
+            Self::encode_field(tag, value, buf, tw);
         }
-    };
-}
+    }
 
-/// Helper macro which emits a `merge_repeated` function for the numeric type.
-macro_rules! merge_repeated_numeric {
-    ($ty:ty,
-     $wire_type:expr,
-     $merge:ident,
-     $merge_repeated:ident) => {
-        pub fn $merge_repeated<B: Buf>(
-            wire_type: WireType,
-            values: &mut Vec<$ty>,
-            buf: &mut Capped<B>,
-            ctx: DecodeContext,
-        ) -> Result<(), DecodeError> {
-            if wire_type == WireType::LengthDelimited {
-                // Packed.
-                let mut capped = buf.take_length_delimited()?;
-                if capped.remaining_before_cap() % $wire_type.encoded_size_alignment() != 0 {
-                    return Err(DecodeError::new("packed field is not a valid length"));
-                }
-                capped.consume_to_cap(|buf| {
-                    let mut value = Default::default();
-                    $merge($wire_type, &mut value, buf, ctx.clone())?;
-                    values.push(value);
-                    Ok(())
-                })
-            } else {
-                // Unpacked.
-                check_wire_type($wire_type, wire_type)?;
-                let mut value = Default::default();
-                $merge(wire_type, &mut value, buf, ctx)?;
-                values.push(value);
-                Ok(())
-            }
+    #[inline]
+    fn encoded_len(tag: u32, value: &T, tm: &mut TagMeasurer) -> usize {
+        if value != T::default() {
+            Self::field_encoded_len(tag, value, tm)
+        } else {
+            0
         }
-    };
+    }
+
+    #[inline]
+    fn decode<B: Buf>(
+        wire_type: WireType,
+        duplicated: bool,
+        value: &mut T,
+        buf: &mut Capped<B>,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError> {
+        if duplicated {
+            return Err(DecodeError::new(
+                "multiple occurrences of non-repeated field",
+            ));
+        }
+        Self::decode_field(wire_type, value, buf, ctx)
+    }
 }
 
-/// Macro which emits a module containing a set of encoding functions for a
-/// variable width numeric type.
+impl<T> DistinguishedEncoder<T> for General
+where
+    General: DistinguishedValueEncoder<T> + Encoder<T>,
+    T: Default + PartialEq,
+{
+    #[inline]
+    fn decode_distinguished<B: Buf>(
+        wire_type: WireType,
+        duplicated: bool,
+        value: &mut T,
+        buf: &mut Capped<B>,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError> {
+        if duplicated {
+            return Err(DecodeError::new(
+                "multiple occurrences of non-repeated field",
+            ));
+        }
+        Self::decode_field_distinguished(wire_type, value, buf, ctx)?;
+        if value == T::default() {
+            return Err(DecodeError::new(
+                "plain field was encoded with its zero value",
+            ));
+        }
+        Ok(())
+    }
+}
+
+impl<T> Encoder<Option<T>> for General
+where
+    General: ValueEncoder<T>,
+    T: Default,
+{
+    #[inline]
+    fn encode<B: BufMut>(tag: u32, value: &Option<T>, buf: &mut B, tw: &mut TagWriter) {
+        if let Some(value) = value {
+            Self::encode_field(tag, value, buf, tw);
+        }
+    }
+
+    #[inline]
+    fn encoded_len(tag: u32, value: &Option<T>, tm: &mut TagMeasurer) -> usize {
+        if let Some(value) = value {
+            Self::field_encoded_len(tag, value, tm)
+        } else {
+            0
+        }
+    }
+
+    #[inline]
+    fn decode<B: Buf>(
+        wire_type: WireType,
+        duplicated: bool,
+        value: &mut Option<T>,
+        buf: &mut Capped<B>,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError> {
+        if duplicated {
+            return Err(DecodeError::new(
+                "multiple occurrences of non-repeated field",
+            ));
+        }
+        Self::decode_field(wire_type, value.get_or_insert_with(T::default), buf, ctx)
+    }
+}
+
+/// Distinguished decoding for Option<T> in General is only different in that it calls the
+/// distinguished decoding path.
+impl<T> DistinguishedEncoder<Option<T>> for General
+where
+    General: DistinguishedValueEncoder<T> + Encoder<Option<T>>,
+    T: Default,
+{
+    #[inline]
+    fn decode_distinguished<B: Buf>(
+        wire_type: WireType,
+        duplicated: bool,
+        value: &mut Option<T>,
+        buf: &mut Capped<B>,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError> {
+        if duplicated {
+            return Err(DecodeError::new(
+                "multiple occurrences of non-repeated field",
+            ));
+        }
+        Self::decode_field_distinguished(wire_type, value.get_or_insert_with(T::default), buf, ctx)
+    }
+}
+
+/// General encodes vecs as repeated fields and in relaxed decoding will accept both packed
+/// and un-packed encodings.
+impl<C> Encoder<C> for General
+where
+    C: Veclike,
+    General: ValueEncoder<C::Item>,
+    C::Item: Default,
+{
+    #[inline]
+    fn encode<B: BufMut>(tag: u32, value: &C, buf: &mut B, tw: &mut TagWriter) {
+        for val in value {
+            Self::encode_field(tag, val, buf, tw);
+        }
+    }
+
+    #[inline]
+    fn encoded_len(tag: u32, value: &C, tm: &mut TagMeasurer) -> usize {
+        value
+            .into_iter()
+            .map(|val| Self::field_encoded_len(tag, value, tm))
+            .sum()
+    }
+
+    #[inline]
+    fn decode<B: Buf>(
+        wire_type: WireType,
+        _duplicated: bool,
+        value: &mut C,
+        buf: &mut Capped<B>,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError> {
+        if wire_type == WireType::LengthDelimited && Self::WIRE_TYPE != WireType::LengthDelimited {
+            Packed::decode_value(value, buf, ctx)
+        } else {
+            let mut new_val = Default::default();
+            Self::decode_field(wire_type, &mut new_val, buf, ctx)?;
+            value.push(new_val);
+            Ok(())
+        }
+    }
+}
+
+/// Distinguished encoding for General enforces only the repeated field representation is allowed.
+impl<C> DistinguishedEncoder<C> for General
+where
+    C: Veclike,
+    General: DistinguishedValueEncoder<C::Item> + Encoder<C>,
+    C::Item: Default,
+{
+    #[inline]
+    fn decode_distinguished<B: Buf>(
+        wire_type: WireType,
+        _duplicated: bool,
+        value: &mut C,
+        buf: &mut Capped<B>,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError> {
+        let mut new_val = Default::default();
+        Self::decode_field(wire_type, &mut new_val, buf, ctx)?;
+        value.push(new_val);
+        Ok(())
+    }
+}
+
+/// Packed encodings are always length delimited.
+impl<T, E> Wiretyped<T> for Packed<E> {
+    const WIRE_TYPE: WireType = WireType::LengthDelimited;
+}
+
+impl<C, E> ValueEncoder<C> for Packed<E>
+where
+    C: Veclike,
+    E: ValueEncoder<C::Item>,
+{
+    #[inline]
+    fn encode_value<B: BufMut>(value: &C, buf: &mut B) {
+        encode_varint(
+            value.into_iter().map(|val| E::value_encoded_len(val)).sum(),
+            buf,
+        );
+        for val in value {
+            E::encode_value(val, buf);
+        }
+    }
+
+    #[inline]
+    fn value_encoded_len(value: &C) -> usize {
+        let inner_len = value.into_iter().map(|val| E::value_encoded_len(val)).sum();
+        encoded_len_varint(inner_len) + inner_len
+    }
+
+    #[inline]
+    fn decode_value<B: Buf>(
+        value: &mut C,
+        buf: &mut Capped<B>,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError> {
+        let mut consumer = FallibleIter::new(buf.take_length_delimited()?.consume(|buf| {
+            let mut new_val = Default::default();
+            E::decode_value(&mut new_val, buf, ctx.clone())?;
+            Ok(new_val)
+        }));
+        value.extend(consumer);
+        consumer.check()
+    }
+}
+
+impl<C, E> DistinguishedValueEncoder<C> for Packed<E>
+where
+    C: Veclike,
+    E: DistinguishedValueEncoder<C::Item>,
+{
+    fn decode_value_distinguished<B: Buf>(
+        value: &mut C,
+        buf: &mut Capped<B>,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError> {
+        let mut consumer = FallibleIter::new(buf.take_length_delimited()?.consume(|buf| {
+            let mut new_val = Default::default();
+            E::decode_value_distinguished(&mut new_val, buf, ctx.clone())?;
+            Ok(new_val)
+        }));
+        value.extend(consumer);
+        consumer.check()
+    }
+}
+
+// TODO(widders): is it impossible to nest Vec<Vec<T>> as repeated fields of packed? we might want
+//  an "Unpacked" encoder for veclikes, we can delegate to it from General
+/// ValueEncoder for packed repeated encodings lets this value type nest.
+impl<C, E> Encoder<C> for Packed<E>
+where
+    C: Veclike,
+    Packed<E>: ValueEncoder<C::Item>,
+{
+    #[inline]
+    fn encode<B: BufMut>(tag: u32, value: &C, buf: &mut B, tw: &mut TagWriter) {
+        if !value.is_empty() {
+            Self::encode_field(tag, value, buf, tw);
+        }
+    }
+
+    #[inline]
+    fn encoded_len(tag: u32, value: &C, tm: &mut TagMeasurer) -> usize {
+        if !value.is_empty() {
+            Self::field_encoded_len(tag, value, tm)
+        } else {
+            0
+        }
+    }
+
+    #[inline]
+    fn decode<B: Buf>(
+        wire_type: WireType,
+        duplicated: bool,
+        value: &mut C,
+        buf: &mut Capped<B>,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError> {
+        if duplicated {
+            return Err(DecodeError::new(
+                "multiple occurrences of packed repeated field",
+            ));
+        }
+        Self::decode_field(wire_type, value, buf, ctx)
+    }
+}
+
+impl<C, E> DistinguishedEncoder<C> for Packed<E>
+where
+    C: Veclike,
+    Packed<E>: DistinguishedValueEncoder<C> + Encoder<C>,
+{
+    #[inline]
+    fn decode_distinguished<B: Buf>(
+        wire_type: WireType,
+        duplicated: bool,
+        value: &mut C,
+        buf: &mut Capped<B>,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError> {
+        if duplicated {
+            return Err(DecodeError::new(
+                "multiple occurrences of packed repeated field",
+            ));
+        }
+        Self::decode_field_distinguished(wire_type, value, buf, ctx)?;
+        if value.is_empty() {
+            return Err(DecodeError::new("packed field encoded with no values"));
+        }
+        Ok(())
+    }
+}
+
+/// Macro which emits implementations for ariable width numeric encoding.
 macro_rules! varint {
-    ($ty:ty,
-     $proto_ty:ident) => (
-        varint!($ty,
-                $proto_ty,
-                to_uint64(value) { *value as u64 },
-                from_uint64(value) { value as $ty });
-    );
+    (
+        $ty:ty,
+        to_uint64($to_uint64_value:ident) $to_uint64:expr,
+        from_uint64($from_uint64_value:ident) $from_uint64:expr
+    ) => {
+        impl Wiretyped<$ty> for General {
+            const WIRE_TYPE: WireType = WireType::Varint;
+        }
 
-    ($ty:ty,
-     $proto_ty:ident,
-     to_uint64($to_uint64_value:ident) $to_uint64:expr,
-     from_uint64($from_uint64_value:ident) $from_uint64:expr) => (
-
-         pub mod $proto_ty {
-            use crate::encoding::*;
-
-            pub fn encode<B: BufMut>(tag: u32, $to_uint64_value: &$ty, buf: &mut B, tw: &mut TagWriter) {
-                tw.encode_key(tag, WireType::Varint, buf);
+        impl ValueEncoder<$ty> for General {
+            #[inline]
+            fn encode_value<B: BufMut>($to_uint64_value: &$ty, buf: &mut B) {
                 encode_varint($to_uint64, buf);
             }
 
-            pub fn merge<B: Buf>(
-                wire_type: WireType,
-                value: &mut $ty,
+            #[inline]
+            fn value_encoded_len($to_uint64_value: &$ty) -> usize {
+                encoded_len_varint($to_uint64)
+            }
+
+            #[inline]
+            fn decode_value<B: Buf>(
+                __value: &mut $ty,
                 buf: &mut Capped<B>,
                 _ctx: DecodeContext,
             ) -> Result<(), DecodeError> {
-                check_wire_type(WireType::Varint, wire_type)?;
                 let $from_uint64_value = buf.decode_varint()?;
-                *value = $from_uint64;
+                *__value = $from_uint64;
                 Ok(())
             }
+        }
 
-            encode_repeated!($ty);
-
-            pub fn encode_packed<B: BufMut>(tag: u32, values: &[$ty], buf: &mut B, tw: &mut TagWriter) {
-                if values.is_empty() { return; }
-
-                tw.encode_key(tag, WireType::LengthDelimited, buf);
-                let len: usize = values.iter().map(|$to_uint64_value| {
-                    encoded_len_varint($to_uint64)
-                }).sum();
-                encode_varint(len as u64, buf);
-
-                for $to_uint64_value in values {
-                    encode_varint($to_uint64, buf);
-                }
-            }
-
-            merge_repeated_numeric!($ty, WireType::Varint, merge, merge_repeated);
-
+        impl DistinguishedValueEncoder<$ty> for General {
             #[inline]
-            pub fn encoded_len(tag: u32, $to_uint64_value: &$ty, tm: &mut TagMeasurer) -> usize {
-                tm.key_len(tag) + encoded_len_varint($to_uint64)
+            fn decode_value_distinguished<B: Buf>(
+                value: &mut $ty,
+                buf: &mut Capped<B>,
+                ctx: DecodeContext,
+            ) -> Result<(), DecodeError> {
+                Self::decode_value(value, buf, ctx)
             }
+        }
 
-            #[inline]
-            pub fn encoded_len_repeated(tag: u32, values: &[$ty], tm: &mut TagMeasurer) -> usize {
-                if values.is_empty() {
-                    0
-                } else {
-                    // successive repeated keys always take up 1 byte
-                    tm.key_len(tag) + values.len() - 1
-                        + values
-                            .iter()
-                            .map(|$to_uint64_value| {
-                                encoded_len_varint($to_uint64)
-                            })
-                            .sum::<usize>()
-                }
-            }
-
-            #[inline]
-            pub fn encoded_len_packed(tag: u32, values: &[$ty], tm: &mut TagMeasurer) -> usize {
-                if values.is_empty() {
-                    0
-                } else {
-                    let len = values.iter()
-                                    .map(|$to_uint64_value| encoded_len_varint($to_uint64))
-                                    .sum::<usize>();
-                    tm.key_len(tag) + encoded_len_varint(len as u64) + len
-                }
-            }
-
-            #[cfg(test)]
-            mod test {
-                use proptest::prelude::*;
-
-                use crate::encoding::$proto_ty::*;
-                use crate::encoding::test::{
-                    check_collection_type,
-                    check_type,
-                };
-
-                proptest! {
-                    #[test]
-                    fn check(value: $ty, tag: u32) {
-                        check_type(value, tag, WireType::Varint,
-                                   encode, merge, encoded_len)?;
-                    }
-                    #[test]
-                    fn check_repeated(value: Vec<$ty>, tag: u32) {
-                        check_collection_type(value, tag, WireType::Varint,
-                                              encode_repeated, merge_repeated,
-                                              encoded_len_repeated)?;
-                    }
-                    #[test]
-                    fn check_packed(value: Vec<$ty>, tag: u32) {
-                        check_type(value, tag, WireType::LengthDelimited,
-                                   encode_packed, merge_repeated,
-                                   encoded_len_packed)?;
-                    }
-                }
-            }
-         }
-
-    );
+        // #[cfg(test)]
+        // mod test_varint_$ty {
+        //     use proptest::prelude::*;
+        //
+        //     use crate::encoding::test::{check_collection_type, check_type};
+        //     use crate::encoding::$proto_ty::*;
+        //
+        //     proptest! {
+        //         #[test]
+        //         fn check(value: $ty, tag: u32) {
+        //             check_type(value, tag, WireType::Varint,
+        //                        encode, merge, encoded_len)?;
+        //         }
+        //         #[test]
+        //         fn check_repeated(value: Vec<$ty>, tag: u32) {
+        //             check_collection_type(value, tag, WireType::Varint,
+        //                                   encode_repeated, merge_repeated,
+        //                                   encoded_len_repeated)?;
+        //         }
+        //         #[test]
+        //         fn check_packed(value: Vec<$ty>, tag: u32) {
+        //             check_type(value, tag, WireType::LengthDelimited,
+        //                        encode_packed, merge_repeated,
+        //                        encoded_len_packed)?;
+        //         }
+        //     }
+        // }
+    };
 }
-varint!(bool, bool,
+varint!(bool,
 to_uint64(value) {
     u64::from(*value)
 },
@@ -740,24 +1179,30 @@ from_uint64(value) {
         _ => return Err(DecodeError::new("invalid varint value for bool"))
     }
 });
-varint!(u32, uint32,
+varint!(u32,
 to_uint64(value) {
     *value as u64
 },
 from_uint64(value) {
-    u32::try_from(value).map_err(|_| DecodeError::new("varint overflows range of uint32"))?
+    u32::try_from(value).map_err(|_| DecodeError::new("varint overflows range of u32"))?
 });
-varint!(u64, uint64);
-varint!(i32, sint32,
+varint!(u64,
+to_uint64(value) {
+    *value
+},
+from_uint64(value) {
+    value
+});
+varint!(i32,
 to_uint64(value) {
     ((value << 1) ^ (value >> 31)) as u32 as u64
 },
 from_uint64(value) {
     let value = u32::try_from(value)
-        .map_err(|_| DecodeError::new("varint overflows range of sint32"))?;
+        .map_err(|_| DecodeError::new("varint overflows range of i32"))?;
     ((value >> 1) as i32) ^ (-((value & 1) as i32))
 });
-varint!(i64, sint64,
+varint!(i64,
 to_uint64(value) {
     ((value << 1) ^ (value >> 63)) as u64
 },
@@ -765,15 +1210,20 @@ from_uint64(value) {
     ((value >> 1) as i64) ^ (-((value & 1) as i64))
 });
 
-/// Macro which emits a module containing a set of encoding functions for a
-/// fixed width numeric type.
+/// Macro which emits implementations for fixed width numeric encoding.
 macro_rules! fixed_width {
     ($ty:ty,
-     $width:expr,
      $wire_type:expr,
-     $proto_ty:ident,
      $put:ident,
      $get:ident) => {
+        impl Wiretyped<$ty> for Fixed {
+            const WIRE_TYPE: WireType = $wire_type;
+        }
+
+        impl ValueEncoder<$ty> for Fixed {
+
+        }
+
         pub mod $proto_ty {
             use crate::encoding::*;
 
@@ -962,20 +1412,21 @@ macro_rules! length_delimited {
     };
 }
 
-pub mod string {
-    use super::*;
+impl Wiretyped<String> for General {
+    const WIRE_TYPE: WireType = WireType::LengthDelimited;
+}
 
-    pub fn encode<B>(tag: u32, value: &String, buf: &mut B, tw: &mut TagWriter)
-    where
-        B: BufMut,
-    {
-        tw.encode_key(tag, WireType::LengthDelimited, buf);
+impl ValueEncoder<String> for General {
+    fn encode_value<B: BufMut>(value: &String, buf: &mut B) {
         encode_varint(value.len() as u64, buf);
         buf.put_slice(value.as_bytes());
     }
 
-    pub fn merge<B: Buf>(
-        wire_type: WireType,
+    fn value_encoded_len(value: &String) -> usize {
+        encoded_len_varint(value.len() as u64) + value.len()
+    }
+
+    fn decode_value<B: Buf>(
         value: &mut String,
         buf: &mut Capped<B>,
         ctx: DecodeContext,
@@ -1003,7 +1454,10 @@ pub mod string {
             }
 
             let drop_guard = DropGuard(value.as_mut_vec());
-            bytes::merge_one_copy(wire_type, drop_guard.0, buf, ctx)?;
+            // If we must copy, make sure to copy only once.
+            drop_guard
+                .0
+                .replace_with(buf.take_length_delimited()?.take_all());
             match str::from_utf8(drop_guard.0) {
                 Ok(_) => {
                     // Success; do not clear the bytes.
@@ -1016,31 +1470,29 @@ pub mod string {
             }
         }
     }
-
-    length_delimited!(String);
-
-    #[cfg(test)]
-    mod test {
-        use proptest::prelude::*;
-
-        use super::super::test::{check_collection_type, check_type};
-        use super::*;
-
-        proptest! {
-            #[test]
-            fn check(value: String, tag: u32) {
-                super::test::check_type(value, tag, WireType::LengthDelimited,
-                                        encode, merge, encoded_len)?;
-            }
-            #[test]
-            fn check_repeated(value: Vec<String>, tag: u32) {
-                super::test::check_collection_type(value, tag, WireType::LengthDelimited,
-                                                   encode_repeated, merge_repeated,
-                                                   encoded_len_repeated)?;
-            }
-        }
-    }
 }
+
+// #[cfg(test)]
+// mod string_test {
+//     use proptest::prelude::*;
+//
+//     use super::super::test::{check_collection_type, check_type};
+//     use super::*;
+//
+//     proptest! {
+//         #[test]
+//         fn check(value: String, tag: u32) {
+//             super::test::check_type(value, tag, WireType::LengthDelimited,
+//                                     encode, merge, encoded_len)?;
+//         }
+//         #[test]
+//         fn check_repeated(value: Vec<String>, tag: u32) {
+//             super::test::check_collection_type(value, tag, WireType::LengthDelimited,
+//                                                encode_repeated, merge_repeated,
+//                                                encoded_len_repeated)?;
+//         }
+//     }
+// }
 
 pub trait BytesAdapter: sealed::BytesAdapter {}
 
@@ -1112,108 +1564,107 @@ impl sealed::BytesAdapter for Vec<u8> {
     }
 }
 
-pub mod bytes {
-    use super::*;
-
-    pub fn encode<A, B>(tag: u32, value: &A, buf: &mut B, tw: &mut TagWriter)
-    where
-        A: BytesAdapter,
-        B: BufMut,
-    {
-        tw.encode_key(tag, WireType::LengthDelimited, buf);
-        encode_varint(value.len() as u64, buf);
-        value.append_to(buf);
-    }
-
-    pub fn merge<A, B>(
-        wire_type: WireType,
-        value: &mut A,
-        buf: &mut Capped<B>,
-        _ctx: DecodeContext,
-    ) -> Result<(), DecodeError>
-    where
-        A: BytesAdapter,
-        B: Buf,
-    {
-        check_wire_type(WireType::LengthDelimited, wire_type)?;
-        let mut buf = buf.take_length_delimited()?;
-
-        // Clear the existing value. This follows from the following rule in the encoding guide[1]:
-        //
-        // > Normally, an encoded message would never have more than one instance of a non-repeated
-        // > field. However, parsers are expected to handle the case in which they do. For numeric
-        // > types and strings, if the same field appears multiple times, the parser accepts the
-        // > last value it sees.
-        //
-        // [1]: https://developers.google.com/protocol-buffers/docs/encoding#optional
-        //
-        // This is intended for A and B both being Bytes so it is zero-copy.
-        // Some combinations of A and B types may cause a double-copy,
-        // in which case merge_one_copy() should be used instead.
-        // TODO(widders): never do this. we are blowing this away entirely. this will not happen in
-        //  bilrost at all, because we can trivially detect incorrectly duplicated fields.
-        let len = buf.remaining_before_cap();
-        value.replace_with(buf.copy_to_bytes(len));
-        Ok(())
-    }
-
-    pub(super) fn merge_one_copy<A, B>(
-        wire_type: WireType,
-        value: &mut A,
-        buf: &mut Capped<B>,
-        _ctx: DecodeContext,
-    ) -> Result<(), DecodeError>
-    where
-        A: BytesAdapter,
-        B: Buf,
-    {
-        check_wire_type(WireType::LengthDelimited, wire_type)?;
-        let buf = buf.take_length_delimited()?;
-        // If we must copy, make sure to copy only once.
-        value.replace_with(buf.take_all());
-        Ok(())
-    }
-
-    length_delimited!(impl BytesAdapter);
-
-    #[cfg(test)]
-    mod test {
-        use proptest::prelude::*;
-
-        use super::super::test::{check_collection_type, check_type};
-        use super::*;
-
-        proptest! {
-            #[test]
-            fn check_vec(value: Vec<u8>, tag: u32) {
-                super::test::check_type::<Vec<u8>, Vec<u8>>(value, tag, WireType::LengthDelimited,
-                                                            encode, merge, encoded_len)?;
-            }
-
-            #[test]
-            fn check_bytes(value: Vec<u8>, tag: u32) {
-                let value = Bytes::from(value);
-                super::test::check_type::<Bytes, Bytes>(value, tag, WireType::LengthDelimited,
-                                                        encode, merge, encoded_len)?;
-            }
-
-            #[test]
-            fn check_repeated_vec(value: Vec<Vec<u8>>, tag: u32) {
-                super::test::check_collection_type(value, tag, WireType::LengthDelimited,
-                                                   encode_repeated, merge_repeated,
-                                                   encoded_len_repeated)?;
-            }
-
-            #[test]
-            fn check_repeated_bytes(value: Vec<Vec<u8>>, tag: u32) {
-                let value = value.into_iter().map(Bytes::from).collect();
-                super::test::check_collection_type(value, tag, WireType::LengthDelimited,
-                                                   encode_repeated, merge_repeated,
-                                                   encoded_len_repeated)?;
-            }
-        }
-    }
-}
+// pub mod bytes {
+//     use super::*;
+//
+//     pub fn encode<A, B>(tag: u32, value: &A, buf: &mut B, tw: &mut TagWriter)
+//     where
+//         A: BytesAdapter,
+//         B: BufMut,
+//     {
+//         tw.encode_key(tag, WireType::LengthDelimited, buf);
+//         encode_varint(value.len() as u64, buf);
+//         value.append_to(buf);
+//     }
+//
+//     pub fn merge<A, B>(
+//         wire_type: WireType,
+//         value: &mut A,
+//         buf: &mut Capped<B>,
+//         _ctx: DecodeContext,
+//     ) -> Result<(), DecodeError>
+//     where
+//         A: BytesAdapter,
+//         B: Buf,
+//     {
+//         check_wire_type(WireType::LengthDelimited, wire_type)?;
+//         let mut buf = buf.take_length_delimited()?;
+//
+//         // Clear the existing value. This follows from the following rule in the encoding guide[1]:
+//         //
+//         // > Normally, an encoded message would never have more than one instance of a non-repeated
+//         // > field. However, parsers are expected to handle the case in which they do. For numeric
+//         // > types and strings, if the same field appears multiple times, the parser accepts the
+//         // > last value it sees.
+//         //
+//         // [1]: https://developers.google.com/protocol-buffers/docs/encoding#optional
+//         //
+//         // This is intended for A and B both being Bytes so it is zero-copy.
+//         // Some combinations of A and B types may cause a double-copy,
+//         // in which case merge_one_copy() should be used instead.
+//         // TODO(widders): we will only need this if we have an actual merge api. do we want that?
+//         let len = buf.remaining_before_cap();
+//         value.replace_with(buf.copy_to_bytes(len));
+//         Ok(())
+//     }
+//
+//     pub(super) fn merge_one_copy<A, B>(
+//         wire_type: WireType,
+//         value: &mut A,
+//         buf: &mut Capped<B>,
+//         _ctx: DecodeContext,
+//     ) -> Result<(), DecodeError>
+//     where
+//         A: BytesAdapter,
+//         B: Buf,
+//     {
+//         check_wire_type(WireType::LengthDelimited, wire_type)?;
+//         let buf = buf.take_length_delimited()?;
+//         // If we must copy, make sure to copy only once.
+//         value.replace_with(buf.take_all());
+//         Ok(())
+//     }
+//
+//     length_delimited!(impl BytesAdapter);
+//
+//     #[cfg(test)]
+//     mod test {
+//         use proptest::prelude::*;
+//
+//         use super::super::test::{check_collection_type, check_type};
+//         use super::*;
+//
+//         proptest! {
+//             #[test]
+//             fn check_vec(value: Vec<u8>, tag: u32) {
+//                 super::test::check_type::<Vec<u8>, Vec<u8>>(value, tag, WireType::LengthDelimited,
+//                                                             encode, merge, encoded_len)?;
+//             }
+//
+//             #[test]
+//             fn check_bytes(value: Vec<u8>, tag: u32) {
+//                 let value = Bytes::from(value);
+//                 super::test::check_type::<Bytes, Bytes>(value, tag, WireType::LengthDelimited,
+//                                                         encode, merge, encoded_len)?;
+//             }
+//
+//             #[test]
+//             fn check_repeated_vec(value: Vec<Vec<u8>>, tag: u32) {
+//                 super::test::check_collection_type(value, tag, WireType::LengthDelimited,
+//                                                    encode_repeated, merge_repeated,
+//                                                    encoded_len_repeated)?;
+//             }
+//
+//             #[test]
+//             fn check_repeated_bytes(value: Vec<Vec<u8>>, tag: u32) {
+//                 let value = value.into_iter().map(Bytes::from).collect();
+//                 super::test::check_collection_type(value, tag, WireType::LengthDelimited,
+//                                                    encode_repeated, merge_repeated,
+//                                                    encoded_len_repeated)?;
+//             }
+//         }
+//     }
+// }
 
 pub mod message {
     use super::*;
@@ -1243,12 +1694,14 @@ pub mod message {
         let mut tr = TagReader::new();
         let inner_ctx = ctx.enter_recursion();
         let mut last_tag = None::<u32>;
-        buf.take_length_delimited()?.consume_to_cap(|buf| {
-            let (tag, wire_type) = tr.decode_key(buf.buf())?;
-            let duplicated = last_tag == Some(tag);
-            last_tag = Some(tag);
-            msg.merge_field(tag, wire_type, duplicated, buf, inner_ctx.clone())
-        })
+        buf.take_length_delimited()?
+            .consume(|buf| {
+                let (tag, wire_type) = tr.decode_key(buf.buf())?;
+                let duplicated = last_tag == Some(tag);
+                last_tag = Some(tag);
+                msg.merge_field(tag, wire_type, duplicated, buf, inner_ctx.clone())
+            })
+            .collect()
     }
 
     pub fn encode_repeated<M, B>(tag: u32, messages: &[M], buf: &mut B, tw: &mut TagWriter)
@@ -1311,7 +1764,6 @@ macro_rules! map {
     //  * map keys must not recur
     //  * maps should be packed! keys and values should directly alternate within a length-
     //    delineated field
-
     ($map_ty:ident) => {
         use crate::encoding::*;
         use core::hash::Hash;
@@ -1466,16 +1918,18 @@ macro_rules! map {
             let mut val = val_default;
             ctx.limit_reached()?;
             let mut tr = TagReader::new();
-            buf.take_length_delimited()?.consume_to_cap(|buf| {
-                let (tag, wire_type) = tr.decode_key(buf.buf())?;
-                // TODO(widders): does this have correct behavior if k or v are incorrectly
-                //  repeated?
-                match tag {
-                    1 => key_merge(wire_type, &mut key, buf, ctx.clone()),
-                    2 => val_merge(wire_type, &mut val, buf, ctx.clone()),
-                    _ => skip_field(wire_type, buf),
-                }
-            })?;
+            buf.take_length_delimited()?
+                .consume(|buf| {
+                    let (tag, wire_type) = tr.decode_key(buf.buf())?;
+                    // TODO(widders): does this have correct behavior if k or v are incorrectly
+                    //  repeated?
+                    match tag {
+                        1 => key_merge(wire_type, &mut key, buf, ctx.clone()),
+                        2 => val_merge(wire_type, &mut val, buf, ctx.clone()),
+                        _ => skip_field(wire_type, buf),
+                    }
+                })
+                .collect()?;
             values.insert(key, val);
 
             Ok(())
@@ -1535,516 +1989,516 @@ pub mod btree_map {
     map!(BTreeMap);
 }
 
-#[cfg(test)]
-mod test {
-    use alloc::string::ToString;
-    use core::borrow::Borrow;
-    use core::fmt::Debug;
-
-    use ::bytes::{Bytes, BytesMut};
-    use proptest::{prelude::*, test_runner::TestCaseResult};
-
-    use crate::encoding::*;
-
-    pub fn check_type<T, B>(
-        value: T,
-        tag: u32,
-        wire_type: WireType,
-        encode: fn(u32, &B, &mut BytesMut, &mut TagWriter),
-        merge: fn(WireType, &mut T, &mut Capped<Bytes>, DecodeContext) -> Result<(), DecodeError>,
-        encoded_len: fn(u32, &B, &mut TagMeasurer) -> usize,
-    ) -> TestCaseResult
-    where
-        T: Debug + Default + PartialEq + Borrow<B>,
-        B: ?Sized,
-    {
-        let mut tw = TagWriter::new();
-        let mut tm = tw.measurer();
-        let expected_len = encoded_len(tag, value.borrow(), &mut tm);
-
-        let mut buf = BytesMut::with_capacity(expected_len);
-        encode(tag, value.borrow(), &mut buf, &mut tw);
-
-        let buf = &mut buf.freeze();
-        let mut buf = Capped::new(buf);
-        let mut tr = TagReader::new();
-
-        prop_assert_eq!(
-            buf.remaining(),
-            expected_len,
-            "encoded_len wrong; expected: {}, actual: {}",
-            expected_len,
-            buf.remaining()
-        );
-
-        if !buf.has_remaining() {
-            // Short circuit for empty packed values.
-            return Ok(());
-        }
-
-        let (decoded_tag, decoded_wire_type) = tr
-            .decode_key(buf.buf())
-            .map_err(|error| TestCaseError::fail(error.to_string()))?;
-        prop_assert_eq!(
-            tag,
-            decoded_tag,
-            "decoded tag does not match; expected: {}, actual: {}",
-            tag,
-            decoded_tag
-        );
-
-        prop_assert_eq!(
-            wire_type,
-            decoded_wire_type,
-            "decoded wire type does not match; expected: {:?}, actual: {:?}",
-            wire_type,
-            decoded_wire_type,
-        );
-
-        match wire_type {
-            WireType::SixtyFourBit if buf.remaining() != 8 => Err(TestCaseError::fail(format!(
-                "64bit wire type illegal remaining: {}, tag: {}",
-                buf.remaining(),
-                tag
-            ))),
-            WireType::ThirtyTwoBit if buf.remaining() != 4 => Err(TestCaseError::fail(format!(
-                "32bit wire type illegal remaining: {}, tag: {}",
-                buf.remaining(),
-                tag
-            ))),
-            _ => Ok(()),
-        }?;
-
-        let mut roundtrip_value = T::default();
-        merge(
-            wire_type,
-            &mut roundtrip_value,
-            &mut buf,
-            DecodeContext::default(),
-        )
-        .map_err(|error| TestCaseError::fail(error.to_string()))?;
-
-        prop_assert!(
-            !buf.has_remaining(),
-            "expected buffer to be empty, remaining: {}",
-            buf.remaining()
-        );
-
-        prop_assert_eq!(value, roundtrip_value);
-
-        Ok(())
-    }
-
-    pub fn check_collection_type<T, B, E, M, L>(
-        value: T,
-        tag: u32,
-        wire_type: WireType,
-        encode: E,
-        mut merge: M,
-        encoded_len: L,
-    ) -> TestCaseResult
-    where
-        T: Debug + Default + PartialEq + Borrow<B>,
-        B: ?Sized,
-        E: FnOnce(u32, &B, &mut BytesMut, &mut TagWriter),
-        M: FnMut(WireType, &mut T, &mut Capped<Bytes>, DecodeContext) -> Result<(), DecodeError>,
-        L: FnOnce(u32, &B, &mut TagMeasurer) -> usize,
-    {
-        let mut tw = TagWriter::new();
-        let mut tm = tw.measurer();
-        let expected_len = encoded_len(tag, value.borrow(), &mut tm);
-
-        let mut buf = BytesMut::with_capacity(expected_len);
-        encode(tag, value.borrow(), &mut buf, &mut tw);
-
-        let mut tr = TagReader::new();
-        let buf = &mut buf.freeze();
-        let mut buf = Capped::new(buf);
-
-        prop_assert_eq!(
-            expected_len,
-            buf.remaining(),
-            "encoded_len wrong; expected: {}, actual: {}",
-            expected_len,
-            buf.remaining()
-        );
-
-        let mut roundtrip_value = Default::default();
-        while buf.has_remaining() {
-            let (decoded_tag, decoded_wire_type) = tr
-                .decode_key(buf.buf())
-                .map_err(|error| TestCaseError::fail(error.to_string()))?;
-
-            prop_assert_eq!(
-                tag,
-                decoded_tag,
-                "decoded tag does not match; expected: {}, actual: {}",
-                tag,
-                decoded_tag
-            );
-
-            prop_assert_eq!(
-                wire_type,
-                decoded_wire_type,
-                "decoded wire type does not match; expected: {:?}, actual: {:?}",
-                wire_type,
-                decoded_wire_type
-            );
-
-            merge(
-                wire_type,
-                &mut roundtrip_value,
-                &mut buf,
-                DecodeContext::default(),
-            )
-            .map_err(|error| TestCaseError::fail(error.to_string()))?;
-        }
-
-        prop_assert_eq!(value, roundtrip_value);
-
-        Ok(())
-    }
-
-    #[test]
-    fn unaligned_fixed64_packed() {
-        // Construct a length-delineated field that is not a multiple of 8 bytes.
-        let mut buf = Vec::<u8>::new();
-        let vals = [0u64, 1, 2, 3];
-        encode_varint((vals.len() * 8 + 1) as u64, &mut buf);
-        for val in vals {
-            buf.put_u64_le(val);
-        }
-        buf.put_u8(42); // Write an extra byte as part of the field
-
-        let mut parsed = Vec::<u64>::new();
-        let res = ufixed64::merge_repeated(
-            WireType::LengthDelimited,
-            &mut parsed,
-            &mut Capped::new(&mut &buf[..]),
-            DecodeContext::default(),
-        );
-        assert!(res.is_err());
-        assert_eq!(
-            res.unwrap_err().to_string(),
-            "failed to decode Bilrost message: packed field is not a valid length"
-        );
-    }
-
-    #[test]
-    fn unaligned_fixed32_packed() {
-        // Construct a length-delineated field that is not a multiple of 4 bytes.
-        let mut buf = Vec::<u8>::new();
-        let vals = [0u32, 1, 2, 3];
-        encode_varint((vals.len() * 4 + 1) as u64, &mut buf);
-        for val in vals {
-            buf.put_u32_le(val);
-        }
-        buf.put_u8(42); // Write an extra byte as part of the field
-
-        let mut parsed = Vec::<u32>::new();
-        let res = ufixed32::merge_repeated(
-            WireType::LengthDelimited,
-            &mut parsed,
-            &mut Capped::new(&mut &buf[..]),
-            DecodeContext::default(),
-        );
-        assert!(res.is_err());
-        assert_eq!(
-            res.unwrap_err().to_string(),
-            "failed to decode Bilrost message: packed field is not a valid length"
-        );
-    }
-
-    #[test]
-    fn string_merge_invalid_utf8() {
-        let mut s = String::new();
-        let buf = b"\x02\x80\x80";
-
-        let r = string::merge(
-            WireType::LengthDelimited,
-            &mut s,
-            &mut Capped::new(&mut &buf[..]),
-            DecodeContext::default(),
-        );
-        r.expect_err("must be an error");
-        assert!(s.is_empty());
-    }
-
-    #[test]
-    fn varint() {
-        fn check(value: u64, mut encoded: &[u8]) {
-            // Small buffer.
-            let mut buf = Vec::with_capacity(1);
-            encode_varint(value, &mut buf);
-            assert_eq!(buf, encoded);
-
-            // Large buffer.
-            let mut buf = Vec::with_capacity(100);
-            encode_varint(value, &mut buf);
-            assert_eq!(buf, encoded);
-
-            assert_eq!(encoded_len_varint(value), encoded.len());
-
-            let roundtrip_value =
-                decode_varint(&mut <&[u8]>::clone(&encoded)).expect("decoding failed");
-            assert_eq!(value, roundtrip_value);
-
-            let roundtrip_value = decode_varint_slow(&mut encoded).expect("slow decoding failed");
-            assert_eq!(value, roundtrip_value);
-        }
-
-        check(2u64.pow(0) - 1, &[0x00]);
-        check(2u64.pow(0), &[0x01]);
-
-        check(2u64.pow(7) - 1, &[0x7F]);
-        check(256, &[0x80, 0x01]);
-        check(128, &[0x80, 0x00]);
-        check(300, &[0xAC, 0x01]);
-
-        check(2u64.pow(14) - 1, &[0xFF, 0x7E]);
-        check(2u64.pow(14), &[0x80, 0x7f]);
-
-        check(0x407f, &[0xFF, 0x7F]);
-        check(0x4080, &[0x80, 0x80, 0x00]);
-        check(0x8080, &[0x80, 0x80, 0x01]);
-
-        check(2u64.pow(21) - 1, &[0xFF, 0xFE, 0x7E]);
-        check(2u64.pow(21), &[0x80, 0xFF, 0x7E]);
-
-        check(0x20407f, &[0xFF, 0xFF, 0x7F]);
-        check(0x204080, &[0x80, 0x80, 0x80, 0x00]);
-        check(0x404080, &[0x80, 0x80, 0x80, 0x01]);
-
-        check(2u64.pow(28) - 1, &[0xFF, 0xFE, 0xFE, 0x7E]);
-        check(2u64.pow(28), &[0x80, 0xFF, 0xFE, 0x7E]);
-
-        check(0x1020407f, &[0xFF, 0xFF, 0xFF, 0x7F]);
-        check(0x10204080, &[0x80, 0x80, 0x80, 0x80, 0x00]);
-        check(0x20204080, &[0x80, 0x80, 0x80, 0x80, 0x01]);
-
-        check(2u64.pow(35) - 1, &[0xFF, 0xFE, 0xFE, 0xFE, 0x7E]);
-        check(2u64.pow(35), &[0x80, 0xFF, 0xFE, 0xFE, 0x7E]);
-
-        check(0x81020407f, &[0xFF, 0xFF, 0xFF, 0xFF, 0x7F]);
-        check(0x810204080, &[0x80, 0x80, 0x80, 0x80, 0x80, 0x00]);
-        check(0x1010204080, &[0x80, 0x80, 0x80, 0x80, 0x80, 0x01]);
-
-        check(2u64.pow(42) - 1, &[0xFF, 0xFE, 0xFE, 0xFE, 0xFE, 0x7E]);
-        check(2u64.pow(42), &[0x80, 0xFF, 0xFE, 0xFE, 0xFE, 0x7E]);
-
-        check(0x4081020407f, &[0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x7F]);
-        check(0x40810204080, &[0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x00]);
-        check(0x80810204080, &[0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x01]);
-
-        check(
-            2u64.pow(49) - 1,
-            &[0xFF, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0x7E],
-        );
-        check(2u64.pow(49), &[0x80, 0xFF, 0xFE, 0xFE, 0xFE, 0xFE, 0x7E]);
-
-        check(0x204081020407f, &[0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x7F]);
-        check(
-            0x2040810204080,
-            &[0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x00],
-        );
-        check(
-            0x4040810204080,
-            &[0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x01],
-        );
-
-        check(
-            2u64.pow(56) - 1,
-            &[0xFF, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0x7E],
-        );
-        check(
-            2u64.pow(56),
-            &[0x80, 0xFF, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0x7E],
-        );
-
-        check(
-            0x10204081020407f,
-            &[0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x7F],
-        );
-        check(
-            0x102040810204080,
-            &[0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x00],
-        );
-        check(
-            0x202040810204080,
-            &[0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x01],
-        );
-
-        check(
-            2u64.pow(63) - 1,
-            &[0xFF, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0x7E],
-        );
-        check(
-            2u64.pow(63),
-            &[0x80, 0xFF, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0x7E],
-        );
-
-        check(
-            0x810204081020407f,
-            &[0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x7F],
-        );
-        check(
-            0x8102040810204080,
-            &[0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80],
-        );
-        // check(
-        //     0x10102040810204080, //
-        //     &[0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x01],
-        // );
-
-        check(
-            u64::MAX,
-            &[0xFF, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE],
-        );
-        check(
-            i64::MAX as u64,
-            &[0xFF, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0x7E],
-        );
-    }
-
-    #[test]
-    fn varint_overflow() {
-        let mut u64_max_plus_one: &[u8] = &[0x80, 0xFF, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE];
-
-        decode_varint(&mut u64_max_plus_one).expect_err("decoding u64::MAX + 1 succeeded");
-        decode_varint_slow(&mut u64_max_plus_one)
-            .expect_err("slow decoding u64::MAX + 1 succeeded");
-
-        let mut u64_over_max: &[u8] = &[0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF];
-
-        decode_varint(&mut u64_over_max).expect_err("decoding over-max succeeded");
-        decode_varint_slow(&mut u64_over_max).expect_err("slow decoding over-max succeeded");
-    }
-
-    #[test]
-    fn varint_truncated() {
-        let mut truncated_one_byte: &[u8] = &[0x80];
-        decode_varint(&mut truncated_one_byte).expect_err("decoding truncated 1 byte succeeded");
-        decode_varint_slow(&mut truncated_one_byte)
-            .expect_err("slow decoding truncated 1 byte succeeded");
-
-        let mut truncated_two_bytes: &[u8] = &[0x80, 0xFF];
-        decode_varint(&mut truncated_two_bytes).expect_err("decoding truncated 6 bytes succeeded");
-        decode_varint_slow(&mut truncated_two_bytes)
-            .expect_err("slow decoding truncated 6 bytes succeeded");
-
-        let mut truncated_six_bytes: &[u8] = &[0x80, 0x81, 0x82, 0x8A, 0x8B, 0x8C];
-        decode_varint(&mut truncated_six_bytes).expect_err("decoding truncated 6 bytes succeeded");
-        decode_varint_slow(&mut truncated_six_bytes)
-            .expect_err("slow decoding truncated 6 bytes succeeded");
-
-        let mut truncated_eight_bytes: &[u8] = &[0x80, 0x81, 0x82, 0x8A, 0x8B, 0x8C, 0xBE, 0xEF];
-        decode_varint(&mut truncated_eight_bytes)
-            .expect_err("decoding truncated 8 bytes succeeded");
-        decode_varint_slow(&mut truncated_eight_bytes)
-            .expect_err("slow decoding truncated 8 bytes succeeded");
-    }
-
-    /// This big bowl o' macro soup generates an encoding property test for each combination of map
-    /// type, scalar map key, and value type.
-    /// TODO: these tests take a long time to compile, can this be improved?
-    macro_rules! map_tests {
-        (keys: $keys:tt,
-         vals: $vals:tt) => {
-            #[cfg(feature = "std")]
-            mod hash_map {
-                use ::std::collections::HashMap;
-                map_tests!(@private HashMap, hash_map, $keys, $vals);
-            }
-            mod btree_map {
-                use ::alloc::collections::BTreeMap;
-                map_tests!(@private BTreeMap, btree_map, $keys, $vals);
-            }
-        };
-
-        (@private $map_type:ident,
-                  $mod_name:ident,
-                  [$(($key_ty:ty, $key_proto:ident)),*],
-                  $vals:tt) => {
-            $(
-                mod $key_proto {
-                    use super::$map_type;
-
-                    use proptest::prelude::*;
-
-                    use crate::encoding::*;
-                    use crate::encoding::test::check_collection_type;
-
-                    map_tests!(@private $map_type, $mod_name, ($key_ty, $key_proto), $vals);
-                }
-            )*
-        };
-
-        (@private $map_type:ident,
-                  $mod_name:ident,
-                  ($key_ty:ty, $key_proto:ident),
-                  [$(($val_ty:ty, $val_proto:ident)),*]) => {
-            $(
-                proptest! {
-                    #[test]
-                    fn $val_proto(values: $map_type<$key_ty, $val_ty>, tag: u32) {
-                        check_collection_type(values, tag, WireType::LengthDelimited,
-                                              |tag, values, buf, tw| {
-                                                  $mod_name::encode($key_proto::encode,
-                                                                    $key_proto::encoded_len,
-                                                                    $val_proto::encode,
-                                                                    $val_proto::encoded_len,
-                                                                    tag,
-                                                                    values,
-                                                                    buf,
-                                                                    tw)
-                                              },
-                                              |wire_type, values, buf, ctx| {
-                                                  check_wire_type(WireType::LengthDelimited, wire_type)?;
-                                                  $mod_name::merge($key_proto::merge,
-                                                                   $val_proto::merge,
-                                                                   values,
-                                                                   buf,
-                                                                   ctx)
-                                              },
-                                              |tag, values, tm| {
-                                                  $mod_name::encoded_len($key_proto::encoded_len,
-                                                                         $val_proto::encoded_len,
-                                                                         tag,
-                                                                         values,
-                                                                         tm)
-                                              })?;
-                    }
-                }
-             )*
-        };
-    }
-
-    map_tests!(keys: [
-        (u32, uint32),
-        (u64, uint64),
-        (i32, sint32),
-        (i64, sint64),
-        (u32, ufixed32),
-        (u64, ufixed64),
-        (i32, sfixed32),
-        (i64, sfixed64),
-        (bool, bool),
-        (String, string),
-        (Vec<u8>, bytes)
-    ],
-    vals: [
-        (f32, float32),
-        (f64, float64),
-        (u32, uint32),
-        (u64, uint64),
-        (i32, sint32),
-        (i64, sint64),
-        (u32, ufixed32),
-        (u64, ufixed64),
-        (i32, sfixed32),
-        (i64, sfixed64),
-        (bool, bool),
-        (String, string),
-        (Vec<u8>, bytes)
-    ]);
-}
+// #[cfg(test)]
+// mod test {
+//     use alloc::string::ToString;
+//     use core::borrow::Borrow;
+//     use core::fmt::Debug;
+//
+//     use ::bytes::{Bytes, BytesMut};
+//     use proptest::{prelude::*, test_runner::TestCaseResult};
+//
+//     use crate::encoding::*;
+//
+//     pub fn check_type<T, B>(
+//         value: T,
+//         tag: u32,
+//         wire_type: WireType,
+//         encode: fn(u32, &B, &mut BytesMut, &mut TagWriter),
+//         merge: fn(WireType, &mut T, &mut Capped<Bytes>, DecodeContext) -> Result<(), DecodeError>,
+//         encoded_len: fn(u32, &B, &mut TagMeasurer) -> usize,
+//     ) -> TestCaseResult
+//     where
+//         T: Debug + Default + PartialEq + Borrow<B>,
+//         B: ?Sized,
+//     {
+//         let mut tw = TagWriter::new();
+//         let mut tm = tw.measurer();
+//         let expected_len = encoded_len(tag, value.borrow(), &mut tm);
+//
+//         let mut buf = BytesMut::with_capacity(expected_len);
+//         encode(tag, value.borrow(), &mut buf, &mut tw);
+//
+//         let buf = &mut buf.freeze();
+//         let mut buf = Capped::new(buf);
+//         let mut tr = TagReader::new();
+//
+//         prop_assert_eq!(
+//             buf.remaining(),
+//             expected_len,
+//             "encoded_len wrong; expected: {}, actual: {}",
+//             expected_len,
+//             buf.remaining()
+//         );
+//
+//         if !buf.has_remaining() {
+//             // Short circuit for empty packed values.
+//             return Ok(());
+//         }
+//
+//         let (decoded_tag, decoded_wire_type) = tr
+//             .decode_key(buf.buf())
+//             .map_err(|error| TestCaseError::fail(error.to_string()))?;
+//         prop_assert_eq!(
+//             tag,
+//             decoded_tag,
+//             "decoded tag does not match; expected: {}, actual: {}",
+//             tag,
+//             decoded_tag
+//         );
+//
+//         prop_assert_eq!(
+//             wire_type,
+//             decoded_wire_type,
+//             "decoded wire type does not match; expected: {:?}, actual: {:?}",
+//             wire_type,
+//             decoded_wire_type,
+//         );
+//
+//         match wire_type {
+//             WireType::SixtyFourBit if buf.remaining() != 8 => Err(TestCaseError::fail(format!(
+//                 "64bit wire type illegal remaining: {}, tag: {}",
+//                 buf.remaining(),
+//                 tag
+//             ))),
+//             WireType::ThirtyTwoBit if buf.remaining() != 4 => Err(TestCaseError::fail(format!(
+//                 "32bit wire type illegal remaining: {}, tag: {}",
+//                 buf.remaining(),
+//                 tag
+//             ))),
+//             _ => Ok(()),
+//         }?;
+//
+//         let mut roundtrip_value = T::default();
+//         merge(
+//             wire_type,
+//             &mut roundtrip_value,
+//             &mut buf,
+//             DecodeContext::default(),
+//         )
+//         .map_err(|error| TestCaseError::fail(error.to_string()))?;
+//
+//         prop_assert!(
+//             !buf.has_remaining(),
+//             "expected buffer to be empty, remaining: {}",
+//             buf.remaining()
+//         );
+//
+//         prop_assert_eq!(value, roundtrip_value);
+//
+//         Ok(())
+//     }
+//
+//     pub fn check_collection_type<T, B, E, M, L>(
+//         value: T,
+//         tag: u32,
+//         wire_type: WireType,
+//         encode: E,
+//         mut merge: M,
+//         encoded_len: L,
+//     ) -> TestCaseResult
+//     where
+//         T: Debug + Default + PartialEq + Borrow<B>,
+//         B: ?Sized,
+//         E: FnOnce(u32, &B, &mut BytesMut, &mut TagWriter),
+//         M: FnMut(WireType, &mut T, &mut Capped<Bytes>, DecodeContext) -> Result<(), DecodeError>,
+//         L: FnOnce(u32, &B, &mut TagMeasurer) -> usize,
+//     {
+//         let mut tw = TagWriter::new();
+//         let mut tm = tw.measurer();
+//         let expected_len = encoded_len(tag, value.borrow(), &mut tm);
+//
+//         let mut buf = BytesMut::with_capacity(expected_len);
+//         encode(tag, value.borrow(), &mut buf, &mut tw);
+//
+//         let mut tr = TagReader::new();
+//         let buf = &mut buf.freeze();
+//         let mut buf = Capped::new(buf);
+//
+//         prop_assert_eq!(
+//             expected_len,
+//             buf.remaining(),
+//             "encoded_len wrong; expected: {}, actual: {}",
+//             expected_len,
+//             buf.remaining()
+//         );
+//
+//         let mut roundtrip_value = Default::default();
+//         while buf.has_remaining() {
+//             let (decoded_tag, decoded_wire_type) = tr
+//                 .decode_key(buf.buf())
+//                 .map_err(|error| TestCaseError::fail(error.to_string()))?;
+//
+//             prop_assert_eq!(
+//                 tag,
+//                 decoded_tag,
+//                 "decoded tag does not match; expected: {}, actual: {}",
+//                 tag,
+//                 decoded_tag
+//             );
+//
+//             prop_assert_eq!(
+//                 wire_type,
+//                 decoded_wire_type,
+//                 "decoded wire type does not match; expected: {:?}, actual: {:?}",
+//                 wire_type,
+//                 decoded_wire_type
+//             );
+//
+//             merge(
+//                 wire_type,
+//                 &mut roundtrip_value,
+//                 &mut buf,
+//                 DecodeContext::default(),
+//             )
+//             .map_err(|error| TestCaseError::fail(error.to_string()))?;
+//         }
+//
+//         prop_assert_eq!(value, roundtrip_value);
+//
+//         Ok(())
+//     }
+//
+//     #[test]
+//     fn unaligned_fixed64_packed() {
+//         // Construct a length-delineated field that is not a multiple of 8 bytes.
+//         let mut buf = Vec::<u8>::new();
+//         let vals = [0u64, 1, 2, 3];
+//         encode_varint((vals.len() * 8 + 1) as u64, &mut buf);
+//         for val in vals {
+//             buf.put_u64_le(val);
+//         }
+//         buf.put_u8(42); // Write an extra byte as part of the field
+//
+//         let mut parsed = Vec::<u64>::new();
+//         let res = ufixed64::merge_repeated(
+//             WireType::LengthDelimited,
+//             &mut parsed,
+//             &mut Capped::new(&mut &buf[..]),
+//             DecodeContext::default(),
+//         );
+//         assert!(res.is_err());
+//         assert_eq!(
+//             res.unwrap_err().to_string(),
+//             "failed to decode Bilrost message: packed field is not a valid length"
+//         );
+//     }
+//
+//     #[test]
+//     fn unaligned_fixed32_packed() {
+//         // Construct a length-delineated field that is not a multiple of 4 bytes.
+//         let mut buf = Vec::<u8>::new();
+//         let vals = [0u32, 1, 2, 3];
+//         encode_varint((vals.len() * 4 + 1) as u64, &mut buf);
+//         for val in vals {
+//             buf.put_u32_le(val);
+//         }
+//         buf.put_u8(42); // Write an extra byte as part of the field
+//
+//         let mut parsed = Vec::<u32>::new();
+//         let res = ufixed32::merge_repeated(
+//             WireType::LengthDelimited,
+//             &mut parsed,
+//             &mut Capped::new(&mut &buf[..]),
+//             DecodeContext::default(),
+//         );
+//         assert!(res.is_err());
+//         assert_eq!(
+//             res.unwrap_err().to_string(),
+//             "failed to decode Bilrost message: packed field is not a valid length"
+//         );
+//     }
+//
+//     #[test]
+//     fn string_merge_invalid_utf8() {
+//         let mut s = String::new();
+//         let buf = b"\x02\x80\x80";
+//
+//         let r = string::merge(
+//             WireType::LengthDelimited,
+//             &mut s,
+//             &mut Capped::new(&mut &buf[..]),
+//             DecodeContext::default(),
+//         );
+//         r.expect_err("must be an error");
+//         assert!(s.is_empty());
+//     }
+//
+//     #[test]
+//     fn varint() {
+//         fn check(value: u64, mut encoded: &[u8]) {
+//             // Small buffer.
+//             let mut buf = Vec::with_capacity(1);
+//             encode_varint(value, &mut buf);
+//             assert_eq!(buf, encoded);
+//
+//             // Large buffer.
+//             let mut buf = Vec::with_capacity(100);
+//             encode_varint(value, &mut buf);
+//             assert_eq!(buf, encoded);
+//
+//             assert_eq!(encoded_len_varint(value), encoded.len());
+//
+//             let roundtrip_value =
+//                 decode_varint(&mut <&[u8]>::clone(&encoded)).expect("decoding failed");
+//             assert_eq!(value, roundtrip_value);
+//
+//             let roundtrip_value = decode_varint_slow(&mut encoded).expect("slow decoding failed");
+//             assert_eq!(value, roundtrip_value);
+//         }
+//
+//         check(2u64.pow(0) - 1, &[0x00]);
+//         check(2u64.pow(0), &[0x01]);
+//
+//         check(2u64.pow(7) - 1, &[0x7F]);
+//         check(256, &[0x80, 0x01]);
+//         check(128, &[0x80, 0x00]);
+//         check(300, &[0xAC, 0x01]);
+//
+//         check(2u64.pow(14) - 1, &[0xFF, 0x7E]);
+//         check(2u64.pow(14), &[0x80, 0x7f]);
+//
+//         check(0x407f, &[0xFF, 0x7F]);
+//         check(0x4080, &[0x80, 0x80, 0x00]);
+//         check(0x8080, &[0x80, 0x80, 0x01]);
+//
+//         check(2u64.pow(21) - 1, &[0xFF, 0xFE, 0x7E]);
+//         check(2u64.pow(21), &[0x80, 0xFF, 0x7E]);
+//
+//         check(0x20407f, &[0xFF, 0xFF, 0x7F]);
+//         check(0x204080, &[0x80, 0x80, 0x80, 0x00]);
+//         check(0x404080, &[0x80, 0x80, 0x80, 0x01]);
+//
+//         check(2u64.pow(28) - 1, &[0xFF, 0xFE, 0xFE, 0x7E]);
+//         check(2u64.pow(28), &[0x80, 0xFF, 0xFE, 0x7E]);
+//
+//         check(0x1020407f, &[0xFF, 0xFF, 0xFF, 0x7F]);
+//         check(0x10204080, &[0x80, 0x80, 0x80, 0x80, 0x00]);
+//         check(0x20204080, &[0x80, 0x80, 0x80, 0x80, 0x01]);
+//
+//         check(2u64.pow(35) - 1, &[0xFF, 0xFE, 0xFE, 0xFE, 0x7E]);
+//         check(2u64.pow(35), &[0x80, 0xFF, 0xFE, 0xFE, 0x7E]);
+//
+//         check(0x81020407f, &[0xFF, 0xFF, 0xFF, 0xFF, 0x7F]);
+//         check(0x810204080, &[0x80, 0x80, 0x80, 0x80, 0x80, 0x00]);
+//         check(0x1010204080, &[0x80, 0x80, 0x80, 0x80, 0x80, 0x01]);
+//
+//         check(2u64.pow(42) - 1, &[0xFF, 0xFE, 0xFE, 0xFE, 0xFE, 0x7E]);
+//         check(2u64.pow(42), &[0x80, 0xFF, 0xFE, 0xFE, 0xFE, 0x7E]);
+//
+//         check(0x4081020407f, &[0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x7F]);
+//         check(0x40810204080, &[0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x00]);
+//         check(0x80810204080, &[0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x01]);
+//
+//         check(
+//             2u64.pow(49) - 1,
+//             &[0xFF, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0x7E],
+//         );
+//         check(2u64.pow(49), &[0x80, 0xFF, 0xFE, 0xFE, 0xFE, 0xFE, 0x7E]);
+//
+//         check(0x204081020407f, &[0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x7F]);
+//         check(
+//             0x2040810204080,
+//             &[0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x00],
+//         );
+//         check(
+//             0x4040810204080,
+//             &[0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x01],
+//         );
+//
+//         check(
+//             2u64.pow(56) - 1,
+//             &[0xFF, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0x7E],
+//         );
+//         check(
+//             2u64.pow(56),
+//             &[0x80, 0xFF, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0x7E],
+//         );
+//
+//         check(
+//             0x10204081020407f,
+//             &[0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x7F],
+//         );
+//         check(
+//             0x102040810204080,
+//             &[0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x00],
+//         );
+//         check(
+//             0x202040810204080,
+//             &[0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x01],
+//         );
+//
+//         check(
+//             2u64.pow(63) - 1,
+//             &[0xFF, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0x7E],
+//         );
+//         check(
+//             2u64.pow(63),
+//             &[0x80, 0xFF, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0x7E],
+//         );
+//
+//         check(
+//             0x810204081020407f,
+//             &[0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x7F],
+//         );
+//         check(
+//             0x8102040810204080,
+//             &[0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80],
+//         );
+//         // check(
+//         //     0x10102040810204080, //
+//         //     &[0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x01],
+//         // );
+//
+//         check(
+//             u64::MAX,
+//             &[0xFF, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE],
+//         );
+//         check(
+//             i64::MAX as u64,
+//             &[0xFF, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0x7E],
+//         );
+//     }
+//
+//     #[test]
+//     fn varint_overflow() {
+//         let mut u64_max_plus_one: &[u8] = &[0x80, 0xFF, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE];
+//
+//         decode_varint(&mut u64_max_plus_one).expect_err("decoding u64::MAX + 1 succeeded");
+//         decode_varint_slow(&mut u64_max_plus_one)
+//             .expect_err("slow decoding u64::MAX + 1 succeeded");
+//
+//         let mut u64_over_max: &[u8] = &[0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF];
+//
+//         decode_varint(&mut u64_over_max).expect_err("decoding over-max succeeded");
+//         decode_varint_slow(&mut u64_over_max).expect_err("slow decoding over-max succeeded");
+//     }
+//
+//     #[test]
+//     fn varint_truncated() {
+//         let mut truncated_one_byte: &[u8] = &[0x80];
+//         decode_varint(&mut truncated_one_byte).expect_err("decoding truncated 1 byte succeeded");
+//         decode_varint_slow(&mut truncated_one_byte)
+//             .expect_err("slow decoding truncated 1 byte succeeded");
+//
+//         let mut truncated_two_bytes: &[u8] = &[0x80, 0xFF];
+//         decode_varint(&mut truncated_two_bytes).expect_err("decoding truncated 6 bytes succeeded");
+//         decode_varint_slow(&mut truncated_two_bytes)
+//             .expect_err("slow decoding truncated 6 bytes succeeded");
+//
+//         let mut truncated_six_bytes: &[u8] = &[0x80, 0x81, 0x82, 0x8A, 0x8B, 0x8C];
+//         decode_varint(&mut truncated_six_bytes).expect_err("decoding truncated 6 bytes succeeded");
+//         decode_varint_slow(&mut truncated_six_bytes)
+//             .expect_err("slow decoding truncated 6 bytes succeeded");
+//
+//         let mut truncated_eight_bytes: &[u8] = &[0x80, 0x81, 0x82, 0x8A, 0x8B, 0x8C, 0xBE, 0xEF];
+//         decode_varint(&mut truncated_eight_bytes)
+//             .expect_err("decoding truncated 8 bytes succeeded");
+//         decode_varint_slow(&mut truncated_eight_bytes)
+//             .expect_err("slow decoding truncated 8 bytes succeeded");
+//     }
+//
+//     /// This big bowl o' macro soup generates an encoding property test for each combination of map
+//     /// type, scalar map key, and value type.
+//     /// TODO: these tests take a long time to compile, can this be improved?
+//     macro_rules! map_tests {
+//         (keys: $keys:tt,
+//          vals: $vals:tt) => {
+//             #[cfg(feature = "std")]
+//             mod hash_map {
+//                 use ::std::collections::HashMap;
+//                 map_tests!(@private HashMap, hash_map, $keys, $vals);
+//             }
+//             mod btree_map {
+//                 use ::alloc::collections::BTreeMap;
+//                 map_tests!(@private BTreeMap, btree_map, $keys, $vals);
+//             }
+//         };
+//
+//         (@private $map_type:ident,
+//                   $mod_name:ident,
+//                   [$(($key_ty:ty, $key_proto:ident)),*],
+//                   $vals:tt) => {
+//             $(
+//                 mod $key_proto {
+//                     use super::$map_type;
+//
+//                     use proptest::prelude::*;
+//
+//                     use crate::encoding::*;
+//                     use crate::encoding::test::check_collection_type;
+//
+//                     map_tests!(@private $map_type, $mod_name, ($key_ty, $key_proto), $vals);
+//                 }
+//             )*
+//         };
+//
+//         (@private $map_type:ident,
+//                   $mod_name:ident,
+//                   ($key_ty:ty, $key_proto:ident),
+//                   [$(($val_ty:ty, $val_proto:ident)),*]) => {
+//             $(
+//                 proptest! {
+//                     #[test]
+//                     fn $val_proto(values: $map_type<$key_ty, $val_ty>, tag: u32) {
+//                         check_collection_type(values, tag, WireType::LengthDelimited,
+//                                               |tag, values, buf, tw| {
+//                                                   $mod_name::encode($key_proto::encode,
+//                                                                     $key_proto::encoded_len,
+//                                                                     $val_proto::encode,
+//                                                                     $val_proto::encoded_len,
+//                                                                     tag,
+//                                                                     values,
+//                                                                     buf,
+//                                                                     tw)
+//                                               },
+//                                               |wire_type, values, buf, ctx| {
+//                                                   check_wire_type(WireType::LengthDelimited, wire_type)?;
+//                                                   $mod_name::merge($key_proto::merge,
+//                                                                    $val_proto::merge,
+//                                                                    values,
+//                                                                    buf,
+//                                                                    ctx)
+//                                               },
+//                                               |tag, values, tm| {
+//                                                   $mod_name::encoded_len($key_proto::encoded_len,
+//                                                                          $val_proto::encoded_len,
+//                                                                          tag,
+//                                                                          values,
+//                                                                          tm)
+//                                               })?;
+//                     }
+//                 }
+//              )*
+//         };
+//     }
+//
+//     // map_tests!(keys: [
+//     //     (u32, uint32),
+//     //     (u64, uint64),
+//     //     (i32, sint32),
+//     //     (i64, sint64),
+//     //     (u32, ufixed32),
+//     //     (u64, ufixed64),
+//     //     (i32, sfixed32),
+//     //     (i64, sfixed64),
+//     //     (bool, bool),
+//     //     (String, string),
+//     //     (Vec<u8>, bytes)
+//     // ],
+//     // vals: [
+//     //     (f32, float32),
+//     //     (f64, float64),
+//     //     (u32, uint32),
+//     //     (u64, uint64),
+//     //     (i32, sint32),
+//     //     (i64, sint64),
+//     //     (u32, ufixed32),
+//     //     (u64, ufixed64),
+//     //     (i32, sfixed32),
+//     //     (i64, sfixed64),
+//     //     (bool, bool),
+//     //     (String, string),
+//     //     (Vec<u8>, bytes)
+//     // ]);
+// }
