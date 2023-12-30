@@ -1110,8 +1110,6 @@ where
     }
 }
 
-// TODO(widders): is it impossible to nest Vec<Vec<T>> as repeated fields of packed? we might want
-//  an "Unpacked" encoder for veclikes, we can delegate to it from General
 /// ValueEncoder for packed repeated encodings lets this value type nest.
 impl<C, E> Encoder<C> for Packed<E>
 where
