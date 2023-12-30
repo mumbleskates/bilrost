@@ -166,6 +166,10 @@ pub trait Message: Debug + Send + Sync {
     fn clear(&mut self);
 }
 
+pub trait DistinguishedMessage: Message {
+    // TODO(widders): this. and revise the above
+}
+
 impl<M> Message for Box<M>
 where
     M: Message,
@@ -202,4 +206,5 @@ mod tests {
     use super::*;
 
     const _MESSAGE_IS_OBJECT_SAFE: Option<&dyn Message> = None;
+    const _DISTINGUISHED_MESSAGE_IS_OBJECT_SAFE: Option<&dyn Message> = None;
 }

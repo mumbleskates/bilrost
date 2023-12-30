@@ -23,8 +23,8 @@ use core::str;
 use ::bytes::buf::Take;
 use ::bytes::{Buf, BufMut, Bytes};
 
-use crate::Message;
 use crate::{decode_length_delimiter, DecodeError};
+use crate::{DistinguishedMessage, Message};
 
 /// Encodes an integer value into LEB128-bijective variable length format, and writes it to the
 /// buffer. The buffer must have enough remaining space (maximum 9 bytes).
@@ -938,14 +938,12 @@ where
     E: ValueEncoder<T>,
     T: Default,
 {
-    #[inline]
     fn encode<B: BufMut>(tag: u32, value: &C, buf: &mut B, tw: &mut TagWriter) {
         for val in value.iter() {
             E::encode_field(tag, val, buf, tw);
         }
     }
 
-    #[inline]
     fn encoded_len(tag: u32, value: &C, tm: &mut TagMeasurer) -> usize {
         if !value.is_empty() {
             // Each *additional* field encoded after the first needs only 1 byte for the field key.
@@ -955,7 +953,6 @@ where
         }
     }
 
-    #[inline]
     fn decode<B: Buf>(
         wire_type: WireType,
         _duplicated: bool,
@@ -982,7 +979,6 @@ where
     E: DistinguishedValueEncoder<T>,
     T: Default + Eq,
 {
-    #[inline]
     fn decode_distinguished<B: Buf>(
         wire_type: WireType,
         _duplicated: bool,
@@ -1041,6 +1037,52 @@ where
     }
 }
 
+impl<T> Wiretyped<T> for General
+where
+    T: Message,
+{
+    const WIRE_TYPE: WireType = WireType::LengthDelimited;
+}
+
+impl<T> ValueEncoder<T> for General
+where
+    T: Message,
+{
+    fn encode_value<B: BufMut>(value: &T, buf: &mut B) {
+        // TODO(widders): care needs to be taken with top level APIs to avoid running over when
+        //  encoding and panicking in the buf
+        encode_varint(value.encoded_len() as u64, buf);
+        value.encode_raw(buf);
+    }
+
+    fn value_encoded_len(value: &T) -> usize {
+        let inner_len = value.encoded_len();
+        encoded_len_varint(inner_len as u64) + inner_len
+    }
+
+    fn decode_value<B: Buf>(
+        value: &mut T,
+        buf: &mut Capped<B>,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError> {
+        // TODO(widders): this will get cleaned up
+        message::merge(WireType::LengthDelimited, value, buf, ctx)
+    }
+}
+
+impl<T> DistinguishedValueEncoder<T> for General
+where
+    T: DistinguishedMessage,
+{
+    fn decode_value_distinguished<B: Buf>(
+        value: &mut T,
+        buf: &mut Capped<B>,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError> {
+        todo!()
+    }
+}
+
 /// Packed encodings are always length delimited.
 impl<T, E> Wiretyped<T> for Packed<E> {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
@@ -1052,7 +1094,6 @@ where
     E: ValueEncoder<T>,
     T: Default,
 {
-    #[inline]
     fn encode_value<B: BufMut>(value: &C, buf: &mut B) {
         encode_varint(E::many_values_encoded_len(value) as u64, buf);
         for val in value.iter() {
@@ -1060,13 +1101,11 @@ where
         }
     }
 
-    #[inline]
     fn value_encoded_len(value: &C) -> usize {
         let inner_len = E::many_values_encoded_len(value);
         encoded_len_varint(inner_len as u64) + inner_len
     }
 
-    #[inline]
     fn decode_value<B: Buf>(
         value: &mut C,
         buf: &mut Capped<B>,
@@ -1305,18 +1344,22 @@ macro_rules! fixed_width {
         }
 
         impl ValueEncoder<$ty> for Fixed {
+            #[inline]
             fn encode_value<B: BufMut>(value: &$ty, buf: &mut B) {
                 buf.$put(*value);
             }
 
+            #[inline]
             fn value_encoded_len(value: &$ty) -> usize {
                 $wire_type.fixed_size()
             }
 
+            #[inline]
             fn many_values_encoded_len<C: Veclike<Item = $ty>>(values: &C) -> usize {
                 $wire_type.fixed_size() * values.len()
             }
 
+            #[inline]
             fn decode_value<B: Buf>(
                 value: &mut $ty,
                 buf: &mut Capped<B>,
@@ -1430,12 +1473,30 @@ macro_rules! fixed_width {
         // }
     };
 }
+macro_rules! fixed_width_distinguished {
+    ($ty:ty) => {
+        impl DistinguishedValueEncoder<$ty> for Fixed {
+            #[inline]
+            fn decode_value_distinguished<B: Buf>(
+                value: &mut T,
+                buf: &mut Capped<B>,
+                ctx: DecodeContext,
+            ) -> Result<(), DecodeError> {
+                Fixed::decode_value(value, buf, ctx)
+            }
+        }
+    };
+}
 fixed_width!(f32, WireType::ThirtyTwoBit, put_f32_le, get_f32_le);
 fixed_width!(f64, WireType::SixtyFourBit, put_f64_le, get_f64_le);
 fixed_width!(u32, WireType::ThirtyTwoBit, put_u32_le, get_u32_le);
 fixed_width!(u64, WireType::SixtyFourBit, put_u64_le, get_u64_le);
 fixed_width!(i32, WireType::ThirtyTwoBit, put_i32_le, get_i32_le);
 fixed_width!(i64, WireType::SixtyFourBit, put_i64_le, get_i64_le);
+fixed_width_distinguished!(u32);
+fixed_width_distinguished!(u64);
+fixed_width_distinguished!(i32);
+fixed_width_distinguished!(i64);
 
 /// Macro which emits encoding functions for a length-delimited type.
 macro_rules! length_delimited {
