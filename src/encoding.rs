@@ -9,7 +9,7 @@ use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::cmp::{
-    min,
+    min, Eq,
     Ordering::{Equal, Greater, Less},
     PartialEq,
 };
@@ -321,6 +321,14 @@ impl WireType {
             WireType::ThirtyTwoBit => 4,
         }
     }
+
+    const fn fixed_size(self) -> usize {
+        match self {
+            WireType::SixtyFourBit => 8,
+            WireType::ThirtyTwoBit => 4,
+            WireType::Varint | WireType::LengthDelimited => panic!("wire type is not fixed size"),
+        }
+    }
 }
 
 pub struct TagWriter {
@@ -467,7 +475,10 @@ impl<'a, B: Buf> Capped<'a, B> {
 
     /// Consume the buffer as an iterator.
     #[inline]
-    fn consume<T, F>(self, read_with: F) -> CappedConsumer<'a, B, F> {
+    fn consume<F, R, E>(self, read_with: F) -> CappedConsumer<'a, B, F>
+    where
+        F: FnMut(&mut Capped<B>) -> Result<R, E>,
+    {
         CappedConsumer::new(self, read_with)
     }
 
@@ -517,7 +528,7 @@ where
         if self.capped.buf.remaining() == self.capped.extra_bytes_remaining {
             return None;
         }
-        let res: Result<T, DecodeError> = (self.reader)(&mut self.capped);
+        let res = (self.reader)(&mut self.capped);
         if res.is_ok() {
             if self.capped.buf.remaining() < self.capped.extra_bytes_remaining {
                 return Some(Err(DecodeError::new("delimited length exceeded")));
@@ -549,13 +560,13 @@ where
     }
 }
 
-impl<T, R, E> Iterator for FallibleIter<T, E>
+impl<T, R, E> Iterator for &mut FallibleIter<T, E>
 where
     T: Iterator<Item = Result<R, E>>,
 {
     type Item = R;
 
-    fn next(&mut self) -> Option<Self::Item> {
+    fn next(&mut self) -> Option<R> {
         match self.iter.next()? {
             Err(err) => {
                 self.outcome = Err(err);
@@ -645,6 +656,10 @@ trait ValueEncoder<T>: Wiretyped<T> {
     //  emit-reversed
     /// Returns the number of bytes the given value would be encoded as.
     fn value_encoded_len(value: &T) -> usize;
+    /// Returns the number of total bytes to encode all the values in the given container.
+    fn many_values_encoded_len<C: Veclike<Item = T>>(values: &C) -> usize {
+        values.iter().map(Self::value_encoded_len).sum()
+    }
     /// Decodes a field assuming the encoder's wire type directly from the buffer.
     fn decode_value<B: Buf>(
         value: &mut T,
@@ -678,7 +693,7 @@ trait FieldEncoder<T> {
     fn decode_field<B: Buf>(
         wire_type: WireType,
         value: &mut T,
-        buf: &mut B,
+        buf: &mut Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError>;
 }
@@ -699,7 +714,7 @@ where
     fn decode_field<B: Buf>(
         wire_type: WireType,
         value: &mut T,
-        buf: &mut B,
+        buf: &mut Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         check_wire_type(Self::WIRE_TYPE, wire_type)?;
@@ -714,19 +729,20 @@ trait DistinguishedFieldEncoder<T> {
     fn decode_field_distinguished<B: Buf>(
         wire_type: WireType,
         value: &mut T,
-        buf: &mut B,
+        buf: &mut Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError>;
 }
 impl<T, E> DistinguishedFieldEncoder<T> for E
 where
     E: DistinguishedValueEncoder<T>,
+    T: Eq,
 {
     #[inline]
     fn decode_field_distinguished<B: Buf>(
         wire_type: WireType,
         value: &mut T,
-        buf: &mut B,
+        buf: &mut Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         check_wire_type(Self::WIRE_TYPE, wire_type)?;
@@ -737,8 +753,12 @@ where
 /// Trait for containers that store their values in a consistent order.
 pub trait Veclike: Extend<Self::Item> {
     type Item;
-    type Iter<'a>: Iterator<Item = &'a Self::Item>;
+    type Iter<'a>: Iterator<Item = &'a Self::Item>
+    where
+        Self::Item: 'a,
+        Self: 'a;
 
+    fn len(&self) -> usize;
     fn iter(&self) -> Self::Iter<'_>;
     fn push(&mut self, item: Self::Item);
     fn is_empty(&self) -> bool;
@@ -746,7 +766,15 @@ pub trait Veclike: Extend<Self::Item> {
 
 impl<T> Veclike for Vec<T> {
     type Item = T;
-    type Iter<'a> = core::slice::Iter<'a, T>;
+    type Iter<'a> = core::slice::Iter<'a, T>
+    where
+        T: 'a,
+        Self: 'a;
+
+    #[inline]
+    fn len(&self) -> usize {
+        Vec::len(self)
+    }
 
     #[inline]
     fn iter(&self) -> Self::Iter<'_> {
@@ -768,8 +796,10 @@ impl<T> Veclike for Vec<T> {
 pub struct General;
 /// Fixed-size encoder. Encodes integers in fixed-size format.
 pub struct Fixed;
-/// Packed encoder. Encodes numeric types in packed format.
-pub struct Packed<E = General>;
+/// Unpacked encoder. Encodes repeated types in unpacked format, writing repeated fields.
+pub struct Unpacked<E = General>(E);
+/// Packed encoder. Encodes repeated types in packed format.
+pub struct Packed<E = General>(E);
 
 // TODO(widders): is any ValueEncoder usable as a Plain Encoder? what's the counterexample?
 impl<T> Encoder<T> for General
@@ -779,14 +809,14 @@ where
 {
     #[inline]
     fn encode<B: BufMut>(tag: u32, value: &T, buf: &mut B, tw: &mut TagWriter) {
-        if value != T::default() {
+        if *value != T::default() {
             Self::encode_field(tag, value, buf, tw);
         }
     }
 
     #[inline]
     fn encoded_len(tag: u32, value: &T, tm: &mut TagMeasurer) -> usize {
-        if value != T::default() {
+        if *value != T::default() {
             Self::field_encoded_len(tag, value, tm)
         } else {
             0
@@ -813,7 +843,7 @@ where
 impl<T> DistinguishedEncoder<T> for General
 where
     General: DistinguishedValueEncoder<T> + Encoder<T>,
-    T: Default + PartialEq,
+    T: Default + Eq,
 {
     #[inline]
     fn decode_distinguished<B: Buf>(
@@ -829,7 +859,7 @@ where
             ));
         }
         Self::decode_field_distinguished(wire_type, value, buf, ctx)?;
-        if value == T::default() {
+        if *value == T::default() {
             return Err(DecodeError::new(
                 "plain field was encoded with its zero value",
             ));
@@ -881,7 +911,7 @@ where
 impl<T> DistinguishedEncoder<Option<T>> for General
 where
     General: DistinguishedValueEncoder<T> + Encoder<Option<T>>,
-    T: Default,
+    T: Default + Eq,
 {
     #[inline]
     fn decode_distinguished<B: Buf>(
@@ -900,27 +930,29 @@ where
     }
 }
 
-/// General encodes vecs as repeated fields and in relaxed decoding will accept both packed
+/// Unpacked encodes vecs as repeated fields and in relaxed decoding will accept both packed
 /// and un-packed encodings.
-impl<C> Encoder<C> for General
+impl<C, E> Encoder<C> for Unpacked<E>
 where
     C: Veclike,
-    General: ValueEncoder<C::Item>,
+    E: ValueEncoder<C::Item>,
     C::Item: Default,
 {
     #[inline]
     fn encode<B: BufMut>(tag: u32, value: &C, buf: &mut B, tw: &mut TagWriter) {
-        for val in value {
-            Self::encode_field(tag, val, buf, tw);
+        for val in value.iter() {
+            E::encode_field(tag, val, buf, tw);
         }
     }
 
     #[inline]
     fn encoded_len(tag: u32, value: &C, tm: &mut TagMeasurer) -> usize {
-        value
-            .into_iter()
-            .map(|val| Self::field_encoded_len(tag, value, tm))
-            .sum()
+        if !value.is_empty() {
+            // Each *additional* field encoded after the first needs only 1 byte for the field key.
+            tm.key_len(tag) + E::many_values_encoded_len(value) + value.len() - 1
+        } else {
+            0
+        }
     }
 
     #[inline]
@@ -931,11 +963,11 @@ where
         buf: &mut Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
-        if wire_type == WireType::LengthDelimited && Self::WIRE_TYPE != WireType::LengthDelimited {
-            Packed::decode_value(value, buf, ctx)
+        if wire_type == WireType::LengthDelimited && E::WIRE_TYPE != WireType::LengthDelimited {
+            Packed::<E>::decode_value(value, buf, ctx)
         } else {
             let mut new_val = Default::default();
-            Self::decode_field(wire_type, &mut new_val, buf, ctx)?;
+            E::decode_field(wire_type, &mut new_val, buf, ctx)?;
             value.push(new_val);
             Ok(())
         }
@@ -943,11 +975,12 @@ where
 }
 
 /// Distinguished encoding for General enforces only the repeated field representation is allowed.
-impl<C> DistinguishedEncoder<C> for General
+impl<C, E> DistinguishedEncoder<C> for Unpacked<E>
 where
+    Unpacked<E>: Encoder<C>,
     C: Veclike,
-    General: DistinguishedValueEncoder<C::Item> + Encoder<C>,
-    C::Item: Default,
+    E: DistinguishedValueEncoder<C::Item>,
+    C::Item: Default + Eq,
 {
     #[inline]
     fn decode_distinguished<B: Buf>(
@@ -958,7 +991,7 @@ where
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         let mut new_val = Default::default();
-        Self::decode_field(wire_type, &mut new_val, buf, ctx)?;
+        E::decode_field_distinguished(wire_type, &mut new_val, buf, ctx)?;
         value.push(new_val);
         Ok(())
     }
@@ -973,22 +1006,20 @@ impl<C, E> ValueEncoder<C> for Packed<E>
 where
     C: Veclike,
     E: ValueEncoder<C::Item>,
+    C::Item: Default,
 {
     #[inline]
     fn encode_value<B: BufMut>(value: &C, buf: &mut B) {
-        encode_varint(
-            value.into_iter().map(|val| E::value_encoded_len(val)).sum(),
-            buf,
-        );
-        for val in value {
+        encode_varint(E::many_values_encoded_len(value) as u64, buf);
+        for val in value.iter() {
             E::encode_value(val, buf);
         }
     }
 
     #[inline]
     fn value_encoded_len(value: &C) -> usize {
-        let inner_len = value.into_iter().map(|val| E::value_encoded_len(val)).sum();
-        encoded_len_varint(inner_len) + inner_len
+        let inner_len = E::many_values_encoded_len(value);
+        encoded_len_varint(inner_len as u64) + inner_len
     }
 
     #[inline]
@@ -997,32 +1028,47 @@ where
         buf: &mut Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
-        let mut consumer = FallibleIter::new(buf.take_length_delimited()?.consume(|buf| {
+        let capped = buf.take_length_delimited()?;
+        if capped.remaining_before_cap()
+            % <Self as Wiretyped<C::Item>>::WIRE_TYPE.encoded_size_alignment()
+            != 0
+        {
+            return Err(DecodeError::new("packed field is not a valid length"));
+        }
+        let mut consumer = FallibleIter::new(capped.consume(|buf| {
             let mut new_val = Default::default();
             E::decode_value(&mut new_val, buf, ctx.clone())?;
             Ok(new_val)
         }));
-        value.extend(consumer);
+        value.extend(&mut consumer);
         consumer.check()
     }
 }
 
 impl<C, E> DistinguishedValueEncoder<C> for Packed<E>
 where
-    C: Veclike,
+    C: Veclike + Eq,
     E: DistinguishedValueEncoder<C::Item>,
+    C::Item: Default + Eq,
 {
     fn decode_value_distinguished<B: Buf>(
         value: &mut C,
         buf: &mut Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
-        let mut consumer = FallibleIter::new(buf.take_length_delimited()?.consume(|buf| {
+        let capped = buf.take_length_delimited()?;
+        if capped.remaining_before_cap()
+            % <Self as Wiretyped<C::Item>>::WIRE_TYPE.encoded_size_alignment()
+            != 0
+        {
+            return Err(DecodeError::new("packed field is not a valid length"));
+        }
+        let mut consumer = FallibleIter::new(capped.consume(|buf| {
             let mut new_val = Default::default();
             E::decode_value_distinguished(&mut new_val, buf, ctx.clone())?;
             Ok(new_val)
         }));
-        value.extend(consumer);
+        value.extend(&mut consumer);
         consumer.check()
     }
 }
@@ -1033,7 +1079,7 @@ where
 impl<C, E> Encoder<C> for Packed<E>
 where
     C: Veclike,
-    Packed<E>: ValueEncoder<C::Item>,
+    Packed<E>: ValueEncoder<C>,
 {
     #[inline]
     fn encode<B: BufMut>(tag: u32, value: &C, buf: &mut B, tw: &mut TagWriter) {
@@ -1070,7 +1116,7 @@ where
 
 impl<C, E> DistinguishedEncoder<C> for Packed<E>
 where
-    C: Veclike,
+    C: Veclike + Eq,
     Packed<E>: DistinguishedValueEncoder<C> + Encoder<C>,
 {
     #[inline]
@@ -1221,157 +1267,137 @@ macro_rules! fixed_width {
         }
 
         impl ValueEncoder<$ty> for Fixed {
-
-        }
-
-        pub mod $proto_ty {
-            use crate::encoding::*;
-
-            pub fn encode<B: BufMut>(tag: u32, value: &$ty, buf: &mut B, tw: &mut TagWriter) {
-                tw.encode_key(tag, $wire_type, buf);
+            fn encode_value<B: BufMut>(value: &$ty, buf: &mut B) {
                 buf.$put(*value);
             }
 
-            pub fn merge<B: Buf>(
-                wire_type: WireType,
+            fn value_encoded_len(value: &$ty) -> usize {
+                $wire_type.fixed_size()
+            }
+
+            fn many_values_encoded_len<C: Veclike<Item = $ty>>(values: &C) -> usize {
+                $wire_type.fixed_size() * values.len()
+            }
+
+            fn decode_value<B: Buf>(
                 value: &mut $ty,
                 buf: &mut Capped<B>,
-                _ctx: DecodeContext,
+                ctx: DecodeContext,
             ) -> Result<(), DecodeError> {
-                check_wire_type($wire_type, wire_type)?;
-                if buf.remaining() < $width {
+                if buf.remaining() < $wire_type.fixed_size() {
                     return Err(DecodeError::new("field truncated"));
                 }
                 *value = buf.$get();
                 Ok(())
             }
-
-            encode_repeated!($ty);
-
-            pub fn encode_packed<B: BufMut>(
-                tag: u32,
-                values: &[$ty],
-                buf: &mut B,
-                tw: &mut TagWriter,
-            ) {
-                if values.is_empty() {
-                    return;
-                }
-
-                tw.encode_key(tag, WireType::LengthDelimited, buf);
-                let len = values.len() as u64 * $width;
-                encode_varint(len as u64, buf);
-
-                for value in values {
-                    buf.$put(*value);
-                }
-            }
-
-            merge_repeated_numeric!($ty, $wire_type, merge, merge_repeated);
-
-            #[inline]
-            pub fn encoded_len(tag: u32, _: &$ty, tm: &mut TagMeasurer) -> usize {
-                tm.key_len(tag) + $width
-            }
-
-            #[inline]
-            pub fn encoded_len_repeated(tag: u32, values: &[$ty], tm: &mut TagMeasurer) -> usize {
-                if values.is_empty() {
-                    0
-                } else {
-                    // successive repeated keys always take up 1 byte
-                    tm.key_len(tag) - 1 + (1 + $width) * values.len()
-                }
-            }
-
-            #[inline]
-            pub fn encoded_len_packed(tag: u32, values: &[$ty], tm: &mut TagMeasurer) -> usize {
-                if values.is_empty() {
-                    0
-                } else {
-                    let len = $width * values.len();
-                    tm.key_len(tag) + encoded_len_varint(len as u64) + len
-                }
-            }
-
-            #[cfg(test)]
-            mod test {
-                use proptest::prelude::*;
-
-                use super::super::test::{check_collection_type, check_type};
-                use super::*;
-
-                proptest! {
-                    #[test]
-                    fn check(value: $ty, tag: u32) {
-                        check_type(value, tag, $wire_type,
-                                   encode, merge, encoded_len)?;
-                    }
-                    #[test]
-                    fn check_repeated(value: Vec<$ty>, tag: u32) {
-                        check_collection_type(value, tag, $wire_type,
-                                              encode_repeated, merge_repeated,
-                                              encoded_len_repeated)?;
-                    }
-                    #[test]
-                    fn check_packed(value: Vec<$ty>, tag: u32) {
-                        check_type(value, tag, WireType::LengthDelimited,
-                                   encode_packed, merge_repeated,
-                                   encoded_len_packed)?;
-                    }
-                }
-            }
         }
+
+        // pub mod $proto_ty {
+        //     use crate::encoding::*;
+        //
+        //     pub fn encode<B: BufMut>(tag: u32, value: &$ty, buf: &mut B, tw: &mut TagWriter) {
+        //         tw.encode_key(tag, $wire_type, buf);
+        //         buf.$put(*value);
+        //     }
+        //
+        //     pub fn merge<B: Buf>(
+        //         wire_type: WireType,
+        //         value: &mut $ty,
+        //         buf: &mut Capped<B>,
+        //         _ctx: DecodeContext,
+        //     ) -> Result<(), DecodeError> {
+        //         check_wire_type($wire_type, wire_type)?;
+        //         if buf.remaining() < $width {
+        //             return Err(DecodeError::new("field truncated"));
+        //         }
+        //         *value = buf.$get();
+        //         Ok(())
+        //     }
+        //
+        //     encode_repeated!($ty);
+        //
+        //     pub fn encode_packed<B: BufMut>(
+        //         tag: u32,
+        //         values: &[$ty],
+        //         buf: &mut B,
+        //         tw: &mut TagWriter,
+        //     ) {
+        //         if values.is_empty() {
+        //             return;
+        //         }
+        //
+        //         tw.encode_key(tag, WireType::LengthDelimited, buf);
+        //         let len = values.len() as u64 * $width;
+        //         encode_varint(len as u64, buf);
+        //
+        //         for value in values {
+        //             buf.$put(*value);
+        //         }
+        //     }
+        //
+        //     merge_repeated_numeric!($ty, $wire_type, merge, merge_repeated);
+        //
+        //     #[inline]
+        //     pub fn encoded_len(tag: u32, _: &$ty, tm: &mut TagMeasurer) -> usize {
+        //         tm.key_len(tag) + $width
+        //     }
+        //
+        //     #[inline]
+        //     pub fn encoded_len_repeated(tag: u32, values: &[$ty], tm: &mut TagMeasurer) -> usize {
+        //         if values.is_empty() {
+        //             0
+        //         } else {
+        //             // successive repeated keys always take up 1 byte
+        //             tm.key_len(tag) - 1 + (1 + $width) * values.len()
+        //         }
+        //     }
+        //
+        //     #[inline]
+        //     pub fn encoded_len_packed(tag: u32, values: &[$ty], tm: &mut TagMeasurer) -> usize {
+        //         if values.is_empty() {
+        //             0
+        //         } else {
+        //             let len = $width * values.len();
+        //             tm.key_len(tag) + encoded_len_varint(len as u64) + len
+        //         }
+        //     }
+        //
+        //     #[cfg(test)]
+        //     mod test {
+        //         use proptest::prelude::*;
+        //
+        //         use super::super::test::{check_collection_type, check_type};
+        //         use super::*;
+        //
+        //         proptest! {
+        //             #[test]
+        //             fn check(value: $ty, tag: u32) {
+        //                 check_type(value, tag, $wire_type,
+        //                            encode, merge, encoded_len)?;
+        //             }
+        //             #[test]
+        //             fn check_repeated(value: Vec<$ty>, tag: u32) {
+        //                 check_collection_type(value, tag, $wire_type,
+        //                                       encode_repeated, merge_repeated,
+        //                                       encoded_len_repeated)?;
+        //             }
+        //             #[test]
+        //             fn check_packed(value: Vec<$ty>, tag: u32) {
+        //                 check_type(value, tag, WireType::LengthDelimited,
+        //                            encode_packed, merge_repeated,
+        //                            encoded_len_packed)?;
+        //             }
+        //         }
+        //     }
+        // }
     };
 }
-fixed_width!(
-    f32,
-    4,
-    WireType::ThirtyTwoBit,
-    float32,
-    put_f32_le,
-    get_f32_le
-);
-fixed_width!(
-    f64,
-    8,
-    WireType::SixtyFourBit,
-    float64,
-    put_f64_le,
-    get_f64_le
-);
-fixed_width!(
-    u32,
-    4,
-    WireType::ThirtyTwoBit,
-    ufixed32,
-    put_u32_le,
-    get_u32_le
-);
-fixed_width!(
-    u64,
-    8,
-    WireType::SixtyFourBit,
-    ufixed64,
-    put_u64_le,
-    get_u64_le
-);
-fixed_width!(
-    i32,
-    4,
-    WireType::ThirtyTwoBit,
-    sfixed32,
-    put_i32_le,
-    get_i32_le
-);
-fixed_width!(
-    i64,
-    8,
-    WireType::SixtyFourBit,
-    sfixed64,
-    put_i64_le,
-    get_i64_le
-);
+fixed_width!(f32, WireType::ThirtyTwoBit, put_f32_le, get_f32_le);
+fixed_width!(f64, WireType::SixtyFourBit, put_f64_le, get_f64_le);
+fixed_width!(u32, WireType::ThirtyTwoBit, put_u32_le, get_u32_le);
+fixed_width!(u64, WireType::SixtyFourBit, put_u64_le, get_u64_le);
+fixed_width!(i32, WireType::ThirtyTwoBit, put_i32_le, get_i32_le);
+fixed_width!(i64, WireType::SixtyFourBit, put_i64_le, get_i64_le);
 
 /// Macro which emits encoding functions for a length-delimited type.
 macro_rules! length_delimited {
@@ -1455,6 +1481,7 @@ impl ValueEncoder<String> for General {
 
             let drop_guard = DropGuard(value.as_mut_vec());
             // If we must copy, make sure to copy only once.
+            use sealed::BytesAdapter;
             drop_guard
                 .0
                 .replace_with(buf.take_length_delimited()?.take_all());
@@ -1911,8 +1938,8 @@ macro_rules! map {
         where
             K: Default + Eq + Hash + Ord,
             B: Buf,
-            KM: Fn(WireType, &mut K, &mut Capped<B>, DecodeContext) -> Result<(), DecodeError>,
-            VM: Fn(WireType, &mut V, &mut Capped<B>, DecodeContext) -> Result<(), DecodeError>,
+            KM: Fn(WireType, &mut K, &mut B, DecodeContext) -> Result<(), DecodeError>,
+            VM: Fn(WireType, &mut V, &mut B, DecodeContext) -> Result<(), DecodeError>,
         {
             let mut key: K = Default::default();
             let mut val = val_default;
@@ -1920,7 +1947,7 @@ macro_rules! map {
             let mut tr = TagReader::new();
             buf.take_length_delimited()?
                 .consume(|buf| {
-                    let (tag, wire_type) = tr.decode_key(buf.buf())?;
+                    let (tag, wire_type) = tr.decode_key(buf)?;
                     // TODO(widders): does this have correct behavior if k or v are incorrectly
                     //  repeated?
                     match tag {
@@ -1979,15 +2006,15 @@ macro_rules! map {
     };
 }
 
-#[cfg(feature = "std")]
-pub mod hash_map {
-    use std::collections::HashMap;
-    map!(HashMap);
-}
-
-pub mod btree_map {
-    map!(BTreeMap);
-}
+// #[cfg(feature = "std")]
+// pub mod hash_map {
+//     use std::collections::HashMap;
+//     map!(HashMap);
+// }
+//
+// pub mod btree_map {
+//     map!(BTreeMap);
+// }
 
 // #[cfg(test)]
 // mod test {
