@@ -1337,12 +1337,14 @@ from_uint64(value) {
     ((value >> 1) as i64) ^ (-((value & 1) as i64))
 });
 
-/// Macro which emits implementations for fixed width numeric encoding.
-macro_rules! fixed_width {
-    ($ty:ty,
-     $wire_type:expr,
-     $put:ident,
-     $get:ident) => {
+/// Macros which emit implementations for fixed width numeric encoding.
+macro_rules! fixed_width_common {
+    (
+        $ty:ty,
+        $wire_type:expr,
+        $put:ident,
+        $get:ident
+    ) => {
         impl Wiretyped<$ty> for Fixed {
             const WIRE_TYPE: WireType = $wire_type;
         }
@@ -1377,6 +1379,7 @@ macro_rules! fixed_width {
             }
         }
 
+        // TODO(widders): tests
         // pub mod $proto_ty {
         //     use crate::encoding::*;
         //
@@ -1477,30 +1480,140 @@ macro_rules! fixed_width {
         // }
     };
 }
-macro_rules! fixed_width_distinguished {
-    ($ty:ty) => {
+
+macro_rules! fixed_width_int {
+    (
+        $ty:ty,
+         $wire_type:expr,
+         $put:ident,
+         $get:ident
+    ) => {
+        fixed_width_common!($ty, $wire_type, $put, $get);
+
         impl DistinguishedValueEncoder<$ty> for Fixed {
             #[inline]
             fn decode_value_distinguished<B: Buf>(
-                value: &mut T,
+                value: &mut $ty,
                 buf: &mut Capped<B>,
                 ctx: DecodeContext,
             ) -> Result<(), DecodeError> {
                 Fixed::decode_value(value, buf, ctx)
             }
         }
+
+        impl Encoder<$ty> for Fixed {
+            #[inline]
+            fn encode<B: BufMut>(tag: u32, value: &$ty, buf: &mut B, tw: &mut TagWriter) {
+                if *value != 0 {
+                    Self::encode_field(tag, value, buf, tw);
+                }
+            }
+
+            #[inline]
+            fn encoded_len(tag: u32, value: &$ty, tm: &mut TagMeasurer) -> usize {
+                if *value != 0 {
+                    Self::field_encoded_len(tag, value, tm)
+                } else {
+                    0
+                }
+            }
+
+            #[inline]
+            fn decode<B: Buf>(
+                wire_type: WireType,
+                duplicated: bool,
+                value: &mut $ty,
+                buf: &mut Capped<B>,
+                ctx: DecodeContext,
+            ) -> Result<(), DecodeError> {
+                if duplicated {
+                    return Err(DecodeError::new(
+                        "multiple occurrences of non-repeated field",
+                    ));
+                }
+                Self::decode_field(wire_type, value, buf, ctx)
+            }
+        }
+
+        impl DistinguishedEncoder<$ty> for Fixed {
+            #[inline]
+            fn decode_distinguished<B: Buf>(
+                wire_type: WireType,
+                duplicated: bool,
+                value: &mut $ty,
+                buf: &mut Capped<B>,
+                ctx: DecodeContext,
+            ) -> Result<(), DecodeError> {
+                if duplicated {
+                    return Err(DecodeError::new(
+                        "multiple occurrences of non-repeated field",
+                    ));
+                }
+                Self::decode_field_distinguished(wire_type, value, buf, ctx)?;
+                if *value == 0 {
+                    return Err(DecodeError::new(
+                        "plain field was encoded with its zero value",
+                    ));
+                }
+                Ok(())
+            }
+        }
     };
 }
-fixed_width!(f32, WireType::ThirtyTwoBit, put_f32_le, get_f32_le);
-fixed_width!(f64, WireType::SixtyFourBit, put_f64_le, get_f64_le);
-fixed_width!(u32, WireType::ThirtyTwoBit, put_u32_le, get_u32_le);
-fixed_width!(u64, WireType::SixtyFourBit, put_u64_le, get_u64_le);
-fixed_width!(i32, WireType::ThirtyTwoBit, put_i32_le, get_i32_le);
-fixed_width!(i64, WireType::SixtyFourBit, put_i64_le, get_i64_le);
-fixed_width_distinguished!(u32);
-fixed_width_distinguished!(u64);
-fixed_width_distinguished!(i32);
-fixed_width_distinguished!(i64);
+
+macro_rules! fixed_width_float {
+    (
+        $ty:ty,
+        $wire_type:expr,
+        $put:ident,
+        $get:ident
+    ) => {
+        fixed_width_common!($ty, $wire_type, $put, $get);
+
+        impl Encoder<$ty> for Fixed {
+            #[inline]
+            fn encode<B: BufMut>(tag: u32, value: &$ty, buf: &mut B, tw: &mut TagWriter) {
+                // Preserve -0.0
+                if *value.to_bits() != 0 {
+                    Self::encode_field(tag, value, buf, tw);
+                }
+            }
+
+            #[inline]
+            fn encoded_len(tag: u32, value: &$ty, tm: &mut TagMeasurer) -> usize {
+                // Preserve -0.0
+                if *value.to_bits() != 0 {
+                    Self::field_encoded_len(tag, value, tm)
+                } else {
+                    0
+                }
+            }
+
+            #[inline]
+            fn decode<B: Buf>(
+                wire_type: WireType,
+                duplicated: bool,
+                value: &mut $ty,
+                buf: &mut Capped<B>,
+                ctx: DecodeContext,
+            ) -> Result<(), DecodeError> {
+                if duplicated {
+                    return Err(DecodeError::new(
+                        "multiple occurrences of non-repeated field",
+                    ));
+                }
+                Self::decode_field(wire_type, value, buf, ctx)
+            }
+        }
+    };
+}
+
+fixed_width_float!(f32, WireType::ThirtyTwoBit, put_f32_le, get_f32_le);
+fixed_width_float!(f64, WireType::SixtyFourBit, put_f64_le, get_f64_le);
+fixed_width_int!(u32, WireType::ThirtyTwoBit, put_u32_le, get_u32_le);
+fixed_width_int!(u64, WireType::SixtyFourBit, put_u64_le, get_u64_le);
+fixed_width_int!(i32, WireType::ThirtyTwoBit, put_i32_le, get_i32_le);
+fixed_width_int!(i64, WireType::SixtyFourBit, put_i64_le, get_i64_le);
 
 /// Macro which emits encoding functions for a length-delimited type.
 macro_rules! length_delimited {
