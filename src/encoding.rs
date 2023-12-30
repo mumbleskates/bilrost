@@ -1177,19 +1177,22 @@ where
 
 /// Macro rule for expressly delegating from one encoder to another.
 macro_rules! delegate_encoder {
-    ($from_ty:ty, $value_ty:ty, $($value_generics:ident, )* $to_ty:ty) => {
-        impl<$($value_generics, )*> Encoder<$value_ty> for $from_ty
+    (
+        delegate from $from_ty:ty, to $to_ty:ty, for type $value_ty:ty
+        $(, with generics $(, $value_generics:ident)*)?
+    ) => {
+        impl$(<$($value_generics, )*>)? Encoder<$value_ty> for $from_ty
         where
             $to_ty: Encoder<$value_ty>,
         {
             #[inline]
             fn encode<B: BufMut>(tag: u32, value: &$value_ty, buf: &mut B, tw: &mut TagWriter) {
-                $to_ty::encode(tag, value, buf, tw)
+                <$to_ty>::encode(tag, value, buf, tw)
             }
 
             #[inline]
             fn encoded_len(tag: u32, value: &$value_ty, tm: &mut TagMeasurer) -> usize {
-                $to_ty::encoded_len(tag, value, tm)
+                <$to_ty>::encoded_len(tag, value, tm)
             }
 
             #[inline]
@@ -1200,11 +1203,11 @@ macro_rules! delegate_encoder {
                 buf: &mut Capped<B>,
                 ctx: DecodeContext,
             ) -> Result<(), DecodeError> {
-                $to_ty::decode(wire_type, duplicated, value, buf, ctx)
+                <$to_ty>::decode(wire_type, duplicated, value, buf, ctx)
             }
         }
 
-        impl<$($value_generics, )*> DistinguishedEncoder<$value_ty> for General
+        impl$(<$($value_generics, )*>)? DistinguishedEncoder<$value_ty> for $from_ty
         where
             $to_ty: DistinguishedEncoder<$value_ty>,
             Self: Encoder<$value_ty>,
@@ -1217,16 +1220,14 @@ macro_rules! delegate_encoder {
                 buf: &mut Capped<B>,
                 ctx: DecodeContext,
             ) -> Result<(), DecodeError> {
-                Unpacked::<Self>::decode_distinguished(wire_type, duplicated, value, buf, ctx)
+                <$to_ty>::decode_distinguished(wire_type, duplicated, value, buf, ctx)
             }
         }
     };
 }
 
-/// General delegates encoding Vec<T> to Unpacked.
-delegate_encoder!(General, Vec<T>, T, Unpacked::<General>);
-/// Fixed delegates encoding Vec<T> to Unpacked.
-delegate_encoder!(Fixed, Vec<T>, T, Unpacked::<Fixed>);
+delegate_encoder!(delegate from General, to Unpacked<General>, for type Vec<T>, with generics, T);
+delegate_encoder!(delegate from Fixed, to Unpacked<Fixed>, for type Vec<T>, with generics, T);
 
 /// Macro which emits implementations for variable width numeric encoding.
 macro_rules! varint {
@@ -1493,9 +1494,9 @@ macro_rules! fixed_width_common {
 macro_rules! fixed_width_int {
     (
         $ty:ty,
-         $wire_type:expr,
-         $put:ident,
-         $get:ident
+        $wire_type:expr,
+        $put:ident,
+        $get:ident
     ) => {
         fixed_width_common!($ty, $wire_type, $put, $get);
 
