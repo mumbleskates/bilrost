@@ -1724,6 +1724,16 @@ impl ValueEncoder<String> for General {
     }
 }
 
+impl DistinguishedValueEncoder<String> for General {
+    fn decode_value_distinguished<B: Buf>(
+        value: &mut String,
+        buf: &mut Capped<B>,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError> {
+        Self::decode_value(value, buf, ctx)
+    }
+}
+
 // #[cfg(test)]
 // mod string_test {
 //     use proptest::prelude::*;
