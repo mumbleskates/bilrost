@@ -166,7 +166,7 @@ pub trait Message: Debug + Send + Sync {
     fn clear(&mut self);
 }
 
-pub trait DistinguishedMessage: Message {
+pub trait DistinguishedMessage: Message + Eq {
     // TODO(widders): this. and revise the above
 }
 

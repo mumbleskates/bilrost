@@ -801,7 +801,7 @@ pub struct Unpacked<E = General>(E);
 /// Packed encoder. Encodes repeated types in packed format.
 pub struct Packed<E = General>(E);
 
-// TODO(widders): is any ValueEncoder usable as a Plain Encoder? what's the counterexample?
+/// General encodes plain values only when they are non-default.
 impl<T> Encoder<T> for General
 where
     General: ValueEncoder<T>,
@@ -840,6 +840,8 @@ where
     }
 }
 
+/// General's distinguished encoding for plain values forbids encoding defaulted values. This
+/// includes directly-nested message types, which are not emitted when all their fields are default.
 impl<T> DistinguishedEncoder<T> for General
 where
     General: DistinguishedValueEncoder<T> + Encoder<T>,
