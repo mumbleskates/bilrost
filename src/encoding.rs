@@ -1275,6 +1275,7 @@ macro_rules! varint {
             }
         }
 
+        // TODO(widders): tests
         // #[cfg(test)]
         // mod test_varint_$ty {
         //     use proptest::prelude::*;
@@ -1304,6 +1305,7 @@ macro_rules! varint {
         // }
     };
 }
+
 varint!(bool,
 to_uint64(value) {
     u64::from(*value)
@@ -1734,6 +1736,7 @@ impl DistinguishedValueEncoder<String> for General {
     }
 }
 
+// TODO(widders): tests
 // #[cfg(test)]
 // mod string_test {
 //     use proptest::prelude::*;
