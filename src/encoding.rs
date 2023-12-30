@@ -868,9 +868,11 @@ where
     }
 }
 
-impl<T> Encoder<Option<T>> for General
+/// Different value encoders may dispatch encoding their plain values slightly differently, but
+/// values wrapped in Option are always encoded the same.
+impl<T, E> Encoder<Option<T>> for E
 where
-    General: ValueEncoder<T>,
+    E: ValueEncoder<T>,
     T: Default,
 {
     #[inline]
@@ -906,11 +908,11 @@ where
     }
 }
 
-/// Distinguished decoding for Option<T> in General is only different in that it calls the
-/// distinguished decoding path.
-impl<T> DistinguishedEncoder<Option<T>> for General
+/// Distinguished decoding for Option<T> is only different in that it calls the distinguished
+/// decoding codepath.
+impl<T, E> DistinguishedEncoder<Option<T>> for E
 where
-    General: DistinguishedValueEncoder<T> + Encoder<Option<T>>,
+    E: DistinguishedValueEncoder<T> + Encoder<Option<T>>,
     T: Default + Eq,
 {
     #[inline]
