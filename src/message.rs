@@ -10,7 +10,7 @@ use crate::encoding::{
 use crate::DecodeError;
 use crate::EncodeError;
 
-/// A Protocol Buffers message.
+/// A Bilrost message.
 pub trait Message: Debug + Send + Sync {
     /// Encodes the message to a buffer.
     ///
