@@ -1168,7 +1168,7 @@ where
     }
 }
 
-/// Macro rule for expressly delegating from one encoder to another.
+/// Macro rules for expressly delegating from one encoder to another.
 macro_rules! delegate_encoding {
     (
         delegate from $from_ty:ty, to $to_ty:ty, for type $value_ty:ty
@@ -1228,13 +1228,112 @@ macro_rules! delegate_encoding {
         }
     };
 }
+macro_rules! delegate_value_encoding {
+    (
+        delegate from $from_ty:ty, to $to_ty:ty, for type $value_ty:ty
+        $(, with generics $(, $value_generics:ident)*)?
+    ) => {
+        impl$(<$($value_generics, )*>)? Wiretyped<$value_ty> for $from_ty
+        where
+            $to_ty: Wiretyped<$value_ty>,
+        {
+            const WIRE_TYPE: WireType = <$to_ty as Wiretyped<$value_ty>>::WIRE_TYPE;
+        }
+
+        impl$(<$($value_generics, )*>)? ValueEncoder<$value_ty> for $from_ty
+        where
+            $to_ty: ValueEncoder<$value_ty>,
+        {
+            #[inline]
+            fn encode_value<B: BufMut>(value: &$value_ty, buf: &mut B) {
+                <$to_ty>::encode_value(value, buf)
+            }
+
+            #[inline]
+            fn value_encoded_len(value: &$value_ty) -> usize {
+                <$to_ty>::value_encoded_len(value)
+            }
+
+            #[inline]
+            fn many_values_encoded_len<C: Veclike<Item = $value_ty>>(values: &C) -> usize {
+                <$to_ty>::many_values_encoded_len(values)
+            }
+
+            #[inline]
+            fn decode_value<B: Buf>(
+                value: &mut $value_ty,
+                buf: &mut Capped<B>,
+                ctx: DecodeContext,
+            ) -> Result<(), DecodeError> {
+                <$to_ty>::decode_value(value, buf, ctx)
+            }
+        }
+    };
+
+    (
+        delegate from $from_ty:ty, to $to_ty:ty, for type $value_ty:ty, including distinguished
+        $(, with generics $(, $value_generics:ident)*)?
+    ) => {
+        delegate_value_encoding!(
+            delegate from $from_ty, to $to_ty, for type $value_ty
+            $(, with generics $(, $value_generics)*)?
+        );
+
+        impl$(<$($value_generics, )*>)? DistinguishedValueEncoder<$value_ty> for $from_ty
+        where
+            $to_ty: DistinguishedValueEncoder<$value_ty>,
+        {
+            #[inline]
+            fn decode_value_distinguished<B: Buf>(
+                value: &mut $value_ty,
+                buf: &mut Capped<B>,
+                ctx: DecodeContext,
+            ) -> Result<(), DecodeError> {
+                <$to_ty>::decode_value_distinguished(value, buf, ctx)
+            }
+        }
+    };
+}
 
 delegate_encoding!(delegate from General, to Unpacked<General>, for type Vec<T>,
     including distinguished, with generics, T);
 delegate_encoding!(delegate from Fixed, to Unpacked<Fixed>, for type Vec<T>,
     including distinguished, with generics, T);
-delegate_encoding!(delegate from General, to Fixed, for type f32);
-delegate_encoding!(delegate from General, to Fixed, for type f64);
+
+delegate_value_encoding!(delegate from General, to Fixed, for type f32);
+delegate_value_encoding!(delegate from General, to Fixed, for type f64);
+
+/// Generalized proptest macro. Kind must be either `expedient` or `distinguished`.
+macro_rules! check_type_test {
+    ($encoder:ty, $kind:ident, $ty:ty, $wire_type:expr) => {
+        #[cfg(test)]
+        mod $kind {
+            use proptest::prelude::*;
+
+            use crate::encoding::test::$kind::{check_type, check_type_unpacked};
+            use crate::encoding::{$encoder, Packed, Unpacked, WireType};
+
+            proptest! {
+                #[test]
+                fn check(value: $ty, tag: u32) {
+                    check_type::<$ty, $encoder>(value, tag, $wire_type)?;
+                }
+                #[test]
+                fn check_unpacked(value: Vec<$ty>, tag: u32) {
+                    check_type_unpacked::<Vec<$ty>, Unpacked<$encoder>>(value, tag, $wire_type)?;
+                }
+                #[test]
+                fn check_packed(value: Vec<$ty>, tag: u32) {
+                    check_type::<Vec<$ty>, Packed<$encoder>>(
+                        value,
+                        tag,
+                        WireType::LengthDelimited,
+                    )?;
+                }
+            }
+        }
+    };
+}
 
 /// Macro which emits implementations for variable width numeric encoding.
 macro_rules! varint {
@@ -1284,25 +1383,8 @@ macro_rules! varint {
 
         #[cfg(test)]
         mod $name {
-            use proptest::prelude::*;
-
-            use crate::encoding::test::{check_type_unpacked, check_type};
-            use crate::encoding::{General, Packed, Unpacked, WireType};
-
-            proptest! {
-                #[test]
-                fn check(value: $ty, tag: u32) {
-                    check_type::<$ty, General>(value, tag, WireType::Varint)?;
-                }
-                #[test]
-                fn check_unpacked(value: Vec<$ty>, tag: u32) {
-                    check_type_unpacked::<Vec<$ty>, Unpacked>(value, tag, WireType::Varint)?;
-                }
-                #[test]
-                fn check_packed(value: Vec<$ty>, tag: u32) {
-                    check_type::<Vec<$ty>, Packed>(value, tag, WireType::LengthDelimited)?;
-                }
-            }
+            check_type_test!(General, expedient, $ty, WireType::Varint);
+            check_type_test!(General, distinguished, $ty, WireType::Varint);
         }
     };
 }
@@ -1390,111 +1472,12 @@ macro_rules! fixed_width_common {
                 Ok(())
             }
         }
-
-        // TODO(widders): tests
-        // pub mod $proto_ty {
-        //     use crate::encoding::*;
-        //
-        //     pub fn encode<B: BufMut>(tag: u32, value: &$ty, buf: &mut B, tw: &mut TagWriter) {
-        //         tw.encode_key(tag, $wire_type, buf);
-        //         buf.$put(*value);
-        //     }
-        //
-        //     pub fn merge<B: Buf>(
-        //         wire_type: WireType,
-        //         value: &mut $ty,
-        //         buf: &mut Capped<B>,
-        //         _ctx: DecodeContext,
-        //     ) -> Result<(), DecodeError> {
-        //         check_wire_type($wire_type, wire_type)?;
-        //         if buf.remaining() < $width {
-        //             return Err(DecodeError::new("field truncated"));
-        //         }
-        //         *value = buf.$get();
-        //         Ok(())
-        //     }
-        //
-        //     encode_repeated!($ty);
-        //
-        //     pub fn encode_packed<B: BufMut>(
-        //         tag: u32,
-        //         values: &[$ty],
-        //         buf: &mut B,
-        //         tw: &mut TagWriter,
-        //     ) {
-        //         if values.is_empty() {
-        //             return;
-        //         }
-        //
-        //         tw.encode_key(tag, WireType::LengthDelimited, buf);
-        //         let len = values.len() as u64 * $width;
-        //         encode_varint(len as u64, buf);
-        //
-        //         for value in values {
-        //             buf.$put(*value);
-        //         }
-        //     }
-        //
-        //     merge_repeated_numeric!($ty, $wire_type, merge, merge_repeated);
-        //
-        //     #[inline]
-        //     pub fn encoded_len(tag: u32, _: &$ty, tm: &mut TagMeasurer) -> usize {
-        //         tm.key_len(tag) + $width
-        //     }
-        //
-        //     #[inline]
-        //     pub fn encoded_len_repeated(tag: u32, values: &[$ty], tm: &mut TagMeasurer) -> usize {
-        //         if values.is_empty() {
-        //             0
-        //         } else {
-        //             // successive repeated keys always take up 1 byte
-        //             tm.key_len(tag) - 1 + (1 + $width) * values.len()
-        //         }
-        //     }
-        //
-        //     #[inline]
-        //     pub fn encoded_len_packed(tag: u32, values: &[$ty], tm: &mut TagMeasurer) -> usize {
-        //         if values.is_empty() {
-        //             0
-        //         } else {
-        //             let len = $width * values.len();
-        //             tm.key_len(tag) + encoded_len_varint(len as u64) + len
-        //         }
-        //     }
-        //
-        //     #[cfg(test)]
-        //     mod test {
-        //         use proptest::prelude::*;
-        //
-        //         use super::super::test::{check_collection_type, check_type};
-        //         use super::*;
-        //
-        //         proptest! {
-        //             #[test]
-        //             fn check(value: $ty, tag: u32) {
-        //                 check_type(value, tag, $wire_type,
-        //                            encode, merge, encoded_len)?;
-        //             }
-        //             #[test]
-        //             fn check_repeated(value: Vec<$ty>, tag: u32) {
-        //                 check_collection_type(value, tag, $wire_type,
-        //                                       encode_repeated, merge_repeated,
-        //                                       encoded_len_repeated)?;
-        //             }
-        //             #[test]
-        //             fn check_packed(value: Vec<$ty>, tag: u32) {
-        //                 check_type(value, tag, WireType::LengthDelimited,
-        //                            encode_packed, merge_repeated,
-        //                            encoded_len_packed)?;
-        //             }
-        //         }
-        //     }
-        // }
     };
 }
 
 macro_rules! fixed_width_int {
     (
+        $test_name:ident,
         $ty:ty,
         $wire_type:expr,
         $put:ident,
@@ -1570,11 +1553,18 @@ macro_rules! fixed_width_int {
                 Ok(())
             }
         }
+
+        #[cfg(test)]
+        mod $test_name {
+            check_type_test!(Fixed, expedient, $ty, $wire_type);
+            check_type_test!(Fixed, distinguished, $ty, $wire_type);
+        }
     };
 }
 
 macro_rules! fixed_width_float {
     (
+        $test_name:ident,
         $ty:ty,
         $wire_type:expr,
         $put:ident,
@@ -1617,15 +1607,60 @@ macro_rules! fixed_width_float {
                 Self::decode_field(wire_type, value, buf, ctx)
             }
         }
+
+        #[cfg(test)]
+        mod $test_name {
+            check_type_test!(Fixed, expedient, $ty, $wire_type);
+
+            mod delegated_from_general {
+                check_type_test!(General, expedient, $ty, $wire_type);
+            }
+        }
     };
 }
 
-fixed_width_float!(f32, WireType::ThirtyTwoBit, put_f32_le, get_f32_le);
-fixed_width_float!(f64, WireType::SixtyFourBit, put_f64_le, get_f64_le);
-fixed_width_int!(u32, WireType::ThirtyTwoBit, put_u32_le, get_u32_le);
-fixed_width_int!(u64, WireType::SixtyFourBit, put_u64_le, get_u64_le);
-fixed_width_int!(i32, WireType::ThirtyTwoBit, put_i32_le, get_i32_le);
-fixed_width_int!(i64, WireType::SixtyFourBit, put_i64_le, get_i64_le);
+fixed_width_float!(
+    f32,
+    f32,
+    WireType::ThirtyTwoBit,
+    put_f32_le,
+    get_f32_le
+);
+fixed_width_float!(
+    f64,
+    f64,
+    WireType::SixtyFourBit,
+    put_f64_le,
+    get_f64_le
+);
+fixed_width_int!(
+    fixed_u32,
+    u32,
+    WireType::ThirtyTwoBit,
+    put_u32_le,
+    get_u32_le
+);
+fixed_width_int!(
+    fixed_u64,
+    u64,
+    WireType::SixtyFourBit,
+    put_u64_le,
+    get_u64_le
+);
+fixed_width_int!(
+    fixed_i32,
+    i32,
+    WireType::ThirtyTwoBit,
+    put_i32_le,
+    get_i32_le
+);
+fixed_width_int!(
+    fixed_i64,
+    i64,
+    WireType::SixtyFourBit,
+    put_i64_le,
+    get_i64_le
+);
 
 /// Macro which emits encoding functions for a length-delimited type.
 macro_rules! length_delimited {
@@ -2333,111 +2368,41 @@ mod test {
         })
     }
 
-    pub fn check_type<T, E>(value: T, tag: u32, wire_type: WireType) -> TestCaseResult
-    where
-        E: Encoder<T>,
-        T: Debug + NewForOverwrite + PartialEq,
-    {
-        let mut tw = TagWriter::new();
-        let mut tm = tw.measurer();
-        let expected_len = E::encoded_len(tag, &value, &mut tm);
+    pub mod expedient {
+        use super::*;
 
-        let mut buf = BytesMut::with_capacity(expected_len);
-        E::encode(tag, &value, &mut buf, &mut tw);
+        pub fn check_type<T, E>(value: T, tag: u32, wire_type: WireType) -> TestCaseResult
+        where
+            T: Debug + NewForOverwrite + PartialEq,
+            E: Encoder<T>,
+        {
+            let mut tw = TagWriter::new();
+            let mut tm = tw.measurer();
+            let expected_len = E::encoded_len(tag, &value, &mut tm);
 
-        let buf = &mut buf.freeze();
-        let mut buf = Capped::new(buf);
-        let mut tr = TagReader::new();
+            let mut buf = BytesMut::with_capacity(expected_len);
+            E::encode(tag, &value, &mut buf, &mut tw);
 
-        prop_assert_eq!(
-            buf.remaining(),
-            expected_len,
-            "encoded_len wrong; expected: {}, actual: {}",
-            expected_len,
-            buf.remaining()
-        );
+            let buf = &mut buf.freeze();
+            let mut buf = Capped::new(buf);
+            let mut tr = TagReader::new();
 
-        if !buf.has_remaining() {
-            // Short circuit for empty packed values.
-            return Ok(());
-        }
+            prop_assert_eq!(
+                buf.remaining(),
+                expected_len,
+                "encoded_len wrong; expected: {}, actual: {}",
+                expected_len,
+                buf.remaining()
+            );
 
-        let (decoded_tag, decoded_wire_type) = tr
-            .decode_key(buf.buf())
-            .map_err(|error| TestCaseError::fail(error.to_string()))?;
-        prop_assert_eq!(
-            tag,
-            decoded_tag,
-            "decoded tag does not match; expected: {}, actual: {}",
-            tag,
-            decoded_tag
-        );
+            if !buf.has_remaining() {
+                // Short circuit for empty packed values.
+                return Ok(());
+            }
 
-        prop_assert_eq!(
-            wire_type,
-            decoded_wire_type,
-            "decoded wire type does not match; expected: {:?}, actual: {:?}",
-            wire_type,
-            decoded_wire_type,
-        );
-
-        check_legal_remaining(tag, wire_type, buf.remaining())?;
-
-        let mut roundtrip_value = T::new_for_overwrite();
-        E::decode(
-            wire_type,
-            false,
-            &mut roundtrip_value,
-            &mut buf,
-            DecodeContext::default(),
-        )
-        .map_err(|error| TestCaseError::fail(error.to_string()))?;
-
-        prop_assert!(
-            !buf.has_remaining(),
-            "expected buffer to be empty, remaining: {}",
-            buf.remaining()
-        );
-
-        prop_assert_eq!(value, roundtrip_value);
-
-        Ok(())
-    }
-
-    pub fn check_type_unpacked<T, E>(
-        value: T,
-        tag: u32,
-        wire_type: WireType,
-    ) -> TestCaseResult
-    where
-        T: Debug + NewForOverwrite + PartialEq,
-        E: Encoder<T>,
-    {
-        let mut tw = TagWriter::new();
-        let mut tm = tw.measurer();
-        let expected_len = E::encoded_len(tag, value.borrow(), &mut tm);
-
-        let mut buf = BytesMut::with_capacity(expected_len);
-        E::encode(tag, value.borrow(), &mut buf, &mut tw);
-
-        let mut tr = TagReader::new();
-        let buf = &mut buf.freeze();
-        let mut buf = Capped::new(buf);
-
-        prop_assert_eq!(
-            expected_len,
-            buf.remaining(),
-            "encoded_len wrong; expected: {}, actual: {}",
-            expected_len,
-            buf.remaining()
-        );
-
-        let mut roundtrip_value = T::new_for_overwrite();
-        while buf.has_remaining() {
             let (decoded_tag, decoded_wire_type) = tr
                 .decode_key(buf.buf())
                 .map_err(|error| TestCaseError::fail(error.to_string()))?;
-
             prop_assert_eq!(
                 tag,
                 decoded_tag,
@@ -2451,9 +2416,12 @@ mod test {
                 decoded_wire_type,
                 "decoded wire type does not match; expected: {:?}, actual: {:?}",
                 wire_type,
-                decoded_wire_type
+                decoded_wire_type,
             );
 
+            check_legal_remaining(tag, wire_type, buf.remaining())?;
+
+            let mut roundtrip_value = T::new_for_overwrite();
             E::decode(
                 wire_type,
                 false,
@@ -2462,11 +2430,214 @@ mod test {
                 DecodeContext::default(),
             )
             .map_err(|error| TestCaseError::fail(error.to_string()))?;
+
+            prop_assert!(
+                !buf.has_remaining(),
+                "expected buffer to be empty, remaining: {}",
+                buf.remaining()
+            );
+
+            prop_assert_eq!(value, roundtrip_value);
+
+            Ok(())
         }
 
-        prop_assert_eq!(value, roundtrip_value);
+        pub fn check_type_unpacked<T, E>(value: T, tag: u32, wire_type: WireType) -> TestCaseResult
+        where
+            T: Debug + NewForOverwrite + PartialEq,
+            E: Encoder<T>,
+        {
+            let mut tw = TagWriter::new();
+            let mut tm = tw.measurer();
+            let expected_len = E::encoded_len(tag, value.borrow(), &mut tm);
 
-        Ok(())
+            let mut buf = BytesMut::with_capacity(expected_len);
+            E::encode(tag, value.borrow(), &mut buf, &mut tw);
+
+            let mut tr = TagReader::new();
+            let buf = &mut buf.freeze();
+            let mut buf = Capped::new(buf);
+
+            prop_assert_eq!(
+                expected_len,
+                buf.remaining(),
+                "encoded_len wrong; expected: {}, actual: {}",
+                expected_len,
+                buf.remaining()
+            );
+
+            let mut roundtrip_value = T::new_for_overwrite();
+            while buf.has_remaining() {
+                let (decoded_tag, decoded_wire_type) = tr
+                    .decode_key(buf.buf())
+                    .map_err(|error| TestCaseError::fail(error.to_string()))?;
+
+                prop_assert_eq!(
+                    tag,
+                    decoded_tag,
+                    "decoded tag does not match; expected: {}, actual: {}",
+                    tag,
+                    decoded_tag
+                );
+
+                prop_assert_eq!(
+                    wire_type,
+                    decoded_wire_type,
+                    "decoded wire type does not match; expected: {:?}, actual: {:?}",
+                    wire_type,
+                    decoded_wire_type
+                );
+
+                E::decode(
+                    wire_type,
+                    false,
+                    &mut roundtrip_value,
+                    &mut buf,
+                    DecodeContext::default(),
+                )
+                .map_err(|error| TestCaseError::fail(error.to_string()))?;
+            }
+
+            prop_assert_eq!(value, roundtrip_value);
+
+            Ok(())
+        }
+    }
+
+    pub mod distinguished {
+        use super::*;
+
+        pub fn check_type<T, E>(value: T, tag: u32, wire_type: WireType) -> TestCaseResult
+        where
+            T: Debug + NewForOverwrite + PartialEq,
+            E: DistinguishedEncoder<T>,
+        {
+            let mut tw = TagWriter::new();
+            let mut tm = tw.measurer();
+            let expected_len = E::encoded_len(tag, &value, &mut tm);
+
+            let mut buf = BytesMut::with_capacity(expected_len);
+            E::encode(tag, &value, &mut buf, &mut tw);
+
+            let buf = &mut buf.freeze();
+            let mut buf = Capped::new(buf);
+            let mut tr = TagReader::new();
+
+            prop_assert_eq!(
+                buf.remaining(),
+                expected_len,
+                "encoded_len wrong; expected: {}, actual: {}",
+                expected_len,
+                buf.remaining()
+            );
+
+            if !buf.has_remaining() {
+                // Short circuit for empty packed values.
+                return Ok(());
+            }
+
+            let (decoded_tag, decoded_wire_type) = tr
+                .decode_key(buf.buf())
+                .map_err(|error| TestCaseError::fail(error.to_string()))?;
+            prop_assert_eq!(
+                tag,
+                decoded_tag,
+                "decoded tag does not match; expected: {}, actual: {}",
+                tag,
+                decoded_tag
+            );
+
+            prop_assert_eq!(
+                wire_type,
+                decoded_wire_type,
+                "decoded wire type does not match; expected: {:?}, actual: {:?}",
+                wire_type,
+                decoded_wire_type,
+            );
+
+            check_legal_remaining(tag, wire_type, buf.remaining())?;
+
+            let mut roundtrip_value = T::new_for_overwrite();
+            E::decode_distinguished(
+                wire_type,
+                false,
+                &mut roundtrip_value,
+                &mut buf,
+                DecodeContext::default(),
+            )
+            .map_err(|error| TestCaseError::fail(error.to_string()))?;
+
+            prop_assert!(
+                !buf.has_remaining(),
+                "expected buffer to be empty, remaining: {}",
+                buf.remaining()
+            );
+
+            prop_assert_eq!(value, roundtrip_value);
+
+            Ok(())
+        }
+
+        pub fn check_type_unpacked<T, E>(value: T, tag: u32, wire_type: WireType) -> TestCaseResult
+        where
+            T: Debug + NewForOverwrite + PartialEq,
+            E: DistinguishedEncoder<T>,
+        {
+            let mut tw = TagWriter::new();
+            let mut tm = tw.measurer();
+            let expected_len = E::encoded_len(tag, value.borrow(), &mut tm);
+
+            let mut buf = BytesMut::with_capacity(expected_len);
+            E::encode(tag, value.borrow(), &mut buf, &mut tw);
+
+            let mut tr = TagReader::new();
+            let buf = &mut buf.freeze();
+            let mut buf = Capped::new(buf);
+
+            prop_assert_eq!(
+                expected_len,
+                buf.remaining(),
+                "encoded_len wrong; expected: {}, actual: {}",
+                expected_len,
+                buf.remaining()
+            );
+
+            let mut roundtrip_value = T::new_for_overwrite();
+            while buf.has_remaining() {
+                let (decoded_tag, decoded_wire_type) = tr
+                    .decode_key(buf.buf())
+                    .map_err(|error| TestCaseError::fail(error.to_string()))?;
+
+                prop_assert_eq!(
+                    tag,
+                    decoded_tag,
+                    "decoded tag does not match; expected: {}, actual: {}",
+                    tag,
+                    decoded_tag
+                );
+
+                prop_assert_eq!(
+                    wire_type,
+                    decoded_wire_type,
+                    "decoded wire type does not match; expected: {:?}, actual: {:?}",
+                    wire_type,
+                    decoded_wire_type
+                );
+
+                E::decode_distinguished(
+                    wire_type,
+                    false,
+                    &mut roundtrip_value,
+                    &mut buf,
+                    DecodeContext::default(),
+                )
+                .map_err(|error| TestCaseError::fail(error.to_string()))?;
+            }
+
+            prop_assert_eq!(value, roundtrip_value);
+
+            Ok(())
+        }
     }
 
     #[test]
