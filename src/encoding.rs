@@ -1169,7 +1169,7 @@ where
 }
 
 /// Macro rule for expressly delegating from one encoder to another.
-macro_rules! delegate_encoder {
+macro_rules! delegate_encoding {
     (
         delegate from $from_ty:ty, to $to_ty:ty, for type $value_ty:ty
         $(, with generics $(, $value_generics:ident)*)?
@@ -1199,6 +1199,16 @@ macro_rules! delegate_encoder {
                 <$to_ty>::decode(wire_type, duplicated, value, buf, ctx)
             }
         }
+    };
+
+    (
+        delegate from $from_ty:ty, to $to_ty:ty, for type $value_ty:ty, including distinguished
+        $(, with generics $(, $value_generics:ident)*)?
+    ) => {
+        delegate_encoding!(
+            delegate from $from_ty, to $to_ty, for type $value_ty
+            $(, with generics $(, $value_generics)*)?
+        );
 
         impl$(<$($value_generics, )*>)? DistinguishedEncoder<$value_ty> for $from_ty
         where
@@ -1219,8 +1229,12 @@ macro_rules! delegate_encoder {
     };
 }
 
-delegate_encoder!(delegate from General, to Unpacked<General>, for type Vec<T>, with generics, T);
-delegate_encoder!(delegate from Fixed, to Unpacked<Fixed>, for type Vec<T>, with generics, T);
+delegate_encoding!(delegate from General, to Unpacked<General>, for type Vec<T>,
+    including distinguished, with generics, T);
+delegate_encoding!(delegate from Fixed, to Unpacked<Fixed>, for type Vec<T>,
+    including distinguished, with generics, T);
+delegate_encoding!(delegate from General, to Fixed, for type f32);
+delegate_encoding!(delegate from General, to Fixed, for type f64);
 
 /// Macro which emits implementations for variable width numeric encoding.
 macro_rules! varint {
