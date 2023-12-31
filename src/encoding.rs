@@ -1295,11 +1295,14 @@ macro_rules! delegate_value_encoding {
     };
 }
 
+// General implements unpacked encodings by default, but only for Vec. Other implementers of Veclike
+// must use Unpacked or Packed.
 delegate_encoding!(delegate from General, to Unpacked<General>, for type Vec<T>,
     including distinguished, with generics, T);
 delegate_encoding!(delegate from Fixed, to Unpacked<Fixed>, for type Vec<T>,
     including distinguished, with generics, T);
 
+// General also encodes floating point values.
 delegate_value_encoding!(delegate from General, to Fixed, for type f32);
 delegate_value_encoding!(delegate from General, to Fixed, for type f64);
 
