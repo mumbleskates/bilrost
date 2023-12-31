@@ -643,12 +643,12 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
         for ::bilrost::encoding::General {
             #[inline]
             fn encode_value<B: ::bilrost::bytes::BufMut>(value: &#ident, buf: &mut B) {
-                ::bilrost::encoding::encode_varint(value.into(), buf);
+                ::bilrost::encoding::encode_varint(u32::from(value.clone()) as u64, buf);
             }
 
             #[inline]
             fn value_encoded_len(value: &#ident) -> usize {
-                ::bilrost::encoding::encoded_len_varint(value.into())
+                ::bilrost::encoding::encoded_len_varint(u32::from(value.clone()) as u64)
             }
 
             #[inline]
@@ -657,8 +657,9 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
                 buf: &mut ::bilrost::encoding::Capped<B>,
                 _ctx: ::bilrost::encoding::DecodeContext,
             ) -> Result<(), ::bilrost::DecodeError> {
-                *value = u32::try_from(buf.decode_varint()?)
+                let int_value = u32::try_from(buf.decode_varint()?)
                     .map_err(|_| ::bilrost::DecodeError::new("varint overflows range of u32"))?;
+                *value = #ident::try_from(int_value)?;
                 Ok(())
             }
         }
@@ -671,7 +672,7 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
                 buf: &mut ::bilrost::encoding::Capped<B>,
                 ctx: ::bilrost::encoding::DecodeContext,
             ) -> Result<(), ::bilrost::DecodeError> {
-                Self::decode_value(value, buf, ctx)
+                <Self as ::bilrost::encoding::ValueEncoder<#ident>>::decode_value(value, buf, ctx)
             }
         }
     };
