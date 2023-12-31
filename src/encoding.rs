@@ -778,7 +778,7 @@ impl<T> Veclike for Vec<T> {
 
     #[inline]
     fn iter(&self) -> Self::Iter<'_> {
-        Vec::iter(self)
+        <[T]>::iter(self)
     }
 
     #[inline]
