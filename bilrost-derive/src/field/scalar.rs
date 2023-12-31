@@ -250,6 +250,9 @@ impl Field {
     }
 
     /// Returns methods to embed in the message.
+    // TODO(widders): update this; it should mostly be the same but we want helpers for going back
+    //  and forth between u32 or Option<u32> and the specified enum type, whatever its requirements
+    //  are.
     pub fn methods(&self, ident: &TokenStream) -> Option<TokenStream> {
         let mut ident_str = ident.to_string();
         if ident_str.starts_with("r#") {
