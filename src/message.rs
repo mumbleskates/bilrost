@@ -12,6 +12,8 @@ use crate::EncodeError;
 
 /// A Bilrost message.
 pub trait Message: Debug + Send + Sync {
+    // TODO(widders): rework
+
     /// Encodes the message to a buffer.
     ///
     /// This method will panic if the buffer has insufficient capacity.
@@ -164,6 +166,8 @@ pub trait Message: Debug + Send + Sync {
 
     /// Clears the message, resetting all fields to their default.
     fn clear(&mut self);
+
+    // TODO(widders): encode and decode with unknown fields in an unknown-fields companion struct
 }
 
 pub trait DistinguishedMessage: Message + Eq {
