@@ -457,7 +457,7 @@ impl<'a, B: Buf> Capped<'a, B> {
     /// Reads a length delimiter from the beginning of the wrapped buffer, then returns a subsidiary
     /// Capped instance for the delineated bytes if it does not overrun the underlying buffer or
     /// this instance's cap.
-    fn take_length_delimited(&mut self) -> Result<Capped<B>, DecodeError> {
+    pub fn take_length_delimited(&mut self) -> Result<Capped<B>, DecodeError> {
         let len = decode_length_delimiter(&mut *self.buf)?;
         let remaining = self.buf.remaining();
         if len > remaining {
@@ -475,7 +475,7 @@ impl<'a, B: Buf> Capped<'a, B> {
 
     /// Consume the buffer as an iterator.
     #[inline]
-    fn consume<F, R, E>(self, read_with: F) -> CappedConsumer<'a, B, F>
+    pub fn consume<F, R, E>(self, read_with: F) -> CappedConsumer<'a, B, F>
     where
         F: FnMut(&mut Capped<B>) -> Result<R, E>,
     {
@@ -488,13 +488,13 @@ impl<'a, B: Buf> Capped<'a, B> {
     }
 
     #[inline]
-    fn take_all(self) -> Take<&'a mut B> {
+    pub fn take_all(self) -> Take<&'a mut B> {
         let len = self.remaining_before_cap();
         self.buf.take(len)
     }
 
     #[inline]
-    fn decode_varint(&mut self) -> Result<u64, DecodeError> {
+    pub fn decode_varint(&mut self) -> Result<u64, DecodeError> {
         decode_varint(self.buf)
     }
 
@@ -507,7 +507,7 @@ impl<'a, B: Buf> Capped<'a, B> {
     }
 }
 
-struct CappedConsumer<'a, B: Buf, F> {
+pub struct CappedConsumer<'a, B: Buf, F> {
     capped: Capped<'a, B>,
     reader: F,
 }
@@ -643,13 +643,13 @@ pub trait DistinguishedEncoder<T>: Encoder<T> {
 /// decoding. This isn't important in general; it's very unlikely anything would implement this, but
 /// this means that it can become a typo to use the relaxed decoding functions by accident when
 /// implementing the distinguished encoders, which could cause serious mishaps.
-trait Wiretyped<T> {
+pub trait Wiretyped<T> {
     const WIRE_TYPE: WireType;
 }
 
 /// Trait for encoding implementations for raw values that always encode to a single value. Used as
 /// the basis for all the other plain, optional, and repeated encodings.
-trait ValueEncoder<T>: Wiretyped<T> {
+pub trait ValueEncoder<T>: Wiretyped<T> {
     /// Encodes the given value unconditionally. This is guaranteed to emit data to the buffer.
     fn encode_value<B: BufMut>(value: &T, buf: &mut B);
     // TODO(widders): change to (or augment with) build-in-reverse-then-emit-forward and
@@ -668,7 +668,7 @@ trait ValueEncoder<T>: Wiretyped<T> {
     ) -> Result<(), DecodeError>;
 }
 
-trait DistinguishedValueEncoder<T>: Wiretyped<T>
+pub trait DistinguishedValueEncoder<T>: Wiretyped<T>
 where
     T: Eq,
 {
@@ -684,7 +684,7 @@ where
 
 /// Affiliated helper trait for ValueEncoder that provides obligate implementations for handling
 /// field keys and wire types.
-trait FieldEncoder<T> {
+pub trait FieldEncoder<T> {
     /// Encodes exactly one field with the given tag and value into the buffer.
     fn encode_field<B: BufMut>(tag: u32, value: &T, buf: &mut B, tw: &mut TagWriter);
     /// Returns the encoded length of the field including its key.
@@ -724,7 +724,7 @@ where
 
 /// Affiliated helper trait for DistinguishedValueEncoder that provides obligate implementations for
 /// handling field keys and wire types.
-trait DistinguishedFieldEncoder<T> {
+pub trait DistinguishedFieldEncoder<T> {
     /// Decodes a field directly from the buffer, also checking the wire type.
     fn decode_field_distinguished<B: Buf>(
         wire_type: WireType,
