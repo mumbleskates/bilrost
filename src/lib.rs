@@ -18,7 +18,8 @@ mod types;
 pub mod encoding;
 
 pub use crate::error::{DecodeError, EncodeError};
-pub use crate::message::{Message, DistinguishedMessage};
+mod helpers;
+pub use crate::message::{DistinguishedMessage, Message};
 pub use crate::name::Name;
 
 use bytes::{Buf, BufMut};
