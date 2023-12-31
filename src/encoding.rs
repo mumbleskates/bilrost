@@ -997,52 +997,6 @@ where
     }
 }
 
-impl<T> Wiretyped<T> for General
-where
-    T: Message,
-{
-    const WIRE_TYPE: WireType = WireType::LengthDelimited;
-}
-
-impl<T> ValueEncoder<T> for General
-where
-    T: Message,
-{
-    fn encode_value<B: BufMut>(value: &T, buf: &mut B) {
-        // TODO(widders): care needs to be taken with top level APIs to avoid running over when
-        //  encoding and panicking in the buf
-        encode_varint(value.encoded_len() as u64, buf);
-        value.encode_raw(buf);
-    }
-
-    fn value_encoded_len(value: &T) -> usize {
-        let inner_len = value.encoded_len();
-        encoded_len_varint(inner_len as u64) + inner_len
-    }
-
-    fn decode_value<B: Buf>(
-        value: &mut T,
-        buf: &mut Capped<B>,
-        ctx: DecodeContext,
-    ) -> Result<(), DecodeError> {
-        // TODO(widders): this will get cleaned up
-        message::merge(WireType::LengthDelimited, value, buf, ctx)
-    }
-}
-
-impl<T> DistinguishedValueEncoder<T> for General
-where
-    T: DistinguishedMessage,
-{
-    fn decode_value_distinguished<B: Buf>(
-        value: &mut T,
-        buf: &mut Capped<B>,
-        ctx: DecodeContext,
-    ) -> Result<(), DecodeError> {
-        todo!()
-    }
-}
-
 /// Packed encodings are always length delimited.
 impl<T, E> Wiretyped<T> for Packed<E> {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
@@ -1929,6 +1883,54 @@ impl sealed::BytesAdapter for Vec<u8> {
 //         }
 //     }
 // }
+
+impl<T> Wiretyped<T> for General
+where
+    T: Message,
+{
+    const WIRE_TYPE: WireType = WireType::LengthDelimited;
+}
+
+impl<T> ValueEncoder<T> for General
+where
+    T: Message,
+{
+    fn encode_value<B: BufMut>(value: &T, buf: &mut B) {
+        // TODO(widders): care needs to be taken with top level APIs to avoid running over when
+        //  encoding and panicking in the buf
+        encode_varint(value.encoded_len() as u64, buf);
+        value.encode_raw(buf);
+    }
+
+    fn value_encoded_len(value: &T) -> usize {
+        let inner_len = value.encoded_len();
+        encoded_len_varint(inner_len as u64) + inner_len
+    }
+
+    fn decode_value<B: Buf>(
+        value: &mut T,
+        buf: &mut Capped<B>,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError> {
+        // TODO(widders): this will get cleaned up
+        message::merge(WireType::LengthDelimited, value, buf, ctx)
+    }
+}
+
+impl<T> DistinguishedValueEncoder<T> for General
+where
+    T: DistinguishedMessage,
+{
+    fn decode_value_distinguished<B: Buf>(
+        value: &mut T,
+        buf: &mut Capped<B>,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError> {
+        todo!()
+    }
+}
+
+// TODO(widders): Oneof
 
 pub mod message {
     use super::*;
