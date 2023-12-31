@@ -114,6 +114,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         } => (false, Vec::new()),
     };
 
+    // TODO(widders): forbid implicit next_tag? hmmmmmm
     let mut next_tag: u32 = 0;
     let unsorted_fields: Vec<(TokenStream, Field)> = fields
         .into_iter()
