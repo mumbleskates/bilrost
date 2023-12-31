@@ -628,8 +628,50 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
             fn try_from(value: u32) -> ::core::result::Result<#ident, ::bilrost::DecodeError> {
                 match value {
                     #(#try_from,)*
-                    _ => ::core::result::Result::Err(::bilrost::DecodeError::new("invalid enumeration value")),
+                    _ => ::core::result::Result::Err(
+                        ::bilrost::DecodeError::new("invalid enumeration value")),
                 }
+            }
+        }
+
+        impl #impl_generics ::bilrost::encoding::Wiretyped<#ident>
+        for ::bilrost::encoding::General {
+            const WIRE_TYPE: ::bilrost::encoding::WireType = ::bilrost::encoding::WireType::Varint;
+        }
+
+        impl #impl_generics ::bilrost::encoding::ValueEncoder<#ident>
+        for ::bilrost::encoding::General {
+            #[inline]
+            fn encode_value<B: ::bilrost::bytes::BufMut>(value: &#ident, buf: &mut B) {
+                ::bilrost::encoding::encode_varint(value.into(), buf);
+            }
+
+            #[inline]
+            fn value_encoded_len(value: &#ident) -> usize {
+                ::bilrost::encoding::encoded_len_varint(value.into())
+            }
+
+            #[inline]
+            fn decode_value<B: ::bilrost::bytes::Buf>(
+                value: &mut #ident,
+                buf: &mut ::bilrost::encoding::Capped<B>,
+                _ctx: ::bilrost::encoding::DecodeContext,
+            ) -> Result<(), ::bilrost::DecodeError> {
+                *value = u32::try_from(buf.decode_varint()?)
+                    .map_err(|_| ::bilrost::DecodeError::new("varint overflows range of u32"))?;
+                Ok(())
+            }
+        }
+
+        impl ::bilrost::encoding::DistinguishedValueEncoder<#ident>
+        for ::bilrost::encoding::General {
+            #[inline]
+            fn decode_value_distinguished<B: ::bilrost::bytes::Buf>(
+                value: &mut #ident,
+                buf: &mut ::bilrost::encoding::Capped<B>,
+                ctx: ::bilrost::encoding::DecodeContext,
+            ) -> Result<(), ::bilrost::DecodeError> {
+                Self::decode_value(value, buf, ctx)
             }
         }
     };

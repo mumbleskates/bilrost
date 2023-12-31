@@ -1298,45 +1298,6 @@ macro_rules! varint {
     };
 }
 
-/// Enums are always encoded as varints.
-impl<T: BilrostEnum> Wiretyped<T> for General {
-    const WIRE_TYPE: WireType = WireType::Varint;
-}
-
-impl<T: BilrostEnum> ValueEncoder<T> for General {
-    #[inline]
-    fn encode_value<B: BufMut>(value: &T, buf: &mut B) {
-        encode_varint(value.into(), buf);
-    }
-
-    #[inline]
-    fn value_encoded_len(value: &T) -> usize {
-        encoded_len_varint(value.into())
-    }
-
-    #[inline]
-    fn decode_value<B: Buf>(
-        value: &mut T,
-        buf: &mut Capped<B>,
-        _ctx: DecodeContext,
-    ) -> Result<(), DecodeError> {
-        *value = u32::try_from(buf.decode_varint()?)
-            .map_err(|_| DecodeError::new("varint overflows range of u32"))?;
-        Ok(())
-    }
-}
-
-impl<T: BilrostEnum> DistinguishedValueEncoder<T> for General {
-    #[inline]
-    fn decode_value_distinguished<B: Buf>(
-        value: &mut u32,
-        buf: &mut Capped<B>,
-        ctx: DecodeContext,
-    ) -> Result<(), DecodeError> {
-        Self::decode_value(value, buf, ctx)
-    }
-}
-
 varint!(bool,
 to_uint64(value) {
     u64::from(*value)
