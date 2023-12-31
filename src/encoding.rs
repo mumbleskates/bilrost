@@ -792,6 +792,35 @@ impl<T> Veclike for Vec<T> {
     }
 }
 
+/// Marker trait for bilrost enumeration types.
+pub trait BilrostEnum: TryFrom<u32> + Into<u32> {}
+
+/// Trait for cheaply producing a new value that will always be overwritten, rather than a value
+/// that really serves as a zero-valued default. This is implemented for types that can be present
+/// optionally (in Option or Vec, for instance) but don't have a Default value, such as
+/// enumerations.
+///
+/// API design note:
+/// Philosophically it would be preferable to make decoding values produce owned values rather than
+/// writing them into a &mut T, but this is currently not possible as reading in values may happen
+/// multiple times for the same destination field (such as Vec<T>, or more challengingly Oneofs).
+// TODO(widders): if we change unpacked repeated to greedily decode every available field with the
+//  same tag instead of waiting for them to be provided, we gain two major things: we can return
+//  decoded types by value instead of always needing to write them into a &mut, and we can do a
+//  better job of complaining when we decode repeated fields with mixed packedness.
+pub trait NewForOverwrite {
+    /// Produces a new Self value to be overwritten.
+    fn new_for_overwrite() -> Self;
+}
+impl<T> NewForOverwrite for T
+where
+    T: Default,
+{
+    fn new_for_overwrite() -> Self {
+        Self::default()
+    }
+}
+
 /// General encoder. Encodes numbers as varints and repeated types un-packed.
 pub struct General;
 /// Fixed-size encoder. Encodes integers in fixed-size format.
@@ -875,7 +904,7 @@ where
 impl<T, E> Encoder<Option<T>> for E
 where
     E: ValueEncoder<T>,
-    T: Default,
+    T: NewForOverwrite,
 {
     #[inline]
     fn encode<B: BufMut>(tag: u32, value: &Option<T>, buf: &mut B, tw: &mut TagWriter) {
@@ -906,7 +935,12 @@ where
                 "multiple occurrences of non-repeated field",
             ));
         }
-        Self::decode_field(wire_type, value.get_or_insert_with(T::default), buf, ctx)
+        Self::decode_field(
+            wire_type,
+            value.get_or_insert_with(T::new_for_overwrite),
+            buf,
+            ctx,
+        )
     }
 }
 
@@ -915,7 +949,7 @@ where
 impl<T, E> DistinguishedEncoder<Option<T>> for E
 where
     E: DistinguishedValueEncoder<T> + Encoder<Option<T>>,
-    T: Default + Eq,
+    T: NewForOverwrite + Eq,
 {
     #[inline]
     fn decode_distinguished<B: Buf>(
@@ -930,7 +964,12 @@ where
                 "multiple occurrences of non-repeated field",
             ));
         }
-        Self::decode_field_distinguished(wire_type, value.get_or_insert_with(T::default), buf, ctx)
+        Self::decode_field_distinguished(
+            wire_type,
+            value.get_or_insert_with(T::new_for_overwrite),
+            buf,
+            ctx,
+        )
     }
 }
 
@@ -940,7 +979,7 @@ impl<C, T, E> Encoder<C> for Unpacked<E>
 where
     C: Veclike<Item = T>,
     E: ValueEncoder<T>,
-    T: Default,
+    T: NewForOverwrite,
 {
     fn encode<B: BufMut>(tag: u32, value: &C, buf: &mut B, tw: &mut TagWriter) {
         for val in value.iter() {
@@ -967,7 +1006,7 @@ where
         if wire_type == WireType::LengthDelimited && E::WIRE_TYPE != WireType::LengthDelimited {
             Packed::<E>::decode_value(value, buf, ctx)
         } else {
-            let mut new_val = Default::default();
+            let mut new_val = T::new_for_overwrite();
             E::decode_field(wire_type, &mut new_val, buf, ctx)?;
             value.push(new_val);
             Ok(())
@@ -981,7 +1020,7 @@ where
     Self: Encoder<C>,
     C: Veclike<Item = T>,
     E: DistinguishedValueEncoder<T>,
-    T: Default + Eq,
+    T: NewForOverwrite + Eq,
 {
     fn decode_distinguished<B: Buf>(
         wire_type: WireType,
@@ -990,7 +1029,7 @@ where
         buf: &mut Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
-        let mut new_val = Default::default();
+        let mut new_val = T::new_for_overwrite();
         E::decode_field_distinguished(wire_type, &mut new_val, buf, ctx)?;
         value.push(new_val);
         Ok(())
@@ -1006,7 +1045,7 @@ impl<C, T, E> ValueEncoder<C> for Packed<E>
 where
     C: Veclike<Item = T>,
     E: ValueEncoder<T>,
-    T: Default,
+    T: NewForOverwrite,
 {
     fn encode_value<B: BufMut>(value: &C, buf: &mut B) {
         encode_varint(E::many_values_encoded_len(value) as u64, buf);
@@ -1030,7 +1069,7 @@ where
             return Err(DecodeError::new("packed field is not a valid length"));
         }
         let mut consumer = FallibleIter::new(capped.consume(|buf| {
-            let mut new_val = Default::default();
+            let mut new_val = T::new_for_overwrite();
             E::decode_value(&mut new_val, buf, ctx.clone())?;
             Ok(new_val)
         }));
@@ -1043,7 +1082,7 @@ impl<C, T, E> DistinguishedValueEncoder<C> for Packed<E>
 where
     C: Veclike<Item = T> + Eq,
     E: DistinguishedValueEncoder<T>,
-    T: Default + Eq,
+    T: NewForOverwrite + Eq,
 {
     fn decode_value_distinguished<B: Buf>(
         value: &mut C,
@@ -1055,7 +1094,7 @@ where
             return Err(DecodeError::new("packed field is not a valid length"));
         }
         let mut consumer = FallibleIter::new(capped.consume(|buf| {
-            let mut new_val = Default::default();
+            let mut new_val = T::new_for_overwrite();
             E::decode_value_distinguished(&mut new_val, buf, ctx.clone())?;
             Ok(new_val)
         }));
@@ -1257,6 +1296,45 @@ macro_rules! varint {
         //     }
         // }
     };
+}
+
+/// Enums are always encoded as varints.
+impl<T: BilrostEnum> Wiretyped<T> for General {
+    const WIRE_TYPE: WireType = WireType::Varint;
+}
+
+impl<T: BilrostEnum> ValueEncoder<T> for General {
+    #[inline]
+    fn encode_value<B: BufMut>(value: &T, buf: &mut B) {
+        encode_varint(value.into(), buf);
+    }
+
+    #[inline]
+    fn value_encoded_len(value: &T) -> usize {
+        encoded_len_varint(value.into())
+    }
+
+    #[inline]
+    fn decode_value<B: Buf>(
+        value: &mut T,
+        buf: &mut Capped<B>,
+        _ctx: DecodeContext,
+    ) -> Result<(), DecodeError> {
+        *value = u32::try_from(buf.decode_varint()?)
+            .map_err(|_| DecodeError::new("varint overflows range of u32"))?;
+        Ok(())
+    }
+}
+
+impl<T: BilrostEnum> DistinguishedValueEncoder<T> for General {
+    #[inline]
+    fn decode_value_distinguished<B: Buf>(
+        value: &mut u32,
+        buf: &mut Capped<B>,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError> {
+        Self::decode_value(value, buf, ctx)
+    }
 }
 
 varint!(bool,
@@ -2022,6 +2100,9 @@ pub mod message {
         }
     }
 }
+
+// TODO(widders): enums (trait for bilrost enums)
+// TODO(widders): helper encoder for enums stored as u32
 
 /// Rust doesn't have a `Map` trait, so macros are currently the best way to be
 /// generic over `HashMap` and `BTreeMap`.

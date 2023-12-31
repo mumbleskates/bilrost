@@ -587,6 +587,8 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
         panic!("Enumeration must have at least one variant");
     }
 
+    // TODO(widders): impl a BilrostEnum trait, and impl Default only when there's a zero-valued
+    //  variant, so that the enum type can be included directly; otherwise impl NewForOverwrite
     let default = variants[0].0.clone();
 
     let is_valid = variants.iter().map(|(_, value)| quote!(#value => true));
