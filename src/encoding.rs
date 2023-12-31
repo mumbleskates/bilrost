@@ -1239,6 +1239,7 @@ delegate_encoding!(delegate from General, to Fixed, for type f64);
 /// Macro which emits implementations for variable width numeric encoding.
 macro_rules! varint {
     (
+        $name:ident,
         $ty:ty,
         to_uint64($to_uint64_value:ident) $to_uint64:expr,
         from_uint64($from_uint64_value:ident) $from_uint64:expr
@@ -1281,38 +1282,32 @@ macro_rules! varint {
             }
         }
 
-        // TODO(widders): tests
-        // #[cfg(test)]
-        // mod test_varint_$ty {
-        //     use proptest::prelude::*;
-        //
-        //     use crate::encoding::test::{check_collection_type, check_type};
-        //     use crate::encoding::$proto_ty::*;
-        //
-        //     proptest! {
-        //         #[test]
-        //         fn check(value: $ty, tag: u32) {
-        //             check_type(value, tag, WireType::Varint,
-        //                        encode, merge, encoded_len)?;
-        //         }
-        //         #[test]
-        //         fn check_repeated(value: Vec<$ty>, tag: u32) {
-        //             check_collection_type(value, tag, WireType::Varint,
-        //                                   encode_repeated, merge_repeated,
-        //                                   encoded_len_repeated)?;
-        //         }
-        //         #[test]
-        //         fn check_packed(value: Vec<$ty>, tag: u32) {
-        //             check_type(value, tag, WireType::LengthDelimited,
-        //                        encode_packed, merge_repeated,
-        //                        encoded_len_packed)?;
-        //         }
-        //     }
-        // }
+        #[cfg(test)]
+        mod $name {
+            use proptest::prelude::*;
+
+            use crate::encoding::test::{check_type_unpacked, check_type};
+            use crate::encoding::{General, Packed, Unpacked, WireType};
+
+            proptest! {
+                #[test]
+                fn check(value: $ty, tag: u32) {
+                    check_type::<$ty, General>(value, tag, WireType::Varint)?;
+                }
+                #[test]
+                fn check_unpacked(value: Vec<$ty>, tag: u32) {
+                    check_type_unpacked::<Vec<$ty>, Unpacked>(value, tag, WireType::Varint)?;
+                }
+                #[test]
+                fn check_packed(value: Vec<$ty>, tag: u32) {
+                    check_type::<Vec<$ty>, Packed>(value, tag, WireType::LengthDelimited)?;
+                }
+            }
+        }
     };
 }
 
-varint!(bool,
+varint!(varint_bool, bool,
 to_uint64(value) {
     u64::from(*value)
 },
@@ -1323,21 +1318,21 @@ from_uint64(value) {
         _ => return Err(DecodeError::new("invalid varint value for bool"))
     }
 });
-varint!(u32,
+varint!(varint_u32, u32,
 to_uint64(value) {
     *value as u64
 },
 from_uint64(value) {
     u32::try_from(value).map_err(|_| DecodeError::new("varint overflows range of u32"))?
 });
-varint!(u64,
+varint!(varint_u64, u64,
 to_uint64(value) {
     *value
 },
 from_uint64(value) {
     value
 });
-varint!(i32,
+varint!(varint_i32, i32,
 to_uint64(value) {
     ((value << 1) ^ (value >> 31)) as u32 as u64
 },
@@ -1346,7 +1341,7 @@ from_uint64(value) {
         .map_err(|_| DecodeError::new("varint overflows range of i32"))?;
     ((value >> 1) as i32) ^ (-((value & 1) as i32))
 });
-varint!(i64,
+varint!(varint_i64, i64,
 to_uint64(value) {
     ((value << 1) ^ (value >> 63)) as u64
 },
@@ -2322,24 +2317,33 @@ mod test {
 
     use crate::encoding::*;
 
-    pub fn check_type<T, B>(
-        value: T,
-        tag: u32,
-        wire_type: WireType,
-        encode: fn(u32, &B, &mut BytesMut, &mut TagWriter),
-        merge: fn(WireType, &mut T, &mut Capped<Bytes>, DecodeContext) -> Result<(), DecodeError>,
-        encoded_len: fn(u32, &B, &mut TagMeasurer) -> usize,
-    ) -> TestCaseResult
+    fn check_legal_remaining(tag: u32, wire_type: WireType, remaining: usize) -> TestCaseResult {
+        match wire_type {
+            WireType::SixtyFourBit => 8..=8,
+            WireType::ThirtyTwoBit => 4..=4,
+            WireType::Varint => 1..=9,
+            WireType::LengthDelimited => 1..=usize::MAX,
+        }
+        .contains(&remaining)
+        .then(|| ())
+        .ok_or_else(|| {
+            TestCaseError::fail(format!(
+                "{wire_type:?} wire type illegal remaining: {remaining}, tag: {tag}"
+            ))
+        })
+    }
+
+    pub fn check_type<T, E>(value: T, tag: u32, wire_type: WireType) -> TestCaseResult
     where
-        T: Debug + Default + PartialEq + Borrow<B>,
-        B: ?Sized,
+        E: Encoder<T>,
+        T: Debug + NewForOverwrite + PartialEq,
     {
         let mut tw = TagWriter::new();
         let mut tm = tw.measurer();
-        let expected_len = encoded_len(tag, value.borrow(), &mut tm);
+        let expected_len = E::encoded_len(tag, &value, &mut tm);
 
         let mut buf = BytesMut::with_capacity(expected_len);
-        encode(tag, value.borrow(), &mut buf, &mut tw);
+        E::encode(tag, &value, &mut buf, &mut tw);
 
         let buf = &mut buf.freeze();
         let mut buf = Capped::new(buf);
@@ -2377,23 +2381,12 @@ mod test {
             decoded_wire_type,
         );
 
-        match wire_type {
-            WireType::SixtyFourBit if buf.remaining() != 8 => Err(TestCaseError::fail(format!(
-                "64bit wire type illegal remaining: {}, tag: {}",
-                buf.remaining(),
-                tag
-            ))),
-            WireType::ThirtyTwoBit if buf.remaining() != 4 => Err(TestCaseError::fail(format!(
-                "32bit wire type illegal remaining: {}, tag: {}",
-                buf.remaining(),
-                tag
-            ))),
-            _ => Ok(()),
-        }?;
+        check_legal_remaining(tag, wire_type, buf.remaining())?;
 
-        let mut roundtrip_value = T::default();
-        merge(
+        let mut roundtrip_value = T::new_for_overwrite();
+        E::decode(
             wire_type,
+            false,
             &mut roundtrip_value,
             &mut buf,
             DecodeContext::default(),
@@ -2411,27 +2404,21 @@ mod test {
         Ok(())
     }
 
-    pub fn check_collection_type<T, B, E, M, L>(
+    pub fn check_type_unpacked<T, E>(
         value: T,
         tag: u32,
         wire_type: WireType,
-        encode: E,
-        mut merge: M,
-        encoded_len: L,
     ) -> TestCaseResult
     where
-        T: Debug + Default + PartialEq + Borrow<B>,
-        B: ?Sized,
-        E: FnOnce(u32, &B, &mut BytesMut, &mut TagWriter),
-        M: FnMut(WireType, &mut T, &mut Capped<Bytes>, DecodeContext) -> Result<(), DecodeError>,
-        L: FnOnce(u32, &B, &mut TagMeasurer) -> usize,
+        T: Debug + NewForOverwrite + PartialEq,
+        E: Encoder<T>,
     {
         let mut tw = TagWriter::new();
         let mut tm = tw.measurer();
-        let expected_len = encoded_len(tag, value.borrow(), &mut tm);
+        let expected_len = E::encoded_len(tag, value.borrow(), &mut tm);
 
         let mut buf = BytesMut::with_capacity(expected_len);
-        encode(tag, value.borrow(), &mut buf, &mut tw);
+        E::encode(tag, value.borrow(), &mut buf, &mut tw);
 
         let mut tr = TagReader::new();
         let buf = &mut buf.freeze();
@@ -2445,7 +2432,7 @@ mod test {
             buf.remaining()
         );
 
-        let mut roundtrip_value = Default::default();
+        let mut roundtrip_value = T::new_for_overwrite();
         while buf.has_remaining() {
             let (decoded_tag, decoded_wire_type) = tr
                 .decode_key(buf.buf())
@@ -2467,8 +2454,9 @@ mod test {
                 decoded_wire_type
             );
 
-            merge(
+            E::decode(
                 wire_type,
+                false,
                 &mut roundtrip_value,
                 &mut buf,
                 DecodeContext::default(),
