@@ -30,6 +30,8 @@ pub use protobuf::*;
 const NANOS_PER_SECOND: i32 = 1_000_000_000;
 const NANOS_MAX: i32 = NANOS_PER_SECOND - 1;
 
+// TODO(widders): Message and into/from impls on time::Duration, time::Instant as optional features
+
 #[cfg(feature = "std")]
 impl std::hash::Hash for Duration {
     fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
