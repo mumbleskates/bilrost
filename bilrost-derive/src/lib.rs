@@ -2,11 +2,9 @@
 // The `quote!` macro requires deep recursion.
 #![recursion_limit = "4096"]
 
-extern crate alloc;
-
-use alloc::collections::BTreeSet;
-use core::mem::take;
-use core::ops::Deref;
+use std::collections::BTreeSet;
+use std::mem::take;
+use std::ops::Deref;
 
 use anyhow::{bail, Error};
 use itertools::Itertools;
