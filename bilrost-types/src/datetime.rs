@@ -50,16 +50,13 @@ impl DateTime {
 
     /// Returns `true` if the `DateTime` is a valid calendar date.
     pub(crate) fn is_valid(&self) -> bool {
-        self >= &DateTime::MIN
-            && self <= &DateTime::MAX
-            && self.month > 0
-            && self.month <= 12
-            && self.day > 0
-            && self.day <= days_in_month(self.year, self.month)
-            && self.hour < 24
-            && self.minute < 60
-            && self.second < 60
-            && self.nanos < 1_000_000_000
+        (DateTime::MIN..=DateTime::MAX).contains(self)
+            && (1..=12).contains(&self.month)
+            && (1..=days_in_month(self.year, self.month)).contains(&self.day)
+            && (0..24).contains(&self.hour)
+            && (0..60).contains(&self.minute)
+            && (0..60).contains(&self.second)
+            && (0..1_000_000_000).contains(&self.nanos)
     }
 }
 
