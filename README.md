@@ -1,6 +1,6 @@
 # *BILROST!*
 
-TODO(widders): normalize capitalization of "bilrost"
+<!-- TODO(widders): normalize capitalization of "bilrost" -->
 
 `bilrost` is a
 [Protocol Buffers](https://developers.google.com/protocol-buffers/)-alike
@@ -88,7 +88,7 @@ encoder which is responsible
 
 #### Expedient vs. Distinguished Encoding
 
-TODO(widders): explain
+<!-- TODO(widders): explain -->
 
 #### Field types
 
@@ -132,7 +132,7 @@ several different containers:
 | `Map<KE, VE>`   | `HashMap<K, V>`  | length-delimited, alternately encoded with `KE` and `VE` | yes         |
 | `General`       | (map types)      | (the same as `Map<General, General>`                     | yes         |
 
-TODO(widders): `Set` types
+<!-- TODO(widders): `Set` types -->
 
 #### Compatible Widening
 
@@ -159,11 +159,14 @@ also change the bytes of the encoding, but expedient decoding will still work.
 
 All enumeration types convert to and from the Rust `u32` type.
 
-TODO(widders): document what else there is about enums and their deriver
+<!-- TODO(widders): document what else there is about enums and their deriver -->
 
 #### Oneof Fields
 
-TODO(widders): impl and doc
+Oneof fields are enums with their own derive macro, which represent multiple
+fields in the message, only one of which may be present in a valid message.
+
+<!-- TODO(widders): impl and doc -->
 
 ## Using `bilrost` in a `no_std` Crate
 
@@ -195,7 +198,7 @@ sequentially occurring tag values by specifying the tag number to skip to with
 the `tag` attribute on the first field after the gap. The following fields will
 be tagged sequentially starting from the next number.
 
-TODO(widders): fix this example
+<!-- TODO(widders): fix this example -->
 ```rust,ignore
 use bilrost;
 use bilrost::{Enumeration, Message};
