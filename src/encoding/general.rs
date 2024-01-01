@@ -249,28 +249,11 @@ impl DistinguishedValueEncoder<String> for General {
     }
 }
 
-// TODO(widders): tests
-// #[cfg(test)]
-// mod string_test {
-//     use proptest::prelude::*;
-//
-//     use super::super::test::{check_collection_type, check_type};
-//     use super::*;
-//
-//     proptest! {
-//         #[test]
-//         fn check(value: String, tag: u32) {
-//             super::test::check_type(value, tag, WireType::LengthDelimited,
-//                                     encode, merge, encoded_len)?;
-//         }
-//         #[test]
-//         fn check_repeated(value: Vec<String>, tag: u32) {
-//             super::test::check_collection_type(value, tag, WireType::LengthDelimited,
-//                                                encode_repeated, merge_repeated,
-//                                                encoded_len_repeated)?;
-//         }
-//     }
-// }
+#[cfg(test)]
+mod string {
+    crate::encoding::check_type_test!(General, expedient, String, WireType::LengthDelimited);
+    crate::encoding::check_type_test!(General, distinguished, String, WireType::LengthDelimited);
+}
 
 // TODO(widders): bytes for General
 // pub mod bytes {
