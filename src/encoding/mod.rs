@@ -597,7 +597,8 @@ pub trait DistinguishedEncoder<T>: Encoder<T> {
 
 /// Encoders' wire-type is relied upon by both relaxed and distinguished encoders, but it is written
 /// to be a separate trait so that distinguished encoders don't necessarily implement relaxed
-/// decoding. This isn't important in general; it's very unlikely anything would implement this, but
+/// decoding. This isn't important in general; it's very unlikely anything would implement
+/// distinguished decoding without also implementing the corresponding expedient encoding, but
 /// this means that it can become a typo to use the relaxed decoding functions by accident when
 /// implementing the distinguished encoders, which could cause serious mishaps.
 pub trait Wiretyped<T> {
