@@ -1,7 +1,6 @@
 #![allow(clippy::implicit_hasher, clippy::ptr_arg)]
 
 use alloc::format;
-use alloc::string::String;
 use alloc::vec::Vec;
 use core::cmp::{
     min, Eq,
@@ -932,6 +931,7 @@ delegate_value_encoding!(delegate from General, to Fixed, for type f32);
 delegate_value_encoding!(delegate from General, to Fixed, for type f64);
 
 /// Generalized proptest macro. Kind must be either `expedient` or `distinguished`.
+#[allow(unused_macros)]
 macro_rules! check_type_test {
     ($encoder:ty, $kind:ident, $ty:ty, $wire_type:expr) => {
         #[cfg(test)]
@@ -962,6 +962,8 @@ macro_rules! check_type_test {
         }
     };
 }
+/// Since this macro is only used in other macros, it currently appears to be unused to the linter.
+#[allow(unused_imports)]
 pub(crate) use check_type_test;
 
 pub trait BytesAdapter: sealed::BytesAdapter {}
@@ -1039,7 +1041,7 @@ pub use general::message;
 
 #[cfg(test)]
 mod test {
-    use alloc::string::ToString;
+    use alloc::string::{String, ToString};
     use core::borrow::Borrow;
     use core::fmt::Debug;
 

@@ -2,7 +2,7 @@ use crate::bytes::{Buf, BufMut};
 use crate::encoding::{
     Capped, DecodeContext, DistinguishedEncoder, DistinguishedFieldEncoder,
     DistinguishedValueEncoder, Encoder, FieldEncoder, General, NewForOverwrite, Packed,
-    TagMeasurer, TagWriter, ValueEncoder, Veclike, WireType, Wiretyped,
+    TagMeasurer, TagWriter, ValueEncoder, Veclike, WireType,
 };
 use crate::DecodeError;
 

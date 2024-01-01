@@ -4,7 +4,6 @@ use core::mem;
 use core::str;
 
 use crate::bytes::{Buf, BufMut};
-use crate::encoding::sealed::BytesAdapter;
 use crate::encoding::{
     check_wire_type, encode_varint, encoded_len_varint, Capped, DecodeContext,
     DistinguishedEncoder, DistinguishedFieldEncoder, DistinguishedValueEncoder, Encoder,
@@ -196,7 +195,7 @@ impl ValueEncoder<String> for General {
     fn decode_value<B: Buf>(
         value: &mut String,
         buf: &mut Capped<B>,
-        ctx: DecodeContext,
+        _ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         // ## Unsafety
         //
