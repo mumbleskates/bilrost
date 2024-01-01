@@ -1048,7 +1048,6 @@ mod test {
 
     use proptest::{prelude::*, test_runner::TestCaseResult};
 
-    use crate::bytes::BytesMut;
     use crate::encoding::*;
 
     fn check_legal_remaining(tag: u32, wire_type: WireType, remaining: usize) -> TestCaseResult {
@@ -1071,6 +1070,7 @@ mod test {
         ($kind:ident, $encoder_trait:ident, $decode:ident) => {
             pub mod $kind {
                 use super::*;
+                use crate::bytes::BytesMut;
 
                 pub fn check_type<T, E>(value: T, tag: u32, wire_type: WireType) -> TestCaseResult
                 where
