@@ -33,14 +33,23 @@ where
 
     fn decode<B: Buf>(
         wire_type: WireType,
-        _duplicated: bool,
+        duplicated: bool,
         value: &mut C,
         buf: &mut Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         if wire_type == WireType::LengthDelimited && E::WIRE_TYPE != WireType::LengthDelimited {
+            // We've encountered a length-delimited field when we aren't expecting one; try decoding
+            // it in packed format instead.
+            if duplicated {
+                return Err(DecodeError::new(
+                    "multiple occurrences of packed repeated field",
+                ));
+            }
             Packed::<E>::decode_value(value, buf, ctx)
         } else {
+            // Otherwise, decode one field normally.
+            // TODO(widders): we would take more fields greedily here
             let mut new_val = T::new_for_overwrite();
             E::decode_field(wire_type, &mut new_val, buf, ctx)?;
             value.push(new_val);

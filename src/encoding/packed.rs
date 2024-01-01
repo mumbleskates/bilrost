@@ -77,10 +77,12 @@ where
 }
 
 /// ValueEncoder for packed repeated encodings lets this value type nest.
-impl<C, E> Encoder<C> for Packed<E>
+impl<C, T, E> Encoder<C> for Packed<E>
 where
-    C: Veclike,
+    C: Veclike<Item = T>,
     Packed<E>: ValueEncoder<C>,
+    E: ValueEncoder<T>,
+    T: NewForOverwrite,
 {
     #[inline]
     fn encode<B: BufMut>(tag: u32, value: &C, buf: &mut B, tw: &mut TagWriter) {
@@ -106,12 +108,22 @@ where
         buf: &mut Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
-        if duplicated {
-            return Err(DecodeError::new(
-                "multiple occurrences of packed repeated field",
-            ));
+        if wire_type == WireType::LengthDelimited {
+            // We've encountered the expected length-delimited type: decode it in packed format.
+            if duplicated {
+                return Err(DecodeError::new(
+                    "multiple occurrences of packed repeated field",
+                ));
+            }
+            Self::decode_value(value, buf, ctx)
+        } else {
+            // Otherwise, try decoding it in the
+            // TODO(widders): we would take more fields greedily here
+            let mut new_val = T::new_for_overwrite();
+            E::decode_field(wire_type, &mut new_val, buf, ctx)?;
+            value.push(new_val);
+            Ok(())
         }
-        Self::decode_field(wire_type, value, buf, ctx)
     }
 }
 
