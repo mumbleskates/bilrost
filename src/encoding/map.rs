@@ -236,7 +236,7 @@ macro_rules! map {
 
 #[cfg(test)]
 mod test {
-        /// This big bowl o' macro soup generates an encoding property test for each combination of map
+    /// This big bowl o' macro soup generates an encoding property test for each combination of map
     /// type, scalar map key, and value type.
     /// TODO: these tests take a long time to compile, can this be improved?
     macro_rules! map_tests {

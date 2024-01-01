@@ -264,8 +264,18 @@ impl DistinguishedValueEncoder<String> for General {
 #[cfg(test)]
 mod string {
     use crate::encoding::check_type_test;
-    check_type_test!(General, expedient, alloc::string::String, WireType::LengthDelimited);
-    check_type_test!(General, distinguished, alloc::string::String, WireType::LengthDelimited);
+    check_type_test!(
+        General,
+        expedient,
+        alloc::string::String,
+        WireType::LengthDelimited
+    );
+    check_type_test!(
+        General,
+        distinguished,
+        alloc::string::String,
+        WireType::LengthDelimited
+    );
 }
 
 impl Wiretyped<Bytes> for General {
@@ -346,7 +356,12 @@ impl DistinguishedValueEncoder<Blob> for General {
 mod blob {
     use crate::encoding::check_type_test;
     check_type_test!(General, expedient, crate::Blob, WireType::LengthDelimited);
-    check_type_test!(General, distinguished, crate::Blob, WireType::LengthDelimited);
+    check_type_test!(
+        General,
+        distinguished,
+        crate::Blob,
+        WireType::LengthDelimited
+    );
 }
 
 // TODO(widders): Oneof

@@ -1,7 +1,16 @@
-use bytes::{Buf, BufMut};
+use crate::encoding::{
+    check_type_test, delegate_encoding, encode_varint, encoded_len_varint, Capped, DecodeContext,
+    DistinguishedEncoder, DistinguishedFieldEncoder, DistinguishedValueEncoder, Encoder,
+    FieldEncoder, TagMeasurer, TagWriter, ValueEncoder, WireType, Wiretyped,
+};
 use crate::DecodeError;
-use crate::encoding::{Capped, check_type_test, DecodeContext, delegate_encoding, DistinguishedEncoder, DistinguishedFieldEncoder, DistinguishedValueEncoder, encode_varint, encoded_len_varint, Encoder, FieldEncoder, General, TagMeasurer, TagWriter, ValueEncoder, WireType, Wiretyped};
+use bytes::{Buf, BufMut};
 
+/// `VecBlob` implements encoding for blob values directly into `Vec<u8>`, and provides the base
+/// implementation for that functionality. `Vec<u8>` cannot generically dispatch to `General`'s
+/// encoding, since `General` already generically implements encoding for other kinds of `Vec`, but
+/// this encoder can be used instead if it's desirable to have a value whose type is exactly
+/// `Vec<u8>`.
 pub struct VecBlob;
 
 impl Wiretyped<Vec<u8>> for VecBlob {
