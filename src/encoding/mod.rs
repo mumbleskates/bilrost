@@ -710,10 +710,6 @@ where
 
 pub use value_traits::{NewForOverwrite, Veclike};
 
-/// Marker trait for bilrost enumeration types.
-// TODO(widders): do we need this? i forget
-pub trait BilrostEnum: TryFrom<u32> + Into<u32> {}
-
 /// Fixed-size encoder. Encodes integers in fixed-size format.
 pub use fixed::Fixed;
 /// General encoder. Encodes numbers as varints and repeated types un-packed.
