@@ -938,7 +938,6 @@ macro_rules! delegate_value_encoding {
 pub(crate) use delegate_value_encoding;
 
 /// Generalized proptest macro. Kind must be either `expedient` or `distinguished`.
-#[allow(unused_macros)]
 macro_rules! check_type_test {
     ($encoder:ty, $kind:ident, $ty:ty, $wire_type:expr) => {
         #[cfg(test)]
@@ -972,83 +971,7 @@ macro_rules! check_type_test {
         }
     };
 }
-// Since this macro is only used in other macros in other modules, it currently appears to be unused
-// to the linter.
-#[allow(unused_imports)]
 pub(crate) use check_type_test;
-
-// TODO(widders): we can delete this eventually. It is only used, originally, to dispatch more
-//  efficient copying out of the source buffer. (e.g., it allows Bytes to use its shallow-copy
-//  optimization, while also making it possible to copy Vec<u8> to Vec<u8> without copying twice.)
-pub trait BytesAdapter: sealed::BytesAdapter {}
-
-mod sealed {
-    use super::{Buf, BufMut};
-
-    pub trait BytesAdapter: Default + Sized + 'static {
-        fn len(&self) -> usize;
-
-        /// Replace contents of this buffer with the contents of another buffer.
-        fn replace_with<B>(&mut self, buf: B)
-        where
-            B: Buf;
-
-        /// Appends this buffer to the (contents of) other buffer.
-        fn append_to<B>(&self, buf: &mut B)
-        where
-            B: BufMut;
-
-        fn is_empty(&self) -> bool {
-            self.len() == 0
-        }
-    }
-}
-
-impl BytesAdapter for Bytes {}
-
-impl sealed::BytesAdapter for Bytes {
-    fn len(&self) -> usize {
-        Buf::remaining(self)
-    }
-
-    fn replace_with<B>(&mut self, mut buf: B)
-    where
-        B: Buf,
-    {
-        *self = buf.copy_to_bytes(buf.remaining());
-    }
-
-    fn append_to<B>(&self, buf: &mut B)
-    where
-        B: BufMut,
-    {
-        buf.put(self.clone())
-    }
-}
-
-impl BytesAdapter for Vec<u8> {}
-
-impl sealed::BytesAdapter for Vec<u8> {
-    fn len(&self) -> usize {
-        Vec::len(self)
-    }
-
-    fn replace_with<B>(&mut self, buf: B)
-    where
-        B: Buf,
-    {
-        self.clear();
-        self.reserve(buf.remaining());
-        self.put(buf);
-    }
-
-    fn append_to<B>(&self, buf: &mut B)
-    where
-        B: BufMut,
-    {
-        buf.put(self.as_slice())
-    }
-}
 
 // TODO(widders): delete this
 pub use general::message;

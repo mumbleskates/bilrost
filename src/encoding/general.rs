@@ -3,14 +3,14 @@ use alloc::vec::Vec;
 use core::mem;
 use core::str;
 
-use crate::bytes::{Buf, BufMut};
+use crate::bytes::{Buf, BufMut, Bytes};
 use crate::encoding::{
     check_wire_type, delegate_encoding, delegate_value_encoding, encode_varint, encoded_len_varint,
     Capped, DecodeContext, DistinguishedEncoder, DistinguishedFieldEncoder,
     DistinguishedValueEncoder, Encoder, FieldEncoder, TagMeasurer, TagReader, TagWriter,
     ValueEncoder, WireType, Wiretyped,
 };
-use crate::{DecodeError, DistinguishedMessage, Message};
+use crate::{Blob, DecodeError, DistinguishedMessage, Message};
 
 pub struct General;
 
@@ -263,122 +263,92 @@ impl DistinguishedValueEncoder<String> for General {
 
 #[cfg(test)]
 mod string {
-    crate::encoding::check_type_test!(
-        General,
-        expedient,
-        alloc::string::String,
-        WireType::LengthDelimited
-    );
-    crate::encoding::check_type_test!(
-        General,
-        distinguished,
-        alloc::string::String,
-        WireType::LengthDelimited
-    );
+    use crate::encoding::check_type_test;
+    check_type_test!(General, expedient, alloc::string::String, WireType::LengthDelimited);
+    check_type_test!(General, distinguished, alloc::string::String, WireType::LengthDelimited);
 }
 
-// TODO(widders): bytes for General
-// pub mod bytes {
-//     use super::*;
-//
-//     pub fn encode<A, B>(tag: u32, value: &A, buf: &mut B, tw: &mut TagWriter)
-//     where
-//         A: BytesAdapter,
-//         B: BufMut,
-//     {
-//         tw.encode_key(tag, WireType::LengthDelimited, buf);
-//         encode_varint(value.len() as u64, buf);
-//         value.append_to(buf);
-//     }
-//
-//     pub fn merge<A, B>(
-//         wire_type: WireType,
-//         value: &mut A,
-//         buf: &mut Capped<B>,
-//         _ctx: DecodeContext,
-//     ) -> Result<(), DecodeError>
-//     where
-//         A: BytesAdapter,
-//         B: Buf,
-//     {
-//         check_wire_type(WireType::LengthDelimited, wire_type)?;
-//         let mut buf = buf.take_length_delimited()?;
-//
-//         // Clear the existing value. This follows from the following rule in the encoding guide[1]:
-//         //
-//         // > Normally, an encoded message would never have more than one instance of a non-repeated
-//         // > field. However, parsers are expected to handle the case in which they do. For numeric
-//         // > types and strings, if the same field appears multiple times, the parser accepts the
-//         // > last value it sees.
-//         //
-//         // [1]: https://developers.google.com/protocol-buffers/docs/encoding#optional
-//         //
-//         // This is intended for A and B both being Bytes so it is zero-copy.
-//         // Some combinations of A and B types may cause a double-copy,
-//         // in which case merge_one_copy() should be used instead.
-//         // TODO(widders): we will only need this if we have an actual merge api. do we want that?
-//         let len = buf.remaining_before_cap();
-//         value.replace_with(buf.copy_to_bytes(len));
-//         Ok(())
-//     }
-//
-//     pub(super) fn merge_one_copy<A, B>(
-//         wire_type: WireType,
-//         value: &mut A,
-//         buf: &mut Capped<B>,
-//         _ctx: DecodeContext,
-//     ) -> Result<(), DecodeError>
-//     where
-//         A: BytesAdapter,
-//         B: Buf,
-//     {
-//         check_wire_type(WireType::LengthDelimited, wire_type)?;
-//         let buf = buf.take_length_delimited()?;
-//         // If we must copy, make sure to copy only once.
-//         value.replace_with(buf.take_all());
-//         Ok(())
-//     }
-//
-//     length_delimited!(impl BytesAdapter);
-//
-//     #[cfg(test)]
-//     mod test {
-//         use proptest::prelude::*;
-//
-//         use super::super::test::{check_collection_type, check_type};
-//         use super::*;
-//
-//         proptest! {
-//             #[test]
-//             fn check_vec(value: Vec<u8>, tag: u32) {
-//                 super::test::check_type::<Vec<u8>, Vec<u8>>(value, tag, WireType::LengthDelimited,
-//                                                             encode, merge, encoded_len)?;
-//             }
-//
-//             #[test]
-//             fn check_bytes(value: Vec<u8>, tag: u32) {
-//                 let value = Bytes::from(value);
-//                 super::test::check_type::<Bytes, Bytes>(value, tag, WireType::LengthDelimited,
-//                                                         encode, merge, encoded_len)?;
-//             }
-//
-//             #[test]
-//             fn check_repeated_vec(value: Vec<Vec<u8>>, tag: u32) {
-//                 super::test::check_collection_type(value, tag, WireType::LengthDelimited,
-//                                                    encode_repeated, merge_repeated,
-//                                                    encoded_len_repeated)?;
-//             }
-//
-//             #[test]
-//             fn check_repeated_bytes(value: Vec<Vec<u8>>, tag: u32) {
-//                 let value = value.into_iter().map(Bytes::from).collect();
-//                 super::test::check_collection_type(value, tag, WireType::LengthDelimited,
-//                                                    encode_repeated, merge_repeated,
-//                                                    encoded_len_repeated)?;
-//             }
-//         }
-//     }
-// }
+impl Wiretyped<Bytes> for General {
+    const WIRE_TYPE: WireType = WireType::LengthDelimited;
+}
+
+impl ValueEncoder<Bytes> for General {
+    fn encode_value<B: BufMut>(value: &Bytes, buf: &mut B) {
+        encode_varint(value.len() as u64, buf);
+        buf.put(value.clone());
+    }
+
+    fn value_encoded_len(value: &Bytes) -> usize {
+        encoded_len_varint(value.len() as u64) + value.len()
+    }
+
+    fn decode_value<B: Buf>(
+        value: &mut Bytes,
+        buf: &mut Capped<B>,
+        _ctx: DecodeContext,
+    ) -> Result<(), DecodeError> {
+        let mut buf = buf.take_length_delimited()?;
+        let len = buf.remaining_before_cap();
+        *value = buf.copy_to_bytes(len);
+        Ok(())
+    }
+}
+
+impl DistinguishedValueEncoder<Bytes> for General {
+    fn decode_value_distinguished<B: Buf>(
+        value: &mut Bytes,
+        buf: &mut Capped<B>,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError> {
+        Self::decode_value(value, buf, ctx)
+    }
+}
+
+// TODO(widders): Bytes value test
+
+impl Wiretyped<Blob> for General {
+    const WIRE_TYPE: WireType = WireType::LengthDelimited;
+}
+
+impl ValueEncoder<Blob> for General {
+    fn encode_value<B: BufMut>(value: &Blob, buf: &mut B) {
+        encode_varint(value.len() as u64, buf);
+        buf.put(value.as_slice());
+    }
+
+    fn value_encoded_len(value: &Blob) -> usize {
+        encoded_len_varint(value.len() as u64) + value.len()
+    }
+
+    fn decode_value<B: Buf>(
+        value: &mut Blob,
+        buf: &mut Capped<B>,
+        _ctx: DecodeContext,
+    ) -> Result<(), DecodeError> {
+        let mut buf = buf.take_length_delimited()?;
+        value.clear();
+        value.reserve(buf.remaining_before_cap());
+        value.put(buf.take_all());
+        Ok(())
+    }
+}
+
+impl DistinguishedValueEncoder<Blob> for General {
+    fn decode_value_distinguished<B: Buf>(
+        value: &mut Blob,
+        buf: &mut Capped<B>,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError> {
+        Self::decode_value(value, buf, ctx)
+    }
+}
+
+#[cfg(test)]
+mod blob {
+    use crate::encoding::check_type_test;
+    check_type_test!(General, expedient, crate::Blob, WireType::LengthDelimited);
+    check_type_test!(General, distinguished, crate::Blob, WireType::LengthDelimited);
+}
 
 // TODO(widders): Oneof
 
