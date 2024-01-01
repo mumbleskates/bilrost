@@ -962,7 +962,8 @@ macro_rules! check_type_test {
         }
     };
 }
-/// Since this macro is only used in other macros, it currently appears to be unused to the linter.
+// Since this macro is only used in other macros in other modules, it currently appears to be unused
+// to the linter.
 #[allow(unused_imports)]
 pub(crate) use check_type_test;
 
