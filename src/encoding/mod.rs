@@ -967,6 +967,9 @@ macro_rules! check_type_test {
 #[allow(unused_imports)]
 pub(crate) use check_type_test;
 
+// TODO(widders): we can delete this eventually. It is only used, originally, to dispatch more
+//  efficient copying out of the source buffer. (e.g., it allows Bytes to use its shallow-copy
+//  optimization, while also making it possible to copy Vec<u8> to Vec<u8> without copying twice.)
 pub trait BytesAdapter: sealed::BytesAdapter {}
 
 mod sealed {
