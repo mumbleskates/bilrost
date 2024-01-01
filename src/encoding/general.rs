@@ -311,35 +311,34 @@ impl Wiretyped<Blob> for General {
 }
 
 impl ValueEncoder<Blob> for General {
+    #[inline]
     fn encode_value<B: BufMut>(value: &Blob, buf: &mut B) {
-        encode_varint(value.len() as u64, buf);
-        buf.put(value.as_slice());
+        crate::encoding::VecBlob::encode_value(value, buf)
     }
 
+    #[inline]
     fn value_encoded_len(value: &Blob) -> usize {
-        encoded_len_varint(value.len() as u64) + value.len()
+        crate::encoding::VecBlob::value_encoded_len(value)
     }
 
+    #[inline]
     fn decode_value<B: Buf>(
         value: &mut Blob,
         buf: &mut Capped<B>,
-        _ctx: DecodeContext,
+        ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
-        let mut buf = buf.take_length_delimited()?;
-        value.clear();
-        value.reserve(buf.remaining_before_cap());
-        value.put(buf.take_all());
-        Ok(())
+        crate::encoding::VecBlob::decode_value(value, buf, ctx)
     }
 }
 
 impl DistinguishedValueEncoder<Blob> for General {
+    #[inline]
     fn decode_value_distinguished<B: Buf>(
         value: &mut Blob,
         buf: &mut Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
-        Self::decode_value(value, buf, ctx)
+        crate::encoding::VecBlob::decode_value_distinguished(value, buf, ctx)
     }
 }
 

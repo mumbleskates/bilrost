@@ -21,6 +21,21 @@ mod map;
 mod packed;
 mod unpacked;
 mod value_traits;
+mod vec_blob;
+
+pub use value_traits::{NewForOverwrite, Veclike};
+
+/// Fixed-size encoder. Encodes integers in fixed-size format.
+pub use fixed::Fixed;
+/// General encoder. Encodes numbers as varints and repeated types un-packed.
+pub use general::General;
+/// Packed encoder. Encodes repeated types in packed format.
+pub use packed::Packed;
+/// Unpacked encoder. Encodes repeated types in unpacked format, writing repeated fields.
+pub use unpacked::Unpacked;
+/// Encoder that decodes bytes data directly into `Vec<u8>`, rather than requiring it to be wrapped
+/// in `Blob`.
+pub use vec_blob::VecBlob;
 
 /// Encodes an integer value into LEB128-bijective variable length format, and writes it to the
 /// buffer. The buffer must have enough remaining space (maximum 9 bytes).
@@ -707,17 +722,6 @@ where
         Self::decode_value_distinguished(value, buf, ctx)
     }
 }
-
-pub use value_traits::{NewForOverwrite, Veclike};
-
-/// Fixed-size encoder. Encodes integers in fixed-size format.
-pub use fixed::Fixed;
-/// General encoder. Encodes numbers as varints and repeated types un-packed.
-pub use general::General;
-/// Packed encoder. Encodes repeated types in packed format.
-pub use packed::Packed;
-/// Unpacked encoder. Encodes repeated types in unpacked format, writing repeated fields.
-pub use unpacked::Unpacked;
 
 /// Different value encoders may dispatch encoding their plain values slightly differently, but
 /// values wrapped in Option are always encoded the same.
