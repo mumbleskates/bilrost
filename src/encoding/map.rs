@@ -7,6 +7,8 @@ macro_rules! map {
     //  * maps should be packed! keys and values should directly alternate within a length-
     //    delineated field
     //  * delegate value encoding for maps from General to Map<General, General>
+
+    // TODO(widders): set types
     ($map_ty:ident) => {
         use crate::encoding::*;
         use core::hash::Hash;

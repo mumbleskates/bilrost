@@ -959,6 +959,7 @@ macro_rules! check_type_test {
                         WireType::LengthDelimited,
                     )?;
                 }
+                // TODO(widders): check expedient decoding between numeric packed and unpacked
             }
         }
     };

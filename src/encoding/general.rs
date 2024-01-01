@@ -182,6 +182,8 @@ impl Wiretyped<String> for General {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
 }
 
+// TODO(widders): rope string? Cow string? cow string is probably pretty doable. does it matter?
+
 impl ValueEncoder<String> for General {
     fn encode_value<B: BufMut>(value: &String, buf: &mut B) {
         encode_varint(value.len() as u64, buf);
