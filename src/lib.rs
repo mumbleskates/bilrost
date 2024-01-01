@@ -9,6 +9,10 @@ pub extern crate alloc;
 // Re-export the bytes crate for use within derived code.
 pub use bytes;
 
+#[cfg(feature = "derive")]
+#[doc(hidden)]
+pub use bilrost_derive::{Enumeration, Message, Oneof};
+
 mod error;
 mod message;
 mod name;
@@ -101,17 +105,3 @@ pub const fn assert_tags_are_equal<const A: usize, const B: usize>(
         i += 1;
     }
 }
-
-// Re-export #[derive(Message, Enumeration, Oneof)].
-// Based on serde's equivalent re-export [1], but enabled by default.
-//
-// [1]: https://github.com/serde-rs/serde/blob/v1.0.89/serde/src/lib.rs#L245-L256
-#[cfg(feature = "derive")]
-#[allow(unused_imports)]
-#[macro_use]
-extern crate bilrost_derive;
-extern crate core;
-
-#[cfg(feature = "derive")]
-#[doc(hidden)]
-pub use bilrost_derive::*;
