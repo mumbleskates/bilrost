@@ -681,6 +681,10 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
     let expanded = if skip_debug {
         expanded
     } else {
+        // TODO(widders): is there any possible reason to have added debug here? what does that even
+        //  do? i think we can completely ditch the in-house default implementations since they only
+        //  seem to do anything for these enum type fakes, which end up in the message's debug as
+        //  code that doesn't evaluate
         let debug = variants
             .iter()
             .map(|(variant_ident, _)| quote!(#ident::#variant_ident => stringify!(#variant_ident)));
