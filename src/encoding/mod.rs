@@ -799,27 +799,36 @@ macro_rules! delegate_encoding {
         delegate from $from_ty:ty, to $to_ty:ty, for type $value_ty:ty
         $(, with generics $(, $value_generics:ident)*)?
     ) => {
-        impl$(<$($value_generics, )*>)? Encoder<$value_ty> for $from_ty
+        impl$(<$($value_generics, )*>)? $crate::encoding::Encoder<$value_ty> for $from_ty
         where
-            $to_ty: Encoder<$value_ty>,
+            $to_ty: $crate::encoding::Encoder<$value_ty>,
         {
             #[inline]
-            fn encode<B: BufMut>(tag: u32, value: &$value_ty, buf: &mut B, tw: &mut TagWriter) {
+            fn encode<B: $crate::bytes::BufMut>(
+                tag: u32,
+                value: &$value_ty,
+                buf: &mut B,
+                tw: &mut $crate::encoding::TagWriter,
+            ) {
                 <$to_ty>::encode(tag, value, buf, tw)
             }
 
             #[inline]
-            fn encoded_len(tag: u32, value: &$value_ty, tm: &mut TagMeasurer) -> usize {
+            fn encoded_len(
+                tag: u32,
+                value: &$value_ty,
+                tm: &mut $crate::encoding::TagMeasurer,
+            ) -> usize {
                 <$to_ty>::encoded_len(tag, value, tm)
             }
 
             #[inline]
-            fn decode<B: Buf>(
-                wire_type: WireType,
+            fn decode<B: $crate::bytes::Buf>(
+                wire_type: $crate::encoding::WireType,
                 duplicated: bool,
                 value: &mut $value_ty,
-                buf: &mut Capped<B>,
-                ctx: DecodeContext,
+                buf: &mut $crate::encoding::Capped<B>,
+                ctx: $crate::encoding::DecodeContext,
             ) -> Result<(), DecodeError> {
                 <$to_ty>::decode(wire_type, duplicated, value, buf, ctx)
             }
@@ -835,42 +844,46 @@ macro_rules! delegate_encoding {
             $(, with generics $(, $value_generics)*)?
         );
 
-        impl$(<$($value_generics, )*>)? DistinguishedEncoder<$value_ty> for $from_ty
+        impl$(<$($value_generics, )*>)? $crate::encoding::DistinguishedEncoder<$value_ty>
+        for $from_ty
         where
-            $to_ty: DistinguishedEncoder<$value_ty>,
-            Self: Encoder<$value_ty>,
+            $to_ty: $crate::encoding::DistinguishedEncoder<$value_ty>,
+            Self: $crate::encoding::Encoder<$value_ty>,
         {
             #[inline]
-            fn decode_distinguished<B: Buf>(
-                wire_type: WireType,
+            fn decode_distinguished<B: crate::bytes::Buf>(
+                wire_type: $crate::encoding::WireType,
                 duplicated: bool,
                 value: &mut $value_ty,
-                buf: &mut Capped<B>,
-                ctx: DecodeContext,
-            ) -> Result<(), DecodeError> {
+                buf: &mut $crate::encoding::Capped<B>,
+                ctx: $crate::encoding::DecodeContext,
+            ) -> Result<(), $crate::DecodeError> {
                 <$to_ty>::decode_distinguished(wire_type, duplicated, value, buf, ctx)
             }
         }
     };
 }
+pub(crate) use delegate_encoding;
+
 macro_rules! delegate_value_encoding {
     (
         delegate from $from_ty:ty, to $to_ty:ty, for type $value_ty:ty
         $(, with generics $(, $value_generics:ident)*)?
     ) => {
-        impl$(<$($value_generics, )*>)? Wiretyped<$value_ty> for $from_ty
+        impl$(<$($value_generics, )*>)? $crate::encoding::Wiretyped<$value_ty> for $from_ty
         where
-            $to_ty: Wiretyped<$value_ty>,
+            $to_ty: $crate::encoding::Wiretyped<$value_ty>,
         {
-            const WIRE_TYPE: WireType = <$to_ty as Wiretyped<$value_ty>>::WIRE_TYPE;
+            const WIRE_TYPE: $crate::encoding::WireType =
+                <$to_ty as $crate::encoding::Wiretyped<$value_ty>>::WIRE_TYPE;
         }
 
-        impl$(<$($value_generics, )*>)? ValueEncoder<$value_ty> for $from_ty
+        impl$(<$($value_generics, )*>)? $crate::encoding::ValueEncoder<$value_ty> for $from_ty
         where
-            $to_ty: ValueEncoder<$value_ty>,
+            $to_ty: $crate::encoding::ValueEncoder<$value_ty>,
         {
             #[inline]
-            fn encode_value<B: BufMut>(value: &$value_ty, buf: &mut B) {
+            fn encode_value<B: $crate::bytes::BufMut>(value: &$value_ty, buf: &mut B) {
                 <$to_ty>::encode_value(value, buf)
             }
 
@@ -880,16 +893,18 @@ macro_rules! delegate_value_encoding {
             }
 
             #[inline]
-            fn many_values_encoded_len<C: Veclike<Item = $value_ty>>(values: &C) -> usize {
+            fn many_values_encoded_len<C: $crate::encoding::Veclike<Item = $value_ty>>(
+                values: &C,
+            ) -> usize {
                 <$to_ty>::many_values_encoded_len(values)
             }
 
             #[inline]
-            fn decode_value<B: Buf>(
+            fn decode_value<B: $crate::bytes::Buf>(
                 value: &mut $value_ty,
-                buf: &mut Capped<B>,
-                ctx: DecodeContext,
-            ) -> Result<(), DecodeError> {
+                buf: &mut $crate::encoding::Capped<B>,
+                ctx: $crate::encoding::DecodeContext,
+            ) -> Result<(), $crate::DecodeError> {
                 <$to_ty>::decode_value(value, buf, ctx)
             }
         }
@@ -904,32 +919,23 @@ macro_rules! delegate_value_encoding {
             $(, with generics $(, $value_generics)*)?
         );
 
-        impl$(<$($value_generics, )*>)? DistinguishedValueEncoder<$value_ty> for $from_ty
+        impl$(<$($value_generics, )*>)? $crate::encoding::DistinguishedValueEncoder<$value_ty>
+        for $from_ty
         where
-            $to_ty: DistinguishedValueEncoder<$value_ty>,
+            $to_ty: $crate::encoding::DistinguishedValueEncoder<$value_ty>,
         {
             #[inline]
             fn decode_value_distinguished<B: Buf>(
                 value: &mut $value_ty,
-                buf: &mut Capped<B>,
-                ctx: DecodeContext,
-            ) -> Result<(), DecodeError> {
+                buf: &mut $crate::encoding::Capped<B>,
+                ctx: $crate::encoding::DecodeContext,
+            ) -> Result<(), $crate::DecodeError> {
                 <$to_ty>::decode_value_distinguished(value, buf, ctx)
             }
         }
     };
 }
-
-// General implements unpacked encodings by default, but only for Vec. Other implementers of Veclike
-// must use Unpacked or Packed.
-delegate_encoding!(delegate from General, to Unpacked<General>, for type Vec<T>,
-    including distinguished, with generics, T);
-delegate_encoding!(delegate from Fixed, to Unpacked<Fixed>, for type Vec<T>,
-    including distinguished, with generics, T);
-
-// General also encodes floating point values.
-delegate_value_encoding!(delegate from General, to Fixed, for type f32);
-delegate_value_encoding!(delegate from General, to Fixed, for type f64);
+pub(crate) use delegate_value_encoding;
 
 /// Generalized proptest macro. Kind must be either `expedient` or `distinguished`.
 #[allow(unused_macros)]
@@ -937,10 +943,12 @@ macro_rules! check_type_test {
     ($encoder:ty, $kind:ident, $ty:ty, $wire_type:expr) => {
         #[cfg(test)]
         mod $kind {
+            use alloc::vec::Vec;
+
             use proptest::prelude::*;
 
             use crate::encoding::test::$kind::{check_type, check_type_unpacked};
-            use crate::encoding::{$encoder, Packed, Unpacked, Vec, WireType};
+            use crate::encoding::{$encoder, Packed, Unpacked, WireType};
 
             proptest! {
                 #[test]

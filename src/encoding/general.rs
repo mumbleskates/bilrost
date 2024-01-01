@@ -5,13 +5,19 @@ use core::str;
 
 use crate::bytes::{Buf, BufMut};
 use crate::encoding::{
-    check_wire_type, encode_varint, encoded_len_varint, Capped, DecodeContext,
-    DistinguishedEncoder, DistinguishedFieldEncoder, DistinguishedValueEncoder, Encoder,
-    FieldEncoder, TagMeasurer, TagReader, TagWriter, ValueEncoder, WireType, Wiretyped,
+    check_wire_type, delegate_encoding, delegate_value_encoding, encode_varint, encoded_len_varint,
+    Capped, DecodeContext, DistinguishedEncoder, DistinguishedFieldEncoder,
+    DistinguishedValueEncoder, Encoder, FieldEncoder, TagMeasurer, TagReader, TagWriter,
+    ValueEncoder, WireType, Wiretyped,
 };
 use crate::{DecodeError, DistinguishedMessage, Message};
 
 pub struct General;
+
+// General implements unpacked encodings by default, but only for Vec. Other implementers of Veclike
+// must use Unpacked or Packed.
+delegate_encoding!(delegate from General, to crate::encoding::Unpacked<General>, for type Vec<T>,
+    including distinguished, with generics, T);
 
 /// General encodes plain values only when they are non-default.
 impl<T> Encoder<T> for General
@@ -178,6 +184,10 @@ from_uint64(value) {
     ((value >> 1) as i64) ^ (-((value & 1) as i64))
 });
 
+// General also encodes floating point values.
+delegate_value_encoding!(delegate from General, to crate::encoding::Fixed, for type f32);
+delegate_value_encoding!(delegate from General, to crate::encoding::Fixed, for type f64);
+
 impl Wiretyped<String> for General {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
 }
@@ -253,8 +263,18 @@ impl DistinguishedValueEncoder<String> for General {
 
 #[cfg(test)]
 mod string {
-    crate::encoding::check_type_test!(General, expedient, String, WireType::LengthDelimited);
-    crate::encoding::check_type_test!(General, distinguished, String, WireType::LengthDelimited);
+    crate::encoding::check_type_test!(
+        General,
+        expedient,
+        alloc::string::String,
+        WireType::LengthDelimited
+    );
+    crate::encoding::check_type_test!(
+        General,
+        distinguished,
+        alloc::string::String,
+        WireType::LengthDelimited
+    );
 }
 
 // TODO(widders): bytes for General
