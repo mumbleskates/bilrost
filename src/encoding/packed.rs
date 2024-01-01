@@ -1,4 +1,3 @@
-use crate::bytes::{Buf, BufMut};
 use crate::encoding::{
     encode_varint, encoded_len_varint, Capped, DecodeContext, DistinguishedEncoder,
     DistinguishedFieldEncoder, DistinguishedValueEncoder, Encoder, FieldEncoder, General,
@@ -6,6 +5,8 @@ use crate::encoding::{
 };
 use crate::helpers::FallibleIter;
 use crate::DecodeError;
+
+use bytes::{Buf, BufMut};
 
 pub struct Packed<E = General>(E);
 

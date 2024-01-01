@@ -3,7 +3,6 @@ use alloc::vec::Vec;
 use core::mem;
 use core::str;
 
-use crate::bytes::{Buf, BufMut, Bytes};
 use crate::encoding::{
     check_wire_type, delegate_encoding, delegate_value_encoding, encode_varint, encoded_len_varint,
     Capped, DecodeContext, DistinguishedEncoder, DistinguishedFieldEncoder,
@@ -11,6 +10,8 @@ use crate::encoding::{
     ValueEncoder, WireType, Wiretyped,
 };
 use crate::{Blob, DecodeError, DistinguishedMessage, Message};
+
+use bytes::{Buf, BufMut, Bytes};
 
 pub struct General;
 
@@ -315,20 +316,20 @@ impl DistinguishedValueEncoder<Bytes> for General {
 }
 
 #[cfg(test)]
-mod bytes {
+mod bytes_blob {
     use crate::encoding::check_type_test;
     check_type_test!(
         General,
         expedient,
         from Vec<u8>,
-        into crate::bytes::Bytes,
+        into bytes::Bytes,
         WireType::LengthDelimited
     );
     check_type_test!(
         General,
         distinguished,
         from Vec<u8>,
-        into crate::bytes::Bytes,
+        into bytes::Bytes,
         WireType::LengthDelimited
     );
 }

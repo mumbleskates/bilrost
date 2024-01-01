@@ -11,8 +11,9 @@ use core::convert::TryFrom;
 use core::default::Default;
 use core::ops::{Deref, DerefMut};
 
-use crate::bytes::buf::Take;
-use crate::bytes::{Buf, BufMut, Bytes};
+use bytes::buf::Take;
+use bytes::{Buf, BufMut};
+
 use crate::{decode_length_delimiter, DecodeError};
 
 mod fixed;
@@ -855,7 +856,7 @@ macro_rules! delegate_encoding {
             Self: $crate::encoding::Encoder<$value_ty>,
         {
             #[inline]
-            fn decode_distinguished<B: crate::bytes::Buf>(
+            fn decode_distinguished<B: $crate::bytes::Buf>(
                 wire_type: $crate::encoding::WireType,
                 duplicated: bool,
                 value: &mut $value_ty,
@@ -1017,7 +1018,7 @@ mod test {
         ($kind:ident, $encoder_trait:ident, $decode:ident) => {
             pub mod $kind {
                 use super::*;
-                use crate::bytes::BytesMut;
+                use bytes::BytesMut;
 
                 pub fn check_type<T, E>(value: T, tag: u32, wire_type: WireType) -> TestCaseResult
                 where

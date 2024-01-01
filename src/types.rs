@@ -9,7 +9,7 @@ use core::borrow::{Borrow, BorrowMut};
 use core::convert::{AsMut, AsRef, From, Into};
 use core::ops::{Deref, DerefMut};
 
-use crate::bytes::{Buf, BufMut};
+use bytes::{Buf, BufMut};
 
 use crate::{
     encoding::{skip_field, Capped, DecodeContext, WireType},

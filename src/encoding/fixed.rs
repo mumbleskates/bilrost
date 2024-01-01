@@ -1,12 +1,13 @@
 use alloc::vec::Vec;
 
-use crate::bytes::{Buf, BufMut};
 use crate::encoding::{
     delegate_encoding, Capped, DecodeContext, DistinguishedEncoder, DistinguishedFieldEncoder,
     DistinguishedValueEncoder, Encoder, FieldEncoder, TagMeasurer, TagWriter, ValueEncoder,
     Veclike, WireType, Wiretyped,
 };
 use crate::DecodeError;
+
+use bytes::{Buf, BufMut};
 
 pub struct Fixed;
 
