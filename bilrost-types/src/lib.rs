@@ -1,6 +1,6 @@
-#![doc(html_root_url = "https://docs.rs/bilrost-types/0.12.2")]
+#![doc(html_root_url = "https://docs.rs/bilrost-types/0.12.3")]
 
-//! Protocol Buffers well-known types.
+//! Analogs for protobuf well-known types.
 //!
 //! Note that the documentation for the types defined in this crate are generated from the Protobuf
 //! definitions, so code examples are not in Rust.
