@@ -15,7 +15,6 @@ pub use bilrost_derive::{Enumeration, Message, Oneof};
 
 mod error;
 mod message;
-mod name;
 mod types;
 
 #[doc(hidden)]
@@ -24,7 +23,8 @@ pub mod encoding;
 pub use crate::error::{DecodeError, EncodeError};
 mod helpers;
 pub use crate::message::{DistinguishedMessage, Message};
-pub use crate::name::Name;
+
+pub use crate::types::Blob;
 
 use bytes::{Buf, BufMut};
 #[cfg(feature = "extended-diagnostics")]
