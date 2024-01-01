@@ -944,6 +944,9 @@ pub(crate) use delegate_value_encoding;
 /// Generalized proptest macro. Kind must be either `expedient` or `distinguished`.
 macro_rules! check_type_test {
     ($encoder:ty, $kind:ident, $ty:ty, $wire_type:expr) => {
+        crate::encoding::check_type_test!($encoder, $kind, from $ty, into $ty, $wire_type);
+    };
+    ($encoder:ty, $kind:ident, from $from_ty:ty, into $into_ty:ty, $wire_type:expr) => {
         #[cfg(test)]
         mod $kind {
             use alloc::vec::Vec;
@@ -955,17 +958,21 @@ macro_rules! check_type_test {
 
             proptest! {
                 #[test]
-                fn check(value: $ty, tag: u32) {
-                    check_type::<$ty, $encoder>(value, tag, $wire_type)?;
+                fn check(value: $from_ty, tag: u32) {
+                    check_type::<$into_ty, $encoder>(<$into_ty>::from(value), tag, $wire_type)?;
                 }
                 #[test]
-                fn check_unpacked(value: Vec<$ty>, tag: u32) {
-                    check_type_unpacked::<Vec<$ty>, Unpacked<$encoder>>(value, tag, $wire_type)?;
+                fn check_unpacked(value: Vec<$from_ty>, tag: u32) {
+                    check_type_unpacked::<Vec<$into_ty>, Unpacked<$encoder>>(
+                        value.into_iter().map(|val| <$into_ty>::from(val)).collect(),
+                        tag,
+                        $wire_type,
+                    )?;
                 }
                 #[test]
-                fn check_packed(value: Vec<$ty>, tag: u32) {
-                    check_type::<Vec<$ty>, Packed<$encoder>>(
-                        value,
+                fn check_packed(value: Vec<$from_ty>, tag: u32) {
+                    check_type::<Vec<$into_ty>, Packed<$encoder>>(
+                        value.into_iter().map(|val| <$into_ty>::from(val)).collect(),
                         tag,
                         WireType::LengthDelimited,
                     )?;

@@ -314,7 +314,24 @@ impl DistinguishedValueEncoder<Bytes> for General {
     }
 }
 
-// TODO(widders): Bytes value test
+#[cfg(test)]
+mod bytes {
+    use crate::encoding::check_type_test;
+    check_type_test!(
+        General,
+        expedient,
+        from Vec<u8>,
+        into crate::bytes::Bytes,
+        WireType::LengthDelimited
+    );
+    check_type_test!(
+        General,
+        distinguished,
+        from Vec<u8>,
+        into crate::bytes::Bytes,
+        WireType::LengthDelimited
+    );
+}
 
 impl Wiretyped<Blob> for General {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
