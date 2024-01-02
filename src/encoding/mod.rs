@@ -1,7 +1,6 @@
 #![allow(clippy::implicit_hasher, clippy::ptr_arg)]
 
 use alloc::format;
-use alloc::vec::Vec;
 use core::cmp::{
     min, Eq,
     Ordering::{Equal, Greater, Less},
@@ -991,6 +990,7 @@ pub use general::message;
 #[cfg(test)]
 mod test {
     use alloc::string::{String, ToString};
+    use alloc::vec::Vec;
     use core::borrow::Borrow;
     use core::fmt::Debug;
 
