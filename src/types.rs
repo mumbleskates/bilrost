@@ -20,7 +20,6 @@ use crate::{
 /// wraps a Vec<u8>.
 #[derive(Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Debug, Default)]
 #[repr(transparent)]
-#[cfg_attr(test, derive(proptest_derive::Arbitrary))]
 pub struct Blob(Vec<u8>);
 
 impl Blob {
@@ -81,6 +80,23 @@ impl Into<Vec<u8>> for Blob {
     fn into(self) -> Vec<u8> {
         self.0
     }
+}
+
+#[cfg(test)]
+impl proptest::arbitrary::Arbitrary for Blob {
+    type Parameters = <Vec<u8> as proptest::arbitrary::Arbitrary>::Parameters;
+    fn arbitrary_with(top: Self::Parameters) -> Self::Strategy {
+        {
+            proptest::strategy::Strategy::prop_map(
+                proptest::arbitrary::any_with::<Vec<u8>>(top),
+                Blob::new,
+            )
+        }
+    }
+    type Strategy = proptest::strategy::Map<
+        <Vec<u8> as proptest::arbitrary::Arbitrary>::Strategy,
+        fn(Vec<u8>) -> Self,
+    >;
 }
 
 impl Message for () {
