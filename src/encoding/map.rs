@@ -1,7 +1,7 @@
 #[allow(unused_macros)]
 macro_rules! map {
     // TODO(widders): change map configurations
-    //  * two Maplike impls similar to Veclike, one for sorted and reversible and one non
+    //  * two Maplike impls similar to Collection, one for sorted and reversible and one non
     //  * map keys must not recur in any configuration
     //  * maps should be packed! keys and values should directly alternate within a length-
     //    delineated field

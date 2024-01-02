@@ -1,7 +1,10 @@
+use alloc::collections::BTreeSet;
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::mem;
 use core::str;
+#[cfg(feature = "std")]
+use std::collections::HashSet;
 
 use crate::encoding::{
     check_wire_type, delegate_encoding, delegate_value_encoding, encode_varint, encoded_len_varint,
@@ -15,10 +18,15 @@ use bytes::{Buf, BufMut, Bytes};
 
 pub struct General;
 
-// General implements unpacked encodings by default, but only for Vec. Other implementers of Veclike
-// must use Unpacked or Packed.
-delegate_encoding!(delegate from General, to crate::encoding::Unpacked<General>, for type Vec<T>,
-    including distinguished, with generics, T);
+// General implements unpacked encodings by default, but only for select collection types. Other
+// implementers of the `Collection` trait must use Unpacked or Packed.
+delegate_encoding!(delegate from General, to crate::encoding::Unpacked<General>,
+    for type Vec<T>, including distinguished, with generics, T);
+delegate_encoding!(delegate from General, to crate::encoding::Unpacked<General>,
+    for type BTreeSet<T>, including distinguished, with generics, T);
+#[cfg(feature = "std")]
+delegate_encoding!(delegate from General, to crate::encoding::Unpacked<General>,
+    for type HashSet<T>, with generics, T);
 
 /// General encodes plain values only when they are non-default.
 impl<T> Encoder<T> for General

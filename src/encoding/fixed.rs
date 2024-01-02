@@ -3,7 +3,7 @@ use alloc::vec::Vec;
 use crate::encoding::{
     delegate_encoding, Capped, DecodeContext, DistinguishedEncoder, DistinguishedFieldEncoder,
     DistinguishedValueEncoder, Encoder, FieldEncoder, TagMeasurer, TagWriter, ValueEncoder,
-    Veclike, WireType, Wiretyped,
+    WireType, Wiretyped,
 };
 use crate::DecodeError;
 
@@ -38,7 +38,10 @@ macro_rules! fixed_width_common {
             }
 
             #[inline]
-            fn many_values_encoded_len<C: Veclike<Item = $ty>>(values: &C) -> usize {
+            fn many_values_encoded_len<'a, I>(values: I) -> usize
+            where
+                I: ExactSizeIterator<Item = &'a $ty>,
+            {
                 $wire_type.fixed_size() * values.len()
             }
 

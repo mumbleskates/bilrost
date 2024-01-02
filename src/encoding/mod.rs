@@ -23,7 +23,7 @@ mod unpacked;
 mod value_traits;
 mod vec_blob;
 
-pub use value_traits::{NewForOverwrite, Veclike};
+pub use value_traits::{Collection, DistinguishedCollection, NewForOverwrite};
 
 /// Fixed-size encoder. Encodes integers in fixed-size format.
 pub use fixed::Fixed;
@@ -630,8 +630,12 @@ pub trait ValueEncoder<T>: Wiretyped<T> {
     /// Returns the number of bytes the given value would be encoded as.
     fn value_encoded_len(value: &T) -> usize;
     /// Returns the number of total bytes to encode all the values in the given container.
-    fn many_values_encoded_len<C: Veclike<Item = T>>(values: &C) -> usize {
-        values.iter().map(Self::value_encoded_len).sum()
+    fn many_values_encoded_len<'a, I>(values: I) -> usize
+    where
+        I: ExactSizeIterator<Item = &'a T>,
+        T: 'a,
+    {
+        values.map(Self::value_encoded_len).sum()
     }
     /// Decodes a field assuming the encoder's wire type directly from the buffer.
     fn decode_value<B: Buf>(
@@ -897,9 +901,10 @@ macro_rules! delegate_value_encoding {
             }
 
             #[inline]
-            fn many_values_encoded_len<C: $crate::encoding::Veclike<Item = $value_ty>>(
-                values: &C,
-            ) -> usize {
+            fn many_values_encoded_len<'a, I>(values: I) -> usize
+            where
+                I: ExactSizeIterator<Item = &'a $value_ty>,
+            {
                 <$to_ty>::many_values_encoded_len(values)
             }
 

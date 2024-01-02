@@ -1,137 +1,9 @@
 use alloc::collections::BTreeSet;
 use alloc::vec::Vec;
-use core::iter::Extend;
+#[cfg(feature = "std")]
+use core::hash::Hash;
 #[cfg(feature = "std")]
 use std::collections::HashSet;
-
-/// Trait for containers that store their values in the inserted order, like `Vec`
-pub trait Veclike: Extend<Self::Item> {
-    type Item;
-    type Iter<'a>: Iterator<Item = &'a Self::Item>
-    where
-        Self::Item: 'a,
-        Self: 'a;
-
-    fn len(&self) -> usize;
-    fn is_empty(&self) -> bool;
-    fn iter(&self) -> Self::Iter<'_>;
-    fn push(&mut self, item: Self::Item);
-}
-
-/// Trait for set containers.
-pub trait Set: Default {
-    type Item;
-    type Iter<'a>: Iterator<Item = &'a Self::Item>
-    where
-        Self::Item: 'a,
-        Self: 'a;
-
-    fn len(&self) -> usize;
-    fn is_empty(&self) -> bool;
-    fn iter(&self) -> Self::Iter<'_>;
-    fn insert(&mut self, item: Self::Item) -> bool;
-}
-
-/// Trait for set containers that store and iterate their items in sorted order.
-pub trait DistinguishedSet: Set + Eq
-where
-    <Self as Set>::Item: Ord,
-    for<'a> <Self as Set>::Iter<'a>: DoubleEndedIterator,
-{
-    fn last(&self) -> Option<&Self::Item>;
-}
-
-impl<T> Veclike for Vec<T> {
-    type Item = T;
-    type Iter<'a> = core::slice::Iter<'a, T>
-    where
-        T: 'a,
-        Self: 'a;
-
-    #[inline]
-    fn len(&self) -> usize {
-        Vec::len(self)
-    }
-
-    #[inline]
-    fn is_empty(&self) -> bool {
-        Vec::is_empty(self)
-    }
-
-    #[inline]
-    fn iter(&self) -> Self::Iter<'_> {
-        <[T]>::iter(self)
-    }
-
-    #[inline]
-    fn push(&mut self, item: T) {
-        Vec::push(self, item)
-    }
-}
-
-impl<T> Set for BTreeSet<T>
-where
-    Self: Default,
-{
-    type Item = T;
-    type Iter<'a> = alloc::collections::btree_set::Iter<'a, T>
-    where
-        Self::Item: 'a,
-        Self: 'a;
-
-    fn len(&self) -> usize {
-        BTreeSet::len(self)
-    }
-
-    fn is_empty(&self) -> bool {
-        BTreeSet::is_empty(self)
-    }
-
-    fn iter(&self) -> Self::Iter<'_> {
-        BTreeSet::iter(self)
-    }
-
-    fn insert(&mut self, item: Self::Item) -> bool {
-        BTreeSet::insert(self, item)
-    }
-}
-
-impl<T> DistinguishedSet for BTreeSet<T>
-where
-    Self: Set + Eq,
-{
-    fn last(&self) -> Option<&T> {
-        BTreeSet::last(self)
-    }
-}
-
-#[cfg(feature = "std")]
-impl<T> Set for HashSet<T>
-where
-    Self: Default,
-{
-    type Item = T;
-    type Iter<'a> = std::collections::hash_set::Iter<'a, T>
-    where
-        Self::Item: 'a,
-        Self: 'a;
-
-    fn len(&self) -> usize {
-        HashSet::len(self)
-    }
-
-    fn is_empty(&self) -> bool {
-        HashSet::is_empty(self)
-    }
-
-    fn iter(&self) -> Self::Iter<'_> {
-        HashSet::iter(self)
-    }
-
-    fn insert(&mut self, item: Self::Item) -> bool {
-        HashSet::insert(self, item)
-    }
-}
 
 /// Trait for cheaply producing a new value that will always be overwritten, rather than a value
 /// that really serves as a zero-valued default. This is implemented for types that can be present
@@ -154,7 +26,168 @@ impl<T> NewForOverwrite for T
 where
     T: Default,
 {
+    #[inline]
     fn new_for_overwrite() -> Self {
         Self::default()
+    }
+}
+
+/// Trait for containers that store multiple items, such as `Vec` and `HashSet`
+pub trait Collection: Default {
+    type Item;
+    type RefIter<'a>: ExactSizeIterator<Item = &'a Self::Item>
+    where
+        Self::Item: 'a,
+        Self: 'a;
+
+    fn len(&self) -> usize;
+    #[inline]
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+    fn iter(&self) -> Self::RefIter<'_>;
+    fn insert(&mut self, item: Self::Item) -> Result<(), &'static str>;
+}
+
+/// Trait for collections that store multiple items and have a distinguished representation, such as
+/// `Vec` and `BTreeSet`. Returns an error if the values are inserted in the wrong order.
+pub trait DistinguishedCollection: Collection + Eq {
+    type ReverseIter<'a>: Iterator<Item = &'a Self::Item>
+    where
+        Self::Item: 'a,
+        Self: 'a;
+
+    fn reversed(&self) -> Self::ReverseIter<'_>;
+    fn insert_distinguished(&mut self, item: Self::Item) -> Result<(), &'static str>;
+}
+
+impl<T> Collection for Vec<T> {
+    type Item = T;
+    type RefIter<'a> = core::slice::Iter<'a, T>
+    where
+        T: 'a,
+        Self: 'a;
+
+    #[inline]
+    fn len(&self) -> usize {
+        Vec::len(self)
+    }
+
+    #[inline]
+    fn iter(&self) -> Self::RefIter<'_> {
+        <[T]>::iter(self)
+    }
+
+    #[inline]
+    fn insert(&mut self, item: T) -> Result<(), &'static str> {
+        Vec::push(self, item);
+        Ok(())
+    }
+}
+
+impl<T> DistinguishedCollection for Vec<T>
+where
+    T: Eq,
+{
+    type ReverseIter<'a> = core::iter::Rev<core::slice::Iter<'a, T>>
+        where
+            Self::Item: 'a,
+            Self: 'a;
+
+    #[inline]
+    fn reversed(&self) -> Self::ReverseIter<'_> {
+        <[T]>::iter(self).rev()
+    }
+
+    #[inline]
+    fn insert_distinguished(&mut self, item: Self::Item) -> Result<(), &'static str> {
+        Vec::push(self, item);
+        Ok(())
+    }
+}
+
+impl<T> Collection for BTreeSet<T>
+where
+    Self: Default,
+    T: Ord,
+{
+    type Item = T;
+    type RefIter<'a> = alloc::collections::btree_set::Iter<'a, T>
+    where
+        Self::Item: 'a,
+        Self: 'a;
+
+    #[inline]
+    fn len(&self) -> usize {
+        BTreeSet::len(self)
+    }
+
+    #[inline]
+    fn iter(&self) -> Self::RefIter<'_> {
+        BTreeSet::iter(self)
+    }
+
+    #[inline]
+    fn insert(&mut self, item: Self::Item) -> Result<(), &'static str> {
+        if !BTreeSet::insert(self, item) {
+            return Err("values are not unique");
+        }
+        Ok(())
+    }
+}
+
+impl<T> DistinguishedCollection for BTreeSet<T>
+where
+    Self: Eq,
+    T: Ord,
+{
+    type ReverseIter<'a> = core::iter::Rev<alloc::collections::btree_set::Iter<'a, T>>
+    where
+        Self::Item: 'a,
+        Self: 'a;
+
+    #[inline]
+    fn reversed(&self) -> Self::ReverseIter<'_> {
+        BTreeSet::iter(self).rev()
+    }
+
+    #[inline]
+    fn insert_distinguished(&mut self, item: Self::Item) -> Result<(), &'static str> {
+        if Some(&item) <= self.last() {
+            return Err("values are not unique and ascending");
+        }
+        self.insert(item);
+        Ok(())
+    }
+}
+
+#[cfg(feature = "std")]
+impl<T> Collection for HashSet<T>
+where
+    Self: Default,
+    T: Hash + Eq,
+{
+    type Item = T;
+    type RefIter<'a> = std::collections::hash_set::Iter<'a, T>
+    where
+        Self::Item: 'a,
+        Self: 'a;
+
+    #[inline]
+    fn len(&self) -> usize {
+        HashSet::len(self)
+    }
+
+    #[inline]
+    fn iter(&self) -> Self::RefIter<'_> {
+        HashSet::iter(self)
+    }
+
+    #[inline]
+    fn insert(&mut self, item: Self::Item) -> Result<(), &'static str> {
+        if !HashSet::insert(self, item) {
+            return Err("values are not unique");
+        }
+        Ok(())
     }
 }

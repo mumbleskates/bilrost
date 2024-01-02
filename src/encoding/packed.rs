@@ -1,9 +1,9 @@
 use crate::encoding::{
     encode_varint, encoded_len_varint, Capped, DecodeContext, DistinguishedEncoder,
     DistinguishedFieldEncoder, DistinguishedValueEncoder, Encoder, FieldEncoder, General,
-    NewForOverwrite, TagMeasurer, TagWriter, ValueEncoder, Veclike, WireType, Wiretyped,
+    NewForOverwrite, TagMeasurer, TagWriter, ValueEncoder, WireType, Wiretyped,
 };
-use crate::helpers::FallibleIter;
+use crate::encoding::value_traits::{Collection, DistinguishedCollection};
 use crate::DecodeError;
 
 use bytes::{Buf, BufMut};
@@ -17,19 +17,19 @@ impl<T, E> Wiretyped<T> for Packed<E> {
 
 impl<C, T, E> ValueEncoder<C> for Packed<E>
 where
-    C: Veclike<Item = T>,
+    C: Collection<Item = T>,
     E: ValueEncoder<T>,
     T: NewForOverwrite,
 {
     fn encode_value<B: BufMut>(value: &C, buf: &mut B) {
-        encode_varint(E::many_values_encoded_len(value) as u64, buf);
+        encode_varint(E::many_values_encoded_len(value.iter()) as u64, buf);
         for val in value.iter() {
             E::encode_value(val, buf);
         }
     }
 
     fn value_encoded_len(value: &C) -> usize {
-        let inner_len = E::many_values_encoded_len(value);
+        let inner_len = E::many_values_encoded_len(value.iter());
         encoded_len_varint(inner_len as u64) + inner_len
     }
 
@@ -42,19 +42,20 @@ where
         if capped.remaining_before_cap() % E::WIRE_TYPE.encoded_size_alignment() != 0 {
             return Err(DecodeError::new("packed field is not a valid length"));
         }
-        let mut consumer = FallibleIter::new(capped.consume(|buf| {
+        for val in capped.consume(|buf| {
             let mut new_val = T::new_for_overwrite();
             E::decode_value(&mut new_val, buf, ctx.clone())?;
             Ok(new_val)
-        }));
-        value.extend(&mut consumer);
-        consumer.check()
+        }) {
+            value.insert(val?).map_err(DecodeError::new)?;
+        }
+        Ok(())
     }
 }
 
 impl<C, T, E> DistinguishedValueEncoder<C> for Packed<E>
 where
-    C: Veclike<Item = T> + Eq,
+    C: DistinguishedCollection<Item = T> + Eq,
     E: DistinguishedValueEncoder<T>,
     T: NewForOverwrite + Eq,
 {
@@ -67,20 +68,21 @@ where
         if capped.remaining_before_cap() % E::WIRE_TYPE.encoded_size_alignment() != 0 {
             return Err(DecodeError::new("packed field is not a valid length"));
         }
-        let mut consumer = FallibleIter::new(capped.consume(|buf| {
+        for val in capped.consume(|buf| {
             let mut new_val = T::new_for_overwrite();
             E::decode_value_distinguished(&mut new_val, buf, ctx.clone())?;
             Ok(new_val)
-        }));
-        value.extend(&mut consumer);
-        consumer.check()
+        }) {
+            value.insert(val?).map_err(DecodeError::new)?;
+        }
+        Ok(())
     }
 }
 
 /// ValueEncoder for packed repeated encodings lets this value type nest.
 impl<C, T, E> Encoder<C> for Packed<E>
 where
-    C: Veclike<Item = T>,
+    C: Collection<Item = T>,
     Packed<E>: ValueEncoder<C>,
     E: ValueEncoder<T>,
     T: NewForOverwrite,
@@ -122,7 +124,7 @@ where
             // TODO(widders): we would take more fields greedily here
             let mut new_val = T::new_for_overwrite();
             E::decode_field(wire_type, &mut new_val, buf, ctx)?;
-            value.push(new_val);
+            value.insert(new_val).map_err(DecodeError::new)?;
             Ok(())
         }
     }
@@ -130,7 +132,7 @@ where
 
 impl<C, E> DistinguishedEncoder<C> for Packed<E>
 where
-    C: Veclike + Eq,
+    C: DistinguishedCollection,
     Packed<E>: DistinguishedValueEncoder<C> + Encoder<C>,
 {
     #[inline]
