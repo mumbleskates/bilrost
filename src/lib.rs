@@ -24,7 +24,7 @@ pub use crate::error::{DecodeError, EncodeError};
 mod helpers;
 pub use crate::message::{DistinguishedMessage, Message};
 
-pub use crate::types::Blob;
+pub use types::Blob;
 
 use bytes::{Buf, BufMut};
 #[cfg(feature = "extended-diagnostics")]

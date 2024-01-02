@@ -1,10 +1,3 @@
-//! Protocol Buffers well-known wrapper types.
-//!
-//! This module provides implementations of `Message` for Rust standard library types which
-//! correspond to a Protobuf well-known wrapper type. The remaining well-known types are defined in
-//! the `bilrost-types` crate in order to avoid a cyclic dependency between `bilrost` and
-//! `bilrost-build`.
-
 use core::borrow::{Borrow, BorrowMut};
 use core::convert::{AsMut, AsRef, From, Into};
 use core::ops::{Deref, DerefMut};

@@ -1,10 +1,11 @@
+use bytes::{Buf, BufMut};
+
 use crate::encoding::{
     check_type_test, delegate_encoding, encode_varint, encoded_len_varint, Capped, DecodeContext,
     DistinguishedEncoder, DistinguishedFieldEncoder, DistinguishedValueEncoder, Encoder,
     FieldEncoder, TagMeasurer, TagWriter, ValueEncoder, WireType, Wiretyped,
 };
 use crate::DecodeError;
-use bytes::{Buf, BufMut};
 
 /// `VecBlob` implements encoding for blob values directly into `Vec<u8>`, and provides the base
 /// implementation for that functionality. `Vec<u8>` cannot generically dispatch to `General`'s

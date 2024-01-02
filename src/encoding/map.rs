@@ -7,7 +7,7 @@ macro_rules! map {
     //    delineated field
     //  * delegate value encoding for maps from General to Map<General, General>
 
-    // TODO(widders): set types
+    // TODO(widders): hashbrown support in a feature
     ($map_ty:ident) => {
         use crate::encoding::*;
         use core::hash::Hash;
@@ -238,6 +238,7 @@ mod test {
     /// This big bowl o' macro soup generates an encoding property test for each combination of map
     /// type, scalar map key, and value type.
     /// TODO: these tests take a long time to compile, can this be improved?
+    #[allow(unused_macros)]
     macro_rules! map_tests {
         (keys: $keys:tt,
          vals: $vals:tt) => {
