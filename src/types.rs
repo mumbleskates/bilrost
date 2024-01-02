@@ -16,8 +16,10 @@ use crate::{
     DecodeError, Message,
 };
 
-/// Newtype wrapper for `Vec<u8>` to act as a simple "bytes data" type in Bilrost. It transparently
-/// wraps a Vec<u8>.
+/// Newtype wrapper to act as a simple "bytes data" type in Bilrost. It transparently wraps a
+/// `Vec<u8>` and is fully supported by the `General` encoder.
+///
+/// To use `Vec<u8>` directly, use the `VecBlob` encoder.
 #[derive(Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Debug, Default)]
 #[repr(transparent)]
 pub struct Blob(Vec<u8>);
