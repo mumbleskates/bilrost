@@ -24,11 +24,11 @@ use crate::{
 pub struct Blob(Vec<u8>);
 
 impl Blob {
-    fn new(vec: Vec<u8>) -> Self {
+    pub fn new(vec: Vec<u8>) -> Self {
         Self(vec)
     }
 
-    fn into_inner(self) -> Vec<u8> {
+    pub fn into_inner(self) -> Vec<u8> {
         self.0
     }
 }
