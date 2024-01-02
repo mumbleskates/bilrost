@@ -32,7 +32,7 @@ impl ValueEncoder<Vec<u8>> for VecBlob {
         buf: &mut Capped<B>,
         _ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
-        let mut buf = buf.take_length_delimited()?;
+        let buf = buf.take_length_delimited()?;
         value.clear();
         value.reserve(buf.remaining_before_cap());
         value.put(buf.take_all());

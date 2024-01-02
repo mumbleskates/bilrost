@@ -1,5 +1,4 @@
-use alloc::collections::BTreeMap;
-
+#[allow(unused_macros)]
 macro_rules! map {
     // TODO(widders): change map configurations
     //  * two Maplike impls similar to Veclike, one for sorted and reversible and one non

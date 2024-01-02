@@ -422,9 +422,9 @@ where
     T: DistinguishedMessage,
 {
     fn decode_value_distinguished<B: Buf>(
-        value: &mut T,
-        buf: &mut Capped<B>,
-        ctx: DecodeContext,
+        _value: &mut T,
+        _buf: &mut Capped<B>,
+        _ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         todo!()
     }
