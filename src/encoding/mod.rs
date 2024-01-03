@@ -946,7 +946,7 @@ macro_rules! delegate_value_encoding {
 }
 pub(crate) use delegate_value_encoding;
 
-/// Generalized proptest macro. Kind must be either `expedient` or `distinguished`.
+/// Generalized proptest macro. Kind must be either `expedient`, `hashable`, or `distinguished`.
 macro_rules! check_type_test {
     ($encoder:ty, $kind:ident, $ty:ty, $wire_type:expr) => {
         crate::encoding::check_type_test!($encoder, $kind, from $ty, into $ty, $wire_type);
@@ -966,28 +966,45 @@ macro_rules! check_type_test {
                 fn check(value: $from_ty, tag: u32) {
                     check_type::<$into_ty, $encoder>(<$into_ty>::from(value), tag, $wire_type)?;
                 }
+            }
+            // TODO(widders): check the appropriate combination of ord (btree) and distinguished
+            //  (not hash)
+            crate::encoding::check_type_test_functions!(
+                $encoder, from $from_ty, into $into_ty, in Vec, vec, $wire_type);
+            // TODO(widders): check expedient decoding between numeric packed and unpacked
+        }
+    };
+}
+pub(crate) use check_type_test;
+macro_rules! check_type_test_functions {
+    (
+        $encoder:ty, from $from_ty:ty, into $into_ty:ty,
+        in $container:ident, $module:ident, $wire_type:expr
+    ) => {
+        mod $module {
+            use super::*;
+            proptest! {
                 #[test]
-                fn check_unpacked(value: Vec<$from_ty>, tag: u32) {
-                    check_type_unpacked::<Vec<$into_ty>, Unpacked<$encoder>>(
+                fn check_unpacked(value: $container<$from_ty>, tag: u32) {
+                    check_type_unpacked::<$container<$into_ty>, Unpacked<$encoder>>(
                         value.into_iter().map(|val| <$into_ty>::from(val)).collect(),
                         tag,
                         $wire_type,
                     )?;
                 }
                 #[test]
-                fn check_packed(value: Vec<$from_ty>, tag: u32) {
-                    check_type::<Vec<$into_ty>, Packed<$encoder>>(
+                fn check_packed(value: $container<$from_ty>, tag: u32) {
+                    check_type::<$container<$into_ty>, Packed<$encoder>>(
                         value.into_iter().map(|val| <$into_ty>::from(val)).collect(),
                         tag,
                         WireType::LengthDelimited,
                     )?;
                 }
-                // TODO(widders): check expedient decoding between numeric packed and unpacked
             }
         }
     };
 }
-pub(crate) use check_type_test;
+pub(crate) use check_type_test_functions;
 
 // TODO(widders): delete this
 pub use general::message;
