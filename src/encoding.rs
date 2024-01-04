@@ -17,8 +17,8 @@ use core::mem;
 use core::ops::{Deref, DerefMut};
 use core::str;
 
-use ::bytes::{Buf, BufMut, Bytes};
 use ::bytes::buf::Take;
+use ::bytes::{Buf, BufMut, Bytes};
 
 use crate::Message;
 use crate::{decode_length_delimiter, DecodeError};
@@ -163,8 +163,8 @@ where
     // generalizing the encoding to more than 64 bit numbers would always be zero, and if there is a
     // desire to encode varints greater than 64 bits in size it is more efficient to use a
     // length-prefixed encoding, which is just the blob wiretype.
-    return u64::checked_add(value, u64::from(buf.get_u8()) << 56)
-        .ok_or(DecodeError::new("overflowed varint"));
+    u64::checked_add(value, u64::from(buf.get_u8()) << 56)
+        .ok_or(DecodeError::new("overflowed varint"))
     // There is probably a reason why using u64::checked_add here seems to cause decoding even
     // smaller varints to bench faster, while using it in the fast-path in decode_varint_slice
     // causes a 5x pessimization. Probably best not to worry about it too much.
@@ -320,13 +320,15 @@ impl WireType {
     }
 }
 
+/// Writes keys for the provided tags.
+#[derive(Default)]
 pub struct TagWriter {
     last_tag: u32,
 }
 
 impl TagWriter {
     pub fn new() -> Self {
-        Self { last_tag: 0 }
+        Default::default()
     }
 
     /// Encode the key delta to the given key into the buffer.
@@ -364,13 +366,14 @@ impl TagWriter {
 }
 
 /// Simulator for writing tags, capable of outputting their encoded length.
+#[derive(Default)]
 pub struct TagMeasurer {
     last_tag: u32,
 }
 
 impl TagMeasurer {
     pub fn new() -> Self {
-        Self { last_tag: 0 }
+        Default::default()
     }
 
     /// Returns the number of bytes that would be written if the given tag was encoded next, and
@@ -390,13 +393,15 @@ impl TagMeasurer {
     }
 }
 
+/// Reads tags from a buffer.
+#[derive(Default)]
 pub struct TagReader {
     last_tag: u32,
 }
 
 impl TagReader {
     pub fn new() -> Self {
-        Self { last_tag: 0 }
+        Default::default()
     }
 
     #[inline(always)]
@@ -517,10 +522,7 @@ impl<'a, B: Buf> DerefMut for Capped<'a, B> {
     }
 }
 
-pub fn skip_field<B: Buf>(
-    wire_type: WireType,
-    buf: &mut Capped<B>,
-) -> Result<(), DecodeError> {
+pub fn skip_field<B: Buf>(wire_type: WireType, buf: &mut Capped<B>) -> Result<(), DecodeError> {
     let len = match wire_type {
         WireType::Varint => buf.decode_varint().map(|_| 0)?,
         WireType::ThirtyTwoBit => 4,
@@ -1289,7 +1291,6 @@ macro_rules! map {
     //  * map keys must not recur
     //  * maps should be packed! keys and values should directly alternate within a length-
     //    delineated field
-
     ($map_ty:ident) => {
         use crate::encoding::*;
         use core::hash::Hash;
@@ -1374,6 +1375,7 @@ macro_rules! map {
         /// than 0 in proto2.
         // TODO(widders): this probably isn't needed actually, due to the above. should enums all
         //  be optional-only?
+        #[allow(clippy::too_many_arguments)]
         pub fn encode_with_default<K, V, B, KE, KL, VE, VL>(
             key_encode: KE,
             key_encoded_len: KL,

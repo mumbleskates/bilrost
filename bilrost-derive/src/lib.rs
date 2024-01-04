@@ -535,7 +535,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         #methods
     };
 
-    Ok(expanded.into())
+    Ok(expanded)
 }
 
 #[proc_macro_derive(Message, attributes(bilrost))]
@@ -654,7 +654,7 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
         }
     };
 
-    Ok(expanded.into())
+    Ok(expanded)
 }
 
 #[proc_macro_derive(Enumeration, attributes(bilrost))]
@@ -841,7 +841,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         }
     };
 
-    Ok(expanded.into())
+    Ok(expanded)
 }
 
 #[proc_macro_derive(Oneof, attributes(bilrost))]
