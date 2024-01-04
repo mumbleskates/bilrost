@@ -903,17 +903,14 @@ mod test {
 
     #[test]
     fn test_rejects_colliding_message_fields() {
-        let output = try_message(
-            quote! {
-                struct Invalid {
-                    #[bilrost(bool, tag = "1")]
-                    a: bool,
-                    #[bilrost(oneof = "super::Whatever", tags = "4, 5, 1")]
-                    b: Option<super::Whatever>,
-                }
+        let output = try_message(quote! {
+            struct Invalid {
+                #[bilrost(bool, tag = "1")]
+                a: bool,
+                #[bilrost(oneof = "super::Whatever", tags = "4, 5, 1")]
+                b: Option<super::Whatever>,
             }
-            .into(),
-        );
+        });
         assert!(output.is_err());
         assert_eq!(
             output.unwrap_err().to_string(),
@@ -923,17 +920,14 @@ mod test {
 
     #[test]
     fn test_rejects_colliding_oneof_variants() {
-        let output = try_oneof(
-            quote! {
-                pub enum Invalid {
-                    #[bilrost(bool, tag = "1")]
-                    A(bool),
-                    #[bilrost(bool, tag = "1")]
-                    B(bool),
-                }
+        let output = try_oneof(quote! {
+            pub enum Invalid {
+                #[bilrost(bool, tag = "1")]
+                A(bool),
+                #[bilrost(bool, tag = "1")]
+                B(bool),
             }
-            .into(),
-        );
+        });
         assert!(output.is_err());
         assert_eq!(
             output.unwrap_err().to_string(),
