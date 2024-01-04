@@ -275,4 +275,4 @@ quite nice, so here we are.
 See [LICENSE](./LICENSE) & [NOTICE](./NOTICE) for details.
 
 Copyright 2022 Dan Burkert & Tokio Contributors
-Copyright 2023 Kent Ross
+Copyright 2023-2024 Kent Ross
