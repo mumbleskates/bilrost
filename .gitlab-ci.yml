@@ -18,6 +18,11 @@ cache:
 stages:
   - test
 
+lint:
+  stage: test
+  script:
+    - cargo clippy --all
+
 test:
   stage: test
   script:
