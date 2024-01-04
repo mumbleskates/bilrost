@@ -21,6 +21,7 @@ stages:
 lint:
   stage: test
   script:
+    - rustup component add clippy
     - cargo clippy --all
 
 test:
