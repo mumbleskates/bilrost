@@ -1,5 +1,5 @@
 use core::borrow::{Borrow, BorrowMut};
-use core::convert::{AsMut, AsRef, From, Into};
+use core::convert::{AsMut, AsRef, From};
 use core::ops::{Deref, DerefMut};
 
 use bytes::{Buf, BufMut};
@@ -71,9 +71,9 @@ impl From<Vec<u8>> for Blob {
     }
 }
 
-impl Into<Vec<u8>> for Blob {
-    fn into(self) -> Vec<u8> {
-        self.0
+impl From<Blob> for Vec<u8> {
+    fn from(value: Blob) -> Self {
+        value.0
     }
 }
 

@@ -177,8 +177,8 @@ where
     // generalizing the encoding to more than 64 bit numbers would always be zero, and if there is a
     // desire to encode varints greater than 64 bits in size it is more efficient to use a
     // length-prefixed encoding, which is just the blob wiretype.
-    return u64::checked_add(value, u64::from(buf.get_u8()) << 56)
-        .ok_or(DecodeError::new("overflowed varint"));
+    u64::checked_add(value, u64::from(buf.get_u8()) << 56)
+        .ok_or(DecodeError::new("overflowed varint"))
     // There is probably a reason why using u64::checked_add here seems to cause decoding even
     // smaller varints to bench faster, while using it in the fast-path in decode_varint_slice
     // causes a 5x pessimization. Probably best not to worry about it too much.
@@ -342,13 +342,15 @@ impl WireType {
     }
 }
 
+/// Writes keys for the provided tags.
+#[derive(Default)]
 pub struct TagWriter {
     last_tag: u32,
 }
 
 impl TagWriter {
     pub fn new() -> Self {
-        Self { last_tag: 0 }
+        Default::default()
     }
 
     /// Encode the key delta to the given key into the buffer.
@@ -386,13 +388,14 @@ impl TagWriter {
 }
 
 /// Simulator for writing tags, capable of outputting their encoded length.
+#[derive(Default)]
 pub struct TagMeasurer {
     last_tag: u32,
 }
 
 impl TagMeasurer {
     pub fn new() -> Self {
-        Self { last_tag: 0 }
+        Default::default()
     }
 
     /// Returns the number of bytes that would be written if the given tag was encoded next, and
@@ -412,13 +415,15 @@ impl TagMeasurer {
     }
 }
 
+/// Reads tags from a buffer.
+#[derive(Default)]
 pub struct TagReader {
     last_tag: u32,
 }
 
 impl TagReader {
     pub fn new() -> Self {
-        Self { last_tag: 0 }
+        Default::default()
     }
 
     #[inline(always)]
@@ -540,10 +545,8 @@ where
             return None;
         }
         let res = (self.reader)(&mut self.capped);
-        if res.is_ok() {
-            if self.capped.buf.remaining() < self.capped.extra_bytes_remaining {
-                return Some(Err(DecodeError::new("delimited length exceeded")));
-            }
+        if res.is_ok() && self.capped.buf.remaining() < self.capped.extra_bytes_remaining {
+            return Some(Err(DecodeError::new("delimited length exceeded")));
         }
         Some(res)
     }
@@ -976,6 +979,7 @@ macro_rules! check_type_test {
     };
 }
 pub(crate) use check_type_test;
+#[allow(unused_macros)]
 macro_rules! check_type_test_functions {
     (
         $encoder:ty, from $from_ty:ty, into $into_ty:ty,
@@ -1004,6 +1008,7 @@ macro_rules! check_type_test_functions {
         }
     };
 }
+#[allow(unused_imports)]
 pub(crate) use check_type_test_functions;
 
 // TODO(widders): delete this
