@@ -281,12 +281,9 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
                             panic!("empty contiguous field group");
                         };
                         let first_tag = first_field.first_tag();
-                        let each_len = fields
-                            .iter()
-                            .cloned()
-                            .map(|(field_ident, field)| {
-                                field.encoded_len(quote!(instance.#field_ident))
-                            });
+                        let each_len = fields.iter().cloned().map(|(field_ident, field)| {
+                            field.encoded_len(quote!(instance.#field_ident))
+                        });
                         quote! {
                             parts[nparts] = (#first_tag, Some(|instance, tm| {
                                 0 #(+ #each_len)*
@@ -335,12 +332,9 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
                             panic!("empty contiguous field group");
                         };
                         let first_tag = first_field.first_tag();
-                        let each_field = fields
-                            .iter()
-                            .cloned()
-                            .map(|(field_ident, field)| {
-                                field.encode(quote!(instance.#field_ident))
-                            });
+                        let each_field = fields.iter().cloned().map(|(field_ident, field)| {
+                            field.encode(quote!(instance.#field_ident))
+                        });
                         quote! {
                             parts[nparts] = (#first_tag, Some(|instance, buf, tw| {
                                 #(#each_field)*
@@ -590,13 +584,11 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
 
     let default = variants[0].0.clone();
 
-    let is_valid = variants
-        .iter()
-        .map(|(_, value)| quote!(#value => true));
+    let is_valid = variants.iter().map(|(_, value)| quote!(#value => true));
 
-    let try_from = variants.iter().map(
-        |(variant, value)| quote!(#value => ::core::result::Result::Ok(#ident::#variant)),
-    );
+    let try_from = variants
+        .iter()
+        .map(|(variant, value)| quote!(#value => ::core::result::Result::Ok(#ident::#variant)));
 
     let is_valid_doc = format!("Returns `true` if `value` is a variant of `{}`.", ident);
 
@@ -638,9 +630,9 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
     let expanded = if skip_debug {
         expanded
     } else {
-        let debug = variants.iter().map(|(variant_ident, _)| {
-            quote!(#ident::#variant_ident => stringify!(#variant_ident))
-        });
+        let debug = variants
+            .iter()
+            .map(|(variant_ident, _)| quote!(#ident::#variant_ident => stringify!(#variant_ident)));
         quote! {
             #expanded
 
@@ -856,17 +848,14 @@ mod test {
 
     #[test]
     fn test_rejects_colliding_message_fields() {
-        let output = try_message(
-            quote! {
-                struct Invalid {
-                    #[bilrost(bool, tag = "1")]
-                    a: bool,
-                    #[bilrost(oneof = "super::Whatever", tags = "4, 5, 1")]
-                    b: Option<super::Whatever>,
-                }
+        let output = try_message(quote! {
+            struct Invalid {
+                #[bilrost(bool, tag = "1")]
+                a: bool,
+                #[bilrost(oneof = "super::Whatever", tags = "4, 5, 1")]
+                b: Option<super::Whatever>,
             }
-            .into(),
-        );
+        });
         assert!(output.is_err());
         assert_eq!(
             output.unwrap_err().to_string(),
@@ -876,17 +865,14 @@ mod test {
 
     #[test]
     fn test_rejects_colliding_oneof_variants() {
-        let output = try_oneof(
-            quote! {
-                pub enum Invalid {
-                    #[bilrost(bool, tag = "1")]
-                    A(bool),
-                    #[bilrost(bool, tag = "1")]
-                    B(bool),
-                }
+        let output = try_oneof(quote! {
+            pub enum Invalid {
+                #[bilrost(bool, tag = "1")]
+                A(bool),
+                #[bilrost(bool, tag = "1")]
+                B(bool),
             }
-            .into(),
-        );
+        });
         assert!(output.is_err());
         assert_eq!(
             output.unwrap_err().to_string(),
@@ -911,7 +897,7 @@ mod test {
         output.unwrap();
     }
 
-        #[test]
+    #[test]
     fn test_tuple_message() {
         let output = try_message(quote! {
             struct Tuple(
