@@ -81,12 +81,10 @@ impl From<Blob> for Vec<u8> {
 impl proptest::arbitrary::Arbitrary for Blob {
     type Parameters = <Vec<u8> as proptest::arbitrary::Arbitrary>::Parameters;
     fn arbitrary_with(top: Self::Parameters) -> Self::Strategy {
-        {
-            proptest::strategy::Strategy::prop_map(
-                proptest::arbitrary::any_with::<Vec<u8>>(top),
-                Blob::new,
-            )
-        }
+        proptest::strategy::Strategy::prop_map(
+            proptest::arbitrary::any_with::<Vec<u8>>(top),
+            Blob::new,
+        )
     }
     type Strategy = proptest::strategy::Map<
         <Vec<u8> as proptest::arbitrary::Arbitrary>::Strategy,
