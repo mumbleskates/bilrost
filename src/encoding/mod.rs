@@ -838,11 +838,9 @@ where
 
 /// Trait to be implemented by (or more commonly derived for) oneofs, which have knowledge of their
 /// variants' tags and encoding.
-// TODO(widders): does this even need to be a trait? it's only going to be used by the encoding impl
-//  of message types
-trait Oneof: Sized {
+pub trait Oneof {
     fn decode_field<B: Buf>(
-        field: &mut Option<Self>,
+        &mut self,
         tag: u32,
         wire_type: WireType,
         duplicated: bool,
@@ -851,9 +849,10 @@ trait Oneof: Sized {
     ) -> Result<(), DecodeError>;
 }
 
-trait DistinuishedOneof: Sized {
+/// Complementary trait for oneof fields all of whose variants have a distinguished encoding.
+pub trait DistinuishedOneof {
     fn decode_field_distinguished<B: Buf>(
-        field: &mut Option<Self>,
+        &mut self,
         tag: u32,
         wire_type: WireType,
         duplicated: bool,
