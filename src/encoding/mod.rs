@@ -603,7 +603,7 @@ pub enum UnknownField<B: Buf> {
     },
 }
 
-impl<B> UnknownField<B> {
+impl<B: Buf> UnknownField<B> {
     pub fn tag(&self) -> u32 {
         match *self {
             UnknownField::Varint { tag, .. } => tag,
