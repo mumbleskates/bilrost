@@ -11,7 +11,7 @@ use core::default::Default;
 use core::ops::{Deref, DerefMut};
 
 use bytes::buf::Take;
-use bytes::{Buf, BufMut};
+use bytes::{Buf, BufMut, Bytes};
 
 use crate::{decode_length_delimiter, DecodeError};
 
@@ -582,6 +582,38 @@ pub fn skip_field<B: Buf>(wire_type: WireType, buf: &mut Capped<B>) -> Result<()
     Ok(())
 }
 
+// TODO(widders): use this?
+pub enum UnknownField<B: Buf> {
+    Varint {
+        tag: u32,
+        value: u64,
+    },
+    LengthDelimited {
+        tag: u32,
+        len: usize,
+        buf: B,
+    },
+    ThirtyTwoBit {
+        tag: u32,
+        value: [u8; 4],
+    },
+    SixtyFourBit {
+        tag: u32,
+        value: [u8; 8],
+    },
+}
+
+impl<B> UnknownField<B> {
+    pub fn tag(&self) -> u32 {
+        match *self {
+            UnknownField::Varint { tag, .. } => tag,
+            UnknownField::LengthDelimited { tag, .. } => tag,
+            UnknownField::ThirtyTwoBit { tag, .. } => tag,
+            UnknownField::SixtyFourBit { tag, .. } => tag,
+        }
+    }
+}
+
 /// The core trait for encoding and decoding bilrost data.
 pub trait Encoder<T> {
     /// Encodes the a field with the given tag and value.
@@ -802,6 +834,32 @@ where
             ctx,
         )
     }
+}
+
+/// Trait to be implemented by (or more commonly derived for) oneofs, which have knowledge of their
+/// variants' tags and encoding.
+// TODO(widders): does this even need to be a trait? it's only going to be used by the encoding impl
+//  of message types
+trait Oneof: Sized {
+    fn decode_field<B: Buf>(
+        field: &mut Option<Self>,
+        tag: u32,
+        wire_type: WireType,
+        duplicated: bool,
+        buf: &mut Capped<B>,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError>;
+}
+
+trait DistinuishedOneof: Sized {
+    fn decode_field_distinguished<B: Buf>(
+        field: &mut Option<Self>,
+        tag: u32,
+        wire_type: WireType,
+        duplicated: bool,
+        buf: &mut Capped<B>,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError>;
 }
 
 /// Macro rules for expressly delegating from one encoder to another.
