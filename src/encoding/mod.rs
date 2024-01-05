@@ -11,7 +11,7 @@ use core::default::Default;
 use core::ops::{Deref, DerefMut};
 
 use bytes::buf::Take;
-use bytes::{Buf, BufMut, Bytes};
+use bytes::{Buf, BufMut};
 
 use crate::{decode_length_delimiter, DecodeError};
 
