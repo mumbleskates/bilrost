@@ -844,10 +844,10 @@ pub trait DistinuishedOneof {
 /// Macro rules for expressly delegating from one encoder to another.
 macro_rules! delegate_encoding {
     (
-        delegate from $from_ty:ty, to $to_ty:ty, for type $value_ty:ty
-        $(, with generics $(, $value_generics:ident)*)?
+        delegate from ($from_ty:ty) to ($to_ty:ty) for type ($value_ty:ty)
+        $(with generics <$($value_generics:ident),+>)?
     ) => {
-        impl$(<$($value_generics, )*>)? $crate::encoding::Encoder<$value_ty> for $from_ty
+        impl$(<$($value_generics),+>)? $crate::encoding::Encoder<$value_ty> for $from_ty
         where
             $to_ty: $crate::encoding::Encoder<$value_ty>,
         {
@@ -884,15 +884,15 @@ macro_rules! delegate_encoding {
     };
 
     (
-        delegate from $from_ty:ty, to $to_ty:ty, for type $value_ty:ty, including distinguished
-        $(, with generics $(, $value_generics:ident)*)?
+        delegate from ($from_ty:ty) to ($to_ty:ty) for type ($value_ty:ty) including distinguished
+        $(with generics <$($value_generics:ident),+>)?
     ) => {
         delegate_encoding!(
-            delegate from $from_ty, to $to_ty, for type $value_ty
-            $(, with generics $(, $value_generics)*)?
+            delegate from ($from_ty) to ($to_ty) for type ($value_ty)
+            $(with generics <$($value_generics),+>)?
         );
 
-        impl$(<$($value_generics, )*>)? $crate::encoding::DistinguishedEncoder<$value_ty>
+        impl$(<$($value_generics),+>)? $crate::encoding::DistinguishedEncoder<$value_ty>
         for $from_ty
         where
             $to_ty: $crate::encoding::DistinguishedEncoder<$value_ty>,
@@ -915,10 +915,10 @@ pub(crate) use delegate_encoding;
 
 macro_rules! delegate_value_encoding {
     (
-        delegate from $from_ty:ty, to $to_ty:ty, for type $value_ty:ty
-        $(, with generics $(, $value_generics:ident)*)?
+        delegate from ($from_ty:ty) to ($to_ty:ty) for type ($value_ty:ty)
+        $(with generics <$($value_generics:ident),+>)?
     ) => {
-        impl$(<$($value_generics, )*>)? $crate::encoding::Wiretyped<$value_ty> for $from_ty
+        impl$(<$($value_generics),+>)? $crate::encoding::Wiretyped<$value_ty> for $from_ty
         where
             $to_ty: $crate::encoding::Wiretyped<$value_ty>,
         {
@@ -926,7 +926,7 @@ macro_rules! delegate_value_encoding {
                 <$to_ty as $crate::encoding::Wiretyped<$value_ty>>::WIRE_TYPE;
         }
 
-        impl$(<$($value_generics, )*>)? $crate::encoding::ValueEncoder<$value_ty> for $from_ty
+        impl$(<$($value_generics),+>)? $crate::encoding::ValueEncoder<$value_ty> for $from_ty
         where
             $to_ty: $crate::encoding::ValueEncoder<$value_ty>,
         {
@@ -960,15 +960,14 @@ macro_rules! delegate_value_encoding {
     };
 
     (
-        delegate from $from_ty:ty, to $to_ty:ty, for type $value_ty:ty, including distinguished
-        $(, with generics $(, $value_generics:ident)*)?
+        delegate from ($from_ty:ty) to ($to_ty:ty) for type ($value_ty:ty) including distinguished
+        $(with generics <$($value_generics:ident),+>)?
     ) => {
-        delegate_value_encoding!(
-            delegate from $from_ty, to $to_ty, for type $value_ty
-            $(, with generics $(, $value_generics)*)?
+        delegate_value_encoding!(delegate from ($from_ty) to ($to_ty) for type ($value_ty)
+            $(with generics <$($value_generics),+>)?
         );
 
-        impl$(<$($value_generics, )*>)? $crate::encoding::DistinguishedValueEncoder<$value_ty>
+        impl$(<$($value_generics),+>)? $crate::encoding::DistinguishedValueEncoder<$value_ty>
         for $from_ty
         where
             $to_ty: $crate::encoding::DistinguishedValueEncoder<$value_ty>,

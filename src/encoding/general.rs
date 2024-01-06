@@ -21,13 +21,13 @@ pub struct General;
 
 // General implements unpacked encodings by default, but only for select collection types. Other
 // implementers of the `Collection` trait must use Unpacked or Packed.
-delegate_encoding!(delegate from General, to crate::encoding::Unpacked<General>,
-    for type Vec<T>, including distinguished, with generics, T);
-delegate_encoding!(delegate from General, to crate::encoding::Unpacked<General>,
-    for type BTreeSet<T>, including distinguished, with generics, T);
+delegate_encoding!(delegate from (General) to (crate::encoding::Unpacked<General>)
+    for type (Vec<T>) including distinguished with generics <T>);
+delegate_encoding!(delegate from (General) to (crate::encoding::Unpacked<General>)
+    for type (BTreeSet<T>) including distinguished with generics <T>);
 #[cfg(feature = "std")]
-delegate_encoding!(delegate from General, to crate::encoding::Unpacked<General>,
-    for type HashSet<T>, with generics, T);
+delegate_encoding!(delegate from (General) to (crate::encoding::Unpacked<General>)
+    for type (HashSet<T>) with generics <T>);
 
 /// General encodes plain values only when they are non-default.
 impl<T> Encoder<T> for General
@@ -195,8 +195,8 @@ from_uint64(value) {
 });
 
 // General also encodes floating point values.
-delegate_value_encoding!(delegate from General, to crate::encoding::Fixed, for type f32);
-delegate_value_encoding!(delegate from General, to crate::encoding::Fixed, for type f64);
+delegate_value_encoding!(delegate from (General) to (crate::encoding::Fixed) for type (f32));
+delegate_value_encoding!(delegate from (General) to (crate::encoding::Fixed) for type (f64));
 
 impl Wiretyped<String> for General {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
@@ -531,7 +531,10 @@ pub mod message {
     }
 }
 
-/// `General` delegates to `Map<General, General>` for `BTreeMap`
+// The following impls would use the delegate_encoding! macro, but if there's an easy way to provide
+// where-clause terms to a macro argument it's not clear what it is.
+
+/// `General` delegates to `Map<General, General>` for `BTreeMap`.
 impl<K, V> Wiretyped<BTreeMap<K, V>> for General
 where
     Map<General, General>: Wiretyped<BTreeMap<K, V>>,
@@ -539,6 +542,7 @@ where
     const WIRE_TYPE: WireType = <Map<General, General> as Wiretyped<BTreeMap<K, V>>>::WIRE_TYPE;
 }
 
+/// `General` delegates to `Map<General, General>` for `BTreeMap`.
 impl<K, V> ValueEncoder<BTreeMap<K, V>> for General
 where
     Map<General, General>: ValueEncoder<BTreeMap<K, V>>,
@@ -564,6 +568,7 @@ where
     }
 }
 
+/// `General` delegates to `Map<General, General>` for `BTreeMap`.
 impl<K, V> DistinguishedValueEncoder<BTreeMap<K, V>> for General
 where
     Map<General, General>: DistinguishedValueEncoder<BTreeMap<K, V>>,
@@ -589,6 +594,7 @@ where
     const WIRE_TYPE: WireType = <Map<General, General> as Wiretyped<HashMap<K, V>>>::WIRE_TYPE;
 }
 
+/// `General` delegates to `Map<General, General>` for `HashMap`
 #[cfg(feature = "std")]
 impl<K, V> ValueEncoder<HashMap<K, V>> for General
 where
