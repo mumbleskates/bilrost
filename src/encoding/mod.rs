@@ -917,6 +917,10 @@ macro_rules! delegate_encoding {
 }
 pub(crate) use delegate_encoding;
 
+/// This macro creates delegated `ValueEncoder` impls for a given type from one encoder to another.
+/// Note: While it's possible to provide additional `where` clause bounds for any generics in the
+/// types, currently the bounds themselves can only be a single identifier, due to the inability of
+/// `macro_rules!` arguments to express even this much without a tremendous mess.
 macro_rules! delegate_value_encoding {
     (
         delegate from ($from_ty:ty) to ($to_ty:ty) for type ($value_ty:ty)
