@@ -88,7 +88,7 @@ where
 impl<C, T, E> Encoder<C> for Packed<E>
 where
     C: Collection<Item = T>,
-    Packed<E>: ValueEncoder<C>,
+    Self: ValueEncoder<C>,
     E: ValueEncoder<T>,
     T: NewForOverwrite,
 {
@@ -138,7 +138,7 @@ where
 impl<C, E> DistinguishedEncoder<C> for Packed<E>
 where
     C: DistinguishedCollection,
-    Packed<E>: DistinguishedValueEncoder<C> + Encoder<C>,
+    Self: DistinguishedValueEncoder<C> + Encoder<C>,
 {
     #[inline]
     fn decode_distinguished<B: Buf>(
