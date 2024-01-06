@@ -38,14 +38,6 @@ macro_rules! fixed_width_common {
             }
 
             #[inline]
-            fn many_values_encoded_len<'a, I>(values: I) -> usize
-            where
-                I: ExactSizeIterator<Item = &'a $ty>,
-            {
-                $wire_type.fixed_size().unwrap() * values.len()
-            }
-
-            #[inline]
             fn decode_value<B: Buf>(
                 value: &mut $ty,
                 buf: &mut Capped<B>,

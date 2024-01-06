@@ -645,12 +645,16 @@ pub trait ValueEncoder<T>: Wiretyped<T> {
     /// Returns the number of bytes the given value would be encoded as.
     fn value_encoded_len(value: &T) -> usize;
     /// Returns the number of total bytes to encode all the values in the given container.
-    fn many_values_encoded_len<'a, I>(values: I) -> usize
+    fn many_values_encoded_len<I>(values: I) -> usize
     where
-        I: ExactSizeIterator<Item = &'a T>,
-        T: 'a,
+        I: ExactSizeIterator,
+        I::Item: Deref<Target = T>,
     {
-        values.map(Self::value_encoded_len).sum()
+        let len = values.len();
+        Self::WIRE_TYPE.fixed_size().map_or_else(
+            || values.map(|val| Self::value_encoded_len(&val)).sum(),
+            |fixed_size| fixed_size * len, // Shortcut when values have a fixed size
+        )
     }
     /// Decodes a field assuming the encoder's wire type directly from the buffer.
     fn decode_value<B: Buf>(
@@ -916,11 +920,13 @@ pub(crate) use delegate_encoding;
 macro_rules! delegate_value_encoding {
     (
         delegate from ($from_ty:ty) to ($to_ty:ty) for type ($value_ty:ty)
+        $(with where clause ($($where_ty:ty : $must_be:tt $(+ $must_more:tt)*),+))?
         $(with generics <$($value_generics:ident),+>)?
     ) => {
         impl$(<$($value_generics),+>)? $crate::encoding::Wiretyped<$value_ty> for $from_ty
         where
             $to_ty: $crate::encoding::Wiretyped<$value_ty>,
+            $($($where_ty : $must_be $(+ $must_more)* ,)+)?
         {
             const WIRE_TYPE: $crate::encoding::WireType =
                 <$to_ty as $crate::encoding::Wiretyped<$value_ty>>::WIRE_TYPE;
@@ -929,6 +935,7 @@ macro_rules! delegate_value_encoding {
         impl$(<$($value_generics),+>)? $crate::encoding::ValueEncoder<$value_ty> for $from_ty
         where
             $to_ty: $crate::encoding::ValueEncoder<$value_ty>,
+            $($($where_ty : $must_be $(+ $must_more)* ,)+)?
         {
             #[inline]
             fn encode_value<B: $crate::bytes::BufMut>(value: &$value_ty, buf: &mut B) {
@@ -941,9 +948,10 @@ macro_rules! delegate_value_encoding {
             }
 
             #[inline]
-            fn many_values_encoded_len<'a, I>(values: I) -> usize
+            fn many_values_encoded_len<I>(values: I) -> usize
             where
-                I: ExactSizeIterator<Item = &'a $value_ty>,
+                I: ExactSizeIterator,
+                I::Item: core::ops::Deref<Target = $value_ty>,
             {
                 <$to_ty>::many_values_encoded_len(values)
             }
@@ -961,9 +969,17 @@ macro_rules! delegate_value_encoding {
 
     (
         delegate from ($from_ty:ty) to ($to_ty:ty) for type ($value_ty:ty) including distinguished
+        $(with where clause for expedient (
+            $($where_ty:ty : $must_be:tt $(+ $must_more:tt)*),+
+        ))?
+        $(with where clause for distinguished (
+            $($dis_where_ty:ty : $dis_must_be:tt $(+ $dis_must_more:tt)*),+
+        ))?
         $(with generics <$($value_generics:ident),+>)?
     ) => {
-        delegate_value_encoding!(delegate from ($from_ty) to ($to_ty) for type ($value_ty)
+        delegate_value_encoding!(
+            delegate from ($from_ty) to ($to_ty) for type ($value_ty)
+            $(with where clause ($($where_ty : $must_be $(+ $must_more)*),+))?
             $(with generics <$($value_generics),+>)?
         );
 
@@ -971,6 +987,8 @@ macro_rules! delegate_value_encoding {
         for $from_ty
         where
             $to_ty: $crate::encoding::DistinguishedValueEncoder<$value_ty>,
+            $($($where_ty : $must_be $(+ $must_more)* ,)+)?
+            $($($dis_where_ty : $dis_must_be $(+ $dis_must_more)* ,)+)?
         {
             #[inline]
             fn decode_value_distinguished<B: Buf>(
