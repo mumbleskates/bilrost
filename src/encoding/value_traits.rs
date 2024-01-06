@@ -31,7 +31,7 @@ where
     }
 }
 
-/// Trait for containers that store multiple items, such as `Vec` and `HashSet`
+/// Trait for containers that store multiple items such as `Vec`, `BTreeSet`, and `HashSet`
 pub trait Collection: Default {
     type Item;
     type RefIter<'a>: ExactSizeIterator<Item = &'a Self::Item>
@@ -49,7 +49,7 @@ pub trait Collection: Default {
 }
 
 /// Trait for collections that store multiple items and have a distinguished representation, such as
-/// `Vec` and `BTreeSet`. Returns an error if the values are inserted in the wrong order.
+/// `Vec` and `BTreeSet`. Returns an error if the items are inserted in the wrong order.
 pub trait DistinguishedCollection: Collection + Eq {
     type ReverseIter<'a>: Iterator<Item = &'a Self::Item>
     where
@@ -79,6 +79,8 @@ pub trait Mapping: Default {
     fn insert(&mut self, key: Self::Key, value: Self::Value) -> Result<(), &'static str>;
 }
 
+/// Trait for associative containers with a distinguished representation. Returns an error if the
+/// items are inserted in the wrong order.
 pub trait DistinguishedMapping: Mapping {
     type ReverseIter<'a>: Iterator<Item = (&'a Self::Key, &'a Self::Value)>
     where
