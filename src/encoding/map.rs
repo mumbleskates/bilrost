@@ -1,8 +1,5 @@
-use crate::encoding::value_traits::Mapping;
-use crate::encoding::{
-    encode_varint, encoded_len_varint, Capped, DecodeContext, General, NewForOverwrite,
-    ValueEncoder, WireType, Wiretyped,
-};
+use crate::encoding::value_traits::{DistinguishedMapping, Mapping};
+use crate::encoding::{check_wire_type, encode_varint, encoded_len_varint, Capped, DecodeContext, DistinguishedValueEncoder, Encoder, FieldEncoder, General, NewForOverwrite, TagMeasurer, TagWriter, ValueEncoder, WireType, Wiretyped, DistinguishedEncoder};
 use crate::DecodeError;
 use bytes::{Buf, BufMut};
 
@@ -83,15 +80,92 @@ where
     }
 }
 
-// TODO(widders): DistinguishedValueEncoder for maps
+impl<M, K, V, KE, VE> DistinguishedValueEncoder<M> for Map<KE, VE>
+where
+    M: DistinguishedMapping<Key = K, Value = V> + Eq,
+    KE: DistinguishedValueEncoder<K>,
+    VE: DistinguishedValueEncoder<V>,
+    K: NewForOverwrite + Eq,
+    V: NewForOverwrite + Eq,
+{
+    fn decode_value_distinguished<B: Buf>(
+        value: &mut M,
+        buf: &mut Capped<B>,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError> {
+        let capped = buf.take_length_delimited()?;
+        if combined_fixed_size(KE::WIRE_TYPE, VE::WIRE_TYPE).map_or(false, |fixed_size| {
+            capped.remaining_before_cap() % fixed_size != 0
+        }) {
+            return Err(DecodeError::new("packed field is not a valid length"));
+        }
+        for item in capped.consume(|buf| {
+            let mut new_key = K::new_for_overwrite();
+            let mut new_val = V::new_for_overwrite();
+            KE::decode_value_distinguished(&mut new_key, buf, ctx.clone())?;
+            VE::decode_value_distinguished(&mut new_val, buf, ctx.clone())?;
+            Ok((new_key, new_val))
+        }) {
+            let (key, val) = item?;
+            value.insert(key, val).map_err(DecodeError::new)?;
+        }
+        Ok(())
+    }
+}
 
-// TODO(widders): Encoder & DistinguishedEncoder for Map<..> (bare values rejecting empty in
-//  distinguished mode)
+impl<M, KE, VE> Encoder<M> for Map<KE, VE>
+where
+    M: Mapping,
+    Self: ValueEncoder<M>,
+{
+    fn encode<B: BufMut>(tag: u32, value: &M, buf: &mut B, tw: &mut TagWriter) {
+        if !value.is_empty() {
+            Self::encode_field(tag, value, buf, tw);
+        }
+    }
 
-// TODO(widders): change map configurations
-//  * maps should be packed! keys and values should directly alternate within a length-
-//    delineated field
-//  * delegate value encoding for maps from General to Map<General, General>
+    fn encoded_len(tag: u32, value: &M, tm: &mut TagMeasurer) -> usize {
+        if !value.is_empty() {
+            Self::field_encoded_len(tag, value, tm)
+        } else {
+            0
+        }
+    }
+
+    fn decode<B: Buf>(
+        wire_type: WireType,
+        duplicated: bool,
+        value: &mut M,
+        buf: &mut Capped<B>,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError> {
+        check_wire_type(WireType::LengthDelimited, wire_type)?;
+        if duplicated {
+            return Err(DecodeError::new("multiple occurrences of map field"));
+        }
+        Self::decode_value(value, buf, ctx)
+    }
+}
+
+impl<M, KE, VE> DistinguishedEncoder<M> for Map<KE, VE>
+where
+    M: DistinguishedMapping + Eq,
+    Self: DistinguishedValueEncoder<M> + Encoder<M>,
+{
+    fn decode_distinguished<B: Buf>(wire_type: WireType, duplicated: bool, value: &mut M, buf: &mut Capped<B>, ctx: DecodeContext) -> Result<(), DecodeError> {
+        check_wire_type(WireType::LengthDelimited, wire_type)?;
+        if duplicated {
+            return Err(DecodeError::new("multiple occurrences of map field"));
+        }
+        Self::decode_value_distinguished(value, buf, ctx)?;
+        if value.is_empty() {
+            return Err(DecodeError::new("map field encoded with no items"));
+        }
+        Ok(())
+    }
+}
+
+// TODO(widders): delegate value encoding for maps from General to Map<General, General>
 
 // TODO(widders): hashbrown support in a feature
 
