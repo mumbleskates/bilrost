@@ -179,7 +179,35 @@ where
 
 #[cfg(test)]
 mod test {
-    // TODO(widders): tests
+    mod btree {
+        use crate::encoding::check_type_test;
+        check_type_test!(
+            Map,
+            expedient,
+            alloc::collections::BTreeMap<u64, f32>,
+            WireType::LengthDelimited
+        );
+        // TODO(widders): this one takes way too long to run (with packed/unpacked nesting)
+        check_type_test!(
+            Map,
+            distinguished,
+            alloc::collections::BTreeMap<u32, i32>,
+            WireType::LengthDelimited
+        );
+    }
+
+    #[cfg(feature = "std")]
+    mod hash {
+        use crate::encoding::check_type_test;
+        check_type_test!(
+            Map,
+            expedient,
+            std::collections::HashMap<u64, f32>,
+            WireType::LengthDelimited
+        );
+    }
+
+    // TODO(widders): more tests
     // map_tests!(keys: [
     //     (u32, uint32),
     //     (u64, uint64),
