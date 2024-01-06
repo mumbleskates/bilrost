@@ -920,7 +920,7 @@ pub(crate) use delegate_encoding;
 macro_rules! delegate_value_encoding {
     (
         delegate from ($from_ty:ty) to ($to_ty:ty) for type ($value_ty:ty)
-        $(with where clause ($($where_ty:ty : $must_be:tt $(+ $must_more:tt)*),+))?
+        $(with where clause ($($where_ty:ty : $must_be:ident $(+ $must_more:ident)*),+))?
         $(with generics <$($value_generics:ident),+>)?
     ) => {
         impl$(<$($value_generics),+>)? $crate::encoding::Wiretyped<$value_ty> for $from_ty
@@ -970,10 +970,10 @@ macro_rules! delegate_value_encoding {
     (
         delegate from ($from_ty:ty) to ($to_ty:ty) for type ($value_ty:ty) including distinguished
         $(with where clause for expedient (
-            $($where_ty:ty : $must_be:tt $(+ $must_more:tt)*),+
+            $($where_ty:ty : $must_be:ident $(+ $must_more:ident)*),+
         ))?
         $(with where clause for distinguished (
-            $($dis_where_ty:ty : $dis_must_be:tt $(+ $dis_must_more:tt)*),+
+            $($dis_where_ty:ty : $dis_must_be:ident $(+ $dis_must_more:ident)*),+
         ))?
         $(with generics <$($value_generics:ident),+>)?
     ) => {
