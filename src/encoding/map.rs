@@ -1,6 +1,6 @@
 use crate::encoding::value_traits::Mapping;
 use crate::encoding::{
-    encode_varint, encoded_len_varint, Capped, DecodeContext, Encoder, General, NewForOverwrite,
+    encode_varint, encoded_len_varint, Capped, DecodeContext, General, NewForOverwrite,
     ValueEncoder, WireType, Wiretyped,
 };
 use crate::DecodeError;
@@ -14,14 +14,17 @@ impl<T, KE, VE> Wiretyped<T> for Map<KE, VE> {
 }
 
 const fn combined_fixed_size(a: WireType, b: WireType) -> Option<usize> {
-    Some(a.fixed_size()? + b.fixed_size()?)
+    match (a.fixed_size(), b.fixed_size()) {
+        (Some(a), Some(b)) => Some(a + b),
+        _ => None,
+    }
 }
 
 fn map_encoded_length<M, KE, VE>(value: &M) -> usize
 where
     M: Mapping,
-    KE: Wiretyped<M::Key>,
-    VE: Wiretyped<M::Value>,
+    KE: ValueEncoder<M::Key>,
+    VE: ValueEncoder<M::Value>,
 {
     combined_fixed_size(KE::WIRE_TYPE, VE::WIRE_TYPE).map_or_else(
         || {
