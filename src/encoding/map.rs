@@ -1,5 +1,9 @@
 use crate::encoding::value_traits::{DistinguishedMapping, Mapping};
-use crate::encoding::{check_wire_type, encode_varint, encoded_len_varint, Capped, DecodeContext, DistinguishedValueEncoder, Encoder, FieldEncoder, General, NewForOverwrite, TagMeasurer, TagWriter, ValueEncoder, WireType, Wiretyped, DistinguishedEncoder};
+use crate::encoding::{
+    check_wire_type, encode_varint, encoded_len_varint, Capped, DecodeContext,
+    DistinguishedEncoder, DistinguishedValueEncoder, Encoder, FieldEncoder, General,
+    NewForOverwrite, TagMeasurer, TagWriter, ValueEncoder, WireType, Wiretyped,
+};
 use crate::DecodeError;
 use bytes::{Buf, BufMut};
 
@@ -152,7 +156,13 @@ where
     M: DistinguishedMapping + Eq,
     Self: DistinguishedValueEncoder<M> + Encoder<M>,
 {
-    fn decode_distinguished<B: Buf>(wire_type: WireType, duplicated: bool, value: &mut M, buf: &mut Capped<B>, ctx: DecodeContext) -> Result<(), DecodeError> {
+    fn decode_distinguished<B: Buf>(
+        wire_type: WireType,
+        duplicated: bool,
+        value: &mut M,
+        buf: &mut Capped<B>,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError> {
         check_wire_type(WireType::LengthDelimited, wire_type)?;
         if duplicated {
             return Err(DecodeError::new("multiple occurrences of map field"));

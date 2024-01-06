@@ -29,12 +29,12 @@ pub use value_traits::{Collection, DistinguishedCollection, NewForOverwrite};
 pub use fixed::Fixed;
 /// General encoder. Encodes numbers as varints and repeated types un-packed.
 pub use general::General;
+/// Encoder for mapping types. Encodes alternating keys and values in packed format.
+pub use map::Map;
 /// Packed encoder. Encodes repeated types in packed format.
 pub use packed::Packed;
 /// Unpacked encoder. Encodes repeated types in unpacked format, writing repeated fields.
 pub use unpacked::Unpacked;
-/// Encoder for mapping types. Encodes alternating keys and values in packed format.
-pub use map::Map;
 /// Encoder that decodes bytes data directly into `Vec<u8>`, rather than requiring it to be wrapped
 /// in `Blob`.
 pub use vec_blob::VecBlob;
