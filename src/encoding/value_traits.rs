@@ -1,5 +1,6 @@
 use alloc::collections::{btree_map, btree_set, BTreeMap, BTreeSet};
 use alloc::vec::Vec;
+#[cfg(feature = "std")]
 use core::hash::Hash;
 #[cfg(feature = "std")]
 use std::collections::{hash_map, hash_set, HashMap, HashSet};

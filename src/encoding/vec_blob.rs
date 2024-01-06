@@ -1,3 +1,5 @@
+use alloc::vec::Vec;
+
 use bytes::{Buf, BufMut};
 
 use crate::encoding::{

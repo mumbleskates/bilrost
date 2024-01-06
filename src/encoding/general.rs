@@ -1,6 +1,7 @@
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::string::String;
 use alloc::vec::Vec;
+#[cfg(feature = "std")]
 use core::hash::Hash;
 use core::mem;
 use core::str;
