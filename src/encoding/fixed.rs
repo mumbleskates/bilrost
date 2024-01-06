@@ -34,7 +34,7 @@ macro_rules! fixed_width_common {
 
             #[inline]
             fn value_encoded_len(_value: &$ty) -> usize {
-                $wire_type.fixed_size()
+                $wire_type.fixed_size().unwrap()
             }
 
             #[inline]
@@ -42,7 +42,7 @@ macro_rules! fixed_width_common {
             where
                 I: ExactSizeIterator<Item = &'a $ty>,
             {
-                $wire_type.fixed_size() * values.len()
+                $wire_type.fixed_size().unwrap() * values.len()
             }
 
             #[inline]
@@ -51,7 +51,7 @@ macro_rules! fixed_width_common {
                 buf: &mut Capped<B>,
                 _ctx: DecodeContext,
             ) -> Result<(), DecodeError> {
-                if buf.remaining() < $wire_type.fixed_size() {
+                if buf.remaining() < $wire_type.fixed_size().unwrap() {
                     return Err(DecodeError::new("field truncated"));
                 }
                 *value = buf.$get();

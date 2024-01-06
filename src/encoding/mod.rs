@@ -324,20 +324,11 @@ impl TryFrom<u64> for WireType {
 }
 
 impl WireType {
-    const fn encoded_size_alignment(self) -> usize {
+    const fn fixed_size(self) -> Option<usize> {
         match self {
-            WireType::Varint => 1,
-            WireType::LengthDelimited => 1,
-            WireType::SixtyFourBit => 8,
-            WireType::ThirtyTwoBit => 4,
-        }
-    }
-
-    const fn fixed_size(self) -> usize {
-        match self {
-            WireType::SixtyFourBit => 8,
-            WireType::ThirtyTwoBit => 4,
-            WireType::Varint | WireType::LengthDelimited => panic!("wire type is not fixed size"),
+            WireType::SixtyFourBit => Some(8),
+            WireType::ThirtyTwoBit => Some(4),
+            WireType::Varint | WireType::LengthDelimited => None,
         }
     }
 }

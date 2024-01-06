@@ -1,9 +1,9 @@
+use crate::encoding::value_traits::{Collection, DistinguishedCollection};
 use crate::encoding::{
     encode_varint, encoded_len_varint, Capped, DecodeContext, DistinguishedEncoder,
     DistinguishedFieldEncoder, DistinguishedValueEncoder, Encoder, FieldEncoder, General,
     NewForOverwrite, TagMeasurer, TagWriter, ValueEncoder, WireType, Wiretyped,
 };
-use crate::encoding::value_traits::{Collection, DistinguishedCollection};
 use crate::DecodeError;
 
 use bytes::{Buf, BufMut};
@@ -30,6 +30,7 @@ where
 
     fn value_encoded_len(value: &C) -> usize {
         let inner_len = E::many_values_encoded_len(value.iter());
+        // TODO(widders): address general cases where u64 may overflow usize, with care
         encoded_len_varint(inner_len as u64) + inner_len
     }
 
@@ -39,7 +40,9 @@ where
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         let capped = buf.take_length_delimited()?;
-        if capped.remaining_before_cap() % E::WIRE_TYPE.encoded_size_alignment() != 0 {
+        if E::WIRE_TYPE.fixed_size().map_or(false, |fixed_size| {
+            buf.remaining_before_cap() % fixed_size != 0
+        }) {
             return Err(DecodeError::new("packed field is not a valid length"));
         }
         for val in capped.consume(|buf| {
@@ -65,7 +68,9 @@ where
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         let capped = buf.take_length_delimited()?;
-        if capped.remaining_before_cap() % E::WIRE_TYPE.encoded_size_alignment() != 0 {
+        if E::WIRE_TYPE.fixed_size().map_or(false, |fixed_size| {
+            capped.remaining_before_cap() % fixed_size != 0
+        }) {
             return Err(DecodeError::new("packed field is not a valid length"));
         }
         for val in capped.consume(|buf| {
