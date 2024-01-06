@@ -920,19 +920,16 @@ macro_rules! delegate_encoding {
 pub(crate) use delegate_encoding;
 
 /// This macro creates delegated `ValueEncoder` impls for a given type from one encoder to another.
-/// Note: While it's possible to provide additional `where` clause bounds for any generics in the
-/// types, currently the bounds themselves can only be a single identifier, due to the inability of
-/// `macro_rules!` arguments to express even this much without a tremendous mess.
 macro_rules! delegate_value_encoding {
     (
         delegate from ($from_ty:ty) to ($to_ty:ty) for type ($value_ty:ty)
-        $(with where clause ($($where_ty:ty : $must_be:ident $(+ $must_more:ident)*),+))?
+        $(with where clause ($($where_clause:tt)+))?
         $(with generics <$($value_generics:ident),+>)?
     ) => {
         impl$(<$($value_generics),+>)? $crate::encoding::Wiretyped<$value_ty> for $from_ty
         where
             $to_ty: $crate::encoding::Wiretyped<$value_ty>,
-            $($($where_ty : $must_be $(+ $must_more)* ,)+)?
+            $($($where_clause)+ ,)?
         {
             const WIRE_TYPE: $crate::encoding::WireType =
                 <$to_ty as $crate::encoding::Wiretyped<$value_ty>>::WIRE_TYPE;
@@ -941,7 +938,7 @@ macro_rules! delegate_value_encoding {
         impl$(<$($value_generics),+>)? $crate::encoding::ValueEncoder<$value_ty> for $from_ty
         where
             $to_ty: $crate::encoding::ValueEncoder<$value_ty>,
-            $($($where_ty : $must_be $(+ $must_more)* ,)+)?
+            $($($where_clause)+ ,)?
         {
             #[inline]
             fn encode_value<B: $crate::bytes::BufMut>(value: &$value_ty, buf: &mut B) {
@@ -975,17 +972,13 @@ macro_rules! delegate_value_encoding {
 
     (
         delegate from ($from_ty:ty) to ($to_ty:ty) for type ($value_ty:ty) including distinguished
-        $(with where clause for expedient (
-            $($where_ty:ty : $must_be:ident $(+ $must_more:ident)*),+
-        ))?
-        $(with where clause for distinguished (
-            $($dis_where_ty:ty : $dis_must_be:ident $(+ $dis_must_more:ident)*),+
-        ))?
+        $(with where clause for expedient ($($expedient_where:tt)+))?
+        $(with where clause for distinguished ($($distinguished_where:tt)+))?
         $(with generics <$($value_generics:ident),+>)?
     ) => {
         delegate_value_encoding!(
             delegate from ($from_ty) to ($to_ty) for type ($value_ty)
-            $(with where clause ($($where_ty : $must_be $(+ $must_more)*),+))?
+            $(with where clause ($($expedient_where)+))?
             $(with generics <$($value_generics),+>)?
         );
 
@@ -993,8 +986,8 @@ macro_rules! delegate_value_encoding {
         for $from_ty
         where
             $to_ty: $crate::encoding::DistinguishedValueEncoder<$value_ty>,
-            $($($where_ty : $must_be $(+ $must_more)* ,)+)?
-            $($($dis_where_ty : $dis_must_be $(+ $dis_must_more)* ,)+)?
+            $($($expedient_where)+ ,)?
+            $($($distinguished_where)+ ,)?
         {
             #[inline]
             fn decode_value_distinguished<B: Buf>(
