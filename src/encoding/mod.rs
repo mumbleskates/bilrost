@@ -23,7 +23,9 @@ mod unpacked;
 mod value_traits;
 mod vec_blob;
 
-pub use value_traits::{Collection, DistinguishedCollection, NewForOverwrite};
+pub use value_traits::{
+    Collection, DistinguishedCollection, DistinguishedMapping, Mapping, NewForOverwrite,
+};
 
 /// Fixed-size encoder. Encodes integers in fixed-size format.
 pub use fixed::Fixed;
