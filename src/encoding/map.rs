@@ -65,7 +65,7 @@ where
     ) -> Result<(), DecodeError> {
         let capped = buf.take_length_delimited()?;
         if combined_fixed_size(KE::WIRE_TYPE, VE::WIRE_TYPE).map_or(false, |fixed_size| {
-            buf.remaining_before_cap() % fixed_size != 0
+            capped.remaining_before_cap() % fixed_size != 0
         }) {
             return Err(DecodeError::new("packed field is not a valid length"));
         }
