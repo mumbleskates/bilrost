@@ -3,7 +3,7 @@ use crate::encoding::{check_wire_type, encode_varint, encoded_len_varint, Capped
 use crate::DecodeError;
 use bytes::{Buf, BufMut};
 
-struct Map<KE = General, VE = General>(KE, VE);
+pub struct Map<KE = General, VE = General>(KE, VE);
 
 /// Maps are always length delimited.
 impl<T, KE, VE> Wiretyped<T> for Map<KE, VE> {
@@ -164,8 +164,6 @@ where
         Ok(())
     }
 }
-
-// TODO(widders): delegate value encoding for maps from General to Map<General, General>
 
 // TODO(widders): hashbrown support in a feature
 

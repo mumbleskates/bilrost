@@ -1,10 +1,10 @@
-use alloc::collections::BTreeSet;
+use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::mem;
 use core::str;
 #[cfg(feature = "std")]
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use crate::encoding::{
     check_wire_type, delegate_encoding, delegate_value_encoding, encode_varint, encoded_len_varint,
@@ -24,9 +24,14 @@ delegate_encoding!(delegate from General, to crate::encoding::Unpacked<General>,
     for type Vec<T>, including distinguished, with generics, T);
 delegate_encoding!(delegate from General, to crate::encoding::Unpacked<General>,
     for type BTreeSet<T>, including distinguished, with generics, T);
+delegate_encoding!(delegate from General, to crate::encoding::Map<General, General>,
+    for type BTreeMap<K, V>, including distinguished, with generics, K, V);
 #[cfg(feature = "std")]
 delegate_encoding!(delegate from General, to crate::encoding::Unpacked<General>,
     for type HashSet<T>, with generics, T);
+#[cfg(feature = "std")]
+delegate_encoding!(delegate from General, to crate::encoding::Map<General, General>,
+    for type HashMap<K, V>, including distinguished, with generics, K, V);
 
 /// General encodes plain values only when they are non-default.
 impl<T> Encoder<T> for General
