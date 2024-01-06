@@ -584,23 +584,10 @@ pub fn skip_field<B: Buf>(wire_type: WireType, buf: &mut Capped<B>) -> Result<()
 
 // TODO(widders): use this?
 pub enum UnknownField<B: Buf> {
-    Varint {
-        tag: u32,
-        value: u64,
-    },
-    LengthDelimited {
-        tag: u32,
-        len: usize,
-        buf: B,
-    },
-    ThirtyTwoBit {
-        tag: u32,
-        value: [u8; 4],
-    },
-    SixtyFourBit {
-        tag: u32,
-        value: [u8; 8],
-    },
+    Varint { tag: u32, value: u64 },
+    LengthDelimited { tag: u32, len: usize, buf: B },
+    ThirtyTwoBit { tag: u32, value: [u8; 4] },
+    SixtyFourBit { tag: u32, value: [u8; 8] },
 }
 
 impl<B: Buf> UnknownField<B> {
@@ -1090,7 +1077,7 @@ mod test {
             WireType::LengthDelimited => 1..=usize::MAX,
         }
         .contains(&remaining)
-        .then(|| ())
+        .then_some(())
         .ok_or_else(|| {
             TestCaseError::fail(format!(
                 "{wire_type:?} wire type illegal remaining: {remaining}, tag: {tag}"
