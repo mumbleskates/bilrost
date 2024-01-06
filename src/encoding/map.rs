@@ -187,13 +187,28 @@ mod test {
             alloc::collections::BTreeMap<u64, f32>,
             WireType::LengthDelimited
         );
-        // TODO(widders): this one takes way too long to run (with packed/unpacked nesting)
         check_type_test!(
             Map,
             distinguished,
             alloc::collections::BTreeMap<u32, i32>,
             WireType::LengthDelimited
         );
+
+        mod delegated_from_general {
+            use crate::encoding::check_type_test;
+            check_type_test!(
+                General,
+                expedient,
+                alloc::collections::BTreeMap<bool, u32>,
+                WireType::LengthDelimited
+            );
+            check_type_test!(
+                General,
+                distinguished,
+                alloc::collections::BTreeMap<bool, u32>,
+                WireType::LengthDelimited
+            );
+        }
     }
 
     #[cfg(feature = "std")]
@@ -205,6 +220,16 @@ mod test {
             std::collections::HashMap<u64, f32>,
             WireType::LengthDelimited
         );
+
+        mod delegated_from_general {
+            use crate::encoding::check_type_test;
+            check_type_test!(
+                General,
+                expedient,
+                std::collections::HashMap<bool, u32>,
+                WireType::LengthDelimited
+            );
+        }
     }
 
     // TODO(widders): more tests

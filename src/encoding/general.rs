@@ -1,6 +1,7 @@
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::string::String;
 use alloc::vec::Vec;
+use core::hash::Hash;
 use core::mem;
 use core::str;
 #[cfg(feature = "std")]
@@ -9,7 +10,7 @@ use std::collections::{HashMap, HashSet};
 use crate::encoding::{
     check_wire_type, delegate_encoding, delegate_value_encoding, encode_varint, encoded_len_varint,
     Capped, DecodeContext, DistinguishedEncoder, DistinguishedFieldEncoder,
-    DistinguishedValueEncoder, Encoder, FieldEncoder, TagMeasurer, TagReader, TagWriter,
+    DistinguishedValueEncoder, Encoder, FieldEncoder, Map, TagMeasurer, TagReader, TagWriter,
     ValueEncoder, WireType, Wiretyped,
 };
 use crate::{Blob, DecodeError, DistinguishedMessage, Message};
@@ -24,14 +25,9 @@ delegate_encoding!(delegate from General, to crate::encoding::Unpacked<General>,
     for type Vec<T>, including distinguished, with generics, T);
 delegate_encoding!(delegate from General, to crate::encoding::Unpacked<General>,
     for type BTreeSet<T>, including distinguished, with generics, T);
-delegate_encoding!(delegate from General, to crate::encoding::Map<General, General>,
-    for type BTreeMap<K, V>, including distinguished, with generics, K, V);
 #[cfg(feature = "std")]
 delegate_encoding!(delegate from General, to crate::encoding::Unpacked<General>,
     for type HashSet<T>, with generics, T);
-#[cfg(feature = "std")]
-delegate_encoding!(delegate from General, to crate::encoding::Map<General, General>,
-    for type HashMap<K, V>, including distinguished, with generics, K, V);
 
 /// General encodes plain values only when they are non-default.
 impl<T> Encoder<T> for General
@@ -532,5 +528,89 @@ pub mod message {
                     .map(|len| len + encoded_len_varint(len as u64))
                     .sum::<usize>()
         }
+    }
+}
+
+/// `General` delegates to `Map<General, General>` for `BTreeMap`
+impl<K, V> Wiretyped<BTreeMap<K, V>> for General
+where
+    Map<General, General>: Wiretyped<BTreeMap<K, V>>,
+{
+    const WIRE_TYPE: WireType = <Map<General, General> as Wiretyped<BTreeMap<K, V>>>::WIRE_TYPE;
+}
+
+impl<K, V> ValueEncoder<BTreeMap<K, V>> for General
+where
+    Map<General, General>: ValueEncoder<BTreeMap<K, V>>,
+    K: Ord,
+{
+    #[inline]
+    fn encode_value<B: BufMut>(value: &BTreeMap<K, V>, buf: &mut B) {
+        <Map<General, General>>::encode_value(value, buf)
+    }
+
+    #[inline]
+    fn value_encoded_len(value: &BTreeMap<K, V>) -> usize {
+        <Map<General, General>>::value_encoded_len(value)
+    }
+
+    #[inline]
+    fn decode_value<B: Buf>(
+        value: &mut BTreeMap<K, V>,
+        buf: &mut Capped<B>,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError> {
+        <Map<General, General>>::decode_value(value, buf, ctx)
+    }
+}
+
+impl<K, V> DistinguishedValueEncoder<BTreeMap<K, V>> for General
+where
+    Map<General, General>: DistinguishedValueEncoder<BTreeMap<K, V>>,
+    K: Ord,
+    V: Eq,
+{
+    #[inline]
+    fn decode_value_distinguished<B: Buf>(
+        value: &mut BTreeMap<K, V>,
+        buf: &mut Capped<B>,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError> {
+        <Map<General, General>>::decode_value_distinguished(value, buf, ctx)
+    }
+}
+
+/// `General` delegates to `Map<General, General>` for `HashMap`
+#[cfg(feature = "std")]
+impl<K, V> Wiretyped<HashMap<K, V>> for General
+where
+    Map<General, General>: Wiretyped<HashMap<K, V>>,
+{
+    const WIRE_TYPE: WireType = <Map<General, General> as Wiretyped<HashMap<K, V>>>::WIRE_TYPE;
+}
+
+#[cfg(feature = "std")]
+impl<K, V> ValueEncoder<HashMap<K, V>> for General
+where
+    Map<General, General>: ValueEncoder<HashMap<K, V>>,
+    K: Eq + Hash,
+{
+    #[inline]
+    fn encode_value<B: BufMut>(value: &HashMap<K, V>, buf: &mut B) {
+        <Map<General, General>>::encode_value(value, buf)
+    }
+
+    #[inline]
+    fn value_encoded_len(value: &HashMap<K, V>) -> usize {
+        <Map<General, General>>::value_encoded_len(value)
+    }
+
+    #[inline]
+    fn decode_value<B: Buf>(
+        value: &mut HashMap<K, V>,
+        buf: &mut Capped<B>,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError> {
+        <Map<General, General>>::decode_value(value, buf, ctx)
     }
 }
