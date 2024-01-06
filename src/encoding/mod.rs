@@ -1006,6 +1006,14 @@ macro_rules! check_type_test {
                 fn check(value: $from_ty, tag: u32) {
                     check_type::<$into_ty, $encoder>(<$into_ty>::from(value), tag, $wire_type)?;
                 }
+                #[test]
+                fn check_optional(value: Option<$from_ty>, tag: u32) {
+                    check_type::<Option<$into_ty>, $encoder>(
+                        value.map(<$into_ty>::from),
+                        tag,
+                        $wire_type,
+                    )?;
+                }
             }
             // TODO(widders): check the appropriate combination of ord (btree) and distinguished
             //  (not hash)
