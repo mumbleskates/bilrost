@@ -1,19 +1,16 @@
 use alloc::boxed::Box;
 use alloc::vec::Vec;
-use core::fmt::Debug;
 
 use bytes::{Buf, BufMut};
 
 use crate::encoding::{
-    encode_varint, encoded_len_varint, message, Capped, DecodeContext, TagReader, WireType,
+    encode_varint, encoded_len_varint, Capped, DecodeContext, General, TagReader, ValueEncoder,
+    WireType,
 };
-use crate::DecodeError;
-use crate::EncodeError;
+use crate::{DecodeError, EncodeError};
 
 /// A Bilrost message.
-pub trait Message: Debug + Send + Sync {
-    // TODO(widders): rework
-
+pub trait Message: TaggedDecoder + Send + Sync {
     /// Encodes the message to a buffer.
     ///
     /// This method will panic if the buffer has insufficient capacity.
@@ -23,22 +20,6 @@ pub trait Message: Debug + Send + Sync {
     fn encode_raw<B>(&self, buf: &mut B)
     where
         B: BufMut,
-        Self: Sized;
-
-    /// Decodes a field from a buffer, and merges it into `self`.
-    ///
-    /// Meant to be used only by `Message` implementations.
-    #[doc(hidden)]
-    fn merge_field<B>(
-        &mut self,
-        tag: u32,
-        wire_type: WireType,
-        duplicated: bool,
-        buf: &mut Capped<B>,
-        ctx: DecodeContext,
-    ) -> Result<(), DecodeError>
-    where
-        B: Buf,
         Self: Sized;
 
     /// Returns the encoded length of the message without a length delimiter.
@@ -138,15 +119,15 @@ pub trait Message: Debug + Send + Sync {
     {
         let ctx = DecodeContext::default();
         let tr = &mut TagReader::new();
-        let mut buf = Capped::new(&mut buf);
         let mut last_tag = None::<u32>;
-        while buf.has_remaining() {
-            let (tag, wire_type) = tr.decode_key(buf.buf())?;
-            let duplicated = last_tag == Some(tag);
-            last_tag = Some(tag);
-            self.merge_field(tag, wire_type, duplicated, &mut buf, ctx.clone())?;
-        }
-        Ok(())
+        Capped::new(&mut buf)
+            .consume(|buf| {
+                let (tag, wire_type) = tr.decode_key(buf.buf())?;
+                let duplicated = last_tag == Some(tag);
+                last_tag = Some(tag);
+                self.decode_tagged_field(tag, wire_type, duplicated, buf, ctx.clone())
+            })
+            .collect()
     }
 
     /// Decodes a length-delimited instance of the message from buffer, and
@@ -156,12 +137,7 @@ pub trait Message: Debug + Send + Sync {
         B: Buf,
         Self: Sized,
     {
-        message::merge(
-            WireType::LengthDelimited,
-            self,
-            &mut Capped::new(&mut buf),
-            DecodeContext::default(),
-        )
+        General::decode_value(self, &mut Capped::new(&mut buf), DecodeContext::default())
     }
 
     /// Clears the message, resetting all fields to their default.
@@ -170,8 +146,60 @@ pub trait Message: Debug + Send + Sync {
     // TODO(widders): encode and decode with unknown fields in an unknown-fields companion struct
 }
 
-pub trait DistinguishedMessage: Message + Eq {
+pub trait DistinguishedMessage: Message + DistinguishedTaggedDecoder + Eq {
     // TODO(widders): this. and revise the above
+}
+
+/// Trait to be implemented by (or more commonly derived for) oneofs and messages, which have
+/// knowledge of their fields' tags and encoding.
+pub trait TaggedDecoder {
+    /// Decodes a field from a buffer into `self`.
+    ///
+    /// Meant to be used only by `Message` and `Oneof` implementations.
+    fn decode_tagged_field<B: Buf>(
+        &mut self,
+        tag: u32,
+        wire_type: WireType,
+        duplicated: bool,
+        buf: &mut Capped<B>,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError>
+    where
+        Self: Sized;
+}
+
+/// Complementary trait for oneof fields and messages, all of whose fields have a distinguished\
+/// encoding.
+pub trait DistinguishedTaggedDecoder {
+    fn decode_tagged_field_distinguished<B: Buf>(
+        &mut self,
+        tag: u32,
+        wire_type: WireType,
+        duplicated: bool,
+        buf: &mut Capped<B>,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError>
+    where
+        Self: Sized;
+}
+
+impl<M> TaggedDecoder for Box<M>
+where
+    M: Message,
+{
+    fn decode_tagged_field<B: Buf>(
+        &mut self,
+        tag: u32,
+        wire_type: WireType,
+        duplicated: bool,
+        buf: &mut Capped<B>,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError>
+    where
+        Self: Sized,
+    {
+        (**self).decode_tagged_field(tag, wire_type, duplicated, buf, ctx)
+    }
 }
 
 impl<M> Message for Box<M>
@@ -184,22 +212,11 @@ where
     {
         (**self).encode_raw(buf)
     }
-    fn merge_field<B>(
-        &mut self,
-        tag: u32,
-        wire_type: WireType,
-        duplicated: bool,
-        buf: &mut Capped<B>,
-        ctx: DecodeContext,
-    ) -> Result<(), DecodeError>
-    where
-        B: Buf,
-    {
-        (**self).merge_field(tag, wire_type, duplicated, buf, ctx)
-    }
+
     fn encoded_len(&self) -> usize {
         (**self).encoded_len()
     }
+
     fn clear(&mut self) {
         (**self).clear()
     }
@@ -210,5 +227,6 @@ mod tests {
     use super::*;
 
     const _MESSAGE_IS_OBJECT_SAFE: Option<&dyn Message> = None;
-    const _DISTINGUISHED_MESSAGE_IS_OBJECT_SAFE: Option<&dyn Message> = None;
+    // TODO(widders): fix this? do we need it? should we remove the Eq requirement?
+    // const _DISTINGUISHED_MESSAGE_IS_OBJECT_SAFE: Option<&dyn DistinguishedMessage> = None;
 }

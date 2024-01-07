@@ -9,10 +9,10 @@ use core::str;
 use std::collections::{HashMap, HashSet};
 
 use crate::encoding::{
-    check_wire_type, delegate_encoding, delegate_value_encoding, encode_varint, encoded_len_varint,
-    Capped, DecodeContext, DistinguishedEncoder, DistinguishedFieldEncoder,
-    DistinguishedValueEncoder, Encoder, FieldEncoder, Map, TagMeasurer, TagReader, TagWriter,
-    ValueEncoder, WireType, Wiretyped,
+    delegate_encoding, delegate_value_encoding, encode_varint, encoded_len_varint, Capped,
+    DecodeContext, DistinguishedEncoder, DistinguishedFieldEncoder, DistinguishedValueEncoder,
+    Encoder, FieldEncoder, Map, TagMeasurer, TagReader, TagWriter, ValueEncoder, WireType,
+    Wiretyped,
 };
 use crate::{Blob, DecodeError, DistinguishedMessage, Message};
 
@@ -432,8 +432,18 @@ where
         buf: &mut Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
-        // TODO(widders): this will get cleaned up
-        message::merge(WireType::LengthDelimited, value, buf, ctx)
+        ctx.limit_reached()?;
+        let mut tr = TagReader::new();
+        let inner_ctx = ctx.enter_recursion();
+        let mut last_tag = None::<u32>;
+        buf.take_length_delimited()?
+            .consume(|buf| {
+                let (tag, wire_type) = tr.decode_key(buf.buf())?;
+                let duplicated = last_tag == Some(tag);
+                last_tag = Some(tag);
+                value.decode_tagged_field(tag, wire_type, duplicated, buf, inner_ctx.clone())
+            })
+            .collect()
     }
 }
 
@@ -447,97 +457,5 @@ where
         _ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         todo!()
-    }
-}
-
-// TODO(widders): delete this module
-pub mod message {
-    use super::*;
-
-    pub fn encode<M, B>(tag: u32, msg: &M, buf: &mut B, tw: &mut TagWriter)
-    where
-        M: Message,
-        B: BufMut,
-    {
-        tw.encode_key(tag, WireType::LengthDelimited, buf);
-        encode_varint(msg.encoded_len() as u64, buf);
-        msg.encode_raw(buf);
-    }
-
-    pub fn merge<M, B>(
-        wire_type: WireType,
-        msg: &mut M,
-        buf: &mut Capped<B>,
-        ctx: DecodeContext,
-    ) -> Result<(), DecodeError>
-    where
-        M: Message,
-        B: Buf,
-    {
-        check_wire_type(WireType::LengthDelimited, wire_type)?;
-        ctx.limit_reached()?;
-        let mut tr = TagReader::new();
-        let inner_ctx = ctx.enter_recursion();
-        let mut last_tag = None::<u32>;
-        buf.take_length_delimited()?
-            .consume(|buf| {
-                let (tag, wire_type) = tr.decode_key(buf.buf())?;
-                let duplicated = last_tag == Some(tag);
-                last_tag = Some(tag);
-                msg.merge_field(tag, wire_type, duplicated, buf, inner_ctx.clone())
-            })
-            .collect()
-    }
-
-    pub fn encode_repeated<M, B>(tag: u32, messages: &[M], buf: &mut B, tw: &mut TagWriter)
-    where
-        M: Message,
-        B: BufMut,
-    {
-        for msg in messages {
-            encode(tag, msg, buf, tw);
-        }
-    }
-
-    pub fn merge_repeated<M, B>(
-        wire_type: WireType,
-        messages: &mut Vec<M>,
-        buf: &mut Capped<B>,
-        ctx: DecodeContext,
-    ) -> Result<(), DecodeError>
-    where
-        M: Message + Default,
-        B: Buf,
-    {
-        check_wire_type(WireType::LengthDelimited, wire_type)?;
-        let mut msg = M::default();
-        merge(WireType::LengthDelimited, &mut msg, buf, ctx)?;
-        messages.push(msg);
-        Ok(())
-    }
-
-    #[inline]
-    pub fn encoded_len<M: Message>(tag: u32, msg: &M, tm: &mut TagMeasurer) -> usize {
-        let len = msg.encoded_len();
-        tm.key_len(tag) + encoded_len_varint(len as u64) + len
-    }
-
-    #[inline]
-    pub fn encoded_len_repeated<M: Message>(
-        tag: u32,
-        messages: &[M],
-        tm: &mut TagMeasurer,
-    ) -> usize {
-        if messages.is_empty() {
-            0
-        } else {
-            // successive repeated keys always take up 1 byte
-            tm.key_len(tag) + messages.len() - 1
-                + messages
-                    .iter()
-                    .map(Message::encoded_len)
-                    .map(|len| len + encoded_len_varint(len as u64))
-                    .sum::<usize>()
-        }
     }
 }

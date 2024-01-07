@@ -5,6 +5,7 @@ use core::ops::{Deref, DerefMut};
 
 use bytes::{Buf, BufMut};
 
+use crate::message::TaggedDecoder;
 use crate::{
     encoding::{skip_field, Capped, DecodeContext, WireType},
     DecodeError, Message,
@@ -93,10 +94,8 @@ impl proptest::arbitrary::Arbitrary for Blob {
     >;
 }
 
-impl Message for () {
-    fn encode_raw<B: BufMut>(&self, _buf: &mut B) {}
-
-    fn merge_field<B: Buf>(
+impl TaggedDecoder for () {
+    fn decode_tagged_field<B: Buf>(
         &mut self,
         _tag: u32,
         wire_type: WireType,
@@ -106,6 +105,10 @@ impl Message for () {
     ) -> Result<(), DecodeError> {
         skip_field(wire_type, buf)
     }
+}
+
+impl Message for () {
+    fn encode_raw<B: BufMut>(&self, _buf: &mut B) {}
 
     fn encoded_len(&self) -> usize {
         0
