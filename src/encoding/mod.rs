@@ -193,7 +193,6 @@ where
 /// The context should be passed by value and can be freely cloned. When passing
 /// to a function which is decoding a nested object, then use `enter_recursion`.
 #[derive(Clone, Debug)]
-#[cfg_attr(feature = "no-recursion-limit", derive(Default))]
 pub struct DecodeContext {
     /// How many times we can recurse in the current decode stack before we hit
     /// the recursion limit.
@@ -205,11 +204,11 @@ pub struct DecodeContext {
     recurse_count: u32,
 }
 
-#[cfg(not(feature = "no-recursion-limit"))]
 impl Default for DecodeContext {
     #[inline]
     fn default() -> DecodeContext {
         DecodeContext {
+            #[cfg(not(feature = "no-recursion-limit"))]
             recurse_count: crate::RECURSION_LIMIT,
         }
     }
@@ -221,18 +220,12 @@ impl DecodeContext {
     /// There is no `exit` function since this function creates a new `DecodeContext`
     /// to be used at the next level of recursion. Continue to use the old context
     // at the previous level of recursion.
-    #[cfg(not(feature = "no-recursion-limit"))]
     #[inline]
     pub(crate) fn enter_recursion(&self) -> DecodeContext {
         DecodeContext {
+            #[cfg(not(feature = "no-recursion-limit"))]
             recurse_count: self.recurse_count - 1,
         }
-    }
-
-    #[cfg(feature = "no-recursion-limit")]
-    #[inline]
-    pub(crate) fn enter_recursion(&self) -> DecodeContext {
-        DecodeContext {}
     }
 
     /// Checks whether the recursion limit has been reached in the stack of
@@ -240,20 +233,13 @@ impl DecodeContext {
     ///
     /// Returns `Ok<()>` if it is ok to continue recursing.
     /// Returns `Err<DecodeError>` if the recursion limit has been reached.
-    #[cfg(not(feature = "no-recursion-limit"))]
-    #[inline]
-    pub(crate) fn limit_reached(&self) -> Result<(), DecodeError> {
-        if self.recurse_count == 0 {
-            Err(DecodeError::new("recursion limit reached"))
-        } else {
-            Ok(())
-        }
-    }
-
-    #[cfg(feature = "no-recursion-limit")]
     #[inline]
     #[allow(clippy::unnecessary_wraps)] // needed in other features
     pub(crate) fn limit_reached(&self) -> Result<(), DecodeError> {
+        #[cfg(not(feature = "no-recursion-limit"))]
+        if self.recurse_count == 0 {
+            return Err(DecodeError::new("recursion limit reached"));
+        }
         Ok(())
     }
 }
