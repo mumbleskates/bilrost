@@ -451,6 +451,13 @@ impl<'a, B: Buf> Capped<'a, B> {
         }
     }
 
+    pub fn lend(&mut self) -> Capped<B> {
+        Capped {
+            buf: self.buf,
+            extra_bytes_remaining: self.extra_bytes_remaining,
+        }
+    }
+
     /// Reads a length delimiter from the beginning of the wrapped buffer, then returns a subsidiary
     /// Capped instance for the delineated bytes if it does not overrun the underlying buffer or
     /// this instance's cap.
@@ -547,7 +554,7 @@ impl<'a, B: Buf> DerefMut for Capped<'a, B> {
     }
 }
 
-pub fn skip_field<B: Buf>(wire_type: WireType, buf: &mut Capped<B>) -> Result<(), DecodeError> {
+pub fn skip_field<B: Buf>(wire_type: WireType, mut buf: Capped<B>) -> Result<(), DecodeError> {
     let len = match wire_type {
         WireType::Varint => buf.decode_varint().map(|_| 0)?,
         WireType::ThirtyTwoBit => 4,
@@ -596,7 +603,7 @@ pub trait Encoder<T> {
         wire_type: WireType,
         duplicated: bool,
         value: &mut T,
-        buf: &mut Capped<B>,
+        buf: Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError>;
 }
@@ -608,7 +615,7 @@ pub trait DistinguishedEncoder<T>: Encoder<T> {
         wire_type: WireType,
         duplicated: bool,
         value: &mut T,
-        buf: &mut Capped<B>,
+        buf: Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError>;
 }
@@ -647,7 +654,7 @@ pub trait ValueEncoder<T>: Wiretyped<T> {
     /// Decodes a field assuming the encoder's wire type directly from the buffer.
     fn decode_value<B: Buf>(
         value: &mut T,
-        buf: &mut Capped<B>,
+        buf: Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError>;
 }
@@ -661,7 +668,7 @@ where
     /// exact same bytes.
     fn decode_value_distinguished<B: Buf>(
         value: &mut T,
-        buf: &mut Capped<B>,
+        buf: Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError>;
 }
@@ -677,7 +684,7 @@ pub trait FieldEncoder<T> {
     fn decode_field<B: Buf>(
         wire_type: WireType,
         value: &mut T,
-        buf: &mut Capped<B>,
+        buf: Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError>;
 }
@@ -698,7 +705,7 @@ where
     fn decode_field<B: Buf>(
         wire_type: WireType,
         value: &mut T,
-        buf: &mut Capped<B>,
+        buf: Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         check_wire_type(Self::WIRE_TYPE, wire_type)?;
@@ -713,7 +720,7 @@ pub trait DistinguishedFieldEncoder<T> {
     fn decode_field_distinguished<B: Buf>(
         wire_type: WireType,
         value: &mut T,
-        buf: &mut Capped<B>,
+        buf: Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError>;
 }
@@ -726,7 +733,7 @@ where
     fn decode_field_distinguished<B: Buf>(
         wire_type: WireType,
         value: &mut T,
-        buf: &mut Capped<B>,
+        buf: Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         check_wire_type(Self::WIRE_TYPE, wire_type)?;
@@ -762,7 +769,7 @@ where
         wire_type: WireType,
         duplicated: bool,
         value: &mut Option<T>,
-        buf: &mut Capped<B>,
+        buf: Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         if duplicated {
@@ -791,7 +798,7 @@ where
         wire_type: WireType,
         duplicated: bool,
         value: &mut Option<T>,
-        buf: &mut Capped<B>,
+        buf: Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         if duplicated {
@@ -842,7 +849,7 @@ macro_rules! delegate_encoding {
                 wire_type: $crate::encoding::WireType,
                 duplicated: bool,
                 value: &mut $value_ty,
-                buf: &mut $crate::encoding::Capped<B>,
+                buf: $crate::encoding::Capped<B>,
                 ctx: $crate::encoding::DecodeContext,
             ) -> Result<(), DecodeError> {
                 <$to_ty>::decode(wire_type, duplicated, value, buf, ctx)
@@ -870,7 +877,7 @@ macro_rules! delegate_encoding {
                 wire_type: $crate::encoding::WireType,
                 duplicated: bool,
                 value: &mut $value_ty,
-                buf: &mut $crate::encoding::Capped<B>,
+                buf: $crate::encoding::Capped<B>,
                 ctx: $crate::encoding::DecodeContext,
             ) -> Result<(), $crate::DecodeError> {
                 <$to_ty>::decode_distinguished(wire_type, duplicated, value, buf, ctx)
@@ -923,7 +930,7 @@ macro_rules! delegate_value_encoding {
             #[inline]
             fn decode_value<B: $crate::bytes::Buf>(
                 value: &mut $value_ty,
-                buf: &mut $crate::encoding::Capped<B>,
+                buf: $crate::encoding::Capped<B>,
                 ctx: $crate::encoding::DecodeContext,
             ) -> Result<(), $crate::DecodeError> {
                 <$to_ty>::decode_value(value, buf, ctx)
@@ -953,7 +960,7 @@ macro_rules! delegate_value_encoding {
             #[inline]
             fn decode_value_distinguished<B: Buf>(
                 value: &mut $value_ty,
-                buf: &mut $crate::encoding::Capped<B>,
+                buf: $crate::encoding::Capped<B>,
                 ctx: $crate::encoding::DecodeContext,
             ) -> Result<(), $crate::DecodeError> {
                 <$to_ty>::decode_value_distinguished(value, buf, ctx)
@@ -1121,7 +1128,7 @@ mod test {
                         wire_type,
                         false,
                         &mut roundtrip_value,
-                        &mut buf,
+                        buf.lend(),
                         DecodeContext::default(),
                     )
                     .map_err(|error| TestCaseError::fail(error.to_string()))?;
@@ -1192,7 +1199,7 @@ mod test {
                             wire_type,
                             not_first,
                             &mut roundtrip_value,
-                            &mut buf,
+                            buf.lend(),
                             DecodeContext::default(),
                         )
                         .map_err(|error| TestCaseError::fail(error.to_string()))?;
@@ -1223,13 +1230,13 @@ mod test {
         let mut parsed = Vec::<u64>::new();
         let res = <Packed<Fixed>>::decode_value(
             &mut parsed,
-            &mut Capped::new(&mut &buf[..]),
+            Capped::new(&mut buf.as_slice()),
             DecodeContext::default(),
         );
         assert!(res.is_err());
         let res = <Packed<Fixed>>::decode_value_distinguished(
             &mut parsed,
-            &mut Capped::new(&mut &buf[..]),
+            Capped::new(&mut buf.as_slice()),
             DecodeContext::default(),
         );
         assert!(res.is_err());
@@ -1253,13 +1260,13 @@ mod test {
         let mut parsed = Vec::<u32>::new();
         let res = <Packed<Fixed>>::decode_value(
             &mut parsed,
-            &mut Capped::new(&mut &buf[..]),
+            Capped::new(&mut buf.as_slice()),
             DecodeContext::default(),
         );
         assert!(res.is_err());
         let res = <Packed<Fixed>>::decode_value_distinguished(
             &mut parsed,
-            &mut Capped::new(&mut &buf[..]),
+            Capped::new(&mut buf.as_slice()),
             DecodeContext::default(),
         );
         assert!(res.is_err());
@@ -1276,7 +1283,7 @@ mod test {
 
         let r = General::decode_value(
             &mut s,
-            &mut Capped::new(&mut &buf[..]),
+            Capped::new(&mut buf.as_slice()),
             DecodeContext::default(),
         );
         r.expect_err("must be an error");

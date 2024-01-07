@@ -98,7 +98,7 @@ impl TaggedDecodable for () {
         _tag: u32,
         wire_type: WireType,
         _duplicated: bool,
-        buf: &mut Capped<B>,
+        buf: Capped<B>,
         _ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         skip_field(wire_type, buf)

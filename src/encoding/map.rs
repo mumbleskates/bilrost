@@ -61,7 +61,7 @@ where
 
     fn decode_value<B: Buf>(
         value: &mut M,
-        buf: &mut Capped<B>,
+        mut buf: Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         let capped = buf.take_length_delimited()?;
@@ -73,8 +73,8 @@ where
         for item in capped.consume(|buf| {
             let mut new_key = K::new_for_overwrite();
             let mut new_val = V::new_for_overwrite();
-            KE::decode_value(&mut new_key, buf, ctx.clone())?;
-            VE::decode_value(&mut new_val, buf, ctx.clone())?;
+            KE::decode_value(&mut new_key, buf.lend(), ctx.clone())?;
+            VE::decode_value(&mut new_val, buf.lend(), ctx.clone())?;
             Ok((new_key, new_val))
         }) {
             let (key, val) = item?;
@@ -94,7 +94,7 @@ where
 {
     fn decode_value_distinguished<B: Buf>(
         value: &mut M,
-        buf: &mut Capped<B>,
+        mut buf: Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         let capped = buf.take_length_delimited()?;
@@ -106,8 +106,8 @@ where
         for item in capped.consume(|buf| {
             let mut new_key = K::new_for_overwrite();
             let mut new_val = V::new_for_overwrite();
-            KE::decode_value_distinguished(&mut new_key, buf, ctx.clone())?;
-            VE::decode_value_distinguished(&mut new_val, buf, ctx.clone())?;
+            KE::decode_value_distinguished(&mut new_key, buf.lend(), ctx.clone())?;
+            VE::decode_value_distinguished(&mut new_val, buf.lend(), ctx.clone())?;
             Ok((new_key, new_val))
         }) {
             let (key, val) = item?;
@@ -140,7 +140,7 @@ where
         wire_type: WireType,
         duplicated: bool,
         value: &mut M,
-        buf: &mut Capped<B>,
+        buf: Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         check_wire_type(WireType::LengthDelimited, wire_type)?;
@@ -160,7 +160,7 @@ where
         wire_type: WireType,
         duplicated: bool,
         value: &mut M,
-        buf: &mut Capped<B>,
+        buf: Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         check_wire_type(WireType::LengthDelimited, wire_type)?;

@@ -32,7 +32,7 @@ impl ValueEncoder<Vec<u8>> for VecBlob {
 
     fn decode_value<B: Buf>(
         value: &mut Vec<u8>,
-        buf: &mut Capped<B>,
+        mut buf: Capped<B>,
         _ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         let buf = buf.take_length_delimited()?;
@@ -46,7 +46,7 @@ impl ValueEncoder<Vec<u8>> for VecBlob {
 impl DistinguishedValueEncoder<Vec<u8>> for VecBlob {
     fn decode_value_distinguished<B: Buf>(
         value: &mut Vec<u8>,
-        buf: &mut Capped<B>,
+        buf: Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         Self::decode_value(value, buf, ctx)
@@ -75,7 +75,7 @@ impl Encoder<Vec<u8>> for VecBlob {
         wire_type: WireType,
         duplicated: bool,
         value: &mut Vec<u8>,
-        buf: &mut Capped<B>,
+        buf: Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         if duplicated {
@@ -93,7 +93,7 @@ impl DistinguishedEncoder<Vec<u8>> for VecBlob {
         wire_type: WireType,
         duplicated: bool,
         value: &mut Vec<u8>,
-        buf: &mut Capped<B>,
+        buf: Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         if duplicated {

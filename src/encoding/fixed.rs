@@ -40,7 +40,7 @@ macro_rules! fixed_width_common {
             #[inline]
             fn decode_value<B: Buf>(
                 value: &mut $ty,
-                buf: &mut Capped<B>,
+                mut buf: Capped<B>,
                 _ctx: DecodeContext,
             ) -> Result<(), DecodeError> {
                 if buf.remaining() < $wire_type.fixed_size().unwrap() {
@@ -67,7 +67,7 @@ macro_rules! fixed_width_int {
             #[inline]
             fn decode_value_distinguished<B: Buf>(
                 value: &mut $ty,
-                buf: &mut Capped<B>,
+                buf: Capped<B>,
                 ctx: DecodeContext,
             ) -> Result<(), DecodeError> {
                 Fixed::decode_value(value, buf, ctx)
@@ -96,7 +96,7 @@ macro_rules! fixed_width_int {
                 wire_type: WireType,
                 duplicated: bool,
                 value: &mut $ty,
-                buf: &mut Capped<B>,
+                buf: Capped<B>,
                 ctx: DecodeContext,
             ) -> Result<(), DecodeError> {
                 if duplicated {
@@ -114,7 +114,7 @@ macro_rules! fixed_width_int {
                 wire_type: WireType,
                 duplicated: bool,
                 value: &mut $ty,
-                buf: &mut Capped<B>,
+                buf: Capped<B>,
                 ctx: DecodeContext,
             ) -> Result<(), DecodeError> {
                 if duplicated {
@@ -174,7 +174,7 @@ macro_rules! fixed_width_float {
                 wire_type: WireType,
                 duplicated: bool,
                 value: &mut $ty,
-                buf: &mut Capped<B>,
+                buf: Capped<B>,
                 ctx: DecodeContext,
             ) -> Result<(), DecodeError> {
                 if duplicated {

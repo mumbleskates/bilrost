@@ -37,7 +37,7 @@ where
         wire_type: WireType,
         duplicated: bool,
         value: &mut C,
-        buf: &mut Capped<B>,
+        buf: Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         if wire_type == WireType::LengthDelimited && E::WIRE_TYPE != WireType::LengthDelimited {
@@ -72,7 +72,7 @@ where
         wire_type: WireType,
         _duplicated: bool,
         value: &mut C,
-        buf: &mut Capped<B>,
+        buf: Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         let mut new_val = T::new_for_overwrite();

@@ -36,7 +36,7 @@ where
 
     fn decode_value<B: Buf>(
         value: &mut C,
-        buf: &mut Capped<B>,
+        mut buf: Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         let capped = buf.take_length_delimited()?;
@@ -47,7 +47,7 @@ where
         }
         for val in capped.consume(|buf| {
             let mut new_val = T::new_for_overwrite();
-            E::decode_value(&mut new_val, buf, ctx.clone())?;
+            E::decode_value(&mut new_val, buf.lend(), ctx.clone())?;
             Ok(new_val)
         }) {
             value.insert(val?).map_err(DecodeError::new)?;
@@ -64,7 +64,7 @@ where
 {
     fn decode_value_distinguished<B: Buf>(
         value: &mut C,
-        buf: &mut Capped<B>,
+        mut buf: Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         let capped = buf.take_length_delimited()?;
@@ -75,7 +75,7 @@ where
         }
         for val in capped.consume(|buf| {
             let mut new_val = T::new_for_overwrite();
-            E::decode_value_distinguished(&mut new_val, buf, ctx.clone())?;
+            E::decode_value_distinguished(&mut new_val, buf.lend(), ctx.clone())?;
             Ok(new_val)
         }) {
             value.insert(val?).map_err(DecodeError::new)?;
@@ -113,7 +113,7 @@ where
         wire_type: WireType,
         duplicated: bool,
         value: &mut C,
-        buf: &mut Capped<B>,
+        buf: Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         if wire_type == WireType::LengthDelimited {
@@ -145,7 +145,7 @@ where
         wire_type: WireType,
         duplicated: bool,
         value: &mut C,
-        buf: &mut Capped<B>,
+        buf: Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         if duplicated {

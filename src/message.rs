@@ -103,7 +103,7 @@ pub trait Message: TaggedDecodable + Send + Sync {
                 let (tag, wire_type) = tr.decode_key(buf.buf())?;
                 let duplicated = last_tag == Some(tag);
                 last_tag = Some(tag);
-                message.decode_tagged_field(tag, wire_type, duplicated, buf, ctx.clone())
+                message.decode_tagged_field(tag, wire_type, duplicated, buf.lend(), ctx.clone())
             })
             .collect::<Result<_, _>>()?;
         Ok(message)
@@ -126,7 +126,7 @@ pub trait Message: TaggedDecodable + Send + Sync {
         B: Buf,
         Self: Sized,
     {
-        General::decode_value(self, &mut Capped::new(&mut buf), DecodeContext::default())
+        General::decode_value(self, Capped::new(&mut buf), DecodeContext::default())
     }
 
     /// Clears the message, resetting all fields to their default.
@@ -151,7 +151,7 @@ pub trait TaggedDecodable {
         tag: u32,
         wire_type: WireType,
         duplicated: bool,
-        buf: &mut Capped<B>,
+        buf: Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError>
     where
@@ -166,7 +166,7 @@ pub trait DistinguishedTaggedDecodable {
         tag: u32,
         wire_type: WireType,
         duplicated: bool,
-        buf: &mut Capped<B>,
+        buf: Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError>
     where
@@ -182,7 +182,7 @@ where
         tag: u32,
         wire_type: WireType,
         duplicated: bool,
-        buf: &mut Capped<B>,
+        buf: Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError>
     where

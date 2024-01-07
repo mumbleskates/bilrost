@@ -67,7 +67,7 @@ where
         wire_type: WireType,
         duplicated: bool,
         value: &mut T,
-        buf: &mut Capped<B>,
+        buf: Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         if duplicated {
@@ -91,7 +91,7 @@ where
         wire_type: WireType,
         duplicated: bool,
         value: &mut T,
-        buf: &mut Capped<B>,
+        buf: Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         if duplicated {
@@ -135,7 +135,7 @@ macro_rules! varint {
             #[inline]
             fn decode_value<B: Buf>(
                 __value: &mut $ty,
-                buf: &mut Capped<B>,
+                mut buf: Capped<B>,
                 _ctx: DecodeContext,
             ) -> Result<(), DecodeError> {
                 let $from_uint64_value = buf.decode_varint()?;
@@ -148,7 +148,7 @@ macro_rules! varint {
             #[inline]
             fn decode_value_distinguished<B: Buf>(
                 value: &mut $ty,
-                buf: &mut Capped<B>,
+                buf: Capped<B>,
                 ctx: DecodeContext,
             ) -> Result<(), DecodeError> {
                 Self::decode_value(value, buf, ctx)
@@ -227,7 +227,7 @@ impl ValueEncoder<String> for General {
 
     fn decode_value<B: Buf>(
         value: &mut String,
-        buf: &mut Capped<B>,
+        mut buf: Capped<B>,
         _ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         // ## Unsafety
@@ -275,7 +275,7 @@ impl ValueEncoder<String> for General {
 impl DistinguishedValueEncoder<String> for General {
     fn decode_value_distinguished<B: Buf>(
         value: &mut String,
-        buf: &mut Capped<B>,
+        buf: Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         Self::decode_value(value, buf, ctx)
@@ -315,7 +315,7 @@ impl ValueEncoder<Bytes> for General {
 
     fn decode_value<B: Buf>(
         value: &mut Bytes,
-        buf: &mut Capped<B>,
+        mut buf: Capped<B>,
         _ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         let mut buf = buf.take_length_delimited()?;
@@ -328,7 +328,7 @@ impl ValueEncoder<Bytes> for General {
 impl DistinguishedValueEncoder<Bytes> for General {
     fn decode_value_distinguished<B: Buf>(
         value: &mut Bytes,
-        buf: &mut Capped<B>,
+        buf: Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         Self::decode_value(value, buf, ctx)
@@ -372,7 +372,7 @@ impl ValueEncoder<Blob> for General {
     #[inline]
     fn decode_value<B: Buf>(
         value: &mut Blob,
-        buf: &mut Capped<B>,
+        buf: Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         crate::encoding::VecBlob::decode_value(value, buf, ctx)
@@ -383,7 +383,7 @@ impl DistinguishedValueEncoder<Blob> for General {
     #[inline]
     fn decode_value_distinguished<B: Buf>(
         value: &mut Blob,
-        buf: &mut Capped<B>,
+        buf: Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         crate::encoding::VecBlob::decode_value_distinguished(value, buf, ctx)
@@ -425,7 +425,7 @@ where
 
     fn decode_value<B: Buf>(
         value: &mut T,
-        buf: &mut Capped<B>,
+        mut buf: Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         // TODO(widders): put these decoding loops in a single place?
@@ -438,7 +438,7 @@ where
                 let (tag, wire_type) = tr.decode_key(buf.buf())?;
                 let duplicated = last_tag == Some(tag);
                 last_tag = Some(tag);
-                value.decode_tagged_field(tag, wire_type, duplicated, buf, inner_ctx.clone())
+                value.decode_tagged_field(tag, wire_type, duplicated, buf.lend(), inner_ctx.clone())
             })
             .collect()
     }
@@ -450,7 +450,7 @@ where
 {
     fn decode_value_distinguished<B: Buf>(
         value: &mut T,
-        buf: &mut Capped<B>,
+        mut buf: Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         // TODO(widders): put these decoding loops in a single place?
@@ -467,7 +467,7 @@ where
                     tag,
                     wire_type,
                     duplicated,
-                    buf,
+                    buf.lend(),
                     inner_ctx.clone(),
                 )
             })
