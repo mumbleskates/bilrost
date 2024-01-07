@@ -10,7 +10,7 @@ use crate::encoding::{
 use crate::{DecodeError, EncodeError};
 
 /// A Bilrost message.
-pub trait Message: TaggedDecoder + Send + Sync {
+pub trait Message: TaggedDecodable + Send + Sync {
     /// Encodes the message to a buffer.
     ///
     /// This method will panic if the buffer has insufficient capacity.
@@ -95,7 +95,18 @@ pub trait Message: TaggedDecoder + Send + Sync {
         Self: Default,
     {
         let mut message = Self::default();
-        Self::merge(&mut message, &mut buf).map(|_| message)
+        let ctx = DecodeContext::default();
+        let tr = &mut TagReader::new();
+        let mut last_tag = None::<u32>;
+        Capped::new(&mut buf)
+            .consume(|buf| {
+                let (tag, wire_type) = tr.decode_key(buf.buf())?;
+                let duplicated = last_tag == Some(tag);
+                last_tag = Some(tag);
+                message.decode_tagged_field(tag, wire_type, duplicated, buf, ctx.clone())
+            })
+            .collect::<Result<_, _>>()?;
+        Ok(message)
     }
 
     /// Decodes a length-delimited instance of the message from the buffer.
@@ -109,29 +120,7 @@ pub trait Message: TaggedDecoder + Send + Sync {
         Ok(message)
     }
 
-    /// Decodes an instance of the message from a buffer, and merges it into `self`.
-    ///
-    /// The entire buffer will be consumed.
-    fn merge<B>(&mut self, mut buf: B) -> Result<(), DecodeError>
-    where
-        B: Buf,
-        Self: Sized,
-    {
-        let ctx = DecodeContext::default();
-        let tr = &mut TagReader::new();
-        let mut last_tag = None::<u32>;
-        Capped::new(&mut buf)
-            .consume(|buf| {
-                let (tag, wire_type) = tr.decode_key(buf.buf())?;
-                let duplicated = last_tag == Some(tag);
-                last_tag = Some(tag);
-                self.decode_tagged_field(tag, wire_type, duplicated, buf, ctx.clone())
-            })
-            .collect()
-    }
-
-    /// Decodes a length-delimited instance of the message from buffer, and
-    /// merges it into `self`.
+    /// Decodes a length-delimited instance of the message from buffer and merges it into `self`.
     fn merge_length_delimited<B>(&mut self, mut buf: B) -> Result<(), DecodeError>
     where
         B: Buf,
@@ -141,18 +130,19 @@ pub trait Message: TaggedDecoder + Send + Sync {
     }
 
     /// Clears the message, resetting all fields to their default.
+    // TODO(widders): rid ourselves of "merge" and "clear" concepts
     fn clear(&mut self);
 
     // TODO(widders): encode and decode with unknown fields in an unknown-fields companion struct
 }
 
-pub trait DistinguishedMessage: Message + DistinguishedTaggedDecoder + Eq {
+pub trait DistinguishedMessage: Message + DistinguishedTaggedDecodable {
     // TODO(widders): this. and revise the above
 }
 
 /// Trait to be implemented by (or more commonly derived for) oneofs and messages, which have
 /// knowledge of their fields' tags and encoding.
-pub trait TaggedDecoder {
+pub trait TaggedDecodable {
     /// Decodes a field from a buffer into `self`.
     ///
     /// Meant to be used only by `Message` and `Oneof` implementations.
@@ -168,9 +158,9 @@ pub trait TaggedDecoder {
         Self: Sized;
 }
 
-/// Complementary trait for oneof fields and messages, all of whose fields have a distinguished\
+/// Complementary trait for oneof fields and messages, all of whose fields have a distinguished
 /// encoding.
-pub trait DistinguishedTaggedDecoder {
+pub trait DistinguishedTaggedDecodable {
     fn decode_tagged_field_distinguished<B: Buf>(
         &mut self,
         tag: u32,
@@ -183,7 +173,7 @@ pub trait DistinguishedTaggedDecoder {
         Self: Sized;
 }
 
-impl<M> TaggedDecoder for Box<M>
+impl<M> TaggedDecodable for Box<M>
 where
     M: Message,
 {
@@ -227,6 +217,9 @@ mod tests {
     use super::*;
 
     const _MESSAGE_IS_OBJECT_SAFE: Option<&dyn Message> = None;
-    // TODO(widders): fix this? do we need it? should we remove the Eq requirement?
-    // const _DISTINGUISHED_MESSAGE_IS_OBJECT_SAFE: Option<&dyn DistinguishedMessage> = None;
+    const _DISTINGUISHED_MESSAGE_IS_OBJECT_SAFE: Option<&dyn DistinguishedMessage> = None;
+
+    // TODO(widders): make these traits actually useful for anything at all when &dyn! right now it
+    //  looks like these traits don't really have any useful object-callable methods at all, maybe
+    //  we should have different ones just for that?
 }

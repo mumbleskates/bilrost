@@ -402,8 +402,6 @@ mod blob {
     );
 }
 
-// TODO(widders): Oneof
-
 impl<T> Wiretyped<T> for General
 where
     T: Message,
@@ -416,8 +414,6 @@ where
     T: Message,
 {
     fn encode_value<B: BufMut>(value: &T, buf: &mut B) {
-        // TODO(widders): care needs to be taken with top level APIs to avoid running over when
-        //  encoding and panicking in the buf
         encode_varint(value.encoded_len() as u64, buf);
         value.encode_raw(buf);
     }
@@ -432,6 +428,7 @@ where
         buf: &mut Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
+        // TODO(widders): put these decoding loops in a single place?
         ctx.limit_reached()?;
         let mut tr = TagReader::new();
         let inner_ctx = ctx.enter_recursion();
@@ -449,13 +446,31 @@ where
 
 impl<T> DistinguishedValueEncoder<T> for General
 where
-    T: DistinguishedMessage,
+    T: DistinguishedMessage + Eq,
 {
     fn decode_value_distinguished<B: Buf>(
-        _value: &mut T,
-        _buf: &mut Capped<B>,
-        _ctx: DecodeContext,
+        value: &mut T,
+        buf: &mut Capped<B>,
+        ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
-        todo!()
+        // TODO(widders): put these decoding loops in a single place?
+        ctx.limit_reached()?;
+        let mut tr = TagReader::new();
+        let inner_ctx = ctx.enter_recursion();
+        let mut last_tag = None::<u32>;
+        buf.take_length_delimited()?
+            .consume(|buf| {
+                let (tag, wire_type) = tr.decode_key(buf.buf())?;
+                let duplicated = last_tag == Some(tag);
+                last_tag = Some(tag);
+                value.decode_tagged_field_distinguished(
+                    tag,
+                    wire_type,
+                    duplicated,
+                    buf,
+                    inner_ctx.clone(),
+                )
+            })
+            .collect()
     }
 }

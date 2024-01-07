@@ -5,11 +5,9 @@ use core::ops::{Deref, DerefMut};
 
 use bytes::{Buf, BufMut};
 
-use crate::message::TaggedDecoder;
-use crate::{
-    encoding::{skip_field, Capped, DecodeContext, WireType},
-    DecodeError, Message,
-};
+use crate::encoding::{skip_field, Capped, DecodeContext, WireType};
+use crate::message::{Message, TaggedDecodable};
+use crate::DecodeError;
 
 /// Newtype wrapper to act as a simple "bytes data" type in Bilrost. It transparently wraps a
 /// `Vec<u8>` and is fully supported by the `General` encoder.
@@ -94,7 +92,7 @@ impl proptest::arbitrary::Arbitrary for Blob {
     >;
 }
 
-impl TaggedDecoder for () {
+impl TaggedDecodable for () {
     fn decode_tagged_field<B: Buf>(
         &mut self,
         _tag: u32,
