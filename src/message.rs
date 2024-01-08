@@ -11,7 +11,7 @@ use crate::{DecodeError, EncodeError};
 /// Merges fields from the given buffer, to its cap, into the given `TaggedDecodable` value.
 /// Implemented as a private standalone method to discourage "merging" as a usage pattern.
 #[inline]
-fn merge<T: TaggedDecodable, B: Buf + ?Sized>(
+pub(crate) fn merge<T: TaggedDecodable, B: Buf + ?Sized>(
     value: &mut T,
     buf: Capped<B>,
     ctx: DecodeContext,
@@ -30,7 +30,7 @@ fn merge<T: TaggedDecodable, B: Buf + ?Sized>(
 /// Merges fields from the given buffer, to its cap, into the given `DistinguishedTaggedDecodable`
 /// value. Implemented as a private standalone method to discourage "merging" as a usage pattern.
 #[inline]
-fn merge_distinguished<T: DistinguishedTaggedDecodable, B: Buf + ?Sized>(
+pub(crate) fn merge_distinguished<T: DistinguishedTaggedDecodable, B: Buf + ?Sized>(
     value: &mut T,
     buf: Capped<B>,
     ctx: DecodeContext,

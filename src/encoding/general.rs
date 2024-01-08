@@ -11,11 +11,12 @@ use std::collections::{HashMap, HashSet};
 use crate::encoding::{
     delegate_encoding, delegate_value_encoding, encode_varint, encoded_len_varint, Capped,
     DecodeContext, DistinguishedEncoder, DistinguishedFieldEncoder, DistinguishedValueEncoder,
-    Encoder, FieldEncoder, Map, TagMeasurer, TagReader, TagWriter, ValueEncoder, WireType,
+    Encoder, FieldEncoder, Map, TagMeasurer, TagWriter, ValueEncoder, WireType,
     Wiretyped,
 };
 use crate::{Blob, DecodeError, DistinguishedMessage, Message};
 
+use crate::message::{merge, merge_distinguished};
 use bytes::{Buf, BufMut, Bytes};
 
 pub struct General;
@@ -428,19 +429,8 @@ where
         mut buf: Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
-        // TODO(widders): put these decoding loops in a single place?
         ctx.limit_reached()?;
-        let mut tr = TagReader::new();
-        let inner_ctx = ctx.enter_recursion();
-        let mut last_tag = None::<u32>;
-        buf.take_length_delimited()?
-            .consume(|buf| {
-                let (tag, wire_type) = tr.decode_key(buf.buf())?;
-                let duplicated = last_tag == Some(tag);
-                last_tag = Some(tag);
-                value.decode_tagged_field(tag, wire_type, duplicated, buf.lend(), inner_ctx.clone())
-            })
-            .collect()
+        merge(value, buf.take_length_delimited()?, ctx.enter_recursion())
     }
 }
 
@@ -453,24 +443,7 @@ where
         mut buf: Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
-        // TODO(widders): put these decoding loops in a single place?
         ctx.limit_reached()?;
-        let mut tr = TagReader::new();
-        let inner_ctx = ctx.enter_recursion();
-        let mut last_tag = None::<u32>;
-        buf.take_length_delimited()?
-            .consume(|buf| {
-                let (tag, wire_type) = tr.decode_key(buf.buf())?;
-                let duplicated = last_tag == Some(tag);
-                last_tag = Some(tag);
-                value.decode_tagged_field_distinguished(
-                    tag,
-                    wire_type,
-                    duplicated,
-                    buf.lend(),
-                    inner_ctx.clone(),
-                )
-            })
-            .collect()
+        merge_distinguished(value, buf.take_length_delimited()?, ctx.enter_recursion())
     }
 }
