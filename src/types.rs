@@ -6,8 +6,8 @@ use core::ops::{Deref, DerefMut};
 use bytes::{Buf, BufMut};
 
 use crate::encoding::{skip_field, Capped, DecodeContext, WireType};
-use crate::message::{Message, TaggedDecodable};
-use crate::DecodeError;
+use crate::message::{DistinguishedTaggedDecodable, Message, TaggedDecodable};
+use crate::{DecodeError, DistinguishedMessage};
 
 /// Newtype wrapper to act as a simple "bytes data" type in Bilrost. It transparently wraps a
 /// `Vec<u8>` and is fully supported by the `General` encoder.
@@ -93,7 +93,7 @@ impl proptest::arbitrary::Arbitrary for Blob {
 }
 
 impl TaggedDecodable for () {
-    fn decode_tagged_field<B: Buf>(
+    fn decode_tagged_field<B: Buf + ?Sized>(
         &mut self,
         _tag: u32,
         wire_type: WireType,
@@ -106,11 +106,24 @@ impl TaggedDecodable for () {
 }
 
 impl Message for () {
-    fn encode_raw<B: BufMut>(&self, _buf: &mut B) {}
+    fn encode_raw<B: BufMut + ?Sized>(&self, _buf: &mut B) {}
 
     fn encoded_len(&self) -> usize {
         0
     }
-
-    fn clear(&mut self) {}
 }
+
+impl DistinguishedTaggedDecodable for () {
+    fn decode_tagged_field_distinguished<B: Buf + ?Sized>(
+        &mut self,
+        _tag: u32,
+        _wire_type: WireType,
+        _duplicated: bool,
+        _buf: Capped<B>,
+        _ctx: DecodeContext,
+    ) -> Result<(), DecodeError> {
+        Err(DecodeError::new("field exists for empty message type"))
+    }
+}
+
+impl DistinguishedMessage for () {}

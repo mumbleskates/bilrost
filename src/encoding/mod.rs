@@ -44,7 +44,7 @@ pub use vec_blob::VecBlob;
 /// Encodes an integer value into LEB128-bijective variable length format, and writes it to the
 /// buffer. The buffer must have enough remaining space (maximum 9 bytes).
 #[inline]
-pub fn encode_varint<B: BufMut>(mut value: u64, buf: &mut B) {
+pub fn encode_varint<B: BufMut + ?Sized>(mut value: u64, buf: &mut B) {
     for _ in 0..9 {
         if value < 0x80 {
             buf.put_u8(value as u8);
@@ -58,7 +58,7 @@ pub fn encode_varint<B: BufMut>(mut value: u64, buf: &mut B) {
 
 /// Decodes a LEB128-bijective-encoded variable length integer from the buffer.
 #[inline]
-pub fn decode_varint<B: Buf>(buf: &mut B) -> Result<u64, DecodeError> {
+pub fn decode_varint<B: Buf + ?Sized>(buf: &mut B) -> Result<u64, DecodeError> {
     let bytes = buf.chunk();
     let len = bytes.len();
     if len == 0 {
@@ -156,10 +156,7 @@ fn decode_varint_slice(bytes: &[u8]) -> Result<(u64, usize), DecodeError> {
 /// necessary.
 #[inline(never)]
 #[cold]
-fn decode_varint_slow<B>(buf: &mut B) -> Result<u64, DecodeError>
-where
-    B: Buf,
-{
+fn decode_varint_slow<B: Buf + ?Sized>(buf: &mut B) -> Result<u64, DecodeError> {
     let mut value = 0;
     for count in 0..min(8, buf.remaining()) {
         let byte = buf.get_u8();
@@ -408,7 +405,10 @@ impl TagReader {
     }
 
     #[inline(always)]
-    pub fn decode_key<B: Buf>(&mut self, buf: &mut B) -> Result<(u32, WireType), DecodeError> {
+    pub fn decode_key<B: Buf + ?Sized>(
+        &mut self,
+        buf: &mut B,
+    ) -> Result<(u32, WireType), DecodeError> {
         let key_delta = decode_varint(buf)?;
         let tag_delta = key_delta >> 2;
         let tag = (self.last_tag as u64) + tag_delta;
@@ -437,18 +437,32 @@ pub fn check_wire_type(expected: WireType, actual: WireType) -> Result<(), Decod
 /// A soft-limited wrapper for `impl Buf` that doesn't invoke extra work whenever the buffer is read
 /// from, only when the remaining bytes are checked. This means it can be nested arbitrarily without
 /// adding extra work every time.
-pub struct Capped<'a, B: Buf> {
+pub struct Capped<'a, B: 'a + Buf + ?Sized> {
     buf: &'a mut B,
     extra_bytes_remaining: usize,
 }
 
-impl<'a, B: Buf> Capped<'a, B> {
+impl<'a, B: 'a + Buf + ?Sized> Capped<'a, B> {
     /// Creates a Capped instance with a cap at the very end of the given buffer.
     pub fn new(buf: &'a mut B) -> Self {
         Self {
             buf,
             extra_bytes_remaining: 0,
         }
+    }
+
+    /// Reads a length from the beginning of the given buffer, then returns a Capped instance
+    /// with its cap at the end of the delimited range.
+    pub fn new_length_delimited(buf: &'a mut B) -> Result<Self, DecodeError> {
+        let len = decode_length_delimiter(&mut *buf)?;
+        let remaining = buf.remaining();
+        if len > remaining {
+            return Err(DecodeError::new("field truncated"));
+        }
+        Ok(Self {
+            buf,
+            extra_bytes_remaining: remaining - len,
+        })
     }
 
     pub fn lend(&mut self) -> Capped<B> {
@@ -511,18 +525,18 @@ impl<'a, B: Buf> Capped<'a, B> {
     }
 }
 
-pub struct CappedConsumer<'a, B: Buf, F> {
+pub struct CappedConsumer<'a, B: Buf + ?Sized, F> {
     capped: Capped<'a, B>,
     reader: F,
 }
 
-impl<'a, B: Buf, F> CappedConsumer<'a, B, F> {
+impl<'a, B: Buf + ?Sized, F> CappedConsumer<'a, B, F> {
     fn new(capped: Capped<'a, B>, reader: F) -> Self {
         Self { capped, reader }
     }
 }
 
-impl<'a, B: Buf, T, F> Iterator for CappedConsumer<'a, B, F>
+impl<'a, B: Buf + ?Sized, T, F> Iterator for CappedConsumer<'a, B, F>
 where
     F: FnMut(&mut Capped<B>) -> Result<T, DecodeError>,
 {
@@ -540,7 +554,7 @@ where
     }
 }
 
-impl<'a, B: Buf> Deref for Capped<'a, B> {
+impl<'a, B: Buf + ?Sized> Deref for Capped<'a, B> {
     type Target = B;
 
     fn deref(&self) -> &B {
@@ -548,13 +562,16 @@ impl<'a, B: Buf> Deref for Capped<'a, B> {
     }
 }
 
-impl<'a, B: Buf> DerefMut for Capped<'a, B> {
+impl<'a, B: Buf + ?Sized> DerefMut for Capped<'a, B> {
     fn deref_mut(&mut self) -> &mut B {
         self.buf
     }
 }
 
-pub fn skip_field<B: Buf>(wire_type: WireType, mut buf: Capped<B>) -> Result<(), DecodeError> {
+pub fn skip_field<B: Buf + ?Sized>(
+    wire_type: WireType,
+    mut buf: Capped<B>,
+) -> Result<(), DecodeError> {
     let len = match wire_type {
         WireType::Varint => buf.decode_varint().map(|_| 0)?,
         WireType::ThirtyTwoBit => 4,

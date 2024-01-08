@@ -21,7 +21,7 @@ mod types;
 pub mod encoding;
 
 pub use crate::error::{DecodeError, EncodeError};
-pub use crate::message::{DistinguishedMessage, Message};
+pub use crate::message::{DistinguishedMessage, DistinguishedMessageDyn, Message, MessageDyn};
 
 pub use types::Blob;
 
