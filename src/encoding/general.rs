@@ -11,8 +11,7 @@ use std::collections::{HashMap, HashSet};
 use crate::encoding::{
     delegate_encoding, delegate_value_encoding, encode_varint, encoded_len_varint, Capped,
     DecodeContext, DistinguishedEncoder, DistinguishedFieldEncoder, DistinguishedValueEncoder,
-    Encoder, FieldEncoder, Map, TagMeasurer, TagWriter, ValueEncoder, WireType,
-    Wiretyped,
+    Encoder, FieldEncoder, Map, TagMeasurer, TagWriter, ValueEncoder, WireType, Wiretyped,
 };
 use crate::{Blob, DecodeError, DistinguishedMessage, Message};
 

@@ -1,11 +1,11 @@
 use bytes::{Buf, BufMut};
 
+use crate::encoding::value_traits::{Collection, DistinguishedCollection};
 use crate::encoding::{
     Capped, DecodeContext, DistinguishedEncoder, DistinguishedFieldEncoder,
     DistinguishedValueEncoder, Encoder, FieldEncoder, General, NewForOverwrite, Packed,
     TagMeasurer, TagWriter, ValueEncoder, WireType,
 };
-use crate::encoding::value_traits::{Collection, DistinguishedCollection};
 use crate::DecodeError;
 
 pub struct Unpacked<E = General>(E);
@@ -77,7 +77,9 @@ where
     ) -> Result<(), DecodeError> {
         let mut new_val = T::new_for_overwrite();
         E::decode_field_distinguished(wire_type, &mut new_val, buf, ctx)?;
-        value.insert_distinguished(new_val).map_err(DecodeError::new)?;
+        value
+            .insert_distinguished(new_val)
+            .map_err(DecodeError::new)?;
         Ok(())
     }
 }

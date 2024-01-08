@@ -228,8 +228,14 @@ where
 
 pub trait DistinguishedMessageDyn {
     fn replace_distinguished_from(&mut self, buf: &mut dyn Buf) -> Result<(), DecodeError>;
-    fn replace_distinguished_from_length_delimited(&mut self, buf: &mut dyn Buf) -> Result<(), DecodeError>;
-    fn replace_distinguished_from_capped(&mut self, buf: Capped<dyn Buf>) -> Result<(), DecodeError>;
+    fn replace_distinguished_from_length_delimited(
+        &mut self,
+        buf: &mut dyn Buf,
+    ) -> Result<(), DecodeError>;
+    fn replace_distinguished_from_capped(
+        &mut self,
+        buf: Capped<dyn Buf>,
+    ) -> Result<(), DecodeError>;
 }
 impl<T> DistinguishedMessageDyn for T
 where
@@ -239,11 +245,17 @@ where
         self.replace_distinguished_from_capped(Capped::new(buf))
     }
 
-    fn replace_distinguished_from_length_delimited(&mut self, buf: &mut dyn Buf) -> Result<(), DecodeError> {
+    fn replace_distinguished_from_length_delimited(
+        &mut self,
+        buf: &mut dyn Buf,
+    ) -> Result<(), DecodeError> {
         self.replace_distinguished_from_capped(Capped::new_length_delimited(buf)?)
     }
 
-    fn replace_distinguished_from_capped(&mut self, buf: Capped<dyn Buf>) -> Result<(), DecodeError> {
+    fn replace_distinguished_from_capped(
+        &mut self,
+        buf: Capped<dyn Buf>,
+    ) -> Result<(), DecodeError> {
         self.clear();
         merge_distinguished(self, buf, DecodeContext::default())
     }
@@ -331,7 +343,8 @@ mod tests {
 
         safe.encoded_len_dyn();
         safe.encode_dyn(&mut vec).unwrap();
-        safe.replace_from_length_delimited(&mut [0u8].as_slice()).unwrap();
+        safe.replace_from_length_delimited(&mut [0u8].as_slice())
+            .unwrap();
 
         msg.encoded_len();
         msg = M::decode_length_delimited(&mut [0u8].as_slice()).unwrap();
