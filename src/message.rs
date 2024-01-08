@@ -57,6 +57,7 @@ pub trait Message: TaggedDecodable + Default {
     /// This method will panic if the buffer has insufficient capacity.
     ///
     /// Meant to be used only by `Message` implementations.
+    // TODO(widders): move this into TaggedDecodable to get it off here too?
     #[doc(hidden)]
     fn encode_raw<B: BufMut + ?Sized>(&self, buf: &mut B);
 
