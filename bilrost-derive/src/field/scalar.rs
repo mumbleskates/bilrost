@@ -55,8 +55,7 @@ impl Field {
         };
 
         let kind = match (label, packed, ty.is_numeric()) {
-            (None, Some(true), _)
-            | (Some(Label::Optional), Some(true), _) => {
+            (None, Some(true), _) | (Some(Label::Optional), Some(true), _) => {
                 bail!("packed attribute may only be applied to repeated fields");
             }
             (_, Some(true), false) => {
@@ -65,8 +64,9 @@ impl Field {
 
             (None, _, _) => Kind::Plain,
             (Some(Label::Optional), _, _) => Kind::Optional,
-            (Some(Label::Repeated), Some(true), _)
-            | (Some(Label::Repeated), None, true) => Kind::Packed,
+            (Some(Label::Repeated), Some(true), _) | (Some(Label::Repeated), None, true) => {
+                Kind::Packed
+            }
             (Some(Label::Repeated), _, _) => Kind::Repeated,
         };
 
@@ -79,9 +79,11 @@ impl Field {
                 Kind::Plain => {
                     field.kind = Kind::AlwaysEncode;
                     Ok(Some(field))
-                },
+                }
                 Kind::Optional => bail!("invalid optional attribute on oneof field"),
-                Kind::AlwaysEncode => bail!("field is already AlwaysEncode, which shouldn't happen"),
+                Kind::AlwaysEncode => {
+                    bail!("field is already AlwaysEncode, which shouldn't happen")
+                }
                 Kind::Packed | Kind::Repeated => bail!("invalid repeated attribute on oneof field"),
             }
         } else {
@@ -187,7 +189,7 @@ impl Field {
     /// Returns an expression which evaluates to the default value of the field.
     pub fn default(&self) -> TokenStream {
         match self.kind {
-            Kind::Plain |Kind::AlwaysEncode => self.ty.owned_zero_value(),
+            Kind::Plain | Kind::AlwaysEncode => self.ty.owned_zero_value(),
             Kind::Optional => quote!(::core::option::Option::None),
             Kind::Repeated | Kind::Packed => quote!(::bilrost::alloc::vec::Vec::new()),
         }
@@ -404,8 +406,7 @@ impl Ty {
                 path,
                 value:
                     Expr::Lit(ExprLit {
-                        lit: Lit::Str(l),
-                        ..
+                        lit: Lit::Str(l), ..
                     }),
                 ..
             }) if path.is_ident("bytes") => Ty::Bytes(BytesTy::try_from_str(&l.value())?),
@@ -413,8 +414,7 @@ impl Ty {
                 path,
                 value:
                     Expr::Lit(ExprLit {
-                        lit: Lit::Str(l),
-                        ..
+                        lit: Lit::Str(l), ..
                     }),
                 ..
             }) if path.is_ident("enumeration") => Ty::Enumeration(parse_str::<Path>(&l.value())?),

@@ -23,8 +23,7 @@ impl Field {
                     Meta::NameValue(MetaNameValue {
                         value:
                             Expr::Lit(ExprLit {
-                                lit: Lit::Str(lit),
-                                ..
+                                lit: Lit::Str(lit), ..
                             }),
                         ..
                     }) => parse_str::<Path>(&lit.value())?,
