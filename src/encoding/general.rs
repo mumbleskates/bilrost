@@ -8,15 +8,15 @@ use core::str;
 #[cfg(feature = "std")]
 use std::collections::{HashMap, HashSet};
 
+use bytes::{Buf, BufMut, Bytes};
+
 use crate::encoding::{
     delegate_encoding, delegate_value_encoding, encode_varint, encoded_len_varint, Capped,
     DecodeContext, DistinguishedEncoder, DistinguishedFieldEncoder, DistinguishedValueEncoder,
     Encoder, FieldEncoder, Map, TagMeasurer, TagWriter, ValueEncoder, WireType, Wiretyped,
 };
-use crate::{Blob, DecodeError, DistinguishedMessage, Message};
-
-use crate::message::{merge, merge_distinguished};
-use bytes::{Buf, BufMut, Bytes};
+use crate::message::{merge, merge_distinguished, RawDistinguishedMessage, RawMessage};
+use crate::{Blob, DecodeError};
 
 pub struct General;
 
@@ -404,22 +404,22 @@ mod blob {
 
 impl<T> Wiretyped<T> for General
 where
-    T: Message,
+    T: RawMessage,
 {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
 }
 
 impl<T> ValueEncoder<T> for General
 where
-    T: Message,
+    T: RawMessage,
 {
     fn encode_value<B: BufMut>(value: &T, buf: &mut B) {
-        encode_varint(value.encoded_len() as u64, buf);
+        encode_varint(value.raw_encoded_len() as u64, buf);
         value.raw_encode(buf);
     }
 
     fn value_encoded_len(value: &T) -> usize {
-        let inner_len = value.encoded_len();
+        let inner_len = value.raw_encoded_len();
         encoded_len_varint(inner_len as u64) + inner_len
     }
 
@@ -435,7 +435,7 @@ where
 
 impl<T> DistinguishedValueEncoder<T> for General
 where
-    T: DistinguishedMessage + Eq,
+    T: RawDistinguishedMessage + Eq,
 {
     fn decode_value_distinguished<B: Buf>(
         value: &mut T,

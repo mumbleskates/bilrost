@@ -51,7 +51,7 @@ pub(crate) fn merge_distinguished<T: RawDistinguishedMessage, B: Buf + ?Sized>(
 ///
 /// Messages are expected to have a `Default` implementation that is exactly the same as each
 /// field's respective `Default` value; that is, functionally identical to a derived `Default`.
-pub trait Message: RawMessage + Default {
+pub trait Message: Default {
     /// Returns the encoded length of the message without a length delimiter.
     fn encoded_len(&self) -> usize;
 
@@ -97,7 +97,7 @@ pub trait Message: RawMessage + Default {
 ///  1. The message will always encode to the same bytes as any other message with an equal value
 ///  2. A message equal to that value will only ever decode without error from that exact sequence
 ///     of bytes, not from any other.
-pub trait DistinguishedMessage: Message + RawDistinguishedMessage + Eq {
+pub trait DistinguishedMessage: Message + Eq {
     /// Decodes an instance of the message from a buffer in distinguished mode.
     ///
     /// The entire buffer will be consumed.
@@ -223,7 +223,7 @@ pub trait MessageDyn {
 }
 impl<T> MessageDyn for T
 where
-    T: Message,
+    T: RawMessage,
 {
     fn encoded_len_dyn(&self) -> usize {
         Message::encoded_len(self)
@@ -279,7 +279,7 @@ pub trait DistinguishedMessageDyn {
 }
 impl<T> DistinguishedMessageDyn for T
 where
-    T: DistinguishedMessage,
+    T: RawDistinguishedMessage,
 {
     fn replace_distinguished_from(&mut self, buf: &mut dyn Buf) -> Result<(), DecodeError> {
         self.replace_distinguished_from_capped(Capped::new(buf))
@@ -412,8 +412,6 @@ mod tests {
         msg.encoded_len();
         msg = M::decode_length_delimited(&mut [0u8].as_slice()).unwrap();
         msg.encode(&mut vec).unwrap();
-        msg.encode_dyn(&mut vec).unwrap();
-        msg.clear()
     }
 
     #[test]
