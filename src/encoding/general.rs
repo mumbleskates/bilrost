@@ -415,7 +415,7 @@ where
 {
     fn encode_value<B: BufMut>(value: &T, buf: &mut B) {
         encode_varint(value.encoded_len() as u64, buf);
-        value.encode_raw(buf);
+        value.raw_encode(buf);
     }
 
     fn value_encoded_len(value: &T) -> usize {

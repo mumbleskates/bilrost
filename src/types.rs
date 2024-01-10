@@ -6,8 +6,8 @@ use core::ops::{Deref, DerefMut};
 use bytes::{Buf, BufMut};
 
 use crate::encoding::{skip_field, Capped, DecodeContext, WireType};
-use crate::message::{DistinguishedTaggedDecodable, Message, TaggedDecodable};
-use crate::{DecodeError, DistinguishedMessage};
+use crate::message::{RawDistinguishedMessage, RawMessage};
+use crate::DecodeError;
 
 /// Newtype wrapper to act as a simple "bytes data" type in Bilrost. It transparently wraps a
 /// `Vec<u8>` and is fully supported by the `General` encoder.
@@ -92,38 +92,40 @@ impl proptest::arbitrary::Arbitrary for Blob {
     >;
 }
 
-impl TaggedDecodable for () {
-    fn decode_tagged_field<B: Buf + ?Sized>(
+impl RawMessage for () {
+    fn raw_encode<B: BufMut + ?Sized>(&self, _buf: &mut B) {}
+
+    fn raw_encoded_len(&self) -> usize {
+        0
+    }
+
+    fn raw_decode_field<B: Buf + ?Sized>(
         &mut self,
         _tag: u32,
         wire_type: WireType,
         _duplicated: bool,
         buf: Capped<B>,
         _ctx: DecodeContext,
-    ) -> Result<(), DecodeError> {
+    ) -> Result<(), DecodeError>
+    where
+        Self: Sized,
+    {
         skip_field(wire_type, buf)
     }
 }
 
-impl Message for () {
-    fn encode_raw<B: BufMut + ?Sized>(&self, _buf: &mut B) {}
-
-    fn encoded_len(&self) -> usize {
-        0
-    }
-}
-
-impl DistinguishedTaggedDecodable for () {
-    fn decode_tagged_field_distinguished<B: Buf + ?Sized>(
+impl RawDistinguishedMessage for () {
+    fn raw_decode_field_distinguished<B: Buf + ?Sized>(
         &mut self,
         _tag: u32,
         _wire_type: WireType,
         _duplicated: bool,
         _buf: Capped<B>,
         _ctx: DecodeContext,
-    ) -> Result<(), DecodeError> {
+    ) -> Result<(), DecodeError>
+    where
+        Self: Sized,
+    {
         Err(DecodeError::new("field exists for empty message type"))
     }
 }
-
-impl DistinguishedMessage for () {}
