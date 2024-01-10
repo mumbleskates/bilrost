@@ -832,6 +832,31 @@ where
     }
 }
 
+/// Trait to be implemented by (or more commonly derived for) oneofs, which have knowledge of their
+/// variants' tags and encoding.
+pub trait Oneof: Default {
+    fn decode_field<B: Buf>(
+        &mut self,
+        tag: u32,
+        wire_type: WireType,
+        duplicated: bool,
+        buf: &mut Capped<B>,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError>;
+}
+
+/// Complementary trait for oneof fields all of whose variants have a distinguished encoding.
+pub trait DistinuishedOneof: Oneof {
+    fn decode_field_distinguished<B: Buf>(
+        &mut self,
+        tag: u32,
+        wire_type: WireType,
+        duplicated: bool,
+        buf: &mut Capped<B>,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError>;
+}
+
 /// Macro rules for expressly delegating from one encoder to another.
 macro_rules! delegate_encoding {
     (
