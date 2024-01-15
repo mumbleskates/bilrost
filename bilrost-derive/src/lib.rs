@@ -399,9 +399,12 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     let expanded = quote! {
         #(#static_guards)*
 
-        impl #impl_generics ::bilrost::Message for #ident #ty_generics #where_clause {
+        impl #impl_generics ::bilrost::RawMessage for #ident #ty_generics #where_clause {
             #[allow(unused_variables)]
-            fn encode_raw<__B>(&self, buf: &mut __B) where __B: ::bilrost::bytes::BufMut {
+            fn raw_encode<__B>(&self, buf: &mut __B)
+            where
+                __B: ::bilrost::bytes::BufMut + ?Sized,
+            {
                 let tw = &mut ::bilrost::encoding::TagWriter::new();
                 #(#encode)*
             }
@@ -412,7 +415,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
                 tag: u32,
                 wire_type: ::bilrost::encoding::WireType,
                 duplicated: bool,
-                buf: &mut ::bilrost::encoding::Capped<__B>,
+                buf: ::bilrost::encoding::Capped<__B>,
                 ctx: ::bilrost::encoding::DecodeContext,
             ) -> ::core::result::Result<(), ::bilrost::DecodeError>
             where
@@ -426,7 +429,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
             }
 
             #[inline]
-            fn encoded_len(&self) -> usize {
+            fn raw_encoded_len(&self) -> usize {
                 let tm = &mut ::bilrost::encoding::TagMeasurer::new();
                 0 #(+ #encoded_len)*
             }
@@ -436,7 +439,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     let impl_wrapper_const_ident = parse_str::<Ident>(
         &("__BILROST_DERIVED_IMPL_MESSAGE_FOR_".to_owned() + &ident.to_string()),
     )?;
-    Ok(quote! {
+    let expanded = quote! {
         const #impl_wrapper_const_ident: () = {
             use ::bilrost::encoding::{
                 Fixed as fixed, General as general, Map as map, Packed as packed,
@@ -449,7 +452,8 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
 
             ()
         };
-    })
+    };
+    Ok(expanded)
 }
 
 #[proc_macro_derive(Message, attributes(bilrost))]
@@ -496,10 +500,6 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
         panic!("Enumeration must have at least one variant");
     }
 
-    // TODO(widders): impl a BilrostEnum trait, and impl Default only when there's a zero-valued
-    //  variant, so that the enum type can be included directly; otherwise impl NewForOverwrite
-    let default = variants[0].0.clone();
-
     let is_valid = variants.iter().map(|(_, value)| quote!(#value => true));
 
     let try_from = variants
@@ -516,12 +516,6 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
                     #(#is_valid,)*
                     _ => false,
                 }
-            }
-        }
-
-        impl #impl_generics ::core::default::Default for #ident #ty_generics #where_clause {
-            fn default() -> #ident {
-                #ident::#default
             }
         }
 
@@ -551,7 +545,7 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
         impl #impl_generics ::bilrost::encoding::ValueEncoder<#ident>
         for ::bilrost::encoding::General {
             #[inline]
-            fn encode_value<B: ::bilrost::bytes::BufMut>(value: &#ident, buf: &mut B) {
+            fn encode_value<B: ::bilrost::bytes::BufMut + ?Sized>(value: &#ident, buf: &mut B) {
                 ::bilrost::encoding::encode_varint(u32::from(value.clone()) as u64, buf);
             }
 
@@ -561,9 +555,9 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
             }
 
             #[inline]
-            fn decode_value<B: ::bilrost::bytes::Buf>(
+            fn decode_value<B: ::bilrost::bytes::Buf + ?Sized>(
                 value: &mut #ident,
-                buf: &mut ::bilrost::encoding::Capped<B>,
+                buf: ::bilrost::encoding::Capped<B>,
                 _ctx: ::bilrost::encoding::DecodeContext,
             ) -> Result<(), ::bilrost::DecodeError> {
                 let int_value = u32::try_from(buf.decode_varint()?)
@@ -576,9 +570,9 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
         impl ::bilrost::encoding::DistinguishedValueEncoder<#ident>
         for ::bilrost::encoding::General {
             #[inline]
-            fn decode_value_distinguished<B: ::bilrost::bytes::Buf>(
+            fn decode_value_distinguished<B: ::bilrost::bytes::Buf + ?Sized>(
                 value: &mut #ident,
-                buf: &mut ::bilrost::encoding::Capped<B>,
+                buf: ::bilrost::encoding::Capped<B>,
                 ctx: ::bilrost::encoding::DecodeContext,
             ) -> Result<(), ::bilrost::DecodeError> {
                 <Self as ::bilrost::encoding::ValueEncoder<#ident>>::decode_value(value, buf, ctx)
@@ -699,7 +693,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
                 tw: &mut ::bilrost::encoding::TagWriter,
             )
             where
-                __B: ::bilrost::bytes::BufMut
+                __B: ::bilrost::bytes::BufMut + ?Sized,
             {
                 match self {
                     #(#encode,)*
@@ -712,11 +706,11 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
                 tag: u32,
                 wire_type: ::bilrost::encoding::WireType,
                 duplicated: bool,
-                buf: &mut ::bilrost::encoding::Capped<__B>,
+                buf: ::bilrost::encoding::Capped<__B>,
                 ctx: ::bilrost::encoding::DecodeContext,
             ) -> ::core::result::Result<(), ::bilrost::DecodeError>
             where
-                __B: ::bilrost::bytes::Buf
+                __B: ::bilrost::bytes::Buf + ?Sized,
             {
                 // TODO(widders): it's possible we could support repeated oneof members
                 if field.is_some() {

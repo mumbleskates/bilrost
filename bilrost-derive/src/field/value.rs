@@ -63,21 +63,22 @@ impl Field {
         Ok(Field { tag, ty, encoder })
     }
 
+    /// Returns a statement which encodes the field using buffer `buf` and tag writer `tw`.
     pub fn encode(&self, ident: TokenStream) -> TokenStream {
         let tag = self.tag;
         let encoder = &self.encoder;
-        quote!(<#encoder as ::bilrost::encoding::Encoder<_>>::encode(#tag, &#ident, buf, tw))
+        quote!(<#encoder as ::bilrost::encoding::Encoder<_>>::encode(#tag, &#ident, buf, tw);)
     }
 
     /// Returns an expression which evaluates to the result of merging a decoded value into the
-    /// field.
+    /// field. The given ident must be an &mut that already refers to the destination.
     pub fn decode(&self, ident: TokenStream) -> TokenStream {
         let encoder = &self.encoder;
         quote!(
             <#encoder as ::bilrost::encoding::Encoder<_>>::decode(
                 wire_type,
                 duplicated,
-                &mut #ident,
+                #ident,
                 buf,
                 ctx,
             )
