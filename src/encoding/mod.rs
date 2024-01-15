@@ -1025,7 +1025,8 @@ macro_rules! check_type_test {
             use proptest::prelude::*;
 
             use crate::encoding::test::$kind::{check_type, check_type_unpacked};
-            use crate::encoding::{$encoder, Packed, Unpacked, WireType};
+            #[allow(unused_imports)]
+            use crate::encoding::{General, Fixed, Map, Packed, Unpacked, VecBlob, WireType};
 
             proptest! {
                 #[test]

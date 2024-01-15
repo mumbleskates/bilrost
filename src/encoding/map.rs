@@ -1,13 +1,13 @@
 use crate::encoding::value_traits::{DistinguishedMapping, Mapping};
 use crate::encoding::{
     check_wire_type, encode_varint, encoded_len_varint, Capped, DecodeContext,
-    DistinguishedEncoder, DistinguishedValueEncoder, Encoder, FieldEncoder, General,
-    NewForOverwrite, TagMeasurer, TagWriter, ValueEncoder, WireType, Wiretyped,
+    DistinguishedEncoder, DistinguishedValueEncoder, Encoder, FieldEncoder, NewForOverwrite,
+    TagMeasurer, TagWriter, ValueEncoder, WireType, Wiretyped,
 };
 use crate::DecodeError;
 use bytes::{Buf, BufMut};
 
-pub struct Map<KE = General, VE = General>(KE, VE);
+pub struct Map<KE, VE>(KE, VE);
 
 /// Maps are always length delimited.
 impl<T, KE, VE> Wiretyped<T> for Map<KE, VE> {
@@ -182,13 +182,13 @@ mod test {
     mod btree {
         use crate::encoding::check_type_test;
         check_type_test!(
-            Map,
+            Map<General, General>,
             expedient,
             alloc::collections::BTreeMap<u64, f32>,
             WireType::LengthDelimited
         );
         check_type_test!(
-            Map,
+            Map<General, General>,
             distinguished,
             alloc::collections::BTreeMap<u32, i32>,
             WireType::LengthDelimited
@@ -215,7 +215,7 @@ mod test {
     mod hash {
         use crate::encoding::check_type_test;
         check_type_test!(
-            Map,
+            Map<General, General>,
             expedient,
             std::collections::HashMap<u64, f32>,
             WireType::LengthDelimited
