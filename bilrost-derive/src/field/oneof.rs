@@ -70,10 +70,17 @@ impl Field {
     }
 
     /// Returns an expression which evaluates to the result of decoding the oneof field.
-    pub fn merge(&self, ident: TokenStream) -> TokenStream {
+    pub fn decode(&self, ident: TokenStream) -> TokenStream {
         let ty = &self.ty;
         quote! {
-            #ty::merge(#ident, tag, wire_type, duplicated, buf, ctx)
+            <#ty as ::bilrost::encoding::Oneof>::raw_decode_field(
+                #ident,
+                tag,
+                wire_type,
+                duplicated,
+                buf,
+                ctx,
+            )
         }
     }
 
@@ -82,9 +89,5 @@ impl Field {
         quote! {
             #ident.as_ref().map_or(0, |v| v.encoded_len(tm))
         }
-    }
-
-    pub fn clear(&self, ident: TokenStream) -> TokenStream {
-        quote!(#ident = ::core::option::Option::None)
     }
 }

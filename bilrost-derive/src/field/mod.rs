@@ -1,25 +1,18 @@
-mod map;
-mod message;
 mod oneof;
-mod scalar;
+mod value;
 
 use std::fmt;
-use std::slice;
 
 use anyhow::{bail, Error};
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 use syn::punctuated::Punctuated;
-use syn::{Attribute, Expr, ExprLit, Lit, LitBool, LitInt, Meta, MetaNameValue, Token};
+use syn::{Attribute, Expr, ExprLit, Lit, LitInt, Meta, MetaNameValue, Token, Type};
 
 #[derive(Clone)]
 pub enum Field {
     /// A scalar field.
-    Scalar(scalar::Field),
-    /// A message field.
-    Message(message::Field),
-    /// A map field.
-    Map(map::Field),
+    Value(value::Field),
     /// A oneof field.
     Oneof(oneof::Field),
 }
@@ -29,53 +22,25 @@ impl Field {
     ///
     /// If the meta items are invalid, an error will be returned.
     /// If the field should be ignored, `None` is returned.
-    pub fn new(attrs: Vec<Attribute>, inferred_tag: Option<u32>) -> Result<Option<Field>, Error> {
+    pub fn new(
+        ty: Type,
+        attrs: Vec<Attribute>,
+        inferred_tag: Option<u32>,
+    ) -> Result<Option<Field>, Error> {
         let attrs = bilrost_attrs(attrs)?;
 
         // TODO: check for ignore attribute.
 
-        let field = if let Some(field) = scalar::Field::new(&attrs, inferred_tag)? {
-            Field::Scalar(field)
-        } else if let Some(field) = message::Field::new(&attrs, inferred_tag)? {
-            Field::Message(field)
-        } else if let Some(field) = map::Field::new(&attrs, inferred_tag)? {
-            Field::Map(field)
-        } else if let Some(field) = oneof::Field::new(&attrs)? {
+        Ok(Some(if let Some(field) = oneof::Field::new(&attrs)? {
             Field::Oneof(field)
         } else {
-            bail!("no type attribute");
-        };
-
-        Ok(Some(field))
-    }
-
-    /// Creates a new oneof `Field` from an iterator of field attributes.
-    ///
-    /// If the meta items are invalid, an error will be returned.
-    /// If the field should be ignored, `None` is returned.
-    pub fn new_oneof(attrs: Vec<Attribute>) -> Result<Option<Field>, Error> {
-        let attrs = bilrost_attrs(attrs)?;
-
-        // TODO: check for ignore attribute.
-
-        let field = if let Some(field) = scalar::Field::new_oneof(&attrs)? {
-            Field::Scalar(field)
-        } else if let Some(field) = message::Field::new_oneof(&attrs)? {
-            Field::Message(field)
-        } else if let Some(field) = map::Field::new_oneof(&attrs)? {
-            Field::Map(field)
-        } else {
-            bail!("no type attribute for oneof field");
-        };
-
-        Ok(Some(field))
+            Field::Value(value::Field::new(ty, &attrs, inferred_tag)?)
+        }))
     }
 
     pub fn tags(&self) -> Vec<u32> {
         match self {
-            Field::Scalar(scalar) => vec![scalar.tag],
-            Field::Message(message) => vec![message.tag],
-            Field::Map(map) => vec![map.tag],
+            Field::Value(scalar) => vec![scalar.tag],
             Field::Oneof(oneof) => oneof.tags.clone(),
         }
     }
@@ -86,27 +51,6 @@ impl Field {
 
     pub fn last_tag(&self) -> u32 {
         self.tags().into_iter().max().unwrap()
-    }
-
-    pub fn requires_duplication_guard(&self) -> Option<&'static str> {
-        match self {
-            // Maps are inherently repeated, and Oneofs have their own guard
-            Field::Map(..)
-            | Field::Oneof(..)
-            | Field::Scalar(scalar::Field {
-                kind: scalar::Kind::Repeated,
-                ..
-            })
-            | Field::Message(message::Field {
-                kind: message::Kind::Repeated,
-                ..
-            }) => None,
-            Field::Scalar(scalar::Field {
-                kind: scalar::Kind::Packed,
-                ..
-            }) => Some("multiple occurrences of packed repeated field"),
-            _ => Some("multiple occurrences of non-repeated field"),
-        }
     }
 
     pub fn tag_list_guard(&self, field_name: String) -> Option<TokenStream> {
@@ -136,129 +80,33 @@ impl Field {
     /// Returns a statement which encodes the field.
     pub fn encode(&self, ident: TokenStream) -> TokenStream {
         match self {
-            Field::Scalar(scalar) => scalar.encode(ident),
-            Field::Message(message) => message.encode(ident),
-            Field::Map(map) => map.encode(ident),
+            Field::Value(scalar) => scalar.encode(ident),
             Field::Oneof(oneof) => oneof.encode(ident),
         }
     }
 
     /// Returns an expression which evaluates to the result of merging a decoded
     /// value into the field.
-    pub fn merge(&self, ident: TokenStream) -> TokenStream {
+    pub fn decode(&self, ident: TokenStream) -> TokenStream {
         match self {
-            Field::Scalar(scalar) => scalar.merge(ident),
-            Field::Message(message) => message.merge(ident),
-            Field::Map(map) => map.merge(ident),
-            Field::Oneof(oneof) => oneof.merge(ident),
+            Field::Value(scalar) => scalar.decode(ident),
+            Field::Oneof(oneof) => oneof.decode(ident),
         }
     }
 
     /// Returns an expression which evaluates to the encoded length of the field.
     pub fn encoded_len(&self, ident: TokenStream) -> TokenStream {
         match self {
-            Field::Scalar(scalar) => scalar.encoded_len(ident),
-            Field::Map(map) => map.encoded_len(ident),
-            Field::Message(msg) => msg.encoded_len(ident),
+            Field::Value(scalar) => scalar.encoded_len(ident),
             Field::Oneof(oneof) => oneof.encoded_len(ident),
-        }
-    }
-
-    /// Returns a statement which clears the field.
-    pub fn clear(&self, ident: TokenStream) -> TokenStream {
-        match self {
-            Field::Scalar(scalar) => scalar.clear(ident),
-            Field::Message(message) => message.clear(ident),
-            Field::Map(map) => map.clear(ident),
-            Field::Oneof(oneof) => oneof.clear(ident),
-        }
-    }
-
-    pub fn default(&self) -> TokenStream {
-        match self {
-            Field::Scalar(scalar) => scalar.default(),
-            _ => quote!(::core::default::Default::default()),
-        }
-    }
-
-    /// Produces the fragment implementing debug for the given field.
-    pub fn debug(&self, ident: TokenStream) -> TokenStream {
-        match self {
-            Field::Scalar(scalar) => {
-                let wrapper = scalar.debug(quote!(ScalarWrapper));
-                quote! {
-                    {
-                        #wrapper
-                        ScalarWrapper(&#ident)
-                    }
-                }
-            }
-            Field::Map(map) => {
-                let wrapper = map.debug(quote!(MapWrapper));
-                quote! {
-                    {
-                        #wrapper
-                        MapWrapper(&#ident)
-                    }
-                }
-            }
-            _ => quote!(&#ident),
         }
     }
 
     pub fn methods(&self, ident: &TokenStream) -> Option<TokenStream> {
         match self {
-            Field::Scalar(scalar) => scalar.methods(ident),
-            Field::Map(map) => map.methods(ident),
+            Field::Value(scalar) => scalar.methods(ident),
             _ => None,
         }
-    }
-}
-
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub enum Label {
-    /// An optional field.
-    Optional,
-    /// A repeated field.
-    Repeated,
-}
-
-impl Label {
-    fn as_str(self) -> &'static str {
-        match self {
-            Label::Optional => "optional",
-            Label::Repeated => "repeated",
-        }
-    }
-
-    fn variants() -> slice::Iter<'static, Label> {
-        const VARIANTS: &[Label] = &[Label::Optional, Label::Repeated];
-        VARIANTS.iter()
-    }
-
-    /// Parses a string into a field label.
-    /// If the string doesn't match a field label, `None` is returned.
-    fn from_attr(attr: &Meta) -> Option<Label> {
-        if let Meta::Path(path) = attr {
-            for &label in Label::variants() {
-                if path.is_ident(label.as_str()) {
-                    return Some(label);
-                }
-            }
-        }
-        None
-    }
-}
-
-impl fmt::Debug for Label {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(self.as_str())
-    }
-}
-
-impl fmt::Display for Label {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(self.as_str())
     }
 }
 
@@ -290,55 +138,6 @@ where
     Ok(())
 }
 
-pub fn set_bool(b: &mut bool, message: &str) -> Result<(), Error> {
-    if *b {
-        bail!("{}", message);
-    } else {
-        *b = true;
-        Ok(())
-    }
-}
-
-/// Unpacks an attribute into a (key, boolean) pair, returning the boolean value.
-/// If the key doesn't match the attribute, `None` is returned.
-fn bool_attr(key: &str, attr: &Meta) -> Result<Option<bool>, Error> {
-    if !attr.path().is_ident(key) {
-        return Ok(None);
-    }
-    match attr {
-        Meta::Path(..) => Ok(Some(true)),
-        Meta::List(meta_list) => Ok(Some(meta_list.parse_args::<LitBool>()?.value())),
-        Meta::NameValue(MetaNameValue {
-            value: Expr::Lit(ExprLit {
-                lit: Lit::Str(lit), ..
-            }),
-            ..
-        }) => lit
-            .value()
-            .parse::<bool>()
-            .map_err(Error::from)
-            .map(Option::Some),
-        Meta::NameValue(MetaNameValue {
-            value:
-                Expr::Lit(ExprLit {
-                    lit: Lit::Bool(LitBool { value, .. }),
-                    ..
-                }),
-            ..
-        }) => Ok(Some(*value)),
-        _ => bail!("invalid {} attribute", key),
-    }
-}
-
-/// Checks if an attribute matches a word.
-fn word_attr(key: &str, attr: &Meta) -> bool {
-    if let Meta::Path(path) = attr {
-        path.is_ident(key)
-    } else {
-        false
-    }
-}
-
 pub(super) fn tag_attr(attr: &Meta) -> Result<Option<u32>, Error> {
     if !attr.path().is_ident("tag") {
         return Ok(None);
@@ -349,11 +148,7 @@ pub(super) fn tag_attr(attr: &Meta) -> Result<Option<u32>, Error> {
             value: Expr::Lit(expr),
             ..
         }) => match &expr.lit {
-            Lit::Str(lit) => lit
-                .value()
-                .parse::<u32>()
-                .map_err(Error::from)
-                .map(Option::Some),
+            Lit::Str(lit) => lit.value().parse::<u32>().map_err(Error::from).map(Some),
             Lit::Int(lit) => Ok(Some(lit.base10_parse()?)),
             _ => bail!("invalid tag attribute: {:?}", attr),
         },

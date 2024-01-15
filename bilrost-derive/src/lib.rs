@@ -11,8 +11,8 @@ use itertools::Itertools;
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use syn::{
-    Data, DataEnum, DataStruct, DeriveInput, Expr, Fields, FieldsNamed, FieldsUnnamed, Ident,
-    Index, Variant,
+    parse_str, Data, DataEnum, DataStruct, DeriveInput, Expr, Fields, FieldsNamed, FieldsUnnamed,
+    Ident, Index, Variant,
 };
 
 use crate::field::Field;
@@ -53,22 +53,13 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
 
     let ident = input.ident;
 
-    syn::custom_keyword!(skip_debug);
-    let skip_debug = input
-        .attrs
-        .iter()
-        .any(|a| a.path().is_ident("bilrost") && a.parse_args::<skip_debug>().is_ok());
-
+    // TODO(widders): should we do this via a derive for `DistinguishedMessage` instead? that seems
+    //  nicer since it means the trait is imported
     syn::custom_keyword!(distinguished);
     let _distinguished = input
         .attrs
         .iter()
         .any(|a| a.path().is_ident("bilrost") && a.parse_args::<distinguished>().is_ok());
-
-    // TODO(widders): universal features
-    //  * there must be a mode to embed enum values directly inside an option
-    //  * do SOMETHING about the universal dependence of encode on encoded_len, which causes nesting
-    //    to become quadratic at encoding time
 
     // TODO(widders): test coverage for completed features:
     //  * do prop-testing for stronger round-trip guarantees now that the encoding is better
@@ -76,13 +67,6 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
 
     // TODO(widders): distinguished features
     //  * unknown fields are forbidden
-    //  * present standard (non-optional) fields with default values are forbidden
-    //  * HashMap is forbidden (simply not implemented)
-    //  * floating point values probably aren't implemented either
-    //  * map keys must be sorted ascending
-    //  * repeated fields must have matching packed-ness
-    //  * distinguished encoding only implemented when nested types also support distinguished
-    //    encoding
 
     let variant_data = match input.data {
         Data::Struct(variant_data) => variant_data,
@@ -93,22 +77,22 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     let generics = &input.generics;
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
-    let (is_struct, fields): (bool, Vec<syn::Field>) = match variant_data {
+    let fields: Vec<syn::Field> = match variant_data {
         DataStruct {
             fields: Fields::Named(FieldsNamed { named: fields, .. }),
             ..
-        } => (true, fields.into_iter().collect()),
+        } => fields.into_iter().collect(),
         DataStruct {
             fields:
                 Fields::Unnamed(FieldsUnnamed {
                     unnamed: fields, ..
                 }),
             ..
-        } => (false, fields.into_iter().collect()),
+        } => fields.into_iter().collect(),
         DataStruct {
             fields: Fields::Unit,
             ..
-        } => (false, Vec::new()),
+        } => Vec::new(),
     };
 
     // TODO(widders): forbid implicit next_tag? hmmmmmm
@@ -124,7 +108,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
                 };
                 quote!(#index)
             });
-            match Field::new(field.attrs, Some(next_tag)) {
+            match Field::new(field.ty, field.attrs, Some(next_tag)) {
                 Ok(Some(field)) => {
                     next_tag = field.tags().iter().max().map(|t| t + 1).unwrap_or(next_tag);
                     Some(Ok((field_ident, field)))
@@ -369,26 +353,15 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         }
     });
 
-    let merge = unsorted_fields.iter().map(|(field_ident, field)| {
-        let merge = field.merge(quote!(value));
-        let merge = if let Some(error_message) = field.requires_duplication_guard() {
-            quote! {
-                if duplicated {
-                    Err(::bilrost::DecodeError::new(#error_message))
-                } else {
-                    #merge
-                }
-            }
-        } else {
-            merge
-        };
+    let decode = unsorted_fields.iter().map(|(field_ident, field)| {
+        let decode = field.decode(quote!(value));
         let tags = field.tags().into_iter().map(|tag| quote!(#tag));
         let tags = Itertools::intersperse(tags, quote!(|));
 
         quote! {
             #(#tags)* => {
                 let mut value = &mut self.#field_ident;
-                #merge.map_err(|mut error| {
+                #decode.map_err(|mut error| {
                     error.push(STRUCT_NAME, stringify!(#field_ident));
                     error
                 })
@@ -402,28 +375,6 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         quote!(
             const STRUCT_NAME: &'static str = stringify!(#ident);
         )
-    };
-
-    let clear = unsorted_fields
-        .iter()
-        .map(|(field_ident, field)| field.clear(quote!(self.#field_ident)));
-
-    let default = if is_struct {
-        let default = unsorted_fields.iter().map(|(field_ident, field)| {
-            let value = field.default();
-            quote!(#field_ident: #value,)
-        });
-        quote! {#ident {
-            #(#default)*
-        }}
-    } else {
-        let default = unsorted_fields.iter().map(|(_, field)| {
-            let value = field.default();
-            quote!(#value,)
-        });
-        quote! {#ident (
-            #(#default)*
-        )}
     };
 
     let methods = unsorted_fields
@@ -456,7 +407,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
             }
 
             #[allow(unused_variables)]
-            fn merge_field<__B>(
+            fn raw_decode_field<__B>(
                 &mut self,
                 tag: u32,
                 wire_type: ::bilrost::encoding::WireType,
@@ -465,11 +416,11 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
                 ctx: ::bilrost::encoding::DecodeContext,
             ) -> ::core::result::Result<(), ::bilrost::DecodeError>
             where
-                __B: ::bilrost::bytes::Buf
+                __B: ::bilrost::bytes::Buf + ?Sized,
             {
                 #struct_name
                 match tag {
-                    #(#merge)*
+                    #(#decode)*
                     _ => ::bilrost::encoding::skip_field(wire_type, buf),
                 }
             }
@@ -479,60 +430,26 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
                 let tm = &mut ::bilrost::encoding::TagMeasurer::new();
                 0 #(+ #encoded_len)*
             }
-
-            fn clear(&mut self) {
-                #(#clear;)*
-            }
-        }
-
-        impl #impl_generics ::core::default::Default for #ident #ty_generics #where_clause {
-            fn default() -> Self {
-                #default
-            }
         }
     };
-    let expanded = if skip_debug {
-        expanded
-    } else {
-        let debugs = unsorted_fields.iter().map(|(field_ident, field)| {
-            let wrapper = field.debug(quote!(self.#field_ident));
-            let call = if is_struct {
-                quote!(builder.field(stringify!(#field_ident), &wrapper))
-            } else {
-                quote!(builder.field(&wrapper))
+
+    let impl_wrapper_const_ident = parse_str::<Ident>(
+        &("__BILROST_DERIVED_IMPL_MESSAGE_FOR_".to_owned() + &ident.to_string()),
+    )?;
+    Ok(quote! {
+        const #impl_wrapper_const_ident: () = {
+            use ::bilrost::encoding::{
+                Fixed as fixed, General as general, Map as map, Packed as packed,
+                Unpacked as unpacked, VecBlob as vecblob,
             };
-            quote! {
-                 let builder = {
-                     let wrapper = #wrapper;
-                     #call
-                 };
-            }
-        });
-        let debug_builder = if is_struct {
-            quote!(f.debug_struct(stringify!(#ident)))
-        } else {
-            quote!(f.debug_tuple(stringify!(#ident)))
-        };
-        quote! {
+
             #expanded
 
-            impl #impl_generics ::core::fmt::Debug for #ident #ty_generics #where_clause {
-                fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
-                    let mut builder = #debug_builder;
-                    #(#debugs;)*
-                    builder.finish()
-                }
-            }
-        }
-    };
+            #methods
 
-    let expanded = quote! {
-        #expanded
-
-        #methods
-    };
-
-    Ok(expanded)
+            ()
+        };
+    })
 }
 
 #[proc_macro_derive(Message, attributes(bilrost))]
@@ -543,12 +460,6 @@ pub fn message(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
     let input: DeriveInput = syn::parse2(input)?;
     let ident = input.ident;
-
-    syn::custom_keyword!(skip_debug);
-    let skip_debug = input
-        .attrs
-        .into_iter()
-        .any(|a| a.path().is_ident("bilrost") && a.parse_args::<skip_debug>().is_ok());
 
     let generics = &input.generics;
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
@@ -675,29 +586,6 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
         }
     };
 
-    let expanded = if skip_debug {
-        expanded
-    } else {
-        // TODO(widders): is there any possible reason to have added debug here? what does that even
-        //  do? i think we can completely ditch the in-house default implementations since they only
-        //  seem to do anything for these enum type fakes, which end up in the message's debug as
-        //  code that doesn't evaluate
-        let debug = variants
-            .iter()
-            .map(|(variant_ident, _)| quote!(#ident::#variant_ident => stringify!(#variant_ident)));
-        quote! {
-            #expanded
-
-            impl #impl_generics ::core::fmt::Debug for #ident #ty_generics #where_clause {
-                fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
-                    f.write_str(match self {
-                        #(#debug,)*
-                    })
-                }
-            }
-        }
-    };
-
     Ok(expanded)
 }
 
@@ -710,12 +598,6 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
     let input: DeriveInput = syn::parse2(input)?;
 
     let ident = input.ident;
-
-    syn::custom_keyword!(skip_debug);
-    let skip_debug = input
-        .attrs
-        .into_iter()
-        .any(|a| a.path().is_ident("bilrost") && a.parse_args::<skip_debug>().is_ok());
 
     let variants = match input.data {
         Data::Enum(DataEnum { variants, .. }) => variants,
@@ -735,17 +617,20 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         ..
     } in variants
     {
-        if match variant_fields {
-            Fields::Unit => 0,
+        let ty = match variant_fields {
+            Fields::Unit => bail!("Oneof enum variants must have a single field"),
             Fields::Named(FieldsNamed { named: fields, .. })
             | Fields::Unnamed(FieldsUnnamed {
                 unnamed: fields, ..
-            }) => fields.len(),
-        } != 1
-        {
-            bail!("Oneof enum variants must have a single field");
-        }
-        match Field::new_oneof(attrs)? {
+            }) if fields.len() != 1 => bail!("Oneof enum variants must have a single field"),
+            Fields::Named(FieldsNamed { named: fields, .. })
+            | Fields::Unnamed(FieldsUnnamed {
+                unnamed: fields, ..
+            }) => {
+                fields.first().unwrap().ty.clone()
+            }
+        };
+        match Field::new(ty, attrs, None)? {
             Some(field) => fields.push((variant_ident, field)),
             None => bail!("invalid oneof variant: oneof variants may not be ignored"),
         }
@@ -774,17 +659,17 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
 
     let merge = fields.iter().map(|(variant_ident, field)| {
         let tag = field.tags()[0];
-        let merge = field.merge(quote!(value));
+        let decode = field.decode(quote!(value));
         quote! {
             #tag => {
                 match field {
                     ::core::option::Option::Some(#ident::#variant_ident(value)) => {
-                        #merge
+                        #decode
                     },
                     _ => {
                         let mut owned_value = ::core::default::Default::default();
                         let value = &mut owned_value;
-                        #merge.map(|_| *field = ::core::option::Option::Some(#ident::#variant_ident(owned_value)))
+                        #decode.map(|_| *field = ::core::option::Option::Some(#ident::#variant_ident(owned_value)))
                     },
                 }
             }
@@ -862,30 +747,6 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
             }
         }
 
-    };
-    let expanded = if skip_debug {
-        expanded
-    } else {
-        let debug = fields.iter().map(|(variant_ident, field)| {
-            let wrapper = field.debug(quote!(*value));
-            quote!(#ident::#variant_ident(value) => {
-                let wrapper = #wrapper;
-                f.debug_tuple(stringify!(#variant_ident))
-                    .field(&wrapper)
-                    .finish()
-            })
-        });
-        quote! {
-            #expanded
-
-            impl #impl_generics ::core::fmt::Debug for #ident #ty_generics #where_clause {
-                fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
-                    match self {
-                        #(#debug,)*
-                    }
-                }
-            }
-        }
     };
 
     Ok(expanded)
