@@ -339,7 +339,7 @@ impl TagWriter {
     /// type. When decoding, the wire type is taken as-is, and the tag delta added to the tag of the
     /// last field decoded.
     #[inline]
-    pub fn encode_key<B: BufMut>(&mut self, tag: u32, wire_type: WireType, buf: &mut B) {
+    pub fn encode_key<B: BufMut + ?Sized>(&mut self, tag: u32, wire_type: WireType, buf: &mut B) {
         match tag.cmp(&self.last_tag) {
             Greater => {
                 let key_delta = (((tag - self.last_tag) as u64) << 2) | (wire_type as u64);
@@ -609,14 +609,14 @@ impl<B: Buf> UnknownField<B> {
 /// The core trait for encoding and decoding bilrost data.
 pub trait Encoder<T> {
     /// Encodes the a field with the given tag and value.
-    fn encode<B: BufMut>(tag: u32, value: &T, buf: &mut B, tw: &mut TagWriter);
+    fn encode<B: BufMut + ?Sized>(tag: u32, value: &T, buf: &mut B, tw: &mut TagWriter);
     // TODO(widders): change to (or augment with) build-in-reverse-then-emit-forward and
     //  emit-reversed
     /// Returns the encoded length of the field, including the key.
     fn encoded_len(tag: u32, value: &T, tm: &mut TagMeasurer) -> usize;
     /// Decodes a field with the given wire type; the field's key should have already been consumed
     /// from the buffer.
-    fn decode<B: Buf>(
+    fn decode<B: Buf + ?Sized>(
         wire_type: WireType,
         duplicated: bool,
         value: &mut T,
@@ -628,7 +628,7 @@ pub trait Encoder<T> {
 pub trait DistinguishedEncoder<T>: Encoder<T> {
     /// Decodes a field for the value, returning an error if it is not precisely the encoding that
     /// would have been emitted for the value.
-    fn decode_distinguished<B: Buf>(
+    fn decode_distinguished<B: Buf + ?Sized>(
         wire_type: WireType,
         duplicated: bool,
         value: &mut T,
@@ -651,7 +651,7 @@ pub trait Wiretyped<T> {
 /// the basis for all the other plain, optional, and repeated encodings.
 pub trait ValueEncoder<T>: Wiretyped<T> {
     /// Encodes the given value unconditionally. This is guaranteed to emit data to the buffer.
-    fn encode_value<B: BufMut>(value: &T, buf: &mut B);
+    fn encode_value<B: BufMut + ?Sized>(value: &T, buf: &mut B);
     // TODO(widders): change to (or augment with) build-in-reverse-then-emit-forward and
     //  emit-reversed
     /// Returns the number of bytes the given value would be encoded as.
@@ -669,7 +669,7 @@ pub trait ValueEncoder<T>: Wiretyped<T> {
         )
     }
     /// Decodes a field assuming the encoder's wire type directly from the buffer.
-    fn decode_value<B: Buf>(
+    fn decode_value<B: Buf + ?Sized>(
         value: &mut T,
         buf: Capped<B>,
         ctx: DecodeContext,
@@ -683,7 +683,7 @@ where
     /// Decodes a field assuming the encoder's wire type directly from the buffer, also performing
     /// any additional validation required to guarantee that the value would be re-encoded into the
     /// exact same bytes.
-    fn decode_value_distinguished<B: Buf>(
+    fn decode_value_distinguished<B: Buf + ?Sized>(
         value: &mut T,
         buf: Capped<B>,
         ctx: DecodeContext,
@@ -694,11 +694,11 @@ where
 /// field keys and wire types.
 pub trait FieldEncoder<T> {
     /// Encodes exactly one field with the given tag and value into the buffer.
-    fn encode_field<B: BufMut>(tag: u32, value: &T, buf: &mut B, tw: &mut TagWriter);
+    fn encode_field<B: BufMut + ?Sized>(tag: u32, value: &T, buf: &mut B, tw: &mut TagWriter);
     /// Returns the encoded length of the field including its key.
     fn field_encoded_len(tag: u32, value: &T, tm: &mut TagMeasurer) -> usize;
     /// Decodes a field directly from the buffer, also checking the wire type.
-    fn decode_field<B: Buf>(
+    fn decode_field<B: Buf + ?Sized>(
         wire_type: WireType,
         value: &mut T,
         buf: Capped<B>,
@@ -710,7 +710,7 @@ where
     E: ValueEncoder<T>,
 {
     #[inline]
-    fn encode_field<B: BufMut>(tag: u32, value: &T, buf: &mut B, tw: &mut TagWriter) {
+    fn encode_field<B: BufMut + ?Sized>(tag: u32, value: &T, buf: &mut B, tw: &mut TagWriter) {
         tw.encode_key(tag, Self::WIRE_TYPE, buf);
         Self::encode_value(value, buf);
     }
@@ -719,7 +719,7 @@ where
         tm.key_len(tag) + Self::value_encoded_len(value)
     }
     #[inline]
-    fn decode_field<B: Buf>(
+    fn decode_field<B: Buf + ?Sized>(
         wire_type: WireType,
         value: &mut T,
         buf: Capped<B>,
@@ -734,7 +734,7 @@ where
 /// handling field keys and wire types.
 pub trait DistinguishedFieldEncoder<T> {
     /// Decodes a field directly from the buffer, also checking the wire type.
-    fn decode_field_distinguished<B: Buf>(
+    fn decode_field_distinguished<B: Buf + ?Sized>(
         wire_type: WireType,
         value: &mut T,
         buf: Capped<B>,
@@ -747,7 +747,7 @@ where
     T: Eq,
 {
     #[inline]
-    fn decode_field_distinguished<B: Buf>(
+    fn decode_field_distinguished<B: Buf + ?Sized>(
         wire_type: WireType,
         value: &mut T,
         buf: Capped<B>,
@@ -766,7 +766,7 @@ where
     T: NewForOverwrite,
 {
     #[inline]
-    fn encode<B: BufMut>(tag: u32, value: &Option<T>, buf: &mut B, tw: &mut TagWriter) {
+    fn encode<B: BufMut + ?Sized>(tag: u32, value: &Option<T>, buf: &mut B, tw: &mut TagWriter) {
         if let Some(value) = value {
             Self::encode_field(tag, value, buf, tw);
         }
@@ -782,7 +782,7 @@ where
     }
 
     #[inline]
-    fn decode<B: Buf>(
+    fn decode<B: Buf + ?Sized>(
         wire_type: WireType,
         duplicated: bool,
         value: &mut Option<T>,
@@ -811,7 +811,7 @@ where
     T: NewForOverwrite + Eq,
 {
     #[inline]
-    fn decode_distinguished<B: Buf>(
+    fn decode_distinguished<B: Buf + ?Sized>(
         wire_type: WireType,
         duplicated: bool,
         value: &mut Option<T>,
@@ -835,7 +835,7 @@ where
 /// Trait to be implemented by (or more commonly derived for) oneofs, which have knowledge of their
 /// variants' tags and encoding.
 pub trait Oneof: Default {
-    fn decode_field<B: Buf>(
+    fn decode_field<B: Buf + ?Sized>(
         &mut self,
         tag: u32,
         wire_type: WireType,
@@ -847,7 +847,7 @@ pub trait Oneof: Default {
 
 /// Complementary trait for oneof fields all of whose variants have a distinguished encoding.
 pub trait DistinuishedOneof: Oneof {
-    fn decode_field_distinguished<B: Buf>(
+    fn decode_field_distinguished<B: Buf + ?Sized>(
         &mut self,
         tag: u32,
         wire_type: WireType,
@@ -868,7 +868,7 @@ macro_rules! delegate_encoding {
             $to_ty: $crate::encoding::Encoder<$value_ty>,
         {
             #[inline]
-            fn encode<B: $crate::bytes::BufMut>(
+            fn encode<B: $crate::bytes::BufMut + ?Sized>(
                 tag: u32,
                 value: &$value_ty,
                 buf: &mut B,
@@ -887,7 +887,7 @@ macro_rules! delegate_encoding {
             }
 
             #[inline]
-            fn decode<B: $crate::bytes::Buf>(
+            fn decode<B: $crate::bytes::Buf + ?Sized>(
                 wire_type: $crate::encoding::WireType,
                 duplicated: bool,
                 value: &mut $value_ty,
@@ -915,7 +915,7 @@ macro_rules! delegate_encoding {
             Self: $crate::encoding::Encoder<$value_ty>,
         {
             #[inline]
-            fn decode_distinguished<B: $crate::bytes::Buf>(
+            fn decode_distinguished<B: $crate::bytes::Buf + ?Sized>(
                 wire_type: $crate::encoding::WireType,
                 duplicated: bool,
                 value: &mut $value_ty,
@@ -951,7 +951,7 @@ macro_rules! delegate_value_encoding {
             $($($where_clause)+ ,)?
         {
             #[inline]
-            fn encode_value<B: $crate::bytes::BufMut>(value: &$value_ty, buf: &mut B) {
+            fn encode_value<B: $crate::bytes::BufMut + ?Sized>(value: &$value_ty, buf: &mut B) {
                 <$to_ty>::encode_value(value, buf)
             }
 
@@ -970,7 +970,7 @@ macro_rules! delegate_value_encoding {
             }
 
             #[inline]
-            fn decode_value<B: $crate::bytes::Buf>(
+            fn decode_value<B: $crate::bytes::Buf + ?Sized>(
                 value: &mut $value_ty,
                 buf: $crate::encoding::Capped<B>,
                 ctx: $crate::encoding::DecodeContext,
@@ -1000,7 +1000,7 @@ macro_rules! delegate_value_encoding {
             $($($distinguished_where)+ ,)?
         {
             #[inline]
-            fn decode_value_distinguished<B: Buf>(
+            fn decode_value_distinguished<B: Buf + ?Sized>(
                 value: &mut $value_ty,
                 buf: $crate::encoding::Capped<B>,
                 ctx: $crate::encoding::DecodeContext,

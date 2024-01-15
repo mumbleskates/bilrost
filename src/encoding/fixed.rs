@@ -28,7 +28,7 @@ macro_rules! fixed_width_common {
 
         impl ValueEncoder<$ty> for Fixed {
             #[inline]
-            fn encode_value<B: BufMut>(value: &$ty, buf: &mut B) {
+            fn encode_value<B: BufMut + ?Sized>(value: &$ty, buf: &mut B) {
                 buf.$put(*value);
             }
 
@@ -38,7 +38,7 @@ macro_rules! fixed_width_common {
             }
 
             #[inline]
-            fn decode_value<B: Buf>(
+            fn decode_value<B: Buf + ?Sized>(
                 value: &mut $ty,
                 mut buf: Capped<B>,
                 _ctx: DecodeContext,
@@ -65,7 +65,7 @@ macro_rules! fixed_width_int {
 
         impl DistinguishedValueEncoder<$ty> for Fixed {
             #[inline]
-            fn decode_value_distinguished<B: Buf>(
+            fn decode_value_distinguished<B: Buf + ?Sized>(
                 value: &mut $ty,
                 buf: Capped<B>,
                 ctx: DecodeContext,
@@ -76,7 +76,7 @@ macro_rules! fixed_width_int {
 
         impl Encoder<$ty> for Fixed {
             #[inline]
-            fn encode<B: BufMut>(tag: u32, value: &$ty, buf: &mut B, tw: &mut TagWriter) {
+            fn encode<B: BufMut + ?Sized>(tag: u32, value: &$ty, buf: &mut B, tw: &mut TagWriter) {
                 if *value != 0 {
                     Self::encode_field(tag, value, buf, tw);
                 }
@@ -92,7 +92,7 @@ macro_rules! fixed_width_int {
             }
 
             #[inline]
-            fn decode<B: Buf>(
+            fn decode<B: Buf + ?Sized>(
                 wire_type: WireType,
                 duplicated: bool,
                 value: &mut $ty,
@@ -110,7 +110,7 @@ macro_rules! fixed_width_int {
 
         impl DistinguishedEncoder<$ty> for Fixed {
             #[inline]
-            fn decode_distinguished<B: Buf>(
+            fn decode_distinguished<B: Buf + ?Sized>(
                 wire_type: WireType,
                 duplicated: bool,
                 value: &mut $ty,
@@ -152,7 +152,7 @@ macro_rules! fixed_width_float {
 
         impl Encoder<$ty> for Fixed {
             #[inline]
-            fn encode<B: BufMut>(tag: u32, value: &$ty, buf: &mut B, tw: &mut TagWriter) {
+            fn encode<B: BufMut + ?Sized>(tag: u32, value: &$ty, buf: &mut B, tw: &mut TagWriter) {
                 // Preserve -0.0
                 if value.to_bits() != 0 {
                     Self::encode_field(tag, value, buf, tw);
@@ -170,7 +170,7 @@ macro_rules! fixed_width_float {
             }
 
             #[inline]
-            fn decode<B: Buf>(
+            fn decode<B: Buf + ?Sized>(
                 wire_type: WireType,
                 duplicated: bool,
                 value: &mut $ty,

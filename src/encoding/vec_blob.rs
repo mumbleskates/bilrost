@@ -21,16 +21,16 @@ impl Wiretyped<Vec<u8>> for VecBlob {
 }
 
 impl ValueEncoder<Vec<u8>> for VecBlob {
-    fn encode_value<B: BufMut>(value: &Vec<u8>, buf: &mut B) {
+    fn encode_value<B: BufMut + ?Sized>(value: &Vec<u8>, buf: &mut B) {
         encode_varint(value.len() as u64, buf);
-        buf.put(value.as_slice());
+        buf.put_slice(value.as_slice());
     }
 
     fn value_encoded_len(value: &Vec<u8>) -> usize {
         encoded_len_varint(value.len() as u64) + value.len()
     }
 
-    fn decode_value<B: Buf>(
+    fn decode_value<B: Buf + ?Sized>(
         value: &mut Vec<u8>,
         mut buf: Capped<B>,
         _ctx: DecodeContext,
@@ -44,7 +44,7 @@ impl ValueEncoder<Vec<u8>> for VecBlob {
 }
 
 impl DistinguishedValueEncoder<Vec<u8>> for VecBlob {
-    fn decode_value_distinguished<B: Buf>(
+    fn decode_value_distinguished<B: Buf + ?Sized>(
         value: &mut Vec<u8>,
         buf: Capped<B>,
         ctx: DecodeContext,
@@ -55,7 +55,7 @@ impl DistinguishedValueEncoder<Vec<u8>> for VecBlob {
 
 impl Encoder<Vec<u8>> for VecBlob {
     #[inline]
-    fn encode<B: BufMut>(tag: u32, value: &Vec<u8>, buf: &mut B, tw: &mut TagWriter) {
+    fn encode<B: BufMut + ?Sized>(tag: u32, value: &Vec<u8>, buf: &mut B, tw: &mut TagWriter) {
         if !value.is_empty() {
             Self::encode_field(tag, value, buf, tw);
         }
@@ -71,7 +71,7 @@ impl Encoder<Vec<u8>> for VecBlob {
     }
 
     #[inline]
-    fn decode<B: Buf>(
+    fn decode<B: Buf + ?Sized>(
         wire_type: WireType,
         duplicated: bool,
         value: &mut Vec<u8>,
@@ -89,7 +89,7 @@ impl Encoder<Vec<u8>> for VecBlob {
 
 impl DistinguishedEncoder<Vec<u8>> for VecBlob {
     #[inline]
-    fn decode_distinguished<B: Buf>(
+    fn decode_distinguished<B: Buf + ?Sized>(
         wire_type: WireType,
         duplicated: bool,
         value: &mut Vec<u8>,

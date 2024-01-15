@@ -47,7 +47,7 @@ where
     T: Default + PartialEq,
 {
     #[inline]
-    fn encode<B: BufMut>(tag: u32, value: &T, buf: &mut B, tw: &mut TagWriter) {
+    fn encode<B: BufMut + ?Sized>(tag: u32, value: &T, buf: &mut B, tw: &mut TagWriter) {
         if *value != T::default() {
             Self::encode_field(tag, value, buf, tw);
         }
@@ -63,7 +63,7 @@ where
     }
 
     #[inline]
-    fn decode<B: Buf>(
+    fn decode<B: Buf + ?Sized>(
         wire_type: WireType,
         duplicated: bool,
         value: &mut T,
@@ -87,7 +87,7 @@ where
     T: Default + Eq,
 {
     #[inline]
-    fn decode_distinguished<B: Buf>(
+    fn decode_distinguished<B: Buf + ?Sized>(
         wire_type: WireType,
         duplicated: bool,
         value: &mut T,
@@ -123,7 +123,7 @@ macro_rules! varint {
 
         impl ValueEncoder<$ty> for General {
             #[inline]
-            fn encode_value<B: BufMut>($to_uint64_value: &$ty, buf: &mut B) {
+            fn encode_value<B: BufMut + ?Sized>($to_uint64_value: &$ty, buf: &mut B) {
                 encode_varint($to_uint64, buf);
             }
 
@@ -133,7 +133,7 @@ macro_rules! varint {
             }
 
             #[inline]
-            fn decode_value<B: Buf>(
+            fn decode_value<B: Buf + ?Sized>(
                 __value: &mut $ty,
                 mut buf: Capped<B>,
                 _ctx: DecodeContext,
@@ -146,7 +146,7 @@ macro_rules! varint {
 
         impl DistinguishedValueEncoder<$ty> for General {
             #[inline]
-            fn decode_value_distinguished<B: Buf>(
+            fn decode_value_distinguished<B: Buf + ?Sized>(
                 value: &mut $ty,
                 buf: Capped<B>,
                 ctx: DecodeContext,
@@ -216,7 +216,7 @@ impl Wiretyped<String> for General {
 // TODO(widders): rope string? Cow string? cow string is probably pretty doable. does it matter?
 
 impl ValueEncoder<String> for General {
-    fn encode_value<B: BufMut>(value: &String, buf: &mut B) {
+    fn encode_value<B: BufMut + ?Sized>(value: &String, buf: &mut B) {
         encode_varint(value.len() as u64, buf);
         buf.put_slice(value.as_bytes());
     }
@@ -225,7 +225,7 @@ impl ValueEncoder<String> for General {
         encoded_len_varint(value.len() as u64) + value.len()
     }
 
-    fn decode_value<B: Buf>(
+    fn decode_value<B: Buf + ?Sized>(
         value: &mut String,
         mut buf: Capped<B>,
         _ctx: DecodeContext,
@@ -273,7 +273,7 @@ impl ValueEncoder<String> for General {
 }
 
 impl DistinguishedValueEncoder<String> for General {
-    fn decode_value_distinguished<B: Buf>(
+    fn decode_value_distinguished<B: Buf + ?Sized>(
         value: &mut String,
         buf: Capped<B>,
         ctx: DecodeContext,
@@ -304,16 +304,16 @@ impl Wiretyped<Bytes> for General {
 }
 
 impl ValueEncoder<Bytes> for General {
-    fn encode_value<B: BufMut>(value: &Bytes, buf: &mut B) {
+    fn encode_value<B: BufMut + ?Sized>(value: &Bytes, mut buf: &mut B) {
         encode_varint(value.len() as u64, buf);
-        buf.put(value.clone());
+        (&mut buf).put(value.clone()); // `put` needs Self to be sized, so we use the ref type
     }
 
     fn value_encoded_len(value: &Bytes) -> usize {
         encoded_len_varint(value.len() as u64) + value.len()
     }
 
-    fn decode_value<B: Buf>(
+    fn decode_value<B: Buf + ?Sized>(
         value: &mut Bytes,
         mut buf: Capped<B>,
         _ctx: DecodeContext,
@@ -326,7 +326,7 @@ impl ValueEncoder<Bytes> for General {
 }
 
 impl DistinguishedValueEncoder<Bytes> for General {
-    fn decode_value_distinguished<B: Buf>(
+    fn decode_value_distinguished<B: Buf + ?Sized>(
         value: &mut Bytes,
         buf: Capped<B>,
         ctx: DecodeContext,
@@ -360,7 +360,7 @@ impl Wiretyped<Blob> for General {
 
 impl ValueEncoder<Blob> for General {
     #[inline]
-    fn encode_value<B: BufMut>(value: &Blob, buf: &mut B) {
+    fn encode_value<B: BufMut + ?Sized>(value: &Blob, buf: &mut B) {
         crate::encoding::VecBlob::encode_value(value, buf)
     }
 
@@ -370,7 +370,7 @@ impl ValueEncoder<Blob> for General {
     }
 
     #[inline]
-    fn decode_value<B: Buf>(
+    fn decode_value<B: Buf + ?Sized>(
         value: &mut Blob,
         buf: Capped<B>,
         ctx: DecodeContext,
@@ -381,7 +381,7 @@ impl ValueEncoder<Blob> for General {
 
 impl DistinguishedValueEncoder<Blob> for General {
     #[inline]
-    fn decode_value_distinguished<B: Buf>(
+    fn decode_value_distinguished<B: Buf + ?Sized>(
         value: &mut Blob,
         buf: Capped<B>,
         ctx: DecodeContext,
@@ -413,7 +413,7 @@ impl<T> ValueEncoder<T> for General
 where
     T: RawMessage,
 {
-    fn encode_value<B: BufMut>(value: &T, buf: &mut B) {
+    fn encode_value<B: BufMut + ?Sized>(value: &T, buf: &mut B) {
         encode_varint(value.raw_encoded_len() as u64, buf);
         value.raw_encode(buf);
     }
@@ -423,7 +423,7 @@ where
         encoded_len_varint(inner_len as u64) + inner_len
     }
 
-    fn decode_value<B: Buf>(
+    fn decode_value<B: Buf + ?Sized>(
         value: &mut T,
         mut buf: Capped<B>,
         ctx: DecodeContext,
@@ -437,7 +437,7 @@ impl<T> DistinguishedValueEncoder<T> for General
 where
     T: RawDistinguishedMessage + Eq,
 {
-    fn decode_value_distinguished<B: Buf>(
+    fn decode_value_distinguished<B: Buf + ?Sized>(
         value: &mut T,
         mut buf: Capped<B>,
         ctx: DecodeContext,

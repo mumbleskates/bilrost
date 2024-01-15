@@ -18,7 +18,7 @@ where
     E: ValueEncoder<T>,
     T: NewForOverwrite,
 {
-    fn encode<B: BufMut>(tag: u32, value: &C, buf: &mut B, tw: &mut TagWriter) {
+    fn encode<B: BufMut + ?Sized>(tag: u32, value: &C, buf: &mut B, tw: &mut TagWriter) {
         for val in value.iter() {
             E::encode_field(tag, val, buf, tw);
         }
@@ -33,7 +33,7 @@ where
         }
     }
 
-    fn decode<B: Buf>(
+    fn decode<B: Buf + ?Sized>(
         wire_type: WireType,
         duplicated: bool,
         value: &mut C,
@@ -68,7 +68,7 @@ where
     E: DistinguishedValueEncoder<T>,
     T: NewForOverwrite + Eq,
 {
-    fn decode_distinguished<B: Buf>(
+    fn decode_distinguished<B: Buf + ?Sized>(
         wire_type: WireType,
         _duplicated: bool,
         value: &mut C,

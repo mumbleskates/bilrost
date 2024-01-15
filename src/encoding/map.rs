@@ -46,7 +46,7 @@ where
     K: NewForOverwrite,
     V: NewForOverwrite,
 {
-    fn encode_value<B: BufMut>(value: &M, buf: &mut B) {
+    fn encode_value<B: BufMut + ?Sized>(value: &M, buf: &mut B) {
         encode_varint(map_encoded_length::<M, KE, VE>(value) as u64, buf);
         for (key, val) in value.iter() {
             KE::encode_value(key, buf);
@@ -59,7 +59,7 @@ where
         encoded_len_varint(inner_len as u64) + inner_len
     }
 
-    fn decode_value<B: Buf>(
+    fn decode_value<B: Buf + ?Sized>(
         value: &mut M,
         mut buf: Capped<B>,
         ctx: DecodeContext,
@@ -92,7 +92,7 @@ where
     K: NewForOverwrite + Eq,
     V: NewForOverwrite + Eq,
 {
-    fn decode_value_distinguished<B: Buf>(
+    fn decode_value_distinguished<B: Buf + ?Sized>(
         value: &mut M,
         mut buf: Capped<B>,
         ctx: DecodeContext,
@@ -122,7 +122,7 @@ where
     M: Mapping,
     Self: ValueEncoder<M>,
 {
-    fn encode<B: BufMut>(tag: u32, value: &M, buf: &mut B, tw: &mut TagWriter) {
+    fn encode<B: BufMut + ?Sized>(tag: u32, value: &M, buf: &mut B, tw: &mut TagWriter) {
         if !value.is_empty() {
             Self::encode_field(tag, value, buf, tw);
         }
@@ -136,7 +136,7 @@ where
         }
     }
 
-    fn decode<B: Buf>(
+    fn decode<B: Buf + ?Sized>(
         wire_type: WireType,
         duplicated: bool,
         value: &mut M,
@@ -156,7 +156,7 @@ where
     M: DistinguishedMapping + Eq,
     Self: DistinguishedValueEncoder<M> + Encoder<M>,
 {
-    fn decode_distinguished<B: Buf>(
+    fn decode_distinguished<B: Buf + ?Sized>(
         wire_type: WireType,
         duplicated: bool,
         value: &mut M,

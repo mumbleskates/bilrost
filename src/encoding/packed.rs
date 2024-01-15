@@ -21,7 +21,7 @@ where
     E: ValueEncoder<T>,
     T: NewForOverwrite,
 {
-    fn encode_value<B: BufMut>(value: &C, buf: &mut B) {
+    fn encode_value<B: BufMut + ?Sized>(value: &C, buf: &mut B) {
         encode_varint(E::many_values_encoded_len(value.iter()) as u64, buf);
         for val in value.iter() {
             E::encode_value(val, buf);
@@ -34,7 +34,7 @@ where
         encoded_len_varint(inner_len as u64) + inner_len
     }
 
-    fn decode_value<B: Buf>(
+    fn decode_value<B: Buf + ?Sized>(
         value: &mut C,
         mut buf: Capped<B>,
         ctx: DecodeContext,
@@ -62,7 +62,7 @@ where
     E: DistinguishedValueEncoder<T>,
     T: NewForOverwrite + Eq,
 {
-    fn decode_value_distinguished<B: Buf>(
+    fn decode_value_distinguished<B: Buf + ?Sized>(
         value: &mut C,
         mut buf: Capped<B>,
         ctx: DecodeContext,
@@ -93,7 +93,7 @@ where
     T: NewForOverwrite,
 {
     #[inline]
-    fn encode<B: BufMut>(tag: u32, value: &C, buf: &mut B, tw: &mut TagWriter) {
+    fn encode<B: BufMut + ?Sized>(tag: u32, value: &C, buf: &mut B, tw: &mut TagWriter) {
         if !value.is_empty() {
             Self::encode_field(tag, value, buf, tw);
         }
@@ -109,7 +109,7 @@ where
     }
 
     #[inline]
-    fn decode<B: Buf>(
+    fn decode<B: Buf + ?Sized>(
         wire_type: WireType,
         duplicated: bool,
         value: &mut C,
@@ -141,7 +141,7 @@ where
     Self: DistinguishedValueEncoder<C> + Encoder<C>,
 {
     #[inline]
-    fn decode_distinguished<B: Buf>(
+    fn decode_distinguished<B: Buf + ?Sized>(
         wire_type: WireType,
         duplicated: bool,
         value: &mut C,

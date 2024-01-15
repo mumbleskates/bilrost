@@ -86,7 +86,7 @@ pub trait Message: Default {
     fn decode_length_delimited<B: Buf>(buf: B) -> Result<Self, DecodeError>;
 
     /// Decodes an instance from the given `Capped` buffer, consuming it to its cap.
-    fn decode_capped<B: Buf>(buf: Capped<B>) -> Result<Self, DecodeError>;
+    fn decode_capped<B: Buf + ?Sized>(buf: Capped<B>) -> Result<Self, DecodeError>;
 
     // TODO(widders): encode and decode with unknown fields in an unknown-fields companion struct
 }
@@ -108,7 +108,7 @@ pub trait DistinguishedMessage: Message + Eq {
 
     /// Decodes an instance from the given `Capped` buffer in distinguished mode, consuming it to
     /// its cap.
-    fn decode_distinguished_capped<B: Buf>(buf: Capped<B>) -> Result<Self, DecodeError>;
+    fn decode_distinguished_capped<B: Buf + ?Sized>(buf: Capped<B>) -> Result<Self, DecodeError>;
 }
 
 /// `Message` is implemented as a usability layer on top of the basic functionality afforded by
@@ -182,7 +182,7 @@ where
         Self::decode_capped(Capped::new_length_delimited(&mut buf)?)
     }
 
-    fn decode_capped<B: Buf>(buf: Capped<B>) -> Result<Self, DecodeError> {
+    fn decode_capped<B: Buf + ?Sized>(buf: Capped<B>) -> Result<Self, DecodeError> {
         let mut message = Self::default();
         merge(&mut message, buf, DecodeContext::default())?;
         Ok(message)
@@ -201,7 +201,7 @@ where
         Self::decode_distinguished_capped(Capped::new_length_delimited(&mut buf)?)
     }
 
-    fn decode_distinguished_capped<B: Buf>(buf: Capped<B>) -> Result<Self, DecodeError> {
+    fn decode_distinguished_capped<B: Buf + ?Sized>(buf: Capped<B>) -> Result<Self, DecodeError> {
         let mut message = Self::default();
         merge_distinguished(&mut message, buf, DecodeContext::default())?;
         Ok(message)
