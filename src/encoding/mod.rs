@@ -855,6 +855,63 @@ pub trait Oneof: Default {
     ) -> Result<(), DecodeError>;
 }
 
+/// Underlying trait for a oneof that has no inherent "empty" variant, opting instead to be wrapped
+/// in an `Option`.
+pub trait UndefaultedOneof {
+    /// Encodes the fields of the oneof into the given buffer.
+    fn oneof_encode<B: BufMut + ?Sized>(&self, buf: &mut B, tw: &mut TagWriter);
+
+    /// Measures the number of bytes that would encode this oneof.
+    fn oneof_encoded_len(&self, tm: &mut TagMeasurer) -> usize;
+
+    /// Returns the current tag of the oneof, if any.
+    fn oneof_current_tag(&self) -> u32;
+
+    /// Decodes from the given buffer.
+    fn oneof_decode_field<B: Buf + ?Sized>(
+        value: &mut Option<Self>,
+        tag: u32,
+        wire_type: WireType,
+        duplicated: bool,
+        buf: Capped<B>,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError>;
+}
+
+impl<T> Oneof for Option<T>
+where
+    T: UndefaultedOneof,
+{
+    fn oneof_encode<B: BufMut + ?Sized>(&self, buf: &mut B, tw: &mut TagWriter) {
+        if let Some(value) = self {
+            value.oneof_encode(buf, tw);
+        }
+    }
+
+    fn oneof_encoded_len(&self, tm: &mut TagMeasurer) -> usize {
+        if let Some(value) = self {
+            value.oneof_encoded_len(tm)
+        } else {
+            0
+        }
+    }
+
+    fn oneof_current_tag(&self) -> Option<u32> {
+        self.as_ref().map(UndefaultedOneof::oneof_current_tag)
+    }
+
+    fn oneof_decode_field<B: Buf + ?Sized>(
+        &mut self,
+        tag: u32,
+        wire_type: WireType,
+        duplicated: bool,
+        buf: Capped<B>,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError> {
+        T::oneof_decode_field(self, tag, wire_type, duplicated, buf, ctx)
+    }
+}
+
 /// Complementary trait for oneof fields all of whose variants have a distinguished encoding.
 pub trait DistinuishedOneof: Oneof {
     fn decode_field_distinguished<B: Buf + ?Sized>(
