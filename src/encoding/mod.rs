@@ -857,7 +857,7 @@ pub trait Oneof: Default {
 
 /// Underlying trait for a oneof that has no inherent "empty" variant, opting instead to be wrapped
 /// in an `Option`.
-pub trait UndefaultedOneof {
+pub trait NonEmptyOneof {
     /// Encodes the fields of the oneof into the given buffer.
     fn oneof_encode<B: BufMut + ?Sized>(&self, buf: &mut B, tw: &mut TagWriter);
 
@@ -880,7 +880,7 @@ pub trait UndefaultedOneof {
 
 impl<T> Oneof for Option<T>
 where
-    T: UndefaultedOneof,
+    T: NonEmptyOneof,
 {
     fn oneof_encode<B: BufMut + ?Sized>(&self, buf: &mut B, tw: &mut TagWriter) {
         if let Some(value) = self {
@@ -897,7 +897,7 @@ where
     }
 
     fn oneof_current_tag(&self) -> Option<u32> {
-        self.as_ref().map(UndefaultedOneof::oneof_current_tag)
+        self.as_ref().map(NonEmptyOneof::oneof_current_tag)
     }
 
     fn oneof_decode_field<B: Buf + ?Sized>(
