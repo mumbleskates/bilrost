@@ -1,9 +1,9 @@
 use anyhow::{bail, Error};
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::{parse_str, Expr, Lit, Meta, MetaNameValue, Type};
+use syn::{parse_str, Expr, Lit, Meta, MetaNameValue, Type, LitInt};
 
-use crate::field::{set_option, tag_attr};
+use crate::field::set_option;
 
 /// A scalar protobuf field.
 #[derive(Clone)]
@@ -32,7 +32,7 @@ pub(super) fn encoder_attr(attr: &Meta) -> Result<Option<Type>, Error> {
 }
 
 impl Field {
-    pub fn new(ty: Type, attrs: &[Meta], inferred_tag: Option<u32>) -> Result<Field, Error> {
+    pub fn new(ty: &Type, attrs: &[Meta], inferred_tag: Option<u32>) -> Result<Field, Error> {
         let mut encoder = None;
         let mut tag = None;
         let mut unknown_attrs = Vec::new();
@@ -60,7 +60,7 @@ impl Field {
 
         let encoder = encoder.unwrap_or(parse_str::<Type>("general")?);
 
-        Ok(Field { tag, ty, encoder })
+        Ok(Field { tag, ty: ty.clone(), encoder })
     }
 
     /// Returns a statement which encodes the field using buffer `buf` and tag writer `tw`.
@@ -121,5 +121,23 @@ impl Field {
         // TODO(widders): add a different attribute in the field to indicate whether and how the
         //  enumeration helper methods should be added
         None
+    }
+}
+
+pub(super) fn tag_attr(attr: &Meta) -> Result<Option<u32>, Error> {
+    if !attr.path().is_ident("tag") {
+        return Ok(None);
+    }
+    match attr {
+        Meta::List(meta_list) => Ok(Some(meta_list.parse_args::<LitInt>()?.base10_parse()?)),
+        Meta::NameValue(MetaNameValue {
+            value: Expr::Lit(expr),
+            ..
+        }) => match &expr.lit {
+            Lit::Str(lit) => lit.value().parse::<u32>().map_err(Error::from).map(Some),
+            Lit::Int(lit) => Ok(Some(lit.base10_parse()?)),
+            _ => bail!("invalid tag attribute: {:?}", attr),
+        },
+        _ => bail!("invalid tag attribute: {:?}", attr),
     }
 }

@@ -1,3 +1,5 @@
+use ::bilrost::alloc;
+
 /// A Duration represents a signed, fixed-length span of time represented
 /// as a count of seconds and fractions of seconds at nanosecond
 /// resolution. It is independent of any calendar and concepts like "day"
@@ -68,7 +70,7 @@ pub struct Duration {
     /// Signed seconds of the span of time. Must be from -315,576,000,000
     /// to +315,576,000,000 inclusive. Note: these bounds are computed from:
     /// 60 sec/min * 60 min/hr * 24 hr/day * 365.25 days/year * 10000 years
-    #[bilrost(sint64, tag = "1")]
+    #[bilrost(tag = "1")]
     pub seconds: i64,
     /// Signed fractions of a second at nanosecond resolution of the span
     /// of time. Durations less than one second are represented with a 0
@@ -76,7 +78,7 @@ pub struct Duration {
     /// of one second or more, a non-zero value for the `nanos` field must be
     /// of the same sign as the `seconds` field. Must be from -999,999,999
     /// to +999,999,999 inclusive.
-    #[bilrost(sfixed32, tag = "2")]
+    #[bilrost(tag = "2", encoder = "fixed")]
     pub nanos: i32,
 }
 
@@ -92,8 +94,8 @@ pub struct Duration {
 #[derive(Clone, PartialEq, ::bilrost::Message)]
 pub struct Struct {
     /// Unordered map of dynamically typed values.
-    #[bilrost(btree_map = "string, message", tag = "1")]
-    pub fields: ::bilrost::alloc::collections::BTreeMap<::bilrost::alloc::string::String, Value>,
+    #[bilrost(tag = "1")]
+    pub fields: alloc::collections::BTreeMap<alloc::string::String, Value>,
 }
 
 /// `Value` represents a dynamically typed value which can be either
@@ -106,7 +108,7 @@ pub struct Struct {
 #[derive(Clone, PartialEq, ::bilrost::Message)]
 pub struct Value {
     /// The kind of value.
-    #[bilrost(oneof = "value::Kind", tags = "1, 2, 3, 4, 5, 6")]
+    #[bilrost(oneof = "1, 2, 3, 4, 5, 6")]
     pub kind: ::core::option::Option<value::Kind>,
 }
 
@@ -114,7 +116,7 @@ pub struct Value {
 pub mod value {
     /// The kind of value.
     #[allow(clippy::derive_partial_eq_without_eq)]
-    #[derive(Clone, PartialEq, ::bilrost::Oneof)]
+    #[derive(Clone, PartialEq, bilrost::Oneof)]
     pub enum Kind {
         /// Represents a null value.
         #[bilrost(enumeration = "super::NullValue", tag = "1")]

@@ -7,7 +7,7 @@ use anyhow::{bail, Error};
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 use syn::punctuated::Punctuated;
-use syn::{Attribute, Expr, ExprLit, Lit, LitInt, Meta, MetaNameValue, Token, Type};
+use syn::{Attribute, Meta, Token, Type};
 
 #[derive(Clone)]
 pub enum Field {
@@ -31,10 +31,10 @@ impl Field {
 
         // TODO: check for ignore attribute.
 
-        Ok(Some(if let Some(field) = oneof::Field::new(&attrs)? {
+        Ok(Some(if let Some(field) = oneof::Field::new(&ty, &attrs)? {
             Field::Oneof(field)
         } else {
-            Field::Value(value::Field::new(ty, &attrs, inferred_tag)?)
+            Field::Value(value::Field::new(&ty, &attrs, inferred_tag)?)
         }))
     }
 
@@ -68,7 +68,7 @@ impl Field {
                 Some(quote!(
                     const _: () = ::bilrost::assert_tags_are_equal(
                         #description,
-                        #oneof_ty::FIELD_TAGS,
+                        <#oneof_ty>::FIELD_TAGS,
                         [#(#tags,)*]
                     );
                 ))
@@ -136,49 +136,4 @@ where
     }
     *option = Some(value);
     Ok(())
-}
-
-pub(super) fn tag_attr(attr: &Meta) -> Result<Option<u32>, Error> {
-    if !attr.path().is_ident("tag") {
-        return Ok(None);
-    }
-    match attr {
-        Meta::List(meta_list) => Ok(Some(meta_list.parse_args::<LitInt>()?.base10_parse()?)),
-        Meta::NameValue(MetaNameValue {
-            value: Expr::Lit(expr),
-            ..
-        }) => match &expr.lit {
-            Lit::Str(lit) => lit.value().parse::<u32>().map_err(Error::from).map(Some),
-            Lit::Int(lit) => Ok(Some(lit.base10_parse()?)),
-            _ => bail!("invalid tag attribute: {:?}", attr),
-        },
-        _ => bail!("invalid tag attribute: {:?}", attr),
-    }
-}
-
-fn tags_attr(attr: &Meta) -> Result<Option<Vec<u32>>, Error> {
-    if !attr.path().is_ident("tags") {
-        return Ok(None);
-    }
-    match attr {
-        Meta::List(meta_list) => Ok(Some(
-            meta_list
-                .parse_args_with(Punctuated::<LitInt, Token![,]>::parse_terminated)?
-                .iter()
-                .map(LitInt::base10_parse)
-                .collect::<Result<Vec<_>, _>>()?,
-        )),
-        Meta::NameValue(MetaNameValue {
-            value: Expr::Lit(ExprLit {
-                lit: Lit::Str(lit), ..
-            }),
-            ..
-        }) => lit
-            .value()
-            .split(',')
-            .map(|s| s.trim().parse::<u32>().map_err(Error::from))
-            .collect::<Result<Vec<u32>, _>>()
-            .map(Some),
-        _ => bail!("invalid tag attribute: {:?}", attr),
-    }
 }
