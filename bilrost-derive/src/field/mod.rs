@@ -7,7 +7,7 @@ use anyhow::{bail, Error};
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 use syn::punctuated::Punctuated;
-use syn::{Attribute, Meta, Token, Type};
+use syn::{Attribute, Meta, Token, Type, WhereClause};
 
 #[derive(Clone)]
 pub enum Field {
@@ -45,16 +45,43 @@ impl Field {
         }
     }
 
+    /// Returns the tag of this field with the least value
     pub fn first_tag(&self) -> u32 {
         self.tags().into_iter().min().unwrap()
     }
 
+    /// Returns the tag of this field with the greatest value
     pub fn last_tag(&self) -> u32 {
         self.tags().into_iter().max().unwrap()
     }
 
+    /// Returns the where clause condition asserting that this field's encoder encodes its type.
+    fn encoder_where(&self) -> Option<TokenStream> {
+        match self {
+            Field::Value(field) => Some(field.encoder_where()),
+            _ => None,
+        }
+    }
+
+    /// Combines an optional already-existing where clause with additional terms for each field's
+    /// encoder to assert that it supports the field's type.
+    pub fn append_wheres<'a>(
+        where_clause: Option<&WhereClause>,
+        fields: impl Iterator<Item = &'a Self>,
+    ) -> TokenStream {
+        // TODO(widders): dedup? can we do that?
+        let encoder_wheres: Vec<_> = fields.flat_map(|f| f.encoder_where()).collect();
+        if let Some(where_clause) = where_clause {
+            quote! { #where_clause #(, #encoder_wheres)* }
+        } else if encoder_wheres.is_empty() {
+            return quote!();
+        } else {
+            quote! { where #(#encoder_wheres),*}
+        }
+    }
+
     pub fn tag_list_guard(&self, field_name: String) -> Option<TokenStream> {
-        match &self {
+        match self {
             Field::Oneof(field) => {
                 let mut tags = self.tags();
                 tags.sort();

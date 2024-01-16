@@ -101,7 +101,7 @@ impl Field {
     }
 
     /// Returns the where clause constraint terms for the field's encoder.
-    pub fn where_clause(&self) -> TokenStream {
+    pub fn encoder_where(&self) -> TokenStream {
         let ty = &self.ty;
         let encoder = &self.encoder;
         quote!(#encoder: ::bilrost::encoding::Encoder<#ty>)

@@ -48,6 +48,24 @@ impl<T> Deref for MustMove<T> {
     }
 }
 
+/// Defines the common aliases for encoder types available to every bilrost derive.
+///
+/// The standard encoders are all made available in scope with lower-cased names, making them
+/// simultaneously easier to spell when writing the field attributes and making them less likely to
+/// shadow custom encoder types.
+fn encoder_alias_header() -> TokenStream {
+    quote! {
+        use ::bilrost::encoding::{
+            Fixed as fixed,
+            General as general,
+            Map as map,
+            Packed as packed,
+            Unpacked as unpacked,
+            VecBlob as vecblob,
+        };
+    }
+}
+
 fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     let input: DeriveInput = syn::parse2(input)?;
 
@@ -394,6 +412,11 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         }
     };
 
+    // Append the requirement that every field's type is encodable with its corresponding encoder
+    // to our where clause.
+    let where_clause =
+        Field::append_wheres(where_clause, unsorted_fields.iter().map(|(_, field)| field));
+
     let static_guards = unsorted_fields
         .iter()
         .filter_map(|(field_ident, field)| field.tag_list_guard(field_ident.to_string()));
@@ -441,12 +464,10 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     let impl_wrapper_const_ident = parse_str::<Ident>(
         &("__BILROST_DERIVED_IMPL_MESSAGE_FOR_".to_owned() + &ident.to_string()),
     )?;
+    let aliases = encoder_alias_header();
     let expanded = quote! {
         const #impl_wrapper_const_ident: () = {
-            use ::bilrost::encoding::{
-                Fixed as fixed, General as general, Map as map, Packed as packed,
-                Unpacked as unpacked, VecBlob as vecblob,
-            };
+            #aliases
 
             #expanded
 
@@ -614,6 +635,8 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
     } in variants
     {
         let ty = match variant_fields {
+            // TODO(widders): support a single empty default Unit variant in lieu of the Option<T>
+            //  implementation
             Fields::Unit => bail!("Oneof enum variants must have a single field"),
             Fields::Named(FieldsNamed { named: fields, .. })
             | Fields::Unnamed(FieldsUnnamed {
@@ -646,25 +669,31 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         );
     }
 
+    // Append the requirement that every field's type is encodable with its corresponding encoder
+    // to our where clause.
+    let where_clause = Field::append_wheres(where_clause, fields.iter().map(|(_, field)| field));
+
     let encode = fields.iter().map(|(variant_ident, field)| {
         let encode = field.encode(quote!(*value));
         quote!(#ident::#variant_ident(value) => { #encode })
     });
 
-    let merge = fields.iter().map(|(variant_ident, field)| {
-        let tag = field.tags()[0];
+    let decode = fields.iter().map(|(variant_ident, field)| {
+        let tag = field.first_tag();
         let decode = field.decode(quote!(value));
         quote! {
             #tag => {
-                match field {
+                match self {
+                    ::core::option::Option::None => {
+                        let value = self.insert(
+                            ::bilrost::encoding::NewForOverwrite::new_for_overwrite()
+                        );
+                        #decode
+                    }
                     ::core::option::Option::Some(#ident::#variant_ident(value)) => {
                         #decode
-                    },
-                    _ => {
-                        let mut owned_value = ::core::default::Default::default();
-                        let value = &mut owned_value;
-                        #decode.map(|_| *field = ::core::option::Option::Some(#ident::#variant_ident(owned_value)))
-                    },
+                    }
+                    _ => Err(::bilrost::DecodeError::new("conflicting fields in oneof")),
                 }
             }
         }
@@ -682,65 +711,63 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
 
     let tags_count = sorted_tags.len();
 
+    let impl_wrapper_const_ident =
+        parse_str::<Ident>(&("__BILROST_DERIVED_IMPL_ONEOF_FOR_".to_owned() + &ident.to_string()))?;
+    let aliases = encoder_alias_header();
     let expanded = quote! {
-        impl #impl_generics #ident #ty_generics #where_clause {
-            pub const FIELD_TAGS: [u32; #tags_count] = [#(#sorted_tags,)*];
+        const #impl_wrapper_const_ident: () = {
+            #aliases
 
-            /// Encodes the message to a buffer.
-            pub fn encode<__B>(
-                &self,
-                buf: &mut __B,
-                tw: &mut ::bilrost::encoding::TagWriter,
-            )
-            where
-                __B: ::bilrost::bytes::BufMut + ?Sized,
+            impl #impl_generics ::bilrost::encoding::Oneof
+            for ::core::option::Option<#ident #ty_generics>
+            #where_clause
             {
-                match self {
-                    #(#encode,)*
+                fn oneof_encode<__B: ::bilrost::bytes::BufMut + ?Sized>(
+                    &self,
+                    buf: &mut __B,
+                    tw: &mut ::bilrost::encoding::TagWriter,
+                ) {
+                    match self.as_ref()? {
+                        #(#encode,)*
+                    }
+                }
+
+                fn oneof_encoded_len(&self, tm: &mut ::bilrost::encoding::TagMeasurer) -> usize {
+                    let Some(value) = self else {
+                        return 0;
+                    };
+                    match value {
+                        #(#encoded_len,)*
+                    }
+                }
+
+                fn oneof_current_tag(&self) -> ::core::option::Option<u32> {
+                    Some(match *self? {
+                        #(#current_tag,)*
+                    })
+                }
+
+                fn oneof_decode_field<__B: ::bilrost::bytes::Buf + ?Sized>(
+                    &mut self,
+                    tag: u32,
+                    wire_type: ::bilrost::encoding::WireType,
+                    duplicated: bool,
+                    buf: ::bilrost::encoding::Capped<__B>,
+                    ctx: ::bilrost::encoding::DecodeContext,
+                ) -> ::core::result::Result<(), ::bilrost::DecodeError> {
+                    match tag {
+                        #(#decode,)*
+                        _ => unreachable!(concat!("invalid ", stringify!(#ident), " tag: {}"), tag),
+                    }
                 }
             }
 
-            /// Decodes an instance of the message from a buffer, and merges it into self.
-            pub fn merge<__B>(
-                field: &mut ::core::option::Option<#ident #ty_generics>,
-                tag: u32,
-                wire_type: ::bilrost::encoding::WireType,
-                duplicated: bool,
-                buf: ::bilrost::encoding::Capped<__B>,
-                ctx: ::bilrost::encoding::DecodeContext,
-            ) -> ::core::result::Result<(), ::bilrost::DecodeError>
-            where
-                __B: ::bilrost::bytes::Buf + ?Sized,
-            {
-                // TODO(widders): it's possible we could support repeated oneof members
-                if field.is_some() {
-                    return Err(::bilrost::DecodeError::new(
-                        "conflicting or repeating fields in oneof"
-                    ));
-                }
-                match tag {
-                    #(#merge,)*
-                    _ => unreachable!(concat!("invalid ", stringify!(#ident), " tag: {}"), tag),
-                }
+            impl #impl_generics #ident #ty_generics #where_clause {
+                pub const FIELD_TAGS: [u32; #tags_count] = [#(#sorted_tags),*];
             }
 
-            /// Returns the encoded length of the message without a length delimiter.
-            #[inline]
-            pub fn encoded_len(&self, tm: &mut ::bilrost::encoding::TagMeasurer) -> usize {
-                match self {
-                    #(#encoded_len,)*
-                }
-            }
-
-            /// Returns the tag id that will be encoded by the current value.
-            #[inline]
-            pub fn current_tag(&self) -> u32 {
-                match *self {
-                    #(#current_tag,)*
-                }
-            }
-        }
-
+            ()
+        };
     };
 
     Ok(expanded)
@@ -814,19 +841,25 @@ mod test {
                 #[bilrost(tag = "1")] bool,
                 #[bilrost(oneof = "2, 3")] B,
             );
-        }).unwrap().to_string();
+        })
+        .unwrap()
+        .to_string();
         let two = try_message(quote! {
             struct A (
                 #[bilrost(tag = 1)] bool,
                 #[bilrost(oneof = "2, 3")] B,
             );
-        }).unwrap().to_string();
+        })
+        .unwrap()
+        .to_string();
         let three = try_message(quote! {
             struct A (
                 #[bilrost(tag(1))] bool,
                 #[bilrost(oneof(2, 3))] B,
             );
-        }).unwrap().to_string();
+        })
+        .unwrap()
+        .to_string();
         assert_eq!(one, two);
         assert_eq!(one, three);
     }

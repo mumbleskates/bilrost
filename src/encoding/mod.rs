@@ -839,7 +839,7 @@ pub trait Oneof: Default {
     fn oneof_encode<B: BufMut + ?Sized>(&self, buf: &mut B, tw: &mut TagWriter);
 
     /// Measures the number of bytes that would encode this oneof.
-    fn oneof_encoded_len(&self, tm: &mut TagMeasurer);
+    fn oneof_encoded_len(&self, tm: &mut TagMeasurer) -> usize;
 
     /// Returns the current tag of the oneof, if any.
     fn oneof_current_tag(&self) -> Option<u32>;
@@ -850,7 +850,7 @@ pub trait Oneof: Default {
         tag: u32,
         wire_type: WireType,
         duplicated: bool,
-        buf: &mut Capped<B>,
+        buf: Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError>;
 }
