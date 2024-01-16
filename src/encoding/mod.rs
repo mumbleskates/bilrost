@@ -835,7 +835,17 @@ where
 /// Trait to be implemented by (or more commonly derived for) oneofs, which have knowledge of their
 /// variants' tags and encoding.
 pub trait Oneof: Default {
-    fn decode_field<B: Buf + ?Sized>(
+    /// Encodes the fields of the oneof into the given buffer.
+    fn oneof_encode<B: BufMut + ?Sized>(&self, buf: &mut B, tw: &mut TagWriter);
+
+    /// Measures the number of bytes that would encode this oneof.
+    fn oneof_encoded_len(&self, tm: &mut TagMeasurer);
+
+    /// Returns the current tag of the oneof, if any.
+    fn oneof_current_tag(&self) -> Option<u32>;
+
+    /// Decodes from the given buffer.
+    fn oneof_decode_field<B: Buf + ?Sized>(
         &mut self,
         tag: u32,
         wire_type: WireType,

@@ -324,8 +324,10 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
                         }
                     }
                     Oneof((field_ident, _)) => quote! {
-                        if let Some(oneof) = self.#field_ident.as_ref() {
-                            parts[nparts] = (oneof.current_tag(), Some(|instance, buf, tw| {
+                        if let Some(oneof_tag) = ::bilrost::encoding::Oneof::oneof_current_tag(
+                            &self.#field_ident,
+                        ) {
+                            parts[nparts] = (oneof_tag, Some(|instance, buf, tw| {
                                 instance.#field_ident.as_ref().unwrap().encode(buf, tw)
                             }));
                             nparts += 1;
@@ -620,9 +622,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
             Fields::Named(FieldsNamed { named: fields, .. })
             | Fields::Unnamed(FieldsUnnamed {
                 unnamed: fields, ..
-            }) => {
-                fields.first().unwrap().ty.clone()
-            }
+            }) => fields.first().unwrap().ty.clone(),
         };
         match Field::new(ty, attrs, None)? {
             Some(field) => fields.push((variant_ident, field)),
@@ -760,9 +760,9 @@ mod test {
     fn test_rejects_colliding_message_fields() {
         let output = try_message(quote! {
             struct Invalid {
-                #[bilrost(bool, tag = "1")]
+                #[bilrost(tag = "1")]
                 a: bool,
-                #[bilrost(oneof = "super::Whatever", tags = "4, 5, 1")]
+                #[bilrost(oneof(4, 5, 1))]
                 b: Option<super::Whatever>,
             }
         });
@@ -777,9 +777,9 @@ mod test {
     fn test_rejects_colliding_oneof_variants() {
         let output = try_oneof(quote! {
             pub enum Invalid {
-                #[bilrost(bool, tag = "1")]
+                #[bilrost(tag = "1")]
                 A(bool),
-                #[bilrost(bool, tag = "1")]
+                #[bilrost(tag = "1")]
                 B(bool),
             }
         });
@@ -794,13 +794,13 @@ mod test {
     fn test_basic_message() {
         let output = try_message(quote! {
             pub struct Struct {
-                #[bilrost(btree_map = "string, sint64", tag = 3)]
+                #[bilrost(tag = 3)]
                 pub fields: BTreeMap<String, i64>,
-                #[bilrost(string, tag = 0)]
+                #[bilrost(tag = 0)]
                 pub foo: String,
-                #[bilrost(sint64, tag = 1)]
+                #[bilrost(tag = 1)]
                 pub bar: i64,
-                #[bilrost(bool, tag = 2)]
+                #[bilrost(tag = 2)]
                 pub baz: bool,
             }
         });
@@ -808,12 +808,36 @@ mod test {
     }
 
     #[test]
+    fn test_attribute_forms_are_equivalent() {
+        let one = try_message(quote! {
+            struct A (
+                #[bilrost(tag = "1")] bool,
+                #[bilrost(oneof = "2, 3")] B,
+            );
+        }).unwrap().to_string();
+        let two = try_message(quote! {
+            struct A (
+                #[bilrost(tag = 1)] bool,
+                #[bilrost(oneof = "2, 3")] B,
+            );
+        }).unwrap().to_string();
+        let three = try_message(quote! {
+            struct A (
+                #[bilrost(tag(1))] bool,
+                #[bilrost(oneof(2, 3))] B,
+            );
+        }).unwrap().to_string();
+        assert_eq!(one, two);
+        assert_eq!(one, three);
+    }
+
+    #[test]
     fn test_tuple_message() {
         let output = try_message(quote! {
             struct Tuple(
-                #[bilrost(bool, tag = 5)] bool,
-                #[bilrost(string, tag = 0)] String,
-                #[bilrost(sint64)] i64,
+                #[bilrost(tag = 5)] bool,
+                #[bilrost(tag = 0)] String,
+                i64,
             );
         });
         output.unwrap();
@@ -823,31 +847,29 @@ mod test {
     fn test_overlapping_message() {
         let output = try_message(quote! {
             struct Struct {
-                #[bilrost(bool, tag = 0)]
+                #[bilrost(tag = 0)]
                 zero: bool,
-                #[bilrost(oneof = "A", tags = "1, 10, 20")]
+                #[bilrost(oneof(1, 10, 20))]
                 a: Option<A>,
-                #[bilrost(bool, tag = 4)]
+                #[bilrost(tag = 4)]
                 four: bool,
-                #[bilrost(bool, tag = 5)]
+                #[bilrost(tag = 5)]
                 five: bool,
-                #[bilrost(oneof = "B", tags = "9, 11")]
+                #[bilrost(oneof(9, 11))]
                 b: Option<B>,
-                #[bilrost(bool)] // implicitly tagged 12
-                twelve: bool,
-                #[bilrost(oneof = "C", tags = "13, 16, 22")]
+                twelve: bool, // implicitly tagged 12
+                #[bilrost(oneof(13, 16, 22))]
                 c: Option<C>,
-                #[bilrost(bool, tag = 14)]
+                #[bilrost(tag = 14)]
                 fourteen: bool,
-                #[bilrost(bool)] // implicitly tagged 15
-                fifteen: bool,
-                #[bilrost(bool, tag = 17)]
+                fifteen: bool, // implicitly tagged 15
+                #[bilrost(tag = 17)]
                 seventeen: bool,
-                #[bilrost(oneof = "D", tags = "18, 19")]
+                #[bilrost(oneof(18, 19))]
                 d: Option<D>,
-                #[bilrost(bool, tag = 21)]
+                #[bilrost(tag = 21)]
                 twentyone: bool,
-                #[bilrost(bool, tag = 50)]
+                #[bilrost(tag = 50)]
                 fifty: bool,
             }
         });

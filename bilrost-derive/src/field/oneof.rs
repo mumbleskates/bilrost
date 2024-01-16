@@ -20,12 +20,14 @@ impl Field {
         for attr in attrs {
             if attr.path().is_ident("oneof") {
                 let tags = match attr {
+                    // oneof(1, 2, 3, 4, 5)
                     Meta::List(meta_list) => meta_list
                         .parse_args_with(Punctuated::<LitInt, Token![,]>::parse_terminated)?
                         .iter()
                         .map(LitInt::base10_parse)
                         .collect::<Result<Vec<_>, _>>()
                         .map_err(Error::from),
+                    // oneof = "1, 2, 3, 4, 5"
                     Meta::NameValue(MetaNameValue {
                         value:
                             Expr::Lit(ExprLit {
@@ -58,22 +60,23 @@ impl Field {
             _ => bail!("unknown attributes for message field: {:?}", unknown_attrs),
         }
 
-        Ok(Some(Field { ty: ty.clone(), tags }))
+        Ok(Some(Field {
+            ty: ty.clone(),
+            tags,
+        }))
     }
 
     /// Returns a statement which encodes the oneof field.
     pub fn encode(&self, ident: TokenStream) -> TokenStream {
         quote! {
-            if let Some(oneof) = &#ident {
-                oneof.encode(buf, tw)
-            }
+            ::bilrost::encoding::Oneof::oneof_encode(&#ident, buf, tw);
         }
     }
 
     /// Returns an expression which evaluates to the result of decoding the oneof field.
     pub fn decode(&self, ident: TokenStream) -> TokenStream {
-        quote! {
-            <::bilrost::encoding::Oneof>::raw_decode_field(
+        quote!(
+            ::bilrost::encoding::Oneof::oneof_decode_field(
                 #ident,
                 tag,
                 wire_type,
@@ -81,13 +84,11 @@ impl Field {
                 buf,
                 ctx,
             )
-        }
+        )
     }
 
     /// Returns an expression which evaluates to the encoded length of the oneof field.
     pub fn encoded_len(&self, ident: TokenStream) -> TokenStream {
-        quote! {
-            #ident.as_ref().map_or(0, |v| v.encoded_len(tm))
-        }
+        quote!(::bilrost::encoding::Oneof::oneof_encoded_len(&#ident))
     }
 }

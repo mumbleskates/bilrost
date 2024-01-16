@@ -1,7 +1,7 @@
 use anyhow::{bail, Error};
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::{parse_str, Expr, Lit, Meta, MetaNameValue, Type, LitInt};
+use syn::{parse2, parse_str, Expr, Lit, LitInt, Meta, MetaList, MetaNameValue, Type};
 
 use crate::field::set_option;
 
@@ -18,17 +18,21 @@ pub(super) fn encoder_attr(attr: &Meta) -> Result<Option<Type>, Error> {
         return Ok(None);
     }
     match attr {
+        // encoder(type tokens go here)
+        Meta::List(MetaList { tokens, .. }) => parse2(tokens.clone()),
+        // encoder = "type tokens go here"
         Meta::NameValue(MetaNameValue {
             value: Expr::Lit(expr),
             ..
         }) => match &expr.lit {
-            Lit::Str(lit) => parse_str::<Type>(&lit.value())
-                .map(Some)
-                .map_err(Error::from),
+            Lit::Str(lit) => parse_str::<Type>(&lit.value()),
+            // TODO(widders): the tag attribute debugs here are really awful looking.
             _ => bail!("invalid tag attribute: {:?}", attr),
         },
         _ => bail!("invalid tag attribute: {:?}", attr),
     }
+    .map(Some)
+    .map_err(Error::from)
 }
 
 impl Field {
@@ -60,7 +64,11 @@ impl Field {
 
         let encoder = encoder.unwrap_or(parse_str::<Type>("general")?);
 
-        Ok(Field { tag, ty: ty.clone(), encoder })
+        Ok(Field {
+            tag,
+            ty: ty.clone(),
+            encoder,
+        })
     }
 
     /// Returns a statement which encodes the field using buffer `buf` and tag writer `tw`.
@@ -129,12 +137,15 @@ pub(super) fn tag_attr(attr: &Meta) -> Result<Option<u32>, Error> {
         return Ok(None);
     }
     match attr {
+        // tag(1)
         Meta::List(meta_list) => Ok(Some(meta_list.parse_args::<LitInt>()?.base10_parse()?)),
         Meta::NameValue(MetaNameValue {
             value: Expr::Lit(expr),
             ..
         }) => match &expr.lit {
+            // tag = "1"
             Lit::Str(lit) => lit.value().parse::<u32>().map_err(Error::from).map(Some),
+            // tag = 1
             Lit::Int(lit) => Ok(Some(lit.base10_parse()?)),
             _ => bail!("invalid tag attribute: {:?}", attr),
         },
