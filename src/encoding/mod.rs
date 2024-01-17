@@ -857,7 +857,7 @@ pub trait Oneof: Default {
 
 /// Underlying trait for a oneof that has no inherent "empty" variant, opting instead to be wrapped
 /// in an `Option`.
-pub trait NonEmptyOneof {
+pub trait NonEmptyOneof: Sized {
     /// Encodes the fields of the oneof into the given buffer.
     fn oneof_encode<B: BufMut + ?Sized>(&self, buf: &mut B, tw: &mut TagWriter);
 

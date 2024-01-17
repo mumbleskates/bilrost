@@ -683,9 +683,9 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         let decode = field.decode(quote!(value));
         quote! {
             #tag => {
-                match self {
+                match field {
                     ::core::option::Option::None => {
-                        let value = self.insert(
+                        let value = field.insert(
                             ::bilrost::encoding::NewForOverwrite::new_for_overwrite()
                         );
                         #decode
@@ -718,8 +718,8 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         const #impl_wrapper_const_ident: () = {
             #aliases
 
-            impl #impl_generics ::bilrost::encoding::Oneof
-            for ::core::option::Option<#ident #ty_generics>
+            impl #impl_generics ::bilrost::encoding::NonEmptyOneof
+            for #ident #ty_generics
             #where_clause
             {
                 fn oneof_encode<__B: ::bilrost::bytes::BufMut + ?Sized>(
@@ -741,14 +741,14 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
                     }
                 }
 
-                fn oneof_current_tag(&self) -> ::core::option::Option<u32> {
-                    Some(match *self? {
+                fn oneof_current_tag(&self) -> u32 {
+                    Some(match self {
                         #(#current_tag,)*
                     })
                 }
 
                 fn oneof_decode_field<__B: ::bilrost::bytes::Buf + ?Sized>(
-                    &mut self,
+                    field: &mut ::core::option::Option<self>,
                     tag: u32,
                     wire_type: ::bilrost::encoding::WireType,
                     duplicated: bool,
