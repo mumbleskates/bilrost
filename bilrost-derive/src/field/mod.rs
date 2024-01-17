@@ -95,8 +95,8 @@ impl Field {
                 Some(quote!(
                     const _: () = ::bilrost::assert_tags_are_equal(
                         #description,
-                        <#oneof_ty>::FIELD_TAGS,
-                        [#(#tags,)*]
+                        <#oneof_ty as ::bilrost::encoding::Oneof>::FIELD_TAGS,
+                        &[#(#tags,)*],
                     );
                 ))
             }
@@ -127,6 +127,15 @@ impl Field {
             Field::Value(scalar) => scalar.encoded_len(ident),
             Field::Oneof(oneof) => oneof.encoded_len(ident),
         }
+    }
+
+    /// If the field is a oneof, returns an expression which evaluates to an Option<u32> of the tag
+    /// of the (maybe) present field in the oneof. Panics if the field is not a oneof.
+    pub fn current_tag(&self, ident: TokenStream) -> TokenStream {
+        let Field::Oneof(field) = self else {
+            panic!("tried to use a value field as a oneof")
+        };
+        field.current_tag(ident)
     }
 
     pub fn methods(&self, ident: &TokenStream) -> Option<TokenStream> {

@@ -85,19 +85,15 @@ pub fn decode_length_delimiter<B: Buf>(mut buf: B) -> Result<usize, DecodeError>
 }
 
 /// Helper function for derived types, asserting that lists of tags are equal at compile time.
-pub const fn assert_tags_are_equal<const A: usize, const B: usize>(
-    failure_description: &str,
-    a: [u32; A],
-    b: [u32; B],
-) {
-    if A != B {
+pub const fn assert_tags_are_equal(failure_description: &str, a: &[u32], b: &[u32]) {
+    if a.len() != b.len() {
         #[cfg(feature = "extended-diagnostics")]
         concat_panic!({}: failure_description, ": expected ", a, " but got ", b);
         #[cfg(not(feature = "extended-diagnostics"))]
         panic!("{}", failure_description);
     }
     let mut i = 0;
-    while i < A {
+    while i < a.len() {
         if a[i] != b[i] {
             #[cfg(feature = "extended-diagnostics")]
             concat_panic!({}: failure_description, ": expected ", a, " but got ", b);

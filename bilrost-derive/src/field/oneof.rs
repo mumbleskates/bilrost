@@ -89,6 +89,12 @@ impl Field {
 
     /// Returns an expression which evaluates to the encoded length of the oneof field.
     pub fn encoded_len(&self, ident: TokenStream) -> TokenStream {
-        quote!(::bilrost::encoding::Oneof::oneof_encoded_len(&#ident))
+        quote!(::bilrost::encoding::Oneof::oneof_encoded_len(&#ident, tm))
+    }
+
+    /// Returns an expression which evaluates to an Option<u32> of the tag of the (maybe) present
+    /// field in the oneof.
+    pub fn current_tag(&self, ident: TokenStream) -> TokenStream {
+        quote!(::bilrost::encoding::Oneof::oneof_current_tag(&#ident))
     }
 }

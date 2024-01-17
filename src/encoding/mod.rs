@@ -835,6 +835,8 @@ where
 /// Trait to be implemented by (or more commonly derived for) oneofs, which have knowledge of their
 /// variants' tags and encoding.
 pub trait Oneof: Default {
+    const FIELD_TAGS: &'static [u32];
+
     /// Encodes the fields of the oneof into the given buffer.
     fn oneof_encode<B: BufMut + ?Sized>(&self, buf: &mut B, tw: &mut TagWriter);
 
@@ -858,6 +860,8 @@ pub trait Oneof: Default {
 /// Underlying trait for a oneof that has no inherent "empty" variant, opting instead to be wrapped
 /// in an `Option`.
 pub trait NonEmptyOneof: Sized {
+    const FIELD_TAGS: &'static [u32];
+
     /// Encodes the fields of the oneof into the given buffer.
     fn oneof_encode<B: BufMut + ?Sized>(&self, buf: &mut B, tw: &mut TagWriter);
 
@@ -882,6 +886,8 @@ impl<T> Oneof for Option<T>
 where
     T: NonEmptyOneof,
 {
+    const FIELD_TAGS: &'static [u32] = T::FIELD_TAGS;
+
     fn oneof_encode<B: BufMut + ?Sized>(&self, buf: &mut B, tw: &mut TagWriter) {
         if let Some(value) = self {
             value.oneof_encode(buf, tw);

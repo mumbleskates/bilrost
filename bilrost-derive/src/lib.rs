@@ -290,12 +290,16 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
                             nparts += 1;
                         }
                     }
-                    Oneof((field_ident, _)) => quote! {
-                        if let Some(oneof) = self.#field_ident.as_ref() {
-                            parts[nparts] = (oneof.current_tag(), Some(|instance, tm| {
-                                instance.#field_ident.as_ref().unwrap().encoded_len(tm)
-                            }));
-                            nparts += 1;
+                    Oneof((field_ident, field)) => {
+                        let current_tag = field.current_tag(quote!(self.#field_ident));
+                        let encoded_len = field.encoded_len(quote!(instance.#field_ident));
+                        quote! {
+                            if let Some(tag) = #current_tag {
+                                parts[nparts] = (tag, Some(|instance, tm| {
+                                    #encoded_len
+                                }));
+                                nparts += 1;
+                            }
                         }
                     },
                 })
@@ -341,14 +345,16 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
                             nparts += 1;
                         }
                     }
-                    Oneof((field_ident, _)) => quote! {
-                        if let Some(oneof_tag) = ::bilrost::encoding::Oneof::oneof_current_tag(
-                            &self.#field_ident,
-                        ) {
-                            parts[nparts] = (oneof_tag, Some(|instance, buf, tw| {
-                                instance.#field_ident.as_ref().unwrap().encode(buf, tw)
-                            }));
-                            nparts += 1;
+                    Oneof((field_ident, field)) => {
+                        let current_tag = field.current_tag(quote!(self.#field_ident));
+                        let encode = field.encode(quote!(instance.#field_ident));
+                        quote! {
+                            if let Some(tag) = #current_tag {
+                                parts[nparts] = (tag, Some(|instance, buf, tw| {
+                                    #encode
+                                }));
+                                nparts += 1;
+                            }
                         }
                     },
                 })
@@ -476,6 +482,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
             ()
         };
     };
+    println!("{}", expanded.to_string());
     Ok(expanded)
 }
 
@@ -685,9 +692,9 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
             #tag => {
                 match field {
                     ::core::option::Option::None => {
-                        let value = field.insert(
+                        let #ident::#variant_ident(value) = field.insert(#ident::#variant_ident(
                             ::bilrost::encoding::NewForOverwrite::new_for_overwrite()
-                        );
+                        )) else { panic!("unreachable") };
                         #decode
                     }
                     ::core::option::Option::Some(#ident::#variant_ident(value)) => {
@@ -709,8 +716,6 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         quote!(#ident::#variant_ident(_) => #tag)
     });
 
-    let tags_count = sorted_tags.len();
-
     let impl_wrapper_const_ident =
         parse_str::<Ident>(&("__BILROST_DERIVED_IMPL_ONEOF_FOR_".to_owned() + &ident.to_string()))?;
     let aliases = encoder_alias_header();
@@ -722,33 +727,32 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
             for #ident #ty_generics
             #where_clause
             {
+                const FIELD_TAGS: &'static [u32] = &[#(#sorted_tags),*];
+
                 fn oneof_encode<__B: ::bilrost::bytes::BufMut + ?Sized>(
                     &self,
                     buf: &mut __B,
                     tw: &mut ::bilrost::encoding::TagWriter,
                 ) {
-                    match self.as_ref()? {
+                    match self {
                         #(#encode,)*
                     }
                 }
 
                 fn oneof_encoded_len(&self, tm: &mut ::bilrost::encoding::TagMeasurer) -> usize {
-                    let Some(value) = self else {
-                        return 0;
-                    };
-                    match value {
+                    match self {
                         #(#encoded_len,)*
                     }
                 }
 
                 fn oneof_current_tag(&self) -> u32 {
-                    Some(match self {
+                    match self {
                         #(#current_tag,)*
-                    })
+                    }
                 }
 
                 fn oneof_decode_field<__B: ::bilrost::bytes::Buf + ?Sized>(
-                    field: &mut ::core::option::Option<self>,
+                    field: &mut ::core::option::Option<Self>,
                     tag: u32,
                     wire_type: ::bilrost::encoding::WireType,
                     duplicated: bool,
@@ -762,14 +766,11 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
                 }
             }
 
-            impl #impl_generics #ident #ty_generics #where_clause {
-                pub const FIELD_TAGS: [u32; #tags_count] = [#(#sorted_tags),*];
-            }
-
             ()
         };
     };
 
+    println!("{}", expanded.to_string());
     Ok(expanded)
 }
 
