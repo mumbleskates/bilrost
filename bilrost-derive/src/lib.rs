@@ -681,6 +681,14 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
     let where_clause = Field::append_wheres(where_clause, fields.iter().map(|(_, field)| field));
 
     let encode = fields.iter().map(|(variant_ident, field)| {
+        // TODO(widders): THIS IS NOT QUITE IT! oneof fields must always encode if they have a
+        //  value! right now, present oneof fields with a General encoder will absent when default,
+        //  and that's simply not right; we might need another (third?) kind of encoding surety(?)
+        //  in addition to encoder and value-encoder.
+        //  however, this also messes with distinguished decoding (or rather, en-coding) of
+        //  unpacked oneof variants, which when present and empty are indistinguishable from absent.
+        //  do we have to just enforce that oneofs only value-encode their fields? that may be the
+        //  only thing that makes sense here.
         let encode = field.encode(quote!(*value));
         quote!(#ident::#variant_ident(value) => { #encode })
     });
