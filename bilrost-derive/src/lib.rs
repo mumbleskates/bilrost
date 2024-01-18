@@ -126,7 +126,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
                 };
                 quote!(#index)
             });
-            match Field::new(field.ty, field.attrs, Some(next_tag)) {
+            match Field::new(field.ty, field.attrs, next_tag) {
                 Ok(Some(field)) => {
                     next_tag = field.tags().iter().max().map(|t| t + 1).unwrap_or(next_tag);
                     Some(Ok((field_ident, field)))
@@ -301,7 +301,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
                                 nparts += 1;
                             }
                         }
-                    },
+                    }
                 })
                 .collect();
             let max_parts = parts.len();
@@ -356,7 +356,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
                                 nparts += 1;
                             }
                         }
-                    },
+                    }
                 })
                 .collect();
             let max_parts = parts.len();
@@ -633,32 +633,34 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
     // Map the variants into 'fields'.
-    let mut fields: Vec<(Ident, Field)> = Vec::new();
-    for Variant {
-        attrs,
-        ident: variant_ident,
-        fields: variant_fields,
-        ..
-    } in variants
-    {
-        let ty = match variant_fields {
-            // TODO(widders): support a single empty default Unit variant in lieu of the Option<T>
-            //  implementation
-            Fields::Unit => bail!("Oneof enum variants must have a single field"),
-            Fields::Named(FieldsNamed { named: fields, .. })
-            | Fields::Unnamed(FieldsUnnamed {
-                unnamed: fields, ..
-            }) if fields.len() != 1 => bail!("Oneof enum variants must have a single field"),
-            Fields::Named(FieldsNamed { named: fields, .. })
-            | Fields::Unnamed(FieldsUnnamed {
-                unnamed: fields, ..
-            }) => fields.first().unwrap().ty.clone(),
-        };
-        match Field::new(ty, attrs, None)? {
-            Some(field) => fields.push((variant_ident, field)),
-            None => bail!("invalid oneof variant: oneof variants may not be ignored"),
-        }
-    }
+    let fields: Vec<(Ident, Field)> = variants
+        .into_iter()
+        .map(
+            |Variant {
+                 attrs,
+                 ident: variant_ident,
+                 fields: variant_fields,
+                 ..
+             }| {
+                let ty = match variant_fields {
+                    // TODO(widders): support a single empty default Unit variant in lieu of the
+                    //  Option<T> implementation
+                    Fields::Unit => bail!("Oneof enum variants must have a single field"),
+                    Fields::Named(FieldsNamed { named: fields, .. })
+                    | Fields::Unnamed(FieldsUnnamed {
+                        unnamed: fields, ..
+                    }) if fields.len() != 1 => {
+                        bail!("Oneof enum variants must have a single field")
+                    }
+                    Fields::Named(FieldsNamed { named: fields, .. })
+                    | Fields::Unnamed(FieldsUnnamed {
+                        unnamed: fields, ..
+                    }) => fields.first().unwrap().ty.clone(),
+                };
+                Ok((variant_ident, Field::new_in_oneof(ty, attrs)?))
+            },
+        )
+        .collect::<Result<_, _>>()?;
 
     if fields.iter().any(|(_, field)| field.tags().len() > 1) {
         panic!("variant with multiple tags");

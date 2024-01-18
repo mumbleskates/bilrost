@@ -11,6 +11,11 @@ pub struct Field {
     pub tag: u32,
     pub ty: Type,
     pub encoder: Type,
+    /// When a value field is in a oneof, it must always encode a nonzero amount of data. The
+    /// encoder must be a ValueEncoder to satisfy this; effectively, Oneof types are much like
+    /// several fields whose values are each wrapped in an `Option`, but at most one of them can be
+    /// `Some`.
+    pub in_oneof: bool,
 }
 
 pub(super) fn encoder_attr(attr: &Meta) -> Result<Option<Type>, Error> {
@@ -36,7 +41,20 @@ pub(super) fn encoder_attr(attr: &Meta) -> Result<Option<Type>, Error> {
 }
 
 impl Field {
-    pub fn new(ty: &Type, attrs: &[Meta], inferred_tag: Option<u32>) -> Result<Field, Error> {
+    pub fn new(ty: &Type, attrs: &[Meta], inferred_tag: u32) -> Result<Field, Error> {
+        Field::new_impl(ty, attrs, Some(inferred_tag), false)
+    }
+
+    pub fn new_in_oneof(ty: &Type, attrs: &[Meta]) -> Result<Field, Error> {
+        Field::new_impl(ty, attrs, None, true)
+    }
+
+    fn new_impl(
+        ty: &Type,
+        attrs: &[Meta],
+        inferred_tag: Option<u32>,
+        in_oneof: bool,
+    ) -> Result<Field, Error> {
         let mut encoder = None;
         let mut tag = None;
         let mut unknown_attrs = Vec::new();
@@ -68,6 +86,7 @@ impl Field {
             tag,
             ty: ty.clone(),
             encoder,
+            in_oneof,
         })
     }
 
@@ -75,36 +94,76 @@ impl Field {
     pub fn encode(&self, ident: TokenStream) -> TokenStream {
         let tag = self.tag;
         let encoder = &self.encoder;
-        quote!(<#encoder as ::bilrost::encoding::Encoder<_>>::encode(#tag, &#ident, buf, tw);)
+        if self.in_oneof {
+            quote! {
+                <#encoder as ::bilrost::encoding::FieldEncoder<_>>::encode_field(
+                    #tag,
+                    &#ident,
+                    buf,
+                    tw,
+                );
+            }
+        } else {
+            quote! {
+                <#encoder as ::bilrost::encoding::Encoder<_>>::encode(#tag, &#ident, buf, tw);
+            }
+        }
     }
 
     /// Returns an expression which evaluates to the result of merging a decoded value into the
     /// field. The given ident must be an &mut that already refers to the destination.
     pub fn decode(&self, ident: TokenStream) -> TokenStream {
         let encoder = &self.encoder;
-        quote!(
-            <#encoder as ::bilrost::encoding::Encoder<_>>::decode(
-                wire_type,
-                duplicated,
-                #ident,
-                buf,
-                ctx,
+        if self.in_oneof {
+            quote!(
+                <#encoder as ::bilrost::encoding::FieldEncoder<_>>::decode_field(
+                    wire_type,
+                    #ident,
+                    buf,
+                    ctx,
+                )
             )
-        )
+        } else {
+            quote!(
+                <#encoder as ::bilrost::encoding::Encoder<_>>::decode(
+                    wire_type,
+                    duplicated,
+                    #ident,
+                    buf,
+                    ctx,
+                )
+            )
+        }
     }
 
     /// Returns an expression which evaluates to the encoded length of the field.
     pub fn encoded_len(&self, ident: TokenStream) -> TokenStream {
         let tag = self.tag;
         let encoder = &self.encoder;
-        quote!(<#encoder as ::bilrost::encoding::Encoder<_>>::encoded_len(#tag, &#ident, tm))
+        if self.in_oneof {
+            quote! {
+                <#encoder as ::bilrost::encoding::FieldEncoder<_>>::field_encoded_len(
+                    #tag,
+                    &#ident,
+                    tm,
+                )
+            }
+        } else {
+            quote! {
+                <#encoder as ::bilrost::encoding::Encoder<_>>::encoded_len(#tag, &#ident, tm)
+            }
+        }
     }
 
     /// Returns the where clause constraint terms for the field's encoder.
     pub fn encoder_where(&self) -> TokenStream {
         let ty = &self.ty;
         let encoder = &self.encoder;
-        quote!(#encoder: ::bilrost::encoding::Encoder<#ty>)
+        if self.in_oneof {
+            quote!(#encoder: ::bilrost::encoding::ValueEncoder<#ty>)
+        } else {
+            quote!(#encoder: ::bilrost::encoding::Encoder<#ty>)
+        }
     }
 
     /// Returns methods to embed in the message.
