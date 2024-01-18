@@ -427,6 +427,8 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         .iter()
         .filter_map(|(field_ident, field)| field.tag_list_guard(field_ident.to_string()));
 
+    let field_idents = unsorted_fields.iter().map(|(field_ident, _)| field_ident);
+
     let expanded = quote! {
         #(#static_guards)*
 
@@ -463,6 +465,14 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
             fn raw_encoded_len(&self) -> usize {
                 let tm = &mut ::bilrost::encoding::TagMeasurer::new();
                 0 #(+ #encoded_len)*
+            }
+        }
+
+        impl #impl_generics ::core::default::Default for #ident #ty_generics #where_clause {
+            fn default() -> Self {
+                Self {
+                    #(#field_idents: ::core::default::Default::default(),)*
+                }
             }
         }
     };

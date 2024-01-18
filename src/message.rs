@@ -50,7 +50,8 @@ pub(crate) fn merge_distinguished<T: RawDistinguishedMessage, B: Buf + ?Sized>(
 /// an object-safe proxy trait, see `MessageDyn`.
 ///
 /// Messages are expected to have a `Default` implementation that is exactly the same as each
-/// field's respective `Default` value; that is, functionally identical to a derived `Default`.
+/// field's respective `Default` value; that is, functionally identical to a derived `Default`. This
+/// is automatically satisfied by the derive macro.
 pub trait Message: Default {
     /// Returns the encoded length of the message without a length delimiter.
     fn encoded_len(&self) -> usize;
