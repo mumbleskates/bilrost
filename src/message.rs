@@ -397,7 +397,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{MessageDyn, Message, DistinguishedMessageDyn};
+    use super::{DistinguishedMessageDyn, Message, MessageDyn, Vec};
 
     const _MESSAGE_DYN_IS_OBJECT_SAFE: Option<&dyn MessageDyn> = None;
     const _DISTINGUISHED_MESSAGE_DYN_IS_OBJECT_SAFE: Option<&dyn DistinguishedMessageDyn> = None;
