@@ -482,7 +482,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
             ()
         };
     };
-    println!("{}", expanded.to_string());
+
     Ok(expanded)
 }
 
@@ -778,7 +778,6 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         };
     };
 
-    println!("{}", expanded.to_string());
     Ok(expanded)
 }
 
