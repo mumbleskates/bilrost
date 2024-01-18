@@ -12,37 +12,37 @@ mod tests {
 
     #[derive(Clone, Debug, PartialEq, Oneof)]
     enum A {
-        #[bilrost(tag = 1)]
+        #[bilrost(1)]
         One(bool),
-        #[bilrost(tag = 10)]
+        #[bilrost(10)]
         Ten(bool),
-        #[bilrost(tag = 20)]
+        #[bilrost(20)]
         Twenty(bool),
     }
 
     #[derive(Clone, Debug, PartialEq, Oneof)]
     enum B {
-        #[bilrost(tag = 9)]
+        #[bilrost(9)]
         Nine(bool),
-        #[bilrost(tag = 11)]
+        #[bilrost(11)]
         Eleven(bool),
     }
 
     #[derive(Clone, Debug, PartialEq, Oneof)]
     enum C {
-        #[bilrost(tag = 13)]
+        #[bilrost(13)]
         Thirteen(bool),
-        #[bilrost(tag = 16)]
+        #[bilrost(16)]
         Sixteen(bool),
-        #[bilrost(tag = 22)]
+        #[bilrost(22)]
         TwentyTwo(bool),
     }
 
     #[derive(Clone, Debug, PartialEq, Oneof)]
     enum D {
-        #[bilrost(tag = 18)]
+        #[bilrost(18)]
         Eighteen(bool),
-        #[bilrost(tag = 19)]
+        #[bilrost(19)]
         Nineteen(bool),
     }
 
@@ -53,13 +53,13 @@ mod tests {
 
     #[derive(Clone, Debug, PartialEq, Message)]
     struct Struct {
-        #[bilrost(tag = 0)]
+        #[bilrost(0)]
         zero: bool,
         #[bilrost(oneof = "1, 10, 20")]
         a: Option<A>,
-        #[bilrost(tag = 4)]
+        #[bilrost(4)]
         four: bool,
-        #[bilrost(tag = 5)]
+        #[bilrost(5)]
         five: bool,
         #[bilrost(oneof = "9, 11")]
         b: Option<B>,
@@ -67,17 +67,17 @@ mod tests {
         twelve: bool,
         #[bilrost(oneof = "13, 16, 22")]
         c: Option<C>,
-        #[bilrost(tag = 14)]
+        #[bilrost(14)]
         fourteen: bool,
         // implicitly tagged 15
         fifteen: bool,
-        #[bilrost(tag = 17)]
+        #[bilrost(17)]
         seventeen: bool,
         #[bilrost(oneof = "18, 19")]
         d: Option<D>,
-        #[bilrost(tag = 21)]
+        #[bilrost(21)]
         twentyone: bool,
-        #[bilrost(tag = 50)]
+        #[bilrost(50)]
         fifty: bool,
     }
 
@@ -135,17 +135,17 @@ mod tests {
     fn duplicated_field_decoding() {
         #[derive(Message)]
         struct Foo {
-            #[bilrost(tag = 1)]
+            #[bilrost(1)]
             a: Vec<bool>,
-            #[bilrost(tag = 2)]
+            #[bilrost(2)]
             b: Vec<bool>,
         }
 
         #[derive(Debug, PartialEq, Message)]
         struct Bar {
-            #[bilrost(tag = 1)]
+            #[bilrost(1)]
             a: Option<bool>,
-            #[bilrost(tag = 2)]
+            #[bilrost(2)]
             b: bool,
         }
 
@@ -232,17 +232,17 @@ mod tests {
     fn oneof_field_decoding() {
         #[derive(Message)]
         struct Foo {
-            #[bilrost(tag = 1)]
+            #[bilrost(1)]
             a: Option<bool>,
-            #[bilrost(tag = 2)]
+            #[bilrost(2)]
             b: Option<bool>,
         }
 
         #[derive(Debug, PartialEq, Oneof)]
         enum AB {
-            #[bilrost(tag = 1)]
+            #[bilrost(1)]
             A(bool),
-            #[bilrost(tag = 2)]
+            #[bilrost(2)]
             B(bool),
         }
         use AB::*;

@@ -7,7 +7,7 @@ use anyhow::{bail, Error};
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 use syn::punctuated::Punctuated;
-use syn::{Attribute, Meta, Token, Type, WhereClause};
+use syn::{Attribute, LitInt, Meta, parse2, Token, Type, WhereClause};
 
 #[derive(Clone)]
 pub enum Field {
@@ -154,11 +154,16 @@ fn bilrost_attrs(attrs: Vec<Attribute>) -> Result<Vec<Meta>, Error> {
     for attr in attrs.iter() {
         if let Meta::List(meta_list) = &attr.meta {
             if meta_list.path.is_ident("bilrost") {
-                result.extend(
-                    meta_list
-                        .parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)?
-                        .into_iter(),
-                )
+                // `bilrost(1)` is transformed into `bilrost(tag = 1)` as a shorthand
+                if let Ok(short_tag) = parse2::<LitInt>(meta_list.tokens.clone()) {
+                    result.push(parse2::<Meta>(quote!(tag = #short_tag)).unwrap());
+                } else {
+                    result.extend(
+                        meta_list
+                            .parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)?
+                            .into_iter(),
+                    );
+                }
             }
         }
     }

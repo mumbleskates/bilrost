@@ -72,7 +72,7 @@ pub struct Duration {
     /// Signed seconds of the span of time. Must be from -315,576,000,000
     /// to +315,576,000,000 inclusive. Note: these bounds are computed from:
     /// 60 sec/min * 60 min/hr * 24 hr/day * 365.25 days/year * 10000 years
-    #[bilrost(tag = 1)]
+    #[bilrost(1)]
     pub seconds: i64,
     /// Signed fractions of a second at nanosecond resolution of the span
     /// of time. Durations less than one second are represented with a 0
@@ -95,7 +95,7 @@ pub struct Duration {
 #[derive(Clone, Debug, PartialEq, Message)]
 pub struct Struct {
     /// Unordered map of dynamically typed values.
-    #[bilrost(tag = 1)]
+    #[bilrost(1)]
     pub fields: BTreeMap<String, Value>,
 }
 
@@ -121,19 +121,19 @@ pub mod value {
     #[derive(Clone, Debug, PartialEq, bilrost::Oneof)]
     pub enum Kind {
         /// Represents a float64 value.
-        #[bilrost(tag = 1)]
+        #[bilrost(1)]
         NumberValue(f64),
         /// Represents a string value.
-        #[bilrost(tag = 2)]
+        #[bilrost(2)]
         StringValue(String),
         /// Represents a boolean value.
-        #[bilrost(tag = 3)]
+        #[bilrost(3)]
         BoolValue(bool),
         /// Represents a structured value.
-        #[bilrost(tag = 4)]
+        #[bilrost(4)]
         StructValue(super::Struct),
         /// Represents a repeated `Value`.
-        #[bilrost(tag = 5)]
+        #[bilrost(5)]
         ListValue(super::ListValue),
     }
 }
@@ -252,7 +252,7 @@ pub struct Timestamp {
     /// Represents seconds of UTC time since Unix epoch
     /// 1970-01-01T00:00:00Z. Must be from 0001-01-01T00:00:00Z to
     /// 9999-12-31T23:59:59Z inclusive.
-    #[bilrost(tag = 1)]
+    #[bilrost(1)]
     pub seconds: i64,
     /// Non-negative fractions of a second at nanosecond resolution. Negative
     /// second values with fractions must still have non-negative nanos values

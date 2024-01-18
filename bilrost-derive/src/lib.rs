@@ -841,13 +841,13 @@ mod test {
     fn test_basic_message() {
         let output = try_message(quote! {
             pub struct Struct {
-                #[bilrost(tag = 3)]
+                #[bilrost(3)]
                 pub fields: BTreeMap<String, i64>,
-                #[bilrost(tag = 0)]
+                #[bilrost(0)]
                 pub foo: String,
-                #[bilrost(tag = 1)]
+                #[bilrost(1)]
                 pub bar: i64,
-                #[bilrost(tag = 2)]
+                #[bilrost(2)]
                 pub baz: bool,
             }
         });
@@ -880,16 +880,25 @@ mod test {
         })
         .unwrap()
         .to_string();
+        let four = try_message(quote! {
+            struct A (
+                #[bilrost(1)] bool,
+                #[bilrost(oneof(2, 3))] B,
+            );
+        })
+        .unwrap()
+        .to_string();
         assert_eq!(one, two);
         assert_eq!(one, three);
+        assert_eq!(one, four);
     }
 
     #[test]
     fn test_tuple_message() {
         let output = try_message(quote! {
             struct Tuple(
-                #[bilrost(tag = 5)] bool,
-                #[bilrost(tag = 0)] String,
+                #[bilrost(5)] bool,
+                #[bilrost(0)] String,
                 i64,
             );
         });
@@ -900,29 +909,29 @@ mod test {
     fn test_overlapping_message() {
         let output = try_message(quote! {
             struct Struct {
-                #[bilrost(tag = 0)]
+                #[bilrost(0)]
                 zero: bool,
                 #[bilrost(oneof(1, 10, 20))]
                 a: Option<A>,
-                #[bilrost(tag = 4)]
+                #[bilrost(4)]
                 four: bool,
-                #[bilrost(tag = 5)]
+                #[bilrost(5)]
                 five: bool,
                 #[bilrost(oneof(9, 11))]
                 b: Option<B>,
                 twelve: bool, // implicitly tagged 12
                 #[bilrost(oneof(13, 16, 22))]
                 c: Option<C>,
-                #[bilrost(tag = 14)]
+                #[bilrost(14)]
                 fourteen: bool,
                 fifteen: bool, // implicitly tagged 15
-                #[bilrost(tag = 17)]
+                #[bilrost(17)]
                 seventeen: bool,
                 #[bilrost(oneof(18, 19))]
                 d: Option<D>,
-                #[bilrost(tag = 21)]
+                #[bilrost(21)]
                 twentyone: bool,
-                #[bilrost(tag = 50)]
+                #[bilrost(50)]
                 fifty: bool,
             }
         });
