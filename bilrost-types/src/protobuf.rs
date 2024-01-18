@@ -1,4 +1,7 @@
-use ::bilrost::alloc;
+use bilrost::alloc::collections::BTreeMap;
+use bilrost::alloc::string::String;
+use bilrost::alloc::vec::Vec;
+use bilrost::Message;
 
 /// A Duration represents a signed, fixed-length span of time represented
 /// as a count of seconds and fractions of seconds at nanosecond
@@ -64,13 +67,12 @@ use ::bilrost::alloc;
 /// encoded in JSON format as "3s", while 3 seconds and 1 nanosecond should
 /// be expressed in JSON format as "3.000000001s", and 3 seconds and 1
 /// microsecond should be expressed in JSON format as "3.000001s".
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::bilrost::Message)]
+#[derive(Clone, Debug, PartialEq, PartialOrd, Message)]
 pub struct Duration {
     /// Signed seconds of the span of time. Must be from -315,576,000,000
     /// to +315,576,000,000 inclusive. Note: these bounds are computed from:
     /// 60 sec/min * 60 min/hr * 24 hr/day * 365.25 days/year * 10000 years
-    #[bilrost(tag = "1")]
+    #[bilrost(tag = 1)]
     pub seconds: i64,
     /// Signed fractions of a second at nanosecond resolution of the span
     /// of time. Durations less than one second are represented with a 0
@@ -78,7 +80,7 @@ pub struct Duration {
     /// of one second or more, a non-zero value for the `nanos` field must be
     /// of the same sign as the `seconds` field. Must be from -999,999,999
     /// to +999,999,999 inclusive.
-    #[bilrost(tag = "2", encoder = "fixed")]
+    #[bilrost(tag = 2, encoder = "fixed")]
     pub nanos: i32,
 }
 
@@ -90,12 +92,11 @@ pub struct Duration {
 /// with the proto support for the language.
 ///
 /// The JSON representation for `Struct` is JSON object.
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::bilrost::Message)]
+#[derive(Clone, Debug, PartialEq, Message)]
 pub struct Struct {
     /// Unordered map of dynamically typed values.
-    #[bilrost(tag = "1")]
-    pub fields: alloc::collections::BTreeMap<alloc::string::String, Value>,
+    #[bilrost(tag = 1)]
+    pub fields: BTreeMap<String, Value>,
 }
 
 /// `Value` represents a dynamically typed value which can be either
@@ -104,37 +105,35 @@ pub struct Struct {
 /// variants. Absence of any variant indicates an error.
 ///
 /// The JSON representation for `Value` is JSON value.
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::bilrost::Message)]
+#[derive(Clone, Debug, PartialEq, Message)]
 pub struct Value {
-    /// The kind of value.
-    #[bilrost(oneof = "1, 2, 3, 4, 5, 6")]
-    pub kind: ::core::option::Option<value::Kind>,
+    /// The kind of value. None represents JSON `null`.
+    // TODO(widders): change this to explicit Null variantw hen that's implemented.
+    #[bilrost(oneof(1, 2, 3, 4, 5))]
+    pub kind: Option<value::Kind>,
 }
 
 /// Nested message and enum types in `Value`.
 pub mod value {
+    use super::String;
+
     /// The kind of value.
-    #[allow(clippy::derive_partial_eq_without_eq)]
-    #[derive(Clone, PartialEq, bilrost::Oneof)]
+    #[derive(Clone, Debug, PartialEq, bilrost::Oneof)]
     pub enum Kind {
-        /// Represents a null value.
-        #[bilrost(enumeration = "super::NullValue", tag = "1")]
-        NullValue(u32),
         /// Represents a float64 value.
-        #[bilrost(float64, tag = "2")]
+        #[bilrost(tag = 1)]
         NumberValue(f64),
         /// Represents a string value.
-        #[bilrost(string, tag = "3")]
-        StringValue(::bilrost::alloc::string::String),
+        #[bilrost(tag = 2)]
+        StringValue(String),
         /// Represents a boolean value.
-        #[bilrost(bool, tag = "4")]
+        #[bilrost(tag = 3)]
         BoolValue(bool),
         /// Represents a structured value.
-        #[bilrost(message, tag = "5")]
+        #[bilrost(tag = 4)]
         StructValue(super::Struct),
         /// Represents a repeated `Value`.
-        #[bilrost(message, tag = "6")]
+        #[bilrost(tag = 5)]
         ListValue(super::ListValue),
     }
 }
@@ -142,42 +141,11 @@ pub mod value {
 /// `ListValue` is a wrapper around a repeated field of values.
 ///
 /// The JSON representation for `ListValue` is JSON array.
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::bilrost::Message)]
+#[derive(Clone, Debug, PartialEq, Message)]
 pub struct ListValue {
     /// Repeated field of dynamically typed values.
-    #[bilrost(message, repeated, tag = "1")]
-    pub values: ::bilrost::alloc::vec::Vec<Value>,
-}
-
-/// `NullValue` is a singleton enumeration to represent the null value for the
-/// `Value` type union.
-///
-/// The JSON representation for `NullValue` is JSON `null`.
-#[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, ::bilrost::Enumeration)]
-#[repr(u32)]
-pub enum NullValue {
-    /// Null value.
-    NullValue = 0,
-}
-
-impl NullValue {
-    /// String value of the enum field names used in the ProtoBuf definition.
-    ///
-    /// The values are not transformed in any way and thus are considered stable
-    /// (if the ProtoBuf definition does not change) and safe for programmatic use.
-    pub fn as_str_name(&self) -> &'static str {
-        match self {
-            NullValue::NullValue => "NULL_VALUE",
-        }
-    }
-    /// Creates an enum from field names used in the ProtoBuf definition.
-    pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
-        match value {
-            "NULL_VALUE" => Some(Self::NullValue),
-            _ => None,
-        }
-    }
+    #[bilrost(tag = 1, encoder = "packed")]
+    pub values: Vec<Value>,
 }
 
 /// A Timestamp represents a point in time independent of any time zone or local
@@ -279,18 +247,17 @@ impl NullValue {
 /// [`strftime`](<https://docs.python.org/2/library/time.html#time.strftime>) with
 /// the time format spec '%Y-%m-%dT%H:%M:%S.%fZ'. Likewise, in Java, one can use
 /// the Joda Time's [`ISODateTimeFormat.dateTime()`](<http://www.joda.org/joda-time/apidocs/org/joda/time/format/ISODateTimeFormat.html#dateTime%2D%2D>) to obtain a formatter capable of generating timestamps in this format.
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::bilrost::Message)]
+#[derive(Clone, Debug, PartialEq, PartialOrd, Message)]
 pub struct Timestamp {
     /// Represents seconds of UTC time since Unix epoch
     /// 1970-01-01T00:00:00Z. Must be from 0001-01-01T00:00:00Z to
     /// 9999-12-31T23:59:59Z inclusive.
-    #[bilrost(sint64, tag = "1")]
+    #[bilrost(tag = 1)]
     pub seconds: i64,
     /// Non-negative fractions of a second at nanosecond resolution. Negative
     /// second values with fractions must still have non-negative nanos values
     /// that count forward in time. Must be from 0 to 999,999,999
     /// inclusive.
-    #[bilrost(sfixed32, tag = "2")]
+    #[bilrost(tag = 2, encoder = "fixed")]
     pub nanos: i32,
 }

@@ -10,39 +10,39 @@ mod tests {
     use core::default::Default;
     use itertools::{repeat_n, Itertools};
 
-    #[derive(Clone, PartialEq, Oneof)]
+    #[derive(Clone, Debug, PartialEq, Oneof)]
     enum A {
-        #[bilrost(bool, tag = 1)]
+        #[bilrost(tag = 1)]
         One(bool),
-        #[bilrost(bool, tag = 10)]
+        #[bilrost(tag = 10)]
         Ten(bool),
-        #[bilrost(bool, tag = 20)]
+        #[bilrost(tag = 20)]
         Twenty(bool),
     }
 
-    #[derive(Clone, PartialEq, Oneof)]
+    #[derive(Clone, Debug, PartialEq, Oneof)]
     enum B {
-        #[bilrost(bool, tag = 9)]
+        #[bilrost(tag = 9)]
         Nine(bool),
-        #[bilrost(bool, tag = 11)]
+        #[bilrost(tag = 11)]
         Eleven(bool),
     }
 
-    #[derive(Clone, PartialEq, Oneof)]
+    #[derive(Clone, Debug, PartialEq, Oneof)]
     enum C {
-        #[bilrost(bool, tag = 13)]
+        #[bilrost(tag = 13)]
         Thirteen(bool),
-        #[bilrost(bool, tag = 16)]
+        #[bilrost(tag = 16)]
         Sixteen(bool),
-        #[bilrost(bool, tag = 22)]
+        #[bilrost(tag = 22)]
         TwentyTwo(bool),
     }
 
-    #[derive(Clone, PartialEq, Oneof)]
+    #[derive(Clone, Debug, PartialEq, Oneof)]
     enum D {
-        #[bilrost(bool, tag = 18)]
+        #[bilrost(tag = 18)]
         Eighteen(bool),
-        #[bilrost(bool, tag = 19)]
+        #[bilrost(tag = 19)]
         Nineteen(bool),
     }
 
@@ -51,33 +51,33 @@ mod tests {
     use C::*;
     use D::*;
 
-    #[derive(Clone, PartialEq, Message)]
+    #[derive(Clone, Debug, PartialEq, Message)]
     struct Struct {
-        #[bilrost(bool, tag = 0)]
+        #[bilrost(tag = 0)]
         zero: bool,
-        #[bilrost(oneof = "A", tags = "1, 10, 20")]
+        #[bilrost(oneof = "1, 10, 20")]
         a: Option<A>,
-        #[bilrost(bool, tag = 4)]
+        #[bilrost(tag = 4)]
         four: bool,
-        #[bilrost(bool, tag = 5)]
+        #[bilrost(tag = 5)]
         five: bool,
-        #[bilrost(oneof = "B", tags = "9, 11")]
+        #[bilrost(oneof = "9, 11")]
         b: Option<B>,
-        #[bilrost(bool)] // implicitly tagged 12
+        // implicitly tagged 12
         twelve: bool,
-        #[bilrost(oneof = "C", tags = "13, 16, 22")]
+        #[bilrost(oneof = "13, 16, 22")]
         c: Option<C>,
-        #[bilrost(bool, tag = 14)]
+        #[bilrost(tag = 14)]
         fourteen: bool,
-        #[bilrost(bool)] // implicitly tagged 15
+        // implicitly tagged 15
         fifteen: bool,
-        #[bilrost(bool, tag = 17)]
+        #[bilrost(tag = 17)]
         seventeen: bool,
-        #[bilrost(oneof = "D", tags = "18, 19")]
+        #[bilrost(oneof = "18, 19")]
         d: Option<D>,
-        #[bilrost(bool, tag = 21)]
+        #[bilrost(tag = 21)]
         twentyone: bool,
-        #[bilrost(bool, tag = 50)]
+        #[bilrost(tag = 50)]
         fifty: bool,
     }
 
@@ -135,17 +135,17 @@ mod tests {
     fn duplicated_field_decoding() {
         #[derive(Message)]
         struct Foo {
-            #[bilrost(bool, repeated, packed = false, tag = 1)]
+            #[bilrost(tag = 1)]
             a: Vec<bool>,
-            #[bilrost(bool, repeated, packed = false, tag = 2)]
+            #[bilrost(tag = 2)]
             b: Vec<bool>,
         }
 
-        #[derive(PartialEq, Message)]
+        #[derive(Debug, PartialEq, Message)]
         struct Bar {
-            #[bilrost(bool, optional, tag = 1)]
+            #[bilrost(tag = 1)]
             a: Option<bool>,
-            #[bilrost(bool, tag = 2)]
+            #[bilrost(tag = 2)]
             b: bool,
         }
 
@@ -194,13 +194,13 @@ mod tests {
     fn duplicated_packed_decoding() {
         #[derive(Message)]
         struct Foo {
-            #[bilrost(bytes = "vec", repeated, tag = 1)]
+            #[bilrost(tag = 1, encoder = "unpacked<vecblob>")]
             a: Vec<Vec<u8>>,
         }
 
-        #[derive(PartialEq, Message)]
+        #[derive(Debug, PartialEq, Message)]
         struct Bar {
-            #[bilrost(bool, repeated, packed = true, tag = 1)]
+            #[bilrost(tag = 1, encoder = "packed")]
             a: Vec<bool>,
         }
 
@@ -232,24 +232,24 @@ mod tests {
     fn oneof_field_decoding() {
         #[derive(Message)]
         struct Foo {
-            #[bilrost(bool, optional, tag = 1)]
+            #[bilrost(tag = 1)]
             a: Option<bool>,
-            #[bilrost(bool, optional, tag = 2)]
+            #[bilrost(tag = 2)]
             b: Option<bool>,
         }
 
-        #[derive(PartialEq, Oneof)]
+        #[derive(Debug, PartialEq, Oneof)]
         enum AB {
-            #[bilrost(bool, tag = 1)]
+            #[bilrost(tag = 1)]
             A(bool),
-            #[bilrost(bool, tag = 2)]
+            #[bilrost(tag = 2)]
             B(bool),
         }
         use AB::*;
 
-        #[derive(PartialEq, Message)]
+        #[derive(Debug, PartialEq, Message)]
         struct Bar {
-            #[bilrost(oneof = "AB", tags = "1, 2")]
+            #[bilrost(oneof = "1, 2")]
             ab: Option<AB>,
         }
 
@@ -273,7 +273,7 @@ mod tests {
         assert_eq!(Bar::decode(&b_only[..]), Ok(Bar { ab: Some(B(true)) }));
         assert_eq!(
             Bar::decode(&both[..]).unwrap_err().to_string(),
-            "failed to decode Bilrost message: Bar.ab: conflicting or repeating fields in oneof"
+            "failed to decode Bilrost message: Bar.ab: conflicting fields in oneof"
         );
     }
 }
