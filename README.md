@@ -47,6 +47,7 @@ incompatible way:
 ### Strengths, Aims, and Advantages
 
 Strengths of bilrost's encoding include those of protocol buffers:
+
 * the encoded messages are very durable, with greatly extensible forward
   compatibility
 * the encoded messages are relatively very compact, and their representation "on
@@ -59,6 +60,7 @@ Strengths of bilrost's encoding include those of protocol buffers:
   repeated is stored with a length prefix
 
 ...as well as more:
+
 * bilrost supports distinguished encoding for types where it makes sense, and is
   designed from a protocol level to make invalid values unrepresentable where
   possible
@@ -199,6 +201,7 @@ the `tag` attribute on the first field after the gap. The following fields will
 be tagged sequentially starting from the next number.
 
 <!-- TODO(widders): fix this example -->
+
 ```rust,ignore
 use bilrost;
 use bilrost::{Enumeration, Message};

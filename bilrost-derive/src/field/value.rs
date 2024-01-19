@@ -107,8 +107,10 @@ impl Field {
     /// Spells a value for the field as an enum variant with the given value.
     pub fn with_value(&self, value: TokenStream) -> TokenStream {
         if !self.in_oneof {
-            panic!("trying to spell a field's value within a oneof variant, but the field is not \
-            part of a oneof");
+            panic!(
+                "trying to spell a field's value within a oneof variant, but the field is not part \
+                of a oneof"
+            );
         }
         match &self.ident_within_variant {
             None => quote!( (#value) ),

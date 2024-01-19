@@ -52,7 +52,10 @@ impl Field {
         };
 
         if !unknown_attrs.is_empty() {
-            bail!("unknown attribute(s) for oneof field: {}", quote!(#(#unknown_attrs),*));
+            bail!(
+                "unknown attribute(s) for oneof field: {}",
+                quote!(#(#unknown_attrs),*)
+            );
         }
 
         Ok(Some(Field {

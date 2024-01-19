@@ -2,7 +2,6 @@
 
 Bilrost ships a few fuzz tests, using both libfuzzer and aflfuzz.
 
-
 ## afl
 
 To run the afl fuzz tests, first install cargo-afl:
@@ -20,7 +19,6 @@ To reproduce a crash:
     cd fuzz/afl/<target>/
     cargo build --bin reproduce
     cargo run --bin reproduce -- out/crashes/<crashfile>
-
 
 ## libfuzzer
 
