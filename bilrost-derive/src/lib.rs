@@ -1095,7 +1095,7 @@ mod test {
     }
 
     #[test]
-    fn test_conflicting_empty_oneof_variants() {
+    fn test_rejects_conflicting_empty_oneof_variants() {
         let output = try_oneof(quote!(
             enum AB {
                 Empty,
@@ -1115,7 +1115,7 @@ mod test {
     }
 
     #[test]
-    fn test_meaningless_empty_variant_attrs() {
+    fn test_rejects_meaningless_empty_variant_attrs() {
         let output = try_oneof(quote!(
             enum AB {
                 #[bilrost(tag = 0, encoder(usize), anything_else)]
@@ -1131,6 +1131,24 @@ mod test {
                 .expect_err("unknown attrs on empty variant not detected")
                 .to_string(),
             "Unknown attribute(s) on empty Oneof variant: tag = 0 , encoder (usize) , anything_else"
+        );
+    }
+
+    #[test]
+    fn test_rejects_unnumbered_oneof_variants() {
+        let output = try_oneof(quote!(
+            enum AB {
+                #[bilrost(1)]
+                A(u32),
+                #[bilrost(encoder(packed))]
+                B(Vec<String>),
+            }
+        ));
+        assert_eq!(
+            output
+                .expect_err("unnumbered oneof variant not detected")
+                .to_string(),
+            "missing tag attribute"
         );
     }
 }
