@@ -7,6 +7,7 @@ use std::mem::take;
 use std::ops::Deref;
 
 use anyhow::{bail, Error};
+use field::bilrost_attrs;
 use itertools::Itertools;
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
@@ -645,39 +646,67 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
     let generics = &input.generics;
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
+    // Oneof enums have either zero or one unit variant. If there is no such variant, the Oneof
+    // trait is implemented on `Option<T>`, and `None` stands in for no fields being set. If there
+    // is such a variant, it becomes the default for the type and stands in for no fields being set,
+    // as the "empty" variant.
+    let mut empty_variant: Option<Ident> = None;
+    let mut fields: Vec<(Ident, Field)> = Vec::new();
     // Map the variants into 'fields'.
-    let fields: Vec<(Ident, Field)> = variants
-        .into_iter()
-        .map(
-            |Variant {
-                 attrs,
-                 ident: variant_ident,
-                 fields: variant_fields,
-                 ..
-             }| {
-                let ty = match variant_fields {
-                    // TODO(widders): support a single empty default Unit variant in lieu of the
-                    //  Option<T> implementation
-                    Fields::Unit => bail!("Oneof enum variants must have a single field"),
-                    Fields::Named(FieldsNamed { named: fields, .. })
-                    | Fields::Unnamed(FieldsUnnamed {
-                        unnamed: fields, ..
-                    }) if fields.len() != 1 => {
-                        bail!("Oneof enum variants must have a single field")
+    for Variant {
+        attrs,
+        ident: variant_ident,
+        fields: variant_fields,
+        ..
+    } in variants
+    {
+        match variant_fields {
+            Fields::Unit => {
+                if empty_variant.replace(variant_ident).is_some() {
+                    bail!("Oneofs may have at most one empty enum variant");
+                }
+                let attrs = bilrost_attrs(attrs)?;
+                if !attrs.is_empty() {
+                    bail!(
+                        "Unknown attribute(s) on empty Oneof variant: {}",
+                        quote!(#(#attrs),*)
+                    );
+                }
+            }
+            // TODO(widders): currently it turns out we handle oneof variants with named fields
+            //  *completely wrong*. did this ever work pre-fork? is it worth fixing?
+            Fields::Named(FieldsNamed {
+                named: variant_fields,
+                ..
+            })
+            | Fields::Unnamed(FieldsUnnamed {
+                unnamed: variant_fields,
+                ..
+            }) => match variant_fields.len() {
+                0 => {
+                    if empty_variant.replace(variant_ident).is_some() {
+                        bail!("Oneofs may have at most one empty enum variant");
                     }
-                    Fields::Named(FieldsNamed { named: fields, .. })
-                    | Fields::Unnamed(FieldsUnnamed {
-                        unnamed: fields, ..
-                    }) => fields.first().unwrap().ty.clone(),
-                };
-                Ok((variant_ident, Field::new_in_oneof(ty, attrs)?))
+                    let attrs = bilrost_attrs(attrs)?;
+                    if !attrs.is_empty() {
+                        bail!(
+                            "Unknown attribute(s) on empty Oneof variant: {}",
+                            quote!(#(#attrs),*)
+                        );
+                    }
+                }
+                1 => {
+                    fields.push((
+                        variant_ident,
+                        Field::new_in_oneof(variant_fields.first().unwrap().ty.clone(), attrs)?,
+                    ));
+                }
+                _ => bail!("Oneof enum variants must have at most a single field"),
             },
-        )
-        .collect::<Result<_, _>>()?;
-
-    if fields.iter().any(|(_, field)| field.tags().len() > 1) {
-        panic!("variant with multiple tags");
+        };
     }
+    let fields = fields;
+
     let sorted_tags: Vec<u32> = fields
         .iter()
         .flat_map(|(_, field)| field.tags())
@@ -694,31 +723,13 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
     // Append the requirement that every field's type is encodable with its corresponding encoder
     // to our where clause.
     let where_clause = Field::append_wheres(where_clause, fields.iter().map(|(_, field)| field));
+    let impl_wrapper_const_ident =
+        parse_str::<Ident>(&("__BILROST_DERIVED_IMPL_ONEOF_FOR_".to_owned() + &ident.to_string()))?;
+    let aliases = encoder_alias_header();
 
     let encode = fields.iter().map(|(variant_ident, field)| {
         let encode = field.encode(quote!(*value));
         quote!(#ident::#variant_ident(value) => { #encode })
-    });
-
-    let decode = fields.iter().map(|(variant_ident, field)| {
-        let tag = field.first_tag();
-        let decode = field.decode(quote!(value));
-        quote! {
-            #tag => {
-                match field {
-                    ::core::option::Option::None => {
-                        let #ident::#variant_ident(value) = field.insert(#ident::#variant_ident(
-                            ::bilrost::encoding::NewForOverwrite::new_for_overwrite()
-                        )) else { panic!("unreachable") };
-                        #decode
-                    }
-                    ::core::option::Option::Some(#ident::#variant_ident(value)) => {
-                        #decode
-                    }
-                    _ => Err(::bilrost::DecodeError::new("conflicting fields in oneof")),
-                }
-            }
-        }
     });
 
     let encoded_len = fields.iter().map(|(variant_ident, field)| {
@@ -726,63 +737,181 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         quote!(#ident::#variant_ident(value) => #encoded_len)
     });
 
-    let current_tag = fields.iter().map(|(variant_ident, field)| {
-        let tag = field.tags()[0];
-        quote!(#ident::#variant_ident(_) => #tag)
-    });
+    let expanded = if let Some(empty_ident) = empty_variant {
+        let current_tag = fields.iter().map(|(variant_ident, field)| {
+            let tag = field.tags()[0];
+            quote!(#ident::#variant_ident(_) => ::core::option::Option::Some(#tag))
+        });
 
-    let impl_wrapper_const_ident =
-        parse_str::<Ident>(&("__BILROST_DERIVED_IMPL_ONEOF_FOR_".to_owned() + &ident.to_string()))?;
-    let aliases = encoder_alias_header();
-    let expanded = quote! {
-        const #impl_wrapper_const_ident: () = {
-            #aliases
-
-            impl #impl_generics ::bilrost::encoding::NonEmptyOneof
-            for #ident #ty_generics
-            #where_clause
-            {
-                const FIELD_TAGS: &'static [u32] = &[#(#sorted_tags),*];
-
-                fn oneof_encode<__B: ::bilrost::bytes::BufMut + ?Sized>(
-                    &self,
-                    buf: &mut __B,
-                    tw: &mut ::bilrost::encoding::TagWriter,
-                ) {
+        let decode = fields.iter().map(|(variant_ident, field)| {
+            let tag = field.first_tag();
+            let decode = field.decode(quote!(value));
+            quote! {
+                #tag => {
                     match self {
-                        #(#encode,)*
-                    }
-                }
-
-                fn oneof_encoded_len(&self, tm: &mut ::bilrost::encoding::TagMeasurer) -> usize {
-                    match self {
-                        #(#encoded_len,)*
-                    }
-                }
-
-                fn oneof_current_tag(&self) -> u32 {
-                    match self {
-                        #(#current_tag,)*
-                    }
-                }
-
-                fn oneof_decode_field<__B: ::bilrost::bytes::Buf + ?Sized>(
-                    field: &mut ::core::option::Option<Self>,
-                    tag: u32,
-                    wire_type: ::bilrost::encoding::WireType,
-                    duplicated: bool,
-                    buf: ::bilrost::encoding::Capped<__B>,
-                    ctx: ::bilrost::encoding::DecodeContext,
-                ) -> ::core::result::Result<(), ::bilrost::DecodeError> {
-                    match tag {
-                        #(#decode,)*
-                        _ => unreachable!(concat!("invalid ", stringify!(#ident), " tag: {}"), tag),
+                        #ident::#empty_ident => {
+                            let mut new_value =
+                                ::bilrost::encoding::NewForOverwrite::new_for_overwrite();
+                            let mut value = &mut new_value;
+                            #decode?;
+                            *self = #ident::#variant_ident(new_value);
+                            Ok(())
+                        }
+                        #ident::#variant_ident(value) => {
+                            #decode
+                        }
+                        _ => Err(::bilrost::DecodeError::new("conflicting fields in oneof")),
                     }
                 }
             }
+        });
 
-            ()
-        };
+        quote! {
+            const #impl_wrapper_const_ident: () = {
+                #aliases
+
+                impl #impl_generics ::bilrost::encoding::Oneof
+                for #ident #ty_generics
+                #where_clause
+                {
+                    const FIELD_TAGS: &'static [u32] = &[#(#sorted_tags),*];
+
+                    fn oneof_encode<__B: ::bilrost::bytes::BufMut + ?Sized>(
+                        &self,
+                        buf: &mut __B,
+                        tw: &mut ::bilrost::encoding::TagWriter,
+                    ) {
+                        match self {
+                            #ident::#empty_ident => {}
+                            #(#encode,)*
+                        }
+                    }
+
+                    fn oneof_encoded_len(
+                        &self,
+                        tm: &mut ::bilrost::encoding::TagMeasurer,
+                    ) -> usize {
+                        match self {
+                            #ident::#empty_ident => 0,
+                            #(#encoded_len,)*
+                        }
+                    }
+
+                    fn oneof_current_tag(&self) -> ::core::option::Option<u32> {
+                        match self {
+                            #ident::#empty_ident => ::core::option::Option::None,
+                            #(#current_tag,)*
+                        }
+                    }
+
+                    fn oneof_decode_field<__B: ::bilrost::bytes::Buf + ?Sized>(
+                        &mut self,
+                        tag: u32,
+                        wire_type: ::bilrost::encoding::WireType,
+                        duplicated: bool,
+                        buf: ::bilrost::encoding::Capped<__B>,
+                        ctx: ::bilrost::encoding::DecodeContext,
+                    ) -> ::core::result::Result<(), ::bilrost::DecodeError> {
+                        match tag {
+                            #(#decode,)*
+                            _ => unreachable!(
+                                concat!("invalid ", stringify!(#ident), " tag: {}"), tag,
+                            ),
+                        }
+                    }
+                }
+
+                impl ::core::default::Default for #ident #ty_generics #where_clause {
+                    fn default() -> Self {
+                        #ident::#empty_ident
+                    }
+                }
+
+                ()
+            };
+        }
+    } else {
+        let current_tag = fields.iter().map(|(variant_ident, field)| {
+            let tag = field.tags()[0];
+            quote!(#ident::#variant_ident(_) => #tag)
+        });
+
+        let decode = fields.iter().map(|(variant_ident, field)| {
+            let tag = field.first_tag();
+            let decode = field.decode(quote!(value));
+            quote! {
+                #tag => {
+                    match field {
+                        ::core::option::Option::None => {
+                            let #ident::#variant_ident(value) = field.insert(#ident::#variant_ident(
+                                ::bilrost::encoding::NewForOverwrite::new_for_overwrite()
+                            )) else { panic!("unreachable") };
+                            #decode
+                        }
+                        ::core::option::Option::Some(#ident::#variant_ident(value)) => {
+                            #decode
+                        }
+                        _ => Err(::bilrost::DecodeError::new("conflicting fields in oneof")),
+                    }
+                }
+            }
+        });
+
+        quote! {
+            const #impl_wrapper_const_ident: () = {
+                #aliases
+
+                impl #impl_generics ::bilrost::encoding::NonEmptyOneof
+                for #ident #ty_generics
+                #where_clause
+                {
+                    const FIELD_TAGS: &'static [u32] = &[#(#sorted_tags),*];
+
+                    fn oneof_encode<__B: ::bilrost::bytes::BufMut + ?Sized>(
+                        &self,
+                        buf: &mut __B,
+                        tw: &mut ::bilrost::encoding::TagWriter,
+                    ) {
+                        match self {
+                            #(#encode,)*
+                        }
+                    }
+
+                    fn oneof_encoded_len(
+                        &self,
+                        tm: &mut ::bilrost::encoding::TagMeasurer,
+                    ) -> usize {
+                        match self {
+                            #(#encoded_len,)*
+                        }
+                    }
+
+                    fn oneof_current_tag(&self) -> u32 {
+                        match self {
+                            #(#current_tag,)*
+                        }
+                    }
+
+                    fn oneof_decode_field<__B: ::bilrost::bytes::Buf + ?Sized>(
+                        field: &mut ::core::option::Option<Self>,
+                        tag: u32,
+                        wire_type: ::bilrost::encoding::WireType,
+                        duplicated: bool,
+                        buf: ::bilrost::encoding::Capped<__B>,
+                        ctx: ::bilrost::encoding::DecodeContext,
+                    ) -> ::core::result::Result<(), ::bilrost::DecodeError> {
+                        match tag {
+                            #(#decode,)*
+                            _ => unreachable!(
+                                concat!("invalid ", stringify!(#ident), " tag: {}"), tag,
+                            ),
+                        }
+                    }
+                }
+
+                ()
+            };
+        }
     };
 
     Ok(expanded)
@@ -808,9 +937,8 @@ mod test {
                 b: Option<super::Whatever>,
             }
         });
-        assert!(output.is_err());
         assert_eq!(
-            output.unwrap_err().to_string(),
+            output.expect_err("duplicate tags not detected").to_string(),
             "message Invalid has duplicate tag 1"
         );
     }
@@ -825,9 +953,10 @@ mod test {
                 B(bool),
             }
         });
-        assert!(output.is_err());
         assert_eq!(
-            output.unwrap_err().to_string(),
+            output
+                .expect_err("conflicting variant tags not detected")
+                .to_string(),
             "invalid oneof Invalid: multiple variants have tag 1"
         );
     }
@@ -960,5 +1089,45 @@ mod test {
             }
         });
         output.unwrap();
+    }
+
+    #[test]
+    fn test_conflicting_empty_oneof_variants() {
+        let output = try_oneof(quote!(
+            enum AB {
+                Empty,
+                AlsoEmpty,
+                #[bilrost(1)]
+                A(bool),
+                #[bilrost(2)]
+                B(bool),
+            }
+        ));
+        assert_eq!(
+            output
+                .expect_err("conflicting empty variants not detected")
+                .to_string(),
+            "Oneofs may have at most one empty enum variant"
+        );
+    }
+
+    #[test]
+    fn test_meaningless_empty_variant_attrs() {
+        let output = try_oneof(quote!(
+            enum AB {
+                #[bilrost(tag = 0, encoder(usize), anything_else)]
+                Empty,
+                #[bilrost(1)]
+                A(bool),
+                #[bilrost(2)]
+                B(bool),
+            }
+        ));
+        assert_eq!(
+            output
+                .expect_err("unknown attrs on empty variant not detected")
+                .to_string(),
+            "Unknown attribute(s) on empty Oneof variant: tag = 0 , encoder (usize) , anything_else"
+        );
     }
 }

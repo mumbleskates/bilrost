@@ -108,9 +108,8 @@ pub struct Struct {
 #[derive(Clone, Debug, PartialEq, Message)]
 pub struct Value {
     /// The kind of value. None represents JSON `null`.
-    // TODO(widders): change this to explicit Null variant when that's implemented.
     #[bilrost(oneof(1, 2, 3, 4, 5))]
-    pub kind: Option<value::Kind>,
+    pub kind: value::Kind,
 }
 
 /// Nested message and enum types in `Value`.
@@ -120,6 +119,8 @@ pub mod value {
     /// The kind of value.
     #[derive(Clone, Debug, PartialEq, bilrost::Oneof)]
     pub enum Kind {
+        /// Represents a JSON null value.
+        Null,
         /// Represents a float64 value.
         #[bilrost(1)]
         NumberValue(f64),

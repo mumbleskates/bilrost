@@ -133,7 +133,8 @@ impl Field {
         }
     }
 
-    /// Returns an expression which evaluates to the encoded length of the field.
+    /// Returns an expression which evaluates to the encoded length of the field. The given ident
+    /// must be the location name of the field value, not a reference.
     pub fn encoded_len(&self, ident: TokenStream) -> TokenStream {
         let tag = self.tag;
         let encoder = &self.encoder;

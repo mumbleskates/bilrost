@@ -277,7 +277,7 @@ mod tests {
     }
 
     #[test]
-    fn oneof_fields_encode_empty() {
+    fn oneof_optioned_fields_encode_empty() {
         #[derive(Debug, PartialEq, Oneof)]
         enum ABC {
             #[bilrost(1)]
@@ -312,6 +312,53 @@ mod tests {
             },
             Foo {
                 abc: Some(C(vec![false])),
+            },
+        ] {
+            let encoded = value.encode_to_vec();
+            let decoded = Foo::decode(encoded.as_slice()).unwrap();
+            assert_eq!(value, decoded);
+        }
+    }
+
+    #[test]
+    fn oneof_plain_fields_encode_empty() {
+        /// Oneofs that have an empty variant
+        #[derive(Debug, PartialEq, Oneof)]
+        enum ABC {
+            /// No fields
+            Empty,
+            #[bilrost(1)]
+            A(String),
+            #[bilrost(2)]
+            B(u32),
+            #[bilrost(tag = 3, encoder = "packed")]
+            C(Vec<bool>),
+        }
+        use ABC::*;
+
+        #[derive(Debug, PartialEq, Message)]
+        struct Foo {
+            #[bilrost(oneof(1, 2, 3))]
+            abc: ABC,
+        }
+
+        for value in [
+            Foo { abc: Empty },
+            Foo {
+                abc: A(Default::default()),
+            },
+            Foo {
+                abc: A("something".to_string()),
+            },
+            Foo {
+                abc: B(Default::default()),
+            },
+            Foo { abc: B(123) },
+            Foo {
+                abc: C(Default::default()),
+            },
+            Foo {
+                abc: C(vec![false]),
             },
         ] {
             let encoded = value.encode_to_vec();
