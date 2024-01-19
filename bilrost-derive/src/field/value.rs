@@ -1,5 +1,5 @@
 use anyhow::{anyhow, bail, Error};
-use proc_macro2::TokenStream;
+use proc_macro2::{Ident, TokenStream};
 use quote::quote;
 use syn::{parse2, parse_str, Expr, Lit, LitInt, Meta, MetaList, MetaNameValue, Type};
 
@@ -16,6 +16,9 @@ pub struct Field {
     /// several fields whose values are each wrapped in an `Option`, but at most one of them can be
     /// `Some`.
     pub in_oneof: bool,
+    /// When a value is a oneof enum's variant member and that variant is a struct, it has a field
+    /// name that we have to use and accessing it is spelled differently.
+    pub ident_within_variant: Option<Ident>,
 }
 
 pub(super) fn encoder_attr(attr: &Meta) -> Result<Option<Type>, Error> {
@@ -36,16 +39,25 @@ pub(super) fn encoder_attr(attr: &Meta) -> Result<Option<Type>, Error> {
         _ => bail!("invalid encoder attribute: {}", quote!(#attr)),
     }
     .map(Some)
-    .map_err(|_| anyhow!("invalid encoder attribute does not look like a type: {}", quote!(#attr)))
+    .map_err(|_| {
+        anyhow!(
+            "invalid encoder attribute does not look like a type: {}",
+            quote!(#attr)
+        )
+    })
 }
 
 impl Field {
     pub fn new(ty: &Type, attrs: &[Meta], inferred_tag: u32) -> Result<Field, Error> {
-        Field::new_impl(ty, attrs, Some(inferred_tag), false)
+        Field::new_impl(ty, attrs, Some(inferred_tag), false, None)
     }
 
-    pub fn new_in_oneof(ty: &Type, attrs: &[Meta]) -> Result<Field, Error> {
-        Field::new_impl(ty, attrs, None, true)
+    pub fn new_in_oneof(
+        ty: &Type,
+        ident_within_variant: Option<Ident>,
+        attrs: &[Meta],
+    ) -> Result<Field, Error> {
+        Field::new_impl(ty, attrs, None, true, ident_within_variant)
     }
 
     fn new_impl(
@@ -53,6 +65,7 @@ impl Field {
         attrs: &[Meta],
         inferred_tag: Option<u32>,
         in_oneof: bool,
+        ident_within_variant: Option<Ident>,
     ) -> Result<Field, Error> {
         let mut encoder = None;
         let mut tag = None;
@@ -69,7 +82,10 @@ impl Field {
         }
 
         if !unknown_attrs.is_empty() {
-            bail!("unknown attribute(s) for field: {}", quote!(#(#unknown_attrs),*))
+            bail!(
+                "unknown attribute(s) for field: {}",
+                quote!(#(#unknown_attrs),*)
+            )
         }
 
         let tag = match tag.or(inferred_tag) {
@@ -84,7 +100,20 @@ impl Field {
             ty: ty.clone(),
             encoder,
             in_oneof,
+            ident_within_variant,
         })
+    }
+
+    /// Spells a value for the field as an enum variant with the given value.
+    pub fn with_value(&self, value: TokenStream) -> TokenStream {
+        if !self.in_oneof {
+            panic!("trying to spell a field's value within a oneof variant, but the field is not \
+            part of a oneof");
+        }
+        match &self.ident_within_variant {
+            None => quote!( (#value) ),
+            Some(inner_ident) => quote!( { #inner_ident: #value } ),
+        }
     }
 
     /// Returns a statement which encodes the field using buffer `buf` and tag writer `tw`.

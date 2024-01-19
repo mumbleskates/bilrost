@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 use std::fmt;
 
 use anyhow::{bail, Error};
-use proc_macro2::TokenStream;
+use proc_macro2::{Ident, TokenStream};
 use quote::{quote, ToTokens};
 use syn::punctuated::Punctuated;
 use syn::{parse2, Attribute, LitInt, Meta, Token, Type, WhereClause};
@@ -35,10 +35,18 @@ impl Field {
         }))
     }
 
-    pub fn new_in_oneof(ty: Type, attrs: Vec<Attribute>) -> Result<Field, Error> {
+    pub fn new_in_oneof(
+        ty: Type,
+        ident_within_variant: Option<Ident>,
+        attrs: Vec<Attribute>,
+    ) -> Result<Field, Error> {
         let attrs = bilrost_attrs(attrs)?;
 
-        Ok(Field::Value(value::Field::new_in_oneof(&ty, &attrs)?))
+        Ok(Field::Value(value::Field::new_in_oneof(
+            &ty,
+            ident_within_variant,
+            &attrs,
+        )?))
     }
 
     pub fn tags(&self) -> Vec<u32> {
@@ -108,6 +116,19 @@ impl Field {
                 ))
             }
             _ => None,
+        }
+    }
+
+    /// Spells a value for the field as an enum variant with the given value.
+    pub fn with_value(&self, value: TokenStream) -> TokenStream {
+        match self {
+            Field::Value(field) => field.with_value(value),
+            Field::Oneof(_) => {
+                panic!(
+                    "trying to spell a field's value within a oneof variant, but the field is a \
+                oneof, not part of a oneof"
+                );
+            }
         }
     }
 

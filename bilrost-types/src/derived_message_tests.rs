@@ -283,7 +283,7 @@ mod tests {
             #[bilrost(1)]
             A(String),
             #[bilrost(2)]
-            B(u32),
+            B { named: u32 },
             #[bilrost(tag = 3, encoder = "packed")]
             C(Vec<bool>),
         }
@@ -304,9 +304,13 @@ mod tests {
                 abc: Some(A("something".to_string())),
             },
             Foo {
-                abc: Some(B(Default::default())),
+                abc: Some(B {
+                    named: Default::default(),
+                }),
             },
-            Foo { abc: Some(B(123)) },
+            Foo {
+                abc: Some(B { named: 123 }),
+            },
             Foo {
                 abc: Some(C(Default::default())),
             },
@@ -330,7 +334,7 @@ mod tests {
             #[bilrost(1)]
             A(String),
             #[bilrost(2)]
-            B(u32),
+            B { named: u32 },
             #[bilrost(tag = 3, encoder = "packed")]
             C(Vec<bool>),
         }
@@ -351,9 +355,13 @@ mod tests {
                 abc: A("something".to_string()),
             },
             Foo {
-                abc: B(Default::default()),
+                abc: B {
+                    named: Default::default(),
+                },
             },
-            Foo { abc: B(123) },
+            Foo {
+                abc: B { named: 123 },
+            },
             Foo {
                 abc: C(Default::default()),
             },

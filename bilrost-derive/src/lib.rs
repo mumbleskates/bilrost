@@ -673,8 +673,6 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
                     );
                 }
             }
-            // TODO(widders): currently it turns out we handle oneof variants with named fields
-            //  *completely wrong*. did this ever work pre-fork? is it worth fixing?
             Fields::Named(FieldsNamed {
                 named: variant_fields,
                 ..
@@ -696,9 +694,10 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
                     }
                 }
                 1 => {
+                    let field = variant_fields.first().unwrap();
                     fields.push((
                         variant_ident,
-                        Field::new_in_oneof(variant_fields.first().unwrap().ty.clone(), attrs)?,
+                        Field::new_in_oneof(field.ty.clone(), field.ident.clone(), attrs)?,
                     ));
                 }
                 _ => bail!("Oneof enum variants must have at most a single field"),
@@ -729,12 +728,14 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
 
     let encode = fields.iter().map(|(variant_ident, field)| {
         let encode = field.encode(quote!(*value));
-        quote!(#ident::#variant_ident(value) => { #encode })
+        let with_value = field.with_value(quote!(value));
+        quote!(#ident::#variant_ident #with_value => { #encode })
     });
 
     let encoded_len = fields.iter().map(|(variant_ident, field)| {
         let encoded_len = field.encoded_len(quote!(*value));
-        quote!(#ident::#variant_ident(value) => #encoded_len)
+        let with_value = field.with_value(quote!(value));
+        quote!(#ident::#variant_ident #with_value => #encoded_len)
     });
 
     let expanded = if let Some(empty_ident) = empty_variant {
@@ -746,6 +747,8 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         let decode = fields.iter().map(|(variant_ident, field)| {
             let tag = field.first_tag();
             let decode = field.decode(quote!(value));
+            let with_new_value = field.with_value(quote!(new_value));
+            let with_value = field.with_value(quote!(value));
             quote! {
                 #tag => {
                     match self {
@@ -754,10 +757,10 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
                                 ::bilrost::encoding::NewForOverwrite::new_for_overwrite();
                             let mut value = &mut new_value;
                             #decode?;
-                            *self = #ident::#variant_ident(new_value);
+                            *self = #ident::#variant_ident #with_new_value;
                             Ok(())
                         }
-                        #ident::#variant_ident(value) => {
+                        #ident::#variant_ident #with_value => {
                             #decode
                         }
                         _ => Err(::bilrost::DecodeError::new("conflicting fields in oneof")),
@@ -839,16 +842,20 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         let decode = fields.iter().map(|(variant_ident, field)| {
             let tag = field.first_tag();
             let decode = field.decode(quote!(value));
+            let with_new_value = field.with_value(quote!(new_value));
+            let with_value = field.with_value(quote!(value));
             quote! {
                 #tag => {
                     match field {
                         ::core::option::Option::None => {
-                            let #ident::#variant_ident(value) = field.insert(#ident::#variant_ident(
-                                ::bilrost::encoding::NewForOverwrite::new_for_overwrite()
-                            )) else { panic!("unreachable") };
-                            #decode
+                            let mut new_value =
+                                ::bilrost::encoding::NewForOverwrite::new_for_overwrite();
+                            let value = &mut new_value;
+                            #decode?;
+                            *field = Some(#ident::#variant_ident #with_new_value);
+                            Ok(())
                         }
-                        ::core::option::Option::Some(#ident::#variant_ident(value)) => {
+                        ::core::option::Option::Some(#ident::#variant_ident #with_value) => {
                             #decode
                         }
                         _ => Err(::bilrost::DecodeError::new("conflicting fields in oneof")),
