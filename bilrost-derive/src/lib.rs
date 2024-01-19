@@ -116,7 +116,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         } => Vec::new(),
     };
 
-    let mut next_tag: u32 = 0;
+    let mut next_tag: u32 = 1;
     let unsorted_fields: Vec<(TokenStream, Field)> = fields
         .into_iter()
         .enumerate()
@@ -853,12 +853,11 @@ mod test {
     fn test_attribute_forms_are_equivalent() {
         let one = try_message(quote! {
             struct A (
-                #[bilrost(tag = "0")] i64,
                 #[bilrost(tag = "1")] bool,
                 #[bilrost(oneof = "2, 3")] B,
                 #[bilrost(tag = "4")] u32,
                 #[bilrost(tag = "5", encoder = "::custom<Z>")] String,
-                #[bilrost(tag = "1000")] bool,
+                #[bilrost(tag = "1000")] i64,
                 #[bilrost(tag = "1001")] bool,
             );
         })
@@ -866,12 +865,11 @@ mod test {
         .to_string();
         let two = try_message(quote! {
             struct A (
-                i64,
                 bool,
                 #[bilrost(oneof = "2, 3")] B,
                 #[bilrost(4)] u32,
                 #[bilrost(encoder(::custom< Z >))] String,
-                #[bilrost(tag = 1000)] bool,
+                #[bilrost(tag = 1000)] i64,
                 bool,
             );
         })
@@ -879,12 +877,11 @@ mod test {
         .to_string();
         let three = try_message(quote! {
             struct A (
-                i64,
                 #[bilrost(tag(1))] bool,
                 #[bilrost(oneof(2, 3))] B,
                 u32,
                 #[bilrost(encoder = "::custom <Z>")] String,
-                #[bilrost(tag(1000))] bool,
+                #[bilrost(tag(1000))] i64,
                 bool,
             );
         })
@@ -892,12 +889,11 @@ mod test {
         .to_string();
         let four = try_message(quote! {
             struct A (
-                #[bilrost(encoder = "general")] i64,
                 #[bilrost(1)] bool,
                 #[bilrost(oneof(2, 3))] B,
                 u32,
                 #[bilrost(encoder(::custom<Z>))] String,
-                #[bilrost(1000)] bool,
+                #[bilrost(1000)] i64,
                 #[bilrost()] bool,
             );
         })
@@ -905,12 +901,11 @@ mod test {
         .to_string();
         let minimal = try_message(quote! {
             struct A (
-                i64,
                 bool,
                 #[bilrost(oneof(2, 3))] B,
                 u32,
                 #[bilrost(encoder(::custom<Z>))] String,
-                #[bilrost(1000)] bool,
+                #[bilrost(1000)] i64,
                 bool,
             );
         })
