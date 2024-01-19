@@ -279,7 +279,7 @@ mod tests {
     #[test]
     fn oneof_optioned_fields_encode_empty() {
         #[derive(Debug, PartialEq, Oneof)]
-        enum ABC {
+        enum Abc {
             #[bilrost(1)]
             A(String),
             #[bilrost(2)]
@@ -287,12 +287,12 @@ mod tests {
             #[bilrost(tag = 3, encoder = "packed")]
             C(Vec<bool>),
         }
-        use ABC::*;
+        use Abc::*;
 
         #[derive(Debug, PartialEq, Message)]
         struct Foo {
             #[bilrost(oneof(1, 2, 3))]
-            abc: Option<ABC>,
+            abc: Option<Abc>,
         }
 
         for value in [
@@ -328,7 +328,7 @@ mod tests {
     fn oneof_plain_fields_encode_empty() {
         /// Oneofs that have an empty variant
         #[derive(Debug, PartialEq, Oneof)]
-        enum ABC {
+        enum Abc {
             /// No fields
             Empty,
             #[bilrost(1)]
@@ -338,12 +338,12 @@ mod tests {
             #[bilrost(tag = 3, encoder = "packed")]
             C(Vec<bool>),
         }
-        use ABC::*;
+        use Abc::*;
 
         #[derive(Debug, PartialEq, Message)]
         struct Foo {
             #[bilrost(oneof(1, 2, 3))]
-            abc: ABC,
+            abc: Abc,
         }
 
         for value in [

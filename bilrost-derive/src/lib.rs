@@ -491,8 +491,6 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
             #expanded
 
             #methods
-
-            ()
         };
     };
 
@@ -741,7 +739,8 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
     let expanded = if let Some(empty_ident) = empty_variant {
         let current_tag = fields.iter().map(|(variant_ident, field)| {
             let tag = field.tags()[0];
-            quote!(#ident::#variant_ident(_) => ::core::option::Option::Some(#tag))
+            let ignored = field.with_value(quote!(_));
+            quote!(#ident::#variant_ident #ignored => ::core::option::Option::Some(#tag))
         });
 
         let decode = fields.iter().map(|(variant_ident, field)| {
@@ -829,14 +828,13 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
                         #ident::#empty_ident
                     }
                 }
-
-                ()
             };
         }
     } else {
         let current_tag = fields.iter().map(|(variant_ident, field)| {
             let tag = field.tags()[0];
-            quote!(#ident::#variant_ident(_) => #tag)
+            let ignored = field.with_value(quote!(_));
+            quote!(#ident::#variant_ident #ignored => #tag)
         });
 
         let decode = fields.iter().map(|(variant_ident, field)| {
@@ -915,8 +913,6 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
                         }
                     }
                 }
-
-                ()
             };
         }
     };
