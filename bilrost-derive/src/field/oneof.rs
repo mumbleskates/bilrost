@@ -39,7 +39,7 @@ impl Field {
                         .split(',')
                         .map(|s| s.trim().parse::<u32>().map_err(Error::from))
                         .collect::<Result<Vec<u32>, _>>(),
-                    _ => bail!("invalid oneof attribute: {:?}", attr),
+                    _ => bail!("invalid oneof attribute: {}", quote!(#attr)),
                 }?;
                 set_option(&mut oneof_tags, tags, "duplicate oneof attribute")?;
             } else {
@@ -51,13 +51,8 @@ impl Field {
             return Ok(None); // Not a oneof field
         };
 
-        match unknown_attrs.len() {
-            0 => (),
-            1 => bail!(
-                "unknown attribute for message field: {:?}",
-                unknown_attrs[0]
-            ),
-            _ => bail!("unknown attributes for message field: {:?}", unknown_attrs),
+        if !unknown_attrs.is_empty() {
+            bail!("unknown attribute(s) for oneof field: {}", quote!(#(#unknown_attrs),*));
         }
 
         Ok(Some(Field {

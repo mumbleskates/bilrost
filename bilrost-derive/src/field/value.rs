@@ -1,4 +1,4 @@
-use anyhow::{bail, Error};
+use anyhow::{anyhow, bail, Error};
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{parse2, parse_str, Expr, Lit, LitInt, Meta, MetaList, MetaNameValue, Type};
@@ -31,13 +31,12 @@ pub(super) fn encoder_attr(attr: &Meta) -> Result<Option<Type>, Error> {
             ..
         }) => match &expr.lit {
             Lit::Str(lit) => parse_str::<Type>(&lit.value()),
-            // TODO(widders): the tag attribute debugs here are really awful looking.
-            _ => bail!("invalid tag attribute: {:?}", attr),
+            _ => bail!("invalid encoder attribute: {}", quote!(#attr)),
         },
-        _ => bail!("invalid tag attribute: {:?}", attr),
+        _ => bail!("invalid encoder attribute: {}", quote!(#attr)),
     }
     .map(Some)
-    .map_err(Error::from)
+    .map_err(|_| anyhow!("invalid encoder attribute does not look like a type: {}", quote!(#attr)))
 }
 
 impl Field {
@@ -69,10 +68,8 @@ impl Field {
             }
         }
 
-        match unknown_attrs.len() {
-            0 => (),
-            1 => bail!("unknown attribute: {:?}", unknown_attrs[0]),
-            _ => bail!("unknown attributes: {:?}", unknown_attrs),
+        if !unknown_attrs.is_empty() {
+            bail!("unknown attribute(s) for field: {}", quote!(#(#unknown_attrs),*))
         }
 
         let tag = match tag.or(inferred_tag) {
@@ -206,8 +203,8 @@ pub(super) fn tag_attr(attr: &Meta) -> Result<Option<u32>, Error> {
             Lit::Str(lit) => lit.value().parse::<u32>().map_err(Error::from).map(Some),
             // tag = 1
             Lit::Int(lit) => Ok(Some(lit.base10_parse()?)),
-            _ => bail!("invalid tag attribute: {:?}", attr),
+            _ => bail!("invalid tag attribute: {}", quote!(#attr)),
         },
-        _ => bail!("invalid tag attribute: {:?}", attr),
+        _ => bail!("invalid tag attribute: {}", quote!(#attr)),
     }
 }
