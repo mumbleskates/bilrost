@@ -98,41 +98,48 @@ Bilrost structs can encode fields with a wide variety of types:
 
 | Encoder             | Value type             | Encoded representation |
 |---------------------|------------------------|------------------------|
-| `General` & `Fixed` | `f32`                  | fixed-size 32 bits     |
-| `General` & `Fixed` | `f64`                  | fixed-size 64 bits     |
-| `General`           | `u32`                  | varint                 |
-| `Fixed`             | `u32`                  | fixed-size 32 bits     |
-| `General`           | `u64`                  | varint                 |
-| `Fixed`             | `u64`                  | fixed-size 64 bits     |
-| `General`           | `i32`                  | varint                 |
-| `Fixed`             | `i32`                  | fixed-size 32 bits     |
-| `General`           | `i64`                  | varint                 |
-| `Fixed`             | `i64`                  | fixed-size 64 bits     |
-| `General`           | `bool`                 | varint                 |
-| `General`           | derived `Enumeration`* | varint                 |
-| `General`           | `String`               | length-delimited       |
-| `General`           | `Vec<u8>`, `Bytes`     | length-delimited       |
-| `General`           | derived `Message`      | length-delimited       |
+| `general` & `fixed` | `f32`                  | fixed-size 32 bits     |
+| `general` & `fixed` | `f64`                  | fixed-size 64 bits     |
+| `general`           | `u32`                  | varint                 |
+| `fixed`             | `u32`                  | fixed-size 32 bits     |
+| `general`           | `u64`                  | varint                 |
+| `fixed`             | `u64`                  | fixed-size 64 bits     |
+| `general`           | `i32`                  | varint                 |
+| `fixed`             | `i32`                  | fixed-size 32 bits     |
+| `general`           | `i64`                  | varint                 |
+| `fixed`             | `i64`                  | fixed-size 64 bits     |
+| `general`           | `bool`                 | varint                 |
+| `general`           | derived `Enumeration`* | varint                 |
+| `general`           | `String`               | length-delimited       |
+| `general`           | `Blob`**, `Bytes`      | length-delimited       |
+| `vecblob`           | `Vec<u8>`              | length-delimited       |
+| `general`           | derived `Message`      | length-delimited       |
 
-Any of these types may be included directly in a Bilrost message struct. If
-that field's value is zero (numeric zero, `false`, `Enumeration` type with a
-zero discriminant, zero-length string or bytes, or a directly nested message
-with all zero fields) that field's value will not emit any bytes when encoded.
+*`Enumeration` types can be directly included if they implement `Default`;
+otherwise they must always be nested.
+
+**`Blob` is a transparent wrapper for `Vec<u8>` that is a drop-in replacement
+in most situations. If nothing but `Vec<u8>` will do, the 
+
+Any of these types may be included directly in a Bilrost message struct. If that
+field's value is defaulted, no bytes will be emitted when it is encoded.
 
 In addition to including them directly, these types can also be nested within
 several different containers:
 
+<!-- TODO(widders): detail encoders and value-encoders -->
+
 | Encoder         | Value type       | Encoded representation                                   | Re-nestable |
 |-----------------|------------------|----------------------------------------------------------|-------------|
 | any encoder `E` | `Option<T>`      | identical; exactly one field encoded if Some             | no          |
-| `Unpacked<E>`   | `Vec<T>`         | the same as encoder `E`, one field per value             | no          |
-| `Packed<E>`     | `Vec<T>`         | length-delimited, successively encoded with `E`          | yes         |
-| `General`       | `Vec<T>`         | (the same as `Unpacked`)                                 | no          |
-| `Unpacked`      | *                | (the same as `Unpacked<General>`)                        | no          |
-| `Packed`        | *                | (the same as `Packed<General>`)                          | yes         |
-| `Map<KE, VE>`   | `BTreeMap<K, V>` | length-delimited, alternately encoded with `KE` and `VE` | yes         |
-| `Map<KE, VE>`   | `HashMap<K, V>`  | length-delimited, alternately encoded with `KE` and `VE` | yes         |
-| `General`       | (map types)      | (the same as `Map<General, General>`                     | yes         |
+| `unpacked<E>`   | `Vec<T>`         | the same as encoder `E`, one field per value             | no          |
+| `packed<E>`     | `Vec<T>`         | length-delimited, successively encoded with `E`          | yes         |
+| `general`       | `Vec<T>`         | (the same as `unpacked`)                                 | no          |
+| `unpacked`      | *                | (the same as `unpacked<general>`)                        | no          |
+| `packed`        | *                | (the same as `packed<general>`)                          | yes         |
+| `map<KE, VE>`   | `BTreeMap<K, V>` | length-delimited, alternately encoded with `KE` and `VE` | yes         |
+| `map<KE, VE>`   | `HashMap<K, V>`  | length-delimited, alternately encoded with `KE` and `VE` | yes         |
+| `general`       | (map types)      | (the same as `map<general, general>`)                    | yes         |
 
 <!-- TODO(widders): `Set` types -->
 
@@ -145,13 +152,13 @@ into the same representation.
 
 | Change                                               | Corresponding values                | Backwards compatibility breaks when...                         |
 |------------------------------------------------------|-------------------------------------|----------------------------------------------------------------| 
-| `bool` --> `u32` --> `u64` with `General` encoding   | `true`/`false` becomes 1/0          | value is out of range of the narrower type                     |
-| `bool` --> `i32` --> `i64` with `General` encoding   | `true`/`false` becomes -1/0         | value is out of range of the narrower type                     |
-| `String` --> `Vec<u8>`/`Bytes`                       | string becomes its UTF-8 data       | value contains invalid UTF-8                                   |
+| `bool` --> `u32` --> `u64` with `general` encoding   | `true`/`false` becomes 1/0          | value is out of range of the narrower type                     |
+| `bool` --> `i32` --> `i64` with `general` encoding   | `true`/`false` becomes -1/0         | value is out of range of the narrower type                     |
+| `String` --> `Blob`/`Bytes`                          | string becomes its UTF-8 data       | value contains invalid UTF-8                                   |
 | `T` --> `Option<T>`                                  | default value of `T` becomes `None` | `Some(default)` is encoded, then decoded in distinguished mode |
-| `Option<T>` --> `Vec<T>` (with `Unpacked` encodings) | maybe-contained value is identical  | multiple values are in the `Vec`                               |
+| `Option<T>` --> `Vec<T>` (with `unpacked` encodings) | maybe-contained value is identical  | multiple values are in the `Vec`                               |
 
-`Vec<T>` can also be changed between `Unpacked` and `Packed` encoding, as long
+`Vec<T>` can also be changed between `unpacked` and `packed` encoding, as long
 as `T` does not have a length-delimited representation. This will break
 compatibility with distinguished decoding in both directions whenever the field
 is present and not default (non-optional and empty or None) because it will
@@ -208,28 +215,23 @@ use bilrost::{Enumeration, Message};
 
 #[derive(Clone, PartialEq, Message)]
 struct Person {
-    #[bilrost(string, tag = "1")]
+    #[bilrost(tag = 1)]
     pub id: String, // tag=1
     // NOTE: Old "name" field has been removed
     // pub name: String, // tag=2 (Removed)
-    #[bilrost(string, tag = "6")]
+    #[bilrost(6)]
     pub given_name: String, // tag=6
-    #[bilrost(string)]
     pub family_name: String, // tag=7
-    #[bilrost(string)]
     pub formatted_name: String, // tag=8
-    #[bilrost(uint32, tag = "3")]
+    #[bilrost(tag = "3")]
     pub age: u32, // tag=3
-    #[bilrost(uint32)]
     pub height: u32, // tag=4
-    #[bilrost(enumeration = "Gender")]
-    pub gender: i32, // tag=5
+    // TODO(widders): implement u32 enumeration helpers
+    pub gender: u32, // tag=5
     // NOTE: Skip to less commonly occurring fields
-    #[bilrost(string, tag = "16")]
+    #[bilrost(tag(16))]
     pub name_prefix: String, // tag=16  (eg. mr/mrs/ms)
-    #[bilrost(string)]
     pub name_suffix: String, // tag=17  (eg. jr/esq)
-    #[bilrost(string)]
     pub maiden_name: String, // tag=18
 }
 
@@ -238,6 +240,7 @@ pub enum Gender {
     Unknown = 0,
     Female = 1,
     Male = 2,
+    Nonbinary = 3,
 }
 ```
 
@@ -255,8 +258,8 @@ pub enum Gender {
 - The mapping from Bilrost type to its Rust encoding is not 1-to-1. As a result,
   trait-based approaches to dispatching don't work very well. Example: four
   different Protobuf field encoders can handle a Rust `Vec<i32>`, each producing
-  a different encoded representation: `General`, `Fixed`, `Packed<General>`, and
-  `Packed<Fixed>`.
+  a different encoded representation: `general`, `fixed`, `packed<general>`, and
+  `packed<fixed>`.
 
   But it is possible to place `serde` derive tags onto the generated types, so
   the same structure can support both `bilrost` and `Serde`.
