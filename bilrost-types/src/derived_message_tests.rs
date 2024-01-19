@@ -260,20 +260,54 @@ mod tests {
         .encode_to_vec();
         let b_only = Foo {
             a: None,
-            b: Some(true),
+            b: Some(false),
         }
         .encode_to_vec();
         let both = Foo {
-            a: Some(true),
+            a: Some(false),
             b: Some(true),
         }
         .encode_to_vec();
 
         assert_eq!(Bar::decode(&a_only[..]), Ok(Bar { ab: Some(A(true)) }));
-        assert_eq!(Bar::decode(&b_only[..]), Ok(Bar { ab: Some(B(true)) }));
+        assert_eq!(Bar::decode(&b_only[..]), Ok(Bar { ab: Some(B(false)) }));
         assert_eq!(
             Bar::decode(&both[..]).unwrap_err().to_string(),
             "failed to decode Bilrost message: Bar.ab: conflicting fields in oneof"
         );
+    }
+
+    #[test]
+    fn oneof_fields_encode_empty() {
+        #[derive(Debug, PartialEq, Oneof)]
+        enum ABC {
+            #[bilrost(1)]
+            A(String),
+            #[bilrost(2)]
+            B(u32),
+            #[bilrost(tag = 3, encoder = "packed")]
+            C(Vec<bool>),
+        }
+        use ABC::*;
+
+        #[derive(Debug, PartialEq, Message)]
+        struct Foo {
+            #[bilrost(oneof(1, 2, 3))]
+            abc: Option<ABC>,
+        }
+
+        for value in [
+            Foo{abc: None},
+            Foo{abc: Some(A(Default::default()))},
+            Foo{abc: Some(A("something".to_owned()))},
+            Foo{abc: Some(B(Default::default()))},
+            Foo{abc: Some(B(123))},
+            Foo{abc: Some(C(Default::default()))},
+            Foo{abc: Some(C(vec![false]))},
+        ] {
+            let encoded = value.encode_to_vec();
+            let decoded = Foo::decode(encoded.as_slice()).unwrap();
+            assert_eq!(value, decoded);
+        }
     }
 }
