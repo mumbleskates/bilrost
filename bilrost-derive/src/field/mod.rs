@@ -1,13 +1,14 @@
 mod oneof;
 mod value;
 
+use std::collections::BTreeMap;
 use std::fmt;
 
 use anyhow::{bail, Error};
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 use syn::punctuated::Punctuated;
-use syn::{Attribute, LitInt, Meta, parse2, Token, Type, WhereClause};
+use syn::{parse2, Attribute, LitInt, Meta, Token, Type, WhereClause};
 
 #[derive(Clone)]
 pub enum Field {
@@ -71,12 +72,16 @@ impl Field {
         where_clause: Option<&WhereClause>,
         fields: impl Iterator<Item = &'a Self>,
     ) -> TokenStream {
-        // TODO(widders): dedup? can we do that?
-        let encoder_wheres: Vec<_> = fields.flat_map(|f| f.encoder_where()).collect();
+        // dedup the where clauses by their String values
+        let encoder_wheres: BTreeMap<_, _> = fields
+            .flat_map(|f| f.encoder_where())
+            .map(|where_| (where_.to_string(), where_))
+            .collect();
+        let encoder_wheres: Vec<_> = encoder_wheres.values().collect();
         if let Some(where_clause) = where_clause {
             quote! { #where_clause #(, #encoder_wheres)* }
         } else if encoder_wheres.is_empty() {
-            return quote!();
+            quote!() // no where clause terms
         } else {
             quote! { where #(#encoder_wheres),*}
         }
