@@ -119,7 +119,8 @@ Bilrost structs can encode fields with a wide variety of types:
 otherwise they must always be nested.
 
 **`Blob` is a transparent wrapper for `Vec<u8>` that is a drop-in replacement
-in most situations. If nothing but `Vec<u8>` will do, the 
+in most situations. If nothing but `Vec<u8>` will do, the `vecblob` encoder
+will encode a plain `Vec<u8>` as a bytes value.
 
 Any of these types may be included directly in a Bilrost message struct. If that
 field's value is defaulted, no bytes will be emitted when it is encoded.
