@@ -340,21 +340,11 @@ impl TagWriter {
     /// last field decoded.
     #[inline]
     pub fn encode_key<B: BufMut + ?Sized>(&mut self, tag: u32, wire_type: WireType, buf: &mut B) {
-        match tag.cmp(&self.last_tag) {
-            Greater => {
-                let key_delta = (((tag - self.last_tag) as u64) << 2) | (wire_type as u64);
-                encode_varint(key_delta, buf);
-                self.last_tag = tag;
-            }
-            Equal => {
-                // Write the wire type as a single-byte varint.
-                buf.put_u8(wire_type as u8);
-            }
-            Less => panic!(
-                "fields encoded out of order: last was {:?}, new is {:?}",
-                self.last_tag, tag
-            ),
-        }
+        let tag_delta = tag
+            .checked_sub(self.last_tag)
+            .expect("fields encoded out of order");
+        self.last_tag = tag;
+        encode_varint(((tag_delta as u64) << 2) | (wire_type as u64), buf);
     }
 
     #[inline]
@@ -380,16 +370,11 @@ impl TagMeasurer {
     /// also advances the state of the encoder as if that tag was written.
     #[inline]
     pub fn key_len(&mut self, tag: u32) -> usize {
-        let len = match tag.cmp(&self.last_tag) {
-            Greater => encoded_len_varint(((tag - self.last_tag) as u64) << 2),
-            Equal => 1,
-            Less => panic!(
-                "fields encoded out of order: last was {:?}, new is {:?}",
-                self.last_tag, tag
-            ),
-        };
+        let tag_delta = tag
+            .checked_sub(self.last_tag)
+            .expect("fields encoded out of order");
         self.last_tag = tag;
-        len
+        encoded_len_varint((tag_delta as u64) << 2)
     }
 }
 
@@ -409,15 +394,16 @@ impl TagReader {
         &mut self,
         buf: &mut B,
     ) -> Result<(u32, WireType), DecodeError> {
-        let key_delta = decode_varint(buf)?;
-        let tag_delta = key_delta >> 2;
-        let tag = (self.last_tag as u64) + tag_delta;
-        if tag > u64::from(u32::MAX) {
-            return Err(DecodeError::new("tag overflowed"));
-        }
-        let wire_type = WireType::try_from(key_delta & 0b11)?;
-        self.last_tag = tag as u32;
-        Ok((tag as u32, wire_type))
+        let key = decode_varint(buf)?;
+        let tag_delta =
+            u32::try_from(key >> 2).map_err(|_| DecodeError::new("field key overflowed"))?;
+        let tag = self
+            .last_tag
+            .checked_add(tag_delta)
+            .ok_or_else(|| DecodeError::new("tag overflowed"))?;
+        let wire_type = WireType::try_from(key & 0b11).unwrap();
+        self.last_tag = tag;
+        Ok((tag, wire_type))
     }
 }
 
