@@ -71,8 +71,6 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
 
     let ident = input.ident;
 
-    // TODO(widders): should we do this via a derive for `DistinguishedMessage` instead? that seems
-    //  nicer since it means the trait is imported
     syn::custom_keyword!(distinguished);
     let _distinguished = input
         .attrs
@@ -82,9 +80,14 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     // TODO(widders): test coverage for completed features:
     //  * do prop-testing for stronger round-trip guarantees now that the encoding is better
     //    distinguished
+    //  * unknown fields are forbidden in distinguished decoding
+    //  * map keys and set values must be ascending in distinguished decoding
+    //  * map keys and set values must never recur in any decoding mode with either hash or btree
+    //  * repeated fields must have matching packed-ness in distinguished decoding
 
     // TODO(widders): distinguished features
-    //  * unknown fields are forbidden
+    //  * derive DistinguishedMessage
+    //      * unknown fields are forbidden
 
     let variant_data = match input.data {
         Data::Struct(variant_data) => variant_data,
@@ -113,7 +116,6 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         } => Vec::new(),
     };
 
-    // TODO(widders): forbid implicit next_tag? hmmmmmm
     let mut next_tag: u32 = 0;
     let unsorted_fields: Vec<(TokenStream, Field)> = fields
         .into_iter()
@@ -694,14 +696,6 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
     let where_clause = Field::append_wheres(where_clause, fields.iter().map(|(_, field)| field));
 
     let encode = fields.iter().map(|(variant_ident, field)| {
-        // TODO(widders): THIS IS NOT QUITE IT! oneof fields must always encode if they have a
-        //  value! right now, present oneof fields with a General encoder will absent when default,
-        //  and that's simply not right; we might need another (third?) kind of encoding surety(?)
-        //  in addition to encoder and value-encoder.
-        //  however, this also messes with distinguished decoding (or rather, en-coding) of
-        //  unpacked oneof variants, which when present and empty are indistinguishable from absent.
-        //  do we have to just enforce that oneofs only value-encode their fields? that may be the
-        //  only thing that makes sense here.
         let encode = field.encode(quote!(*value));
         quote!(#ident::#variant_ident(value) => { #encode })
     });
@@ -859,32 +853,65 @@ mod test {
     fn test_attribute_forms_are_equivalent() {
         let one = try_message(quote! {
             struct A (
+                #[bilrost(tag = "0")] i64,
                 #[bilrost(tag = "1")] bool,
                 #[bilrost(oneof = "2, 3")] B,
+                #[bilrost(tag = "4")] u32,
+                #[bilrost(tag = "5", encoder = "::custom<Z>")] String,
+                #[bilrost(tag = "1000")] bool,
+                #[bilrost(tag = "1001")] bool,
             );
         })
         .unwrap()
         .to_string();
         let two = try_message(quote! {
             struct A (
-                #[bilrost(tag = 1)] bool,
+                i64,
+                bool,
                 #[bilrost(oneof = "2, 3")] B,
+                #[bilrost(4)] u32,
+                #[bilrost(encoder(::custom< Z >))] String,
+                #[bilrost(tag = 1000)] bool,
+                bool,
             );
         })
         .unwrap()
         .to_string();
         let three = try_message(quote! {
             struct A (
+                i64,
                 #[bilrost(tag(1))] bool,
                 #[bilrost(oneof(2, 3))] B,
+                u32,
+                #[bilrost(encoder = "::custom <Z>")] String,
+                #[bilrost(tag(1000))] bool,
+                bool,
             );
         })
         .unwrap()
         .to_string();
         let four = try_message(quote! {
             struct A (
+                #[bilrost(encoder = "general")] i64,
                 #[bilrost(1)] bool,
                 #[bilrost(oneof(2, 3))] B,
+                u32,
+                #[bilrost(encoder(::custom<Z>))] String,
+                #[bilrost(1000)] bool,
+                #[bilrost()] bool,
+            );
+        })
+        .unwrap()
+        .to_string();
+        let minimal = try_message(quote! {
+            struct A (
+                i64,
+                bool,
+                #[bilrost(oneof(2, 3))] B,
+                u32,
+                #[bilrost(encoder(::custom<Z>))] String,
+                #[bilrost(1000)] bool,
+                bool,
             );
         })
         .unwrap()
@@ -892,6 +919,7 @@ mod test {
         assert_eq!(one, two);
         assert_eq!(one, three);
         assert_eq!(one, four);
+        assert_eq!(one, minimal);
     }
 
     #[test]

@@ -108,7 +108,7 @@ pub struct Struct {
 #[derive(Clone, Debug, PartialEq, Message)]
 pub struct Value {
     /// The kind of value. None represents JSON `null`.
-    // TODO(widders): change this to explicit Null variantw hen that's implemented.
+    // TODO(widders): change this to explicit Null variant when that's implemented.
     #[bilrost(oneof(1, 2, 3, 4, 5))]
     pub kind: Option<value::Kind>,
 }
