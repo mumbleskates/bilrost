@@ -2,11 +2,10 @@
 mod tests {
     extern crate alloc;
 
+    use alloc::string::{String, ToString};
+    use alloc::vec;
     use alloc::vec::Vec;
-    use bilrost::{
-        alloc::{string::ToString, vec},
-        Message, Oneof,
-    };
+    use bilrost::{Message, Oneof};
     use core::default::Default;
     use itertools::{repeat_n, Itertools};
 
@@ -297,13 +296,23 @@ mod tests {
         }
 
         for value in [
-            Foo{abc: None},
-            Foo{abc: Some(A(Default::default()))},
-            Foo{abc: Some(A("something".to_owned()))},
-            Foo{abc: Some(B(Default::default()))},
-            Foo{abc: Some(B(123))},
-            Foo{abc: Some(C(Default::default()))},
-            Foo{abc: Some(C(vec![false]))},
+            Foo { abc: None },
+            Foo {
+                abc: Some(A(Default::default())),
+            },
+            Foo {
+                abc: Some(A("something".to_string())),
+            },
+            Foo {
+                abc: Some(B(Default::default())),
+            },
+            Foo { abc: Some(B(123)) },
+            Foo {
+                abc: Some(C(Default::default())),
+            },
+            Foo {
+                abc: Some(C(vec![false])),
+            },
         ] {
             let encoded = value.encode_to_vec();
             let decoded = Foo::decode(encoded.as_slice()).unwrap();
