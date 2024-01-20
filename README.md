@@ -130,17 +130,17 @@ several different containers:
 
 <!-- TODO(widders): detail encoders and value-encoders -->
 
-| Encoder         | Value type       | Encoded representation                                   | Re-nestable |
-|-----------------|------------------|----------------------------------------------------------|-------------|
-| any encoder `E` | `Option<T>`      | identical; exactly one field encoded if Some             | no          |
-| `unpacked<E>`   | `Vec<T>`         | the same as encoder `E`, one field per value             | no          |
-| `packed<E>`     | `Vec<T>`         | length-delimited, successively encoded with `E`          | yes         |
-| `general`       | `Vec<T>`         | (the same as `unpacked`)                                 | no          |
-| `unpacked`      | *                | (the same as `unpacked<general>`)                        | no          |
-| `packed`        | *                | (the same as `packed<general>`)                          | yes         |
-| `map<KE, VE>`   | `BTreeMap<K, V>` | length-delimited, alternately encoded with `KE` and `VE` | yes         |
-| `map<KE, VE>`   | `HashMap<K, V>`  | length-delimited, alternately encoded with `KE` and `VE` | yes         |
-| `general`       | (map types)      | (the same as `map<general, general>`)                    | yes         |
+| Encoder       | Value type             | Encoded representation                                                         | Re-nestable |
+|---------------|------------------------|--------------------------------------------------------------------------------|-------------|
+| any encoder   | `Option<T>`            | identical; at least some bytes are always encoded if `Some`, nothing if `None` | no          |
+| `unpacked<E>` | `Vec<T>`               | the same as encoder `E`, one field per value                                   | no          |
+| `unpacked`    | *                      | (the same as `unpacked<general>`)                                              | no          |
+| `packed<E>`   | `Vec<T>`               | length-delimited, successively encoded with `E`                                | yes         |
+| `packed`      | *                      | (the same as `packed<general>`)                                                | yes         |
+| `map<KE, VE>` | `BTreeMap<K, V>`       | length-delimited, alternately encoded with `KE` and `VE`                       | yes         |
+| `map<KE, VE>` | `HashMap<K, V>`        | length-delimited, alternately encoded with `KE` and `VE`                       | yes         |
+| `general`     | `Vec<T>`               | (the same as `unpacked`)                                                       | no          |
+| `general`     | `BTreeMap` & `HashMap` | (the same as `map<general, general>`)                                          | yes         |
 
 <!-- TODO(widders): `Set` types -->
 
