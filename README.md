@@ -40,9 +40,9 @@ TODO: fill out this outline for a better introduction
         * encoders
         * custom encoders
     * of the (current lack of) ecosystem
-      * no reflection yet
-      * no DSL for specifying schemas yet
-      * no support across other languages yet
+        * no reflection yet
+        * no DSL for specifying schemas yet
+        * no support across other languages yet
     * specification of the encoding
         * messages as strings of bytes that encode zero or more fields
         * varint encoding
