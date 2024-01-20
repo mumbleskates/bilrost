@@ -17,46 +17,52 @@ provide access to all of those capabilities with maximum convenience.
 
 TODO: fill out this outline for a better introduction
 
-* features of bilrost
-    * the philosophy
-        * data has meaning based on where you find it
-        * encodings with explicit schemas can be easier to guess the meaning of
-          if you don't already know, but most of the time this is wasted bytes
-        * therefore it is often very sensible to encode data in a way that is
-          legible to you, with implicit schemas and room for extending
-        * as an encoding, bilrost works to make invalid states unrepresentable
-          when practical where it doesn't greatly increase complexity
-        * bilrost is designed to aid, but not require, distinguished encoding
-    * the overall concepts
-        * tagged fields
-        * forwards and backwards compatibility as message types are extended
-        * distinguished encoding
-        * some semantics depend upon the types themselves, like defaults and
-          maybe ordering
-    * of the library itself and its usability
-        * how to derive
-            * field annotations
-        * types that work with `bilrost`
-        * encoders
-        * custom encoders
-    * of the (current lack of) ecosystem
-        * no reflection yet
-        * no DSL for specifying schemas yet
-        * no support across other languages yet
-    * specification of the encoding
-        * messages as strings of bytes that encode zero or more fields
-        * varint encoding
-        * fixed-width encodings must be little-endian
-        * field keys and wire types
-        * complex types
-            * unpacked encodings for vecs and sets
-            * packed encodings for vecs and sets
-            * map encodings
-        * disallowed decoding constraints
-            * out-of-domain values must err
-            * text strings with invalid utf-8 must err
-            * sets with duplicated values must err
-            * maps with duplicated values must err
+* the overall concepts
+    * tagged fields
+    * forwards and backwards compatibility as message types are extended
+    * distinguished encoding
+    * some semantics depend upon the types themselves, like defaults and
+      maybe ordering
+* the philosophy
+    * data has meaning based on where you find it
+    * encodings with explicit schemas can be easier to guess the meaning of
+      if you don't already know, but most of the time this is wasted bytes
+    * therefore it is often very sensible to encode data in a way that is
+      legible to you, with implicit schemas and room for extending
+    * as an encoding, bilrost works to make invalid states unrepresentable
+      when practical where it doesn't greatly increase complexity
+    * bilrost is designed to aid, but not require, distinguished encoding
+* using the library
+    * how to derive
+        * field annotations
+    * types that work with `bilrost`
+    * encoders
+    * custom encoders
+* the (current lack of) ecosystem compared to protobuf
+    * no reflection yet
+    * no DSL for specifying schemas yet
+    * no support across other languages yet
+* encoding specification
+    * messages as strings of bytes that encode zero or more fields
+    * varint encoding
+    * fixed-width encodings must be little-endian
+    * field keys and wire types
+    * complex types
+        * unpacked encodings for vecs and sets
+        * packed encodings for vecs and sets
+        * map encodings
+    * disallowed decoding constraints
+        * unexpectedly repeated fields must err
+        * out-of-domain values must err
+        * text strings with invalid utf-8 must err
+        * sets with duplicated items must err
+        * maps with duplicated keys must err
+    * additional decoding constraints for distinguished
+        * fields must implement `Eq`
+        * fields must never be present in the decoded data when they have the
+          default value
+        * unknown fields must err
+        * maps' keys and sets' items must be ordered
 
 * All varints (including tag fields and lengths) use
   [bijective numeration](https://en.wikipedia.org/wiki/Bijective_numeration),
