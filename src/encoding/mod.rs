@@ -1140,6 +1140,7 @@ pub(crate) use check_type_test_functions;
 
 #[cfg(test)]
 mod test {
+    use alloc::collections::BTreeMap;
     use alloc::string::{String, ToString};
     use alloc::vec::Vec;
     use core::borrow::Borrow;
@@ -1318,12 +1319,8 @@ mod test {
     fn unaligned_fixed64_packed() {
         // Construct a length-delineated field that is not a multiple of 8 bytes.
         let mut buf = Vec::<u8>::new();
-        let vals = [0u64, 1, 2, 3];
-        encode_varint((vals.len() * 8 + 1) as u64, &mut buf);
-        for val in vals {
-            buf.put_u64_le(val);
-        }
-        buf.put_u8(42); // Write an extra byte as part of the field
+        encode_varint(12, &mut buf);
+        buf.extend([1; 12]);
 
         let mut parsed = Vec::<u64>::new();
         let res = <Packed<Fixed>>::decode_value(
@@ -1331,15 +1328,17 @@ mod test {
             Capped::new(&mut buf.as_slice()),
             DecodeContext::default(),
         );
-        assert!(res.is_err());
+        assert_eq!(
+            res.expect_err("unaligned packed fixed64 decoded without error").to_string(),
+            "failed to decode Bilrost message: packed field is not a valid length"
+        );
         let res = <Packed<Fixed>>::decode_value_distinguished(
             &mut parsed,
             Capped::new(&mut buf.as_slice()),
             DecodeContext::default(),
         );
-        assert!(res.is_err());
         assert_eq!(
-            res.unwrap_err().to_string(),
+            res.expect_err("unaligned packed fixed64 decoded without error").to_string(),
             "failed to decode Bilrost message: packed field is not a valid length"
         );
     }
@@ -1348,12 +1347,8 @@ mod test {
     fn unaligned_fixed32_packed() {
         // Construct a length-delineated field that is not a multiple of 4 bytes.
         let mut buf = Vec::<u8>::new();
-        let vals = [0u32, 1, 2, 3];
-        encode_varint((vals.len() * 4 + 1) as u64, &mut buf);
-        for val in vals {
-            buf.put_u32_le(val);
-        }
-        buf.put_u8(42); // Write an extra byte as part of the field
+        encode_varint(17, &mut buf);
+        buf.extend([1; 17]);
 
         let mut parsed = Vec::<u32>::new();
         let res = <Packed<Fixed>>::decode_value(
@@ -1361,15 +1356,48 @@ mod test {
             Capped::new(&mut buf.as_slice()),
             DecodeContext::default(),
         );
-        assert!(res.is_err());
+        assert_eq!(
+            res.expect_err("unaligned packed fixed32 decoded without error").to_string(),
+            "failed to decode Bilrost message: packed field is not a valid length"
+        );
         let res = <Packed<Fixed>>::decode_value_distinguished(
             &mut parsed,
             Capped::new(&mut buf.as_slice()),
             DecodeContext::default(),
         );
-        assert!(res.is_err());
         assert_eq!(
-            res.unwrap_err().to_string(),
+            res.expect_err("unaligned packed fixed32 decoded without error").to_string(),
+            "failed to decode Bilrost message: packed field is not a valid length"
+        );
+    }
+
+    #[test]
+    fn unaligned_map_packed() {
+        // Construct a length-delineated field that is not a multiple of the sum of fixed size key
+        // and value in a map. In the case we are testing it is a fixed size 4+8 = 12 bytes per
+        // entry.
+        let mut buf = Vec::<u8>::new();
+        encode_varint(16, &mut buf);
+        buf.extend([1; 16]);
+
+        // The entries for this map always consume 12 bytes each.
+        let mut parsed = BTreeMap::<u32, u64>::new();
+        let res = <Map<Fixed, Fixed>>::decode_value(
+            &mut parsed,
+            Capped::new(&mut buf.as_slice()),
+            DecodeContext::default(),
+        );
+        assert_eq!(
+            res.expect_err("unaligned 12-byte map decoded without error").to_string(),
+            "failed to decode Bilrost message: packed field is not a valid length"
+        );
+        let res = <Map<Fixed, Fixed>>::decode_value_distinguished(
+            &mut parsed,
+            Capped::new(&mut buf.as_slice()),
+            DecodeContext::default(),
+        );
+        assert_eq!(
+            res.expect_err("unaligned 12-byte map decoded without error").to_string(),
             "failed to decode Bilrost message: packed field is not a valid length"
         );
     }
