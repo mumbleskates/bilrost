@@ -6,10 +6,57 @@
 [Protocol Buffers](https://developers.google.com/protocol-buffers/)-alike
 encoding for the [Rust Language](https://www.rust-lang.org/). It is a direct
 fork of
-[`prost`](https://github.com/tokio-rs/prost). Like `prost`, `bilrost` can
+[`prost`](https://github.com/tokio-rs/prost). Like `prost`, bilrost can
 enable writing simple, idiomatic Rust code with `derive` macros that serializes
-and deserializes data similar to protocol buffers but in a slightly different,
-incompatible way:
+and deserializes structs as portable and durable binary data, using an encoding
+scheme similar to that of protocol buffers but slightly different and mutually
+incompatible. Bilrost (as a specification) strives to provide a superset of the
+capabilities of protocol buffers while reducing the surface area for mistakes
+and surprises; `bilrost` (the Rust Language implementation library) strives to
+provide access to all of those capabilities with maximum convenience.
+
+TODO: fill out this outline for a better introduction
+
+* features of bilrost
+    * the philosophy
+        * data has meaning based on where you find it
+        * encodings with explicit schemas can be easier to guess the meaning of
+          if you don't already know, but most of the time this is wasted bytes
+        * therefore it is often very sensible to encode data in a way that is
+          legible to you, with implicit schemas and room for extending
+        * as an encoding, bilrost works to make invalid states unrepresentable
+          when practical where it doesn't greatly increase complexity
+        * bilrost is designed to aid, but not require, distinguished encoding
+    * the overall concepts
+        * tagged fields
+        * forwards and backwards compatibility as message types are extended
+        * distinguished encoding
+        * some semantics depend upon the types themselves, like defaults and
+          maybe ordering
+    * of the library itself and its usability
+        * how to derive
+            * field annotations
+        * types that work with `bilrost`
+        * encoders
+        * custom encoders
+    * of the (current lack of) ecosystem
+      * no reflection yet
+      * no DSL for specifying schemas yet
+      * no support across other languages yet
+    * specification of the encoding
+        * messages as strings of bytes that encode zero or more fields
+        * varint encoding
+        * fixed-width encodings must be little-endian
+        * field keys and wire types
+        * complex types
+            * unpacked encodings for vecs and sets
+            * packed encodings for vecs and sets
+            * map encodings
+        * disallowed decoding constraints
+            * out-of-domain values must err
+            * text strings with invalid utf-8 must err
+            * sets with duplicated values must err
+            * maps with duplicated values must err
 
 * All varints (including tag fields and lengths) use
   [bijective numeration](https://en.wikipedia.org/wiki/Bijective_numeration),
@@ -181,8 +228,7 @@ fields in the message, only one of which may be present in a valid message.
 ## Using `bilrost` in a `no_std` Crate
 
 `bilrost` is compatible with `no_std` crates. To enable `no_std` support,
-disable
-the `std` features in `bilrost` and `bilrost-types`:
+disable the `std` features in `bilrost` and `bilrost-types`:
 
 ```ignore
 [dependencies]
@@ -192,9 +238,9 @@ bilrost = { version = "0.12", default-features = false, features = ["derive"] }
 ## Serializing Existing Types
 
 `bilrost` uses a custom derive macro to handle encoding and decoding types,
-which means that if your existing Rust type is compatible with bilrost encoders,
-you can serialize and deserialize it by adding the appropriate derive and field
-annotations.
+which means that if your existing Rust type is compatible with `bilrost`
+encoders, you can serialize and deserialize it by adding the appropriate derive
+and field annotations.
 
 ### Tag Inference for Existing Types
 
@@ -250,17 +296,17 @@ pub enum Gender {
 1. **Could `bilrost` be implemented as a serializer for
    [Serde](https://serde.rs/)?**
 
-  Probably not, however I would like to hear from a Serde expert on the matter.
-  There are two complications with trying to serialize Protobuf messages with
-  Serde:
+Probably not, however I would like to hear from a Serde expert on the matter.
+There are two complications with trying to serialize Protobuf messages with
+Serde:
 
 - Bilrost fields bear a numbered tag, and currently there appears to be no
   mechanism suitable for this in `serde`.
-- The mapping from Bilrost type to its Rust encoding is not 1-to-1. As a result,
-  trait-based approaches to dispatching don't work very well. Example: four
-  different Protobuf field encoders can handle a Rust `Vec<i32>`, each producing
-  a different encoded representation: `general`, `fixed`, `packed<general>`, and
-  `packed<fixed>`.
+- The mapping from `bilrost` message field's type to its Rust encoding is not
+  1-to-1. As a result, trait-based approaches to dispatching don't work very
+  well. Example: four different Protobuf field encoders can handle a
+  Rust `Vec<i32>`, each producing a different encoded
+  representation: `general`, `fixed`, `packed<general>`, and `packed<fixed>`.
 
   But it is possible to place `serde` derive tags onto the generated types, so
   the same structure can support both `bilrost` and `Serde`.
