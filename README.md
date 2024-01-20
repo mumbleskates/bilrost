@@ -29,6 +29,8 @@ TODO: fill out this outline for a better introduction
       if you don't already know, but most of the time this is wasted bytes
     * therefore it is often very sensible to encode data in a way that is
       legible to you, with implicit schemas and room for extending
+    * the data you get back when decoding should not transform any of the field
+      values except by omitting extensions (no int coercion)
     * as an encoding, bilrost works to make invalid states unrepresentable
       when practical where it doesn't greatly increase complexity
     * bilrost is designed to aid, but not require, distinguished encoding
@@ -57,12 +59,40 @@ TODO: fill out this outline for a better introduction
         * text strings with invalid utf-8 must err
         * sets with duplicated items must err
         * maps with duplicated keys must err
+        * oneofs with conflicting fields must err
     * additional decoding constraints for distinguished
         * fields must implement `Eq`
         * fields must never be present in the decoded data when they have the
           default value
         * unknown fields must err
         * maps' keys and sets' items must be ordered
+    * major changes in relation to protobuf and the history there
+        * bijective varints
+            * what leb128 varints gave protobuf
+                * simplicity
+                * zero-extension
+            * what bijective varints give us
+                * ez distinguished encoding
+                * very very close to the same read/write cost
+                * smaller size
+        * no non-zigzag signed varints
+        * no integer domain coercion
+            * the data you get back should mean what it said or fail
+        * field ordering
+            * what unordered fields gave protobuf
+                * easy catting of partial messages
+                * overlays
+                    * can be horrible, e.g. message fields upgraded to repeated
+            * what ordered fields give us
+                * no value stomping
+                * easy detection of repeated violation without presence data
+                * even makes required fields possible to detect, though that's
+                  not implemented
+        * no groups
+        * allowing packed length-delineated types
+            * risk of upgrading them is considered the user's responsibility
+        * first class maps
+            * maps in protobuf were a pain and seem like a bodge
 
 * All varints (including tag fields and lengths) use
   [bijective numeration](https://en.wikipedia.org/wiki/Bijective_numeration),
