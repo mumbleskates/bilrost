@@ -1,11 +1,7 @@
 #![allow(clippy::implicit_hasher, clippy::ptr_arg)]
 
 use alloc::format;
-use core::cmp::{
-    min, Eq,
-    Ordering::{Equal, Greater, Less},
-    PartialEq,
-};
+use core::cmp::{min, Eq, PartialEq};
 use core::convert::TryFrom;
 use core::default::Default;
 use core::ops::{Deref, DerefMut};
