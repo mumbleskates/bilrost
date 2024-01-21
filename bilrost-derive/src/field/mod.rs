@@ -40,12 +40,10 @@ impl Field {
         ident_within_variant: Option<Ident>,
         attrs: Vec<Attribute>,
     ) -> Result<Field, Error> {
-        let attrs = bilrost_attrs(attrs)?;
-
         Ok(Field::Value(value::Field::new_in_oneof(
             &ty,
             ident_within_variant,
-            &attrs,
+            &bilrost_attrs(attrs)?,
         )?))
     }
 
