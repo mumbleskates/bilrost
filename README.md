@@ -66,33 +66,44 @@ TODO: fill out this outline for a better introduction
           default value
         * unknown fields must err
         * maps' keys and sets' items must be ordered
-    * major changes in relation to protobuf and the history there
-        * bijective varints
-            * what leb128 varints gave protobuf
-                * simplicity
-                * zero-extension
-            * what bijective varints give us
-                * ez distinguished encoding
-                * very very close to the same read/write cost
-                * smaller size
-        * no non-zigzag signed varints
-        * no integer domain coercion
-            * the data you get back should mean what it said or fail
-        * field ordering
-            * what unordered fields gave protobuf
-                * easy catting of partial messages
-                * overlays
-                    * can be horrible, e.g. message fields upgraded to repeated
-            * what ordered fields give us
-                * no value stomping
-                * easy detection of repeated violation without presence data
-                * even makes required fields possible to detect, though that's
-                  not implemented
-        * no groups
-        * allowing packed length-delineated types
-            * risk of upgrading them is considered the user's responsibility
-        * first class maps
-            * maps in protobuf were a pain and seem like a bodge
+* major changes in relation to protobuf and the history there
+    * bijective varints
+        * what leb128 varints gave protobuf
+            * simplicity
+            * zero-extension
+        * what bijective varints give us
+            * ez distinguished encoding
+            * very very close to the same read/write cost
+            * smaller size
+    * no non-zigzag signed varints
+        * these are just an efficiency footgun really
+        * even the `int32` protobuf type uses 10 entire bytes to encode negative
+          numbers just in case the type is widened to `int64` later. savings
+          seem minimal
+    * no integer domain coercion
+        * the data you get back should mean what it said or fail
+    * field ordering
+        * what unordered fields gave protobuf
+            * easy catting of partial messages
+            * overlays
+                * can be horrible, e.g. message fields upgraded to repeated
+        * what ordered fields give us
+            * no value stomping
+            * easy detection of repeated violation without presence data
+            * even makes required fields possible to detect, though that's
+              not implemented
+    * less constrained field tags
+        * protobuf constrained the whole field key, including wire type, to 32
+          bits. we can just not do that instead
+    * no groups
+        * historically these seem to be the original way data was nested, rather
+          than nesting messages as length-delimited values
+    * allowing packed length-delimited types
+        * risk of upgrading them is considered the user's responsibility
+    * first class maps
+        * maps in protobuf were a pain and seem like a bodge
+        * theoretically it's possible to widen that schema into a repeated
+          nested message with more fields, but this is almost never done
 
 * All varints (including tag fields and lengths) use
   [bijective numeration](https://en.wikipedia.org/wiki/Bijective_numeration),
