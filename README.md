@@ -180,7 +180,7 @@ framework. These things are possible, they just don't exist yet.
 
 Bilrost's basic unit of encoding is the message. Bilrost messages may have zero
 or more fields, which each bear a corresponding numeric tag and are assigned an
-encoder which is responsible
+encoder which determines how it is read and written from raw bytes.
 
 #### Expedient vs. Distinguished Encoding
 
