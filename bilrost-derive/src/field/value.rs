@@ -233,7 +233,7 @@ fn named_attr<T: parse::Parse>(attr: &Meta, attr_name: &str) -> Result<Option<T>
             value: Expr::Lit(expr),
             ..
         }) => match &expr.lit {
-            Lit::Str(lit) => parse_str::<Type>(&lit.value()),
+            Lit::Str(lit) => parse_str::<T>(&lit.value()),
             _ => bail!("invalid {attr_name} attribute: {}", quote!(#attr)),
         },
         _ => bail!("invalid {attr_name} attribute: {}", quote!(#attr)),
