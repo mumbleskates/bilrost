@@ -180,6 +180,8 @@ impl Field {
     //  and forth between u32 or Option<u32> and the specified enum type, whatever its requirements
     //  are.
     pub fn methods(&self, _ident: &TokenStream) -> Option<TokenStream> {
+        // let enumeration_ty = self.enumeration_ty.as_ref()?;
+
         // let mut ident_str = ident.to_string();
         // if ident_str.starts_with("r#") {
         //     ident_str = ident_str[2..].to_owned();
@@ -194,8 +196,6 @@ impl Field {
         //     Err(_) => quote!(#ident),
         // };
 
-        // TODO(widders): add a different attribute in the field to indicate whether and how the
-        //  enumeration helper methods should be added
         None
     }
 }
