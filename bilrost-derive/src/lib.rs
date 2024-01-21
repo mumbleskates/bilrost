@@ -550,7 +550,7 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
     // If `std::Default` is implemented for the type in a way we can't auto-detect, we make it
     // possible to trigger implementing the automatic `NewForOverwrite` by including a
     // `bilrost(has_default)` attribute on the type.
-    if bilrost_attrs(input.attrs)
+    if bilrost_attrs(input.attrs)?
         .into_iter()
         .any(|attr| match attr {
             Meta::Path(path) if path.is_ident("has_default") => true,
@@ -561,7 +561,7 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
     }
 
     if variants.is_empty() {
-        panic!("Enumeration must have at least one variant");
+        bail!("Enumeration must have at least one variant");
     }
 
     let is_valid = variants.iter().map(|(_, value)| quote!(#value => true));
@@ -966,7 +966,7 @@ pub fn oneof(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
 #[cfg(test)]
 mod test {
-    use crate::{try_message, try_oneof};
+    use crate::{try_enumeration, try_message, try_oneof};
     use quote::quote;
 
     #[test]
@@ -1188,6 +1188,78 @@ mod test {
                 .expect_err("unnumbered oneof variant not detected")
                 .to_string(),
             "missing tag attribute"
+        );
+    }
+
+    #[test]
+    fn test_rejects_struct_and_union_enumerations() {
+        let output = try_enumeration(quote!(
+            struct X { x: String }
+        ));
+        assert_eq!(
+            output
+                .expect_err("enumeration of struct not detected")
+                .to_string(),
+            "Enumeration can not be derived for a struct"
+        );
+        let output = try_enumeration(quote!(
+            union XY {
+                x: String,
+                Y: Vec<u8>,
+            }
+        ));
+        assert_eq!(
+            output
+                .expect_err("enumeration of union not detected")
+                .to_string(),
+            "Enumeration can not be derived for a union"
+        );
+    }
+
+    #[test]
+    fn test_rejects_variant_with_field_in_enumeration() {
+        let output = try_enumeration(quote!(
+            enum X {
+                A = 1,
+                B(u32) = 2,
+            }
+        ));
+        assert_eq!(
+            output
+                .expect_err("variant with field not detected")
+                .to_string(),
+            "Enumeration variants may not have fields"
+        );
+    }
+
+    #[test]
+    fn test_rejects_variant_without_discriminant_in_enumeration() {
+        let output = try_enumeration(quote!(
+            enum X {
+                A = 1,
+                B = 2,
+                C,
+                D = 4,
+            }
+        ));
+        assert_eq!(
+            output
+                .expect_err("variant without discriminant not detected")
+                .to_string(),
+            "Enumeration variants must have a discriminant"
+        );
+    }
+
+    #[test]
+    fn test_rejects_empty_enumeration() {
+        let output = try_enumeration(quote!(
+            enum X {}
+        ));
+        assert_eq!(
+            output
+                .expect_err("enumeration without variants not detected")
+                .to_string(),
+            "Enumeration must have at least one variant"
         );
     }
 }
