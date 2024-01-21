@@ -21,32 +21,6 @@ pub struct Field {
     pub ident_within_variant: Option<Ident>,
 }
 
-pub(super) fn encoder_attr(attr: &Meta) -> Result<Option<Type>, Error> {
-    if !attr.path().is_ident("encoder") {
-        return Ok(None);
-    }
-    match attr {
-        // encoder(type tokens go here)
-        Meta::List(MetaList { tokens, .. }) => parse2(tokens.clone()),
-        // encoder = "type tokens go here"
-        Meta::NameValue(MetaNameValue {
-            value: Expr::Lit(expr),
-            ..
-        }) => match &expr.lit {
-            Lit::Str(lit) => parse_str::<Type>(&lit.value()),
-            _ => bail!("invalid encoder attribute: {}", quote!(#attr)),
-        },
-        _ => bail!("invalid encoder attribute: {}", quote!(#attr)),
-    }
-    .map(Some)
-    .map_err(|_| {
-        anyhow!(
-            "invalid encoder attribute does not look like a type: {}",
-            quote!(#attr)
-        )
-    })
-}
-
 impl Field {
     pub fn new(ty: &Type, attrs: &[Meta], inferred_tag: u32) -> Result<Field, Error> {
         Field::new_impl(ty, attrs, Some(inferred_tag), false, None)
@@ -220,7 +194,7 @@ impl Field {
     }
 }
 
-pub(super) fn tag_attr(attr: &Meta) -> Result<Option<u32>, Error> {
+fn tag_attr(attr: &Meta) -> Result<Option<u32>, Error> {
     if !attr.path().is_ident("tag") {
         return Ok(None);
     }
@@ -239,4 +213,30 @@ pub(super) fn tag_attr(attr: &Meta) -> Result<Option<u32>, Error> {
         },
         _ => bail!("invalid tag attribute: {}", quote!(#attr)),
     }
+}
+
+fn encoder_attr(attr: &Meta) -> Result<Option<Type>, Error> {
+    if !attr.path().is_ident("encoder") {
+        return Ok(None);
+    }
+    match attr {
+        // encoder(type tokens go here)
+        Meta::List(MetaList { tokens, .. }) => parse2(tokens.clone()),
+        // encoder = "type tokens go here"
+        Meta::NameValue(MetaNameValue {
+            value: Expr::Lit(expr),
+            ..
+        }) => match &expr.lit {
+            Lit::Str(lit) => parse_str::<Type>(&lit.value()),
+            _ => bail!("invalid encoder attribute: {}", quote!(#attr)),
+        },
+        _ => bail!("invalid encoder attribute: {}", quote!(#attr)),
+    }
+    .map(Some)
+    .map_err(|_| {
+        anyhow!(
+            "invalid encoder attribute does not look like a type: {}",
+            quote!(#attr)
+        )
+    })
 }
