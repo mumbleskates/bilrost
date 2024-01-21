@@ -40,6 +40,17 @@ impl std::hash::Hash for Duration {
     }
 }
 
+impl core::ops::Neg for Duration {
+    type Output = Self;
+
+    fn neg(self) -> Self {
+        Self {
+            seconds: -self.seconds,
+            nanos: -self.nanos,
+        }
+    }
+}
+
 impl Duration {
     /// Normalizes the duration to a canonical format.
     ///
