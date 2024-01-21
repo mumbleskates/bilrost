@@ -13,7 +13,7 @@ use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use syn::{
     parse_str, Data, DataEnum, DataStruct, DeriveInput, Expr, Fields, FieldsNamed, FieldsUnnamed,
-    Ident, Index, Variant,
+    Ident, Index, Meta, Variant,
 };
 
 use crate::field::Field;
@@ -512,7 +512,9 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
 
     // Map the variants into 'fields'.
     let mut variants: Vec<(Ident, Expr)> = Vec::new();
+    let mut has_default = false;
     for Variant {
+        attrs,
         ident,
         fields,
         discriminant,
@@ -530,6 +532,32 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
             Some((_, expr)) => variants.push((ident, expr)),
             None => bail!("Enumeration variants must have a discriminant"),
         }
+
+        // Detect whether `Default` is being derived by looking for the #[default] attribute. This
+        // isn't foolproof, but it's good enough for most cases and 1) if we falsely detect that
+        // `Default` was implemented `NewForOverwrite` can be implemented manually if needed; if we
+        // fail to detect that `Default` was implemented we can suppress generating the automatic
+        // `NewForOverwrite` with the `bilrost(has_default)` attribute described below; and 3) the
+        // `NewForOverwrite` trait is slated to be factored out anyway.
+        if attrs.iter().any(|attr| match &attr.meta {
+            Meta::Path(path) if path.is_ident("default") => true,
+            _ => false,
+        }) {
+            has_default = true;
+        }
+    }
+
+    // If `std::Default` is implemented for the type in a way we can't auto-detect, we make it
+    // possible to trigger implementing the automatic `NewForOverwrite` by including a
+    // `bilrost(has_default)` attribute on the type.
+    if bilrost_attrs(input.attrs)
+        .into_iter()
+        .any(|attr| match attr {
+            Meta::Path(path) if path.is_ident("has_default") => true,
+            _ => false,
+        })
+    {
+        has_default = true;
     }
 
     if variants.is_empty() {
@@ -543,6 +571,20 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
         .map(|(variant, value)| quote!(#value => ::core::result::Result::Ok(#ident::#variant)));
 
     let is_valid_doc = format!("Returns `true` if `value` is a variant of `{}`.", ident);
+
+    let new_for_overwrite = if has_default {
+        quote!()
+    } else {
+        let (first_variant, _) = variants.first().unwrap();
+        quote! {
+            impl ::bilrost::encoding::NewForOverwrite
+            for #impl_generics #ident #ty_generics #where_clause {
+                fn new_for_overwrite() -> Self {
+                    Self::#first_variant
+                }
+            }
+        }
+    };
 
     let expanded = quote! {
         impl #impl_generics #ident #ty_generics #where_clause {
@@ -573,6 +615,8 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
             }
         }
 
+        #new_for_overwrite
+
         impl #impl_generics ::bilrost::encoding::Wiretyped<#ident>
         for ::bilrost::encoding::General {
             const WIRE_TYPE: ::bilrost::encoding::WireType = ::bilrost::encoding::WireType::Varint;
@@ -593,7 +637,7 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
             #[inline]
             fn decode_value<B: ::bilrost::bytes::Buf + ?Sized>(
                 value: &mut #ident,
-                buf: ::bilrost::encoding::Capped<B>,
+                mut buf: ::bilrost::encoding::Capped<B>,
                 _ctx: ::bilrost::encoding::DecodeContext,
             ) -> Result<(), ::bilrost::DecodeError> {
                 let int_value = u32::try_from(buf.decode_varint()?)
