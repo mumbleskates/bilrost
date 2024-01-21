@@ -1,7 +1,8 @@
 use anyhow::{anyhow, bail, Error};
 use proc_macro2::{Ident, TokenStream};
 use quote::quote;
-use syn::{parse2, parse_str, Expr, Lit, LitInt, Meta, MetaList, MetaNameValue, Type};
+use std::any::type_name;
+use syn::{parse, parse2, parse_str, Expr, Lit, LitInt, Meta, MetaList, MetaNameValue, Type};
 
 use crate::field::set_option;
 
@@ -11,6 +12,7 @@ pub struct Field {
     pub tag: u32,
     pub ty: Type,
     pub encoder: Type,
+    pub enumeration_ty: Option<Type>,
     /// When a value field is in a oneof, it must always encode a nonzero amount of data. The
     /// encoder must be a ValueEncoder to satisfy this; effectively, Oneof types are much like
     /// several fields whose values are each wrapped in an `Option`, but at most one of them can be
@@ -42,12 +44,15 @@ impl Field {
         ident_within_variant: Option<Ident>,
     ) -> Result<Field, Error> {
         let mut encoder = None;
+        let mut enumeration = None;
         let mut tag = None;
         let mut unknown_attrs = Vec::new();
 
         for attr in attrs {
-            if let Some(t) = encoder_attr(attr)? {
+            if let Some(t) = named_attr(attr, "encoder")? {
                 set_option(&mut encoder, t, "duplicate encoder attributes")?;
+            } else if let Some(t) = named_attr(attr, "enumeration")? {
+                set_option(&mut enumeration, t, "duplicate enumeration attributes")?;
             } else if let Some(t) = tag_attr(attr)? {
                 set_option(&mut tag, t, "duplicate tag attributes")?;
             } else {
@@ -73,6 +78,7 @@ impl Field {
             tag,
             ty: ty.clone(),
             encoder,
+            enumeration_ty,
             in_oneof,
             ident_within_variant,
         })
@@ -215,8 +221,8 @@ fn tag_attr(attr: &Meta) -> Result<Option<u32>, Error> {
     }
 }
 
-fn encoder_attr(attr: &Meta) -> Result<Option<Type>, Error> {
-    if !attr.path().is_ident("encoder") {
+fn named_attr<T: parse::Parse>(attr: &Meta, attr_name: &str) -> Result<Option<T>, Error> {
+    if !attr.path().is_ident(attr_name) {
         return Ok(None);
     }
     match attr {
@@ -228,15 +234,16 @@ fn encoder_attr(attr: &Meta) -> Result<Option<Type>, Error> {
             ..
         }) => match &expr.lit {
             Lit::Str(lit) => parse_str::<Type>(&lit.value()),
-            _ => bail!("invalid encoder attribute: {}", quote!(#attr)),
+            _ => bail!("invalid {attr_name} attribute: {}", quote!(#attr)),
         },
-        _ => bail!("invalid encoder attribute: {}", quote!(#attr)),
+        _ => bail!("invalid {attr_name} attribute: {}", quote!(#attr)),
     }
     .map(Some)
     .map_err(|_| {
         anyhow!(
-            "invalid encoder attribute does not look like a type: {}",
-            quote!(#attr)
+            "invalid {attr_name} attribute does not look like a(n) {}: {}",
+            type_name::<T>(),
+            quote!(#attr),
         )
     })
 }
