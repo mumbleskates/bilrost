@@ -72,12 +72,6 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
 
     let ident = input.ident;
 
-    syn::custom_keyword!(distinguished);
-    let _distinguished = input
-        .attrs
-        .iter()
-        .any(|a| a.path().is_ident("bilrost") && a.parse_args::<distinguished>().is_ok());
-
     // TODO(widders): test coverage for completed features:
     //  * do prop-testing for stronger round-trip guarantees now that the encoding is better
     //    distinguished
