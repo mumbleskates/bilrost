@@ -496,7 +496,6 @@ pub fn message(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     try_message(input.into()).unwrap().into()
 }
 
-// TODO(widders): Make this actually work! do it!! ok todo is here now
 fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
     let input: DeriveInput = syn::parse2(input)?;
     let ident = input.ident;
