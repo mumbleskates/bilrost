@@ -5,7 +5,7 @@ mod tests {
     use alloc::string::{String, ToString};
     use alloc::vec;
     use alloc::vec::Vec;
-    use bilrost::{Message, Oneof};
+    use bilrost::{Enumeration, Message, Oneof};
     use core::default::Default;
     use itertools::{repeat_n, Itertools};
 
@@ -372,6 +372,48 @@ mod tests {
             let encoded = value.encode_to_vec();
             let decoded = Foo::decode(encoded.as_slice()).unwrap();
             assert_eq!(value, decoded);
+        }
+    }
+
+    #[test]
+    fn enumeration_decoding() {
+        #[derive(Clone, Debug, PartialEq, Eq, Enumeration)]
+        enum E {
+            Five = 5,
+            Ten = 10,
+            Fifteen = 15,
+        }
+
+        #[derive(Clone, Debug, Default, PartialEq, Eq, Enumeration)]
+        enum F {
+            #[default]
+            Big = 1000,
+            Bigger = 1_000_000,
+            Biggest = 1_000_000_000,
+        }
+
+        #[derive(Clone, Debug, PartialEq, Message)]
+        struct EnumStruct {
+            no_default: Option<E>,
+            has_default: F,
+        }
+
+        for (no_default, has_default) in [None, Some(E::Five), Some(E::Ten), Some(E::Fifteen)]
+            .into_iter()
+            .cartesian_product([F::Big, F::Bigger, F::Biggest])
+        {
+            let out = EnumStruct {
+                no_default,
+                has_default,
+            };
+            let encoded_len = out.encoded_len();
+            let encoded = out.encode_to_vec();
+            assert_eq!(encoded.len(), encoded_len);
+            let re = EnumStruct::decode(encoded.as_slice()).unwrap();
+            assert_eq!(out, re);
+            // TODO(widders): enable this
+            // let re_distinguished = EnumStruct::decode_distinguished(encoded.as_slice()).unwrap();
+            // assert_eq!(out, re_distinguished);
         }
     }
 }
