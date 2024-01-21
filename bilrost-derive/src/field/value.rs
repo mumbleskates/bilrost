@@ -43,18 +43,18 @@ impl Field {
         in_oneof: bool,
         ident_within_variant: Option<Ident>,
     ) -> Result<Field, Error> {
+        let mut tag = None;
         let mut encoder = None;
         let mut enumeration_ty = None;
-        let mut tag = None;
         let mut unknown_attrs = Vec::new();
 
         for attr in attrs {
-            if let Some(t) = named_attr(attr, "encoder")? {
+            if let Some(t) = tag_attr(attr)? {
+                set_option(&mut tag, t, "duplicate tag attributes")?;
+            } else if let Some(t) = named_attr(attr, "encoder")? {
                 set_option(&mut encoder, t, "duplicate encoder attributes")?;
             } else if let Some(t) = named_attr(attr, "enumeration")? {
                 set_option(&mut enumeration_ty, t, "duplicate enumeration attributes")?;
-            } else if let Some(t) = tag_attr(attr)? {
-                set_option(&mut tag, t, "duplicate tag attributes")?;
             } else {
                 unknown_attrs.push(attr);
             }
