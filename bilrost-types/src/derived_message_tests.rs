@@ -5,7 +5,7 @@ mod tests {
     use alloc::string::{String, ToString};
     use alloc::vec::Vec;
     use alloc::{format, vec};
-    use bilrost::{Enumeration, Message, Oneof};
+    use bilrost::{DistinguishedMessage, Enumeration, Message, Oneof};
     use core::default::Default;
     use itertools::{repeat_n, Itertools};
 
@@ -392,7 +392,7 @@ mod tests {
             Biggest = 1_000_000_000,
         }
 
-        #[derive(Clone, Debug, PartialEq, Message)]
+        #[derive(Clone, Debug, PartialEq, Eq, Message, DistinguishedMessage)]
         struct EnumStruct {
             no_default: Option<E>,
             has_default: F,
@@ -411,9 +411,8 @@ mod tests {
             assert_eq!(encoded.len(), encoded_len);
             let re = EnumStruct::decode(encoded.as_slice()).unwrap();
             assert_eq!(out, re);
-            // TODO(widders): enable this
-            // let re_distinguished = EnumStruct::decode_distinguished(encoded.as_slice()).unwrap();
-            // assert_eq!(out, re_distinguished);
+            let re_distinguished = EnumStruct::decode_distinguished(encoded.as_slice()).unwrap();
+            assert_eq!(out, re_distinguished);
         }
     }
 
