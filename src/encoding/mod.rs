@@ -840,20 +840,6 @@ pub trait Oneof: Default {
     ) -> Result<(), DecodeError>;
 }
 
-/// Trait to be implemented by (or more commonly derived for) oneofs, which have knowledge of their
-/// variants' tags and encoding.
-pub trait DistinguishedOneof: Oneof {
-    /// Decodes from the given buffer in distinguished mode.
-    fn oneof_decode_field_distinguished<B: Buf + ?Sized>(
-        &mut self,
-        tag: u32,
-        wire_type: WireType,
-        duplicated: bool,
-        buf: Capped<B>,
-        ctx: DecodeContext,
-    ) -> Result<(), DecodeError>;
-}
-
 /// Underlying trait for a oneof that has no inherent "empty" variant, opting instead to be wrapped
 /// in an `Option`.
 pub trait NonEmptyOneof: Sized {
@@ -915,14 +901,16 @@ where
     }
 }
 
-/// Complementary trait for oneof fields all of whose variants have a distinguished encoding.
-pub trait DistinuishedOneof: Oneof {
-    fn decode_field_distinguished<B: Buf + ?Sized>(
+/// Trait to be implemented by (or more commonly derived for) oneofs, which have knowledge of their
+/// variants' tags and encoding.
+pub trait DistinguishedOneof: Oneof {
+    /// Decodes from the given buffer in distinguished mode.
+    fn oneof_decode_field_distinguished<B: Buf + ?Sized>(
         &mut self,
         tag: u32,
         wire_type: WireType,
         duplicated: bool,
-        buf: &mut Capped<B>,
+        buf: Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError>;
 }
