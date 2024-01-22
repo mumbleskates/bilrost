@@ -915,6 +915,37 @@ pub trait DistinguishedOneof: Oneof {
     ) -> Result<(), DecodeError>;
 }
 
+/// Underlying trait for a oneof that has no inherent "empty" variant, opting instead to be wrapped
+/// in an `Option`.
+pub trait NonEmptyDistinguishedOneof: Sized {
+    /// Decodes from the given buffer.
+    fn oneof_decode_field_distinguished<B: Buf + ?Sized>(
+        value: &mut Option<Self>,
+        tag: u32,
+        wire_type: WireType,
+        duplicated: bool,
+        buf: Capped<B>,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError>;
+}
+
+impl<T> DistinguishedOneof for Option<T>
+where
+    T: NonEmptyDistinguishedOneof,
+    Self: Oneof,
+{
+    fn oneof_decode_field_distinguished<B: Buf + ?Sized>(
+        &mut self,
+        tag: u32,
+        wire_type: WireType,
+        duplicated: bool,
+        buf: Capped<B>,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError> {
+        T::oneof_decode_field_distinguished(self, tag, wire_type, duplicated, buf, ctx)
+    }
+}
+
 /// Trait used by derived enumeration helper functions to provide getters and setters for integer
 /// fields via their associated `Enumeration` type.
 pub trait EnumerationHelper<FieldType> {

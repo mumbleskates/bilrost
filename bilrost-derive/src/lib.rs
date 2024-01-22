@@ -935,12 +935,6 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         );
     }
 
-    // Append the requirement that every field's type is encodable with its corresponding encoder
-    // to our where clause.
-    let impl_wrapper_const_ident =
-        parse_str::<Ident>(&("__BILROST_DERIVED_IMPL_ONEOF_FOR_".to_owned() + &ident.to_string()))?;
-    let aliases = encoder_alias_header();
-
     let encode = fields.iter().map(|(variant_ident, field)| {
         let encode = field.encode(quote!(*value));
         let with_value = field.with_value(quote!(value));
@@ -953,6 +947,9 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         quote!(#ident::#variant_ident #with_value => #encoded_len)
     });
 
+    let impl_wrapper_const_ident =
+        parse_str::<Ident>(&("__BILROST_DERIVED_IMPL_ONEOF_FOR_".to_owned() + &ident.to_string()))?;
+    let aliases = encoder_alias_header();
     let expanded = if let Some(empty_ident) = empty_variant {
         let current_tag = fields.iter().map(|(variant_ident, field)| {
             let tag = field.tags()[0];
@@ -966,21 +963,19 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
             let with_new_value = field.with_value(quote!(new_value));
             let with_value = field.with_value(quote!(value));
             quote! {
-                #tag => {
-                    match self {
-                        #ident::#empty_ident => {
-                            let mut new_value =
-                                ::bilrost::encoding::NewForOverwrite::new_for_overwrite();
-                            let mut value = &mut new_value;
-                            #decode?;
-                            *self = #ident::#variant_ident #with_new_value;
-                            Ok(())
-                        }
-                        #ident::#variant_ident #with_value => {
-                            #decode
-                        }
-                        _ => Err(::bilrost::DecodeError::new("conflicting fields in oneof")),
+                #tag => match self {
+                    #ident::#empty_ident => {
+                        let mut new_value =
+                            ::bilrost::encoding::NewForOverwrite::new_for_overwrite();
+                        let mut value = &mut new_value;
+                        #decode?;
+                        *self = #ident::#variant_ident #with_new_value;
+                        Ok(())
                     }
+                    #ident::#variant_ident #with_value => {
+                        #decode
+                    }
+                    _ => Err(::bilrost::DecodeError::new("conflicting fields in oneof")),
                 }
             }
         });
@@ -990,8 +985,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
                 #aliases
 
                 impl #impl_generics ::bilrost::encoding::Oneof
-                for #ident #ty_generics
-                #where_clause
+                for #ident #ty_generics #where_clause
                 {
                     const FIELD_TAGS: &'static [u32] = &[#(#sorted_tags),*];
 
@@ -1060,21 +1054,19 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
             let with_new_value = field.with_value(quote!(new_value));
             let with_value = field.with_value(quote!(value));
             quote! {
-                #tag => {
-                    match field {
-                        ::core::option::Option::None => {
-                            let mut new_value =
-                                ::bilrost::encoding::NewForOverwrite::new_for_overwrite();
-                            let value = &mut new_value;
-                            #decode?;
-                            *field = Some(#ident::#variant_ident #with_new_value);
-                            Ok(())
-                        }
-                        ::core::option::Option::Some(#ident::#variant_ident #with_value) => {
-                            #decode
-                        }
-                        _ => Err(::bilrost::DecodeError::new("conflicting fields in oneof")),
+                #tag => match field {
+                    ::core::option::Option::None => {
+                        let mut new_value =
+                            ::bilrost::encoding::NewForOverwrite::new_for_overwrite();
+                        let value = &mut new_value;
+                        #decode?;
+                        *field = Some(#ident::#variant_ident #with_new_value);
+                        Ok(())
                     }
+                    ::core::option::Option::Some(#ident::#variant_ident #with_value) => {
+                        #decode
+                    }
+                    _ => Err(::bilrost::DecodeError::new("conflicting fields in oneof")),
                 }
             }
         });
@@ -1084,8 +1076,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
                 #aliases
 
                 impl #impl_generics ::bilrost::encoding::NonEmptyOneof
-                for #ident #ty_generics
-                #where_clause
+                for #ident #ty_generics #where_clause
                 {
                     const FIELD_TAGS: &'static [u32] = &[#(#sorted_tags),*];
 
@@ -1140,6 +1131,130 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
 #[proc_macro_derive(Oneof, attributes(bilrost))]
 pub fn oneof(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     try_oneof(input.into()).unwrap().into()
+}
+
+fn try_distinguished_oneof(input: TokenStream) -> Result<TokenStream, Error> {
+    let input: DeriveInput = syn::parse2(input)?;
+
+    let PreprocessedOneof {
+        ident,
+        impl_generics,
+        ty_generics,
+        where_clause,
+        fields,
+        empty_variant,
+    } = preprocess_oneof(&input)?;
+    let where_clause = append_distinguished_encoder_wheres(where_clause, &fields);
+
+    let expanded = if let Some(empty_ident) = empty_variant {
+        let decode = fields.iter().map(|(variant_ident, field)| {
+            let tag = field.first_tag();
+            let decode = field.decode(quote!(value));
+            let with_new_value = field.with_value(quote!(new_value));
+            let with_value = field.with_value(quote!(value));
+            quote! {
+                #tag => match self {
+                    #ident::#empty_ident => {
+                        let mut new_value =
+                            ::bilrost::encoding::NewForOverwrite::new_for_overwrite();
+                        let mut value = &mut new_value;
+                        #decode?;
+                        *self = #ident::#variant_ident #with_new_value;
+                        Ok(())
+                    }
+                    #ident::#variant_ident #with_value => {
+                        #decode
+                    }
+                    _ => Err(::bilrost::DecodeError::new("conflicting fields in oneof")),
+                }
+            }
+        });
+
+        quote! {
+            impl #impl_generics ::bilrost::encoding::DistinguishedOneof
+            for #ident #ty_generics #where_clause
+            {
+                fn oneof_decode_field_distinguished<__B: ::bilrost::bytes::Buf + ?Sized>(
+                    &mut self,
+                    tag: u32,
+                    wire_type: ::bilrost::encoding::WireType,
+                    duplicated: bool,
+                    buf: ::bilrost::encoding::Capped<__B>,
+                    ctx: ::bilrost::encoding::DecodeContext,
+                ) -> ::core::result::Result<(), ::bilrost::DecodeError> {
+                    match tag {
+                        #(#decode,)*
+                        _ => unreachable!(
+                            concat!("invalid ", stringify!(#ident), " tag: {}"), tag,
+                        ),
+                    }
+                }
+            }
+        }
+    } else {
+        let decode = fields.iter().map(|(variant_ident, field)| {
+            let tag = field.first_tag();
+            let decode = field.decode(quote!(value));
+            let with_new_value = field.with_value(quote!(new_value));
+            let with_value = field.with_value(quote!(value));
+            quote! {
+                #tag => match field {
+                    ::core::option::Option::None => {
+                        let mut new_value =
+                            ::bilrost::encoding::NewForOverwrite::new_for_overwrite();
+                        let value = &mut new_value;
+                        #decode?;
+                        *field = Some(#ident::#variant_ident #with_new_value);
+                        Ok(())
+                    }
+                    ::core::option::Option::Some(#ident::#variant_ident #with_value) => {
+                        #decode
+                    }
+                    _ => Err(::bilrost::DecodeError::new("conflicting fields in oneof")),
+                }
+            }
+        });
+
+        quote! {
+            impl #impl_generics ::bilrost::encoding::NonEmptyDistinguishedOneof
+            for #ident #ty_generics #where_clause
+            {
+                fn oneof_decode_field_distinguished<__B: ::bilrost::bytes::Buf + ?Sized>(
+                    field: &mut ::core::option::Option<Self>,
+                    tag: u32,
+                    wire_type: ::bilrost::encoding::WireType,
+                    duplicated: bool,
+                    buf: ::bilrost::encoding::Capped<__B>,
+                    ctx: ::bilrost::encoding::DecodeContext,
+                ) -> ::core::result::Result<(), ::bilrost::DecodeError> {
+                    match tag {
+                        #(#decode,)*
+                        _ => unreachable!(
+                            concat!("invalid ", stringify!(#ident), " tag: {}"), tag,
+                        ),
+                    }
+                }
+            }
+        }
+    };
+
+    let impl_wrapper_const_ident =
+        parse_str::<Ident>(&("__BILROST_DERIVED_IMPL_DISTINGUISHED_ONEOF_FOR_".to_owned() + &ident.to_string()))?;
+    let aliases = encoder_alias_header();
+    let expanded = quote! {
+        const #impl_wrapper_const_ident: () = {
+            #aliases
+
+            #expanded
+        };
+    };
+
+    Ok(expanded)
+}
+
+#[proc_macro_derive(DistinguishedOneof, attributes(bilrost))]
+pub fn distinguished_oneof(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    try_distinguished_oneof(input.into()).unwrap().into()
 }
 
 #[cfg(test)]
