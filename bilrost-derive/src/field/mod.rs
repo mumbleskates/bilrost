@@ -1,14 +1,13 @@
 mod oneof;
 mod value;
 
-use std::collections::BTreeMap;
 use std::fmt;
 
 use anyhow::{bail, Error};
 use proc_macro2::{Ident, TokenStream};
 use quote::{quote, ToTokens};
 use syn::punctuated::Punctuated;
-use syn::{parse2, Attribute, LitInt, Meta, Token, Type, WhereClause};
+use syn::{parse2, Attribute, LitInt, Meta, Token, Type};
 
 #[derive(Clone)]
 pub enum Field {
@@ -65,31 +64,19 @@ impl Field {
     }
 
     /// Returns the where clause condition asserting that this field's encoder encodes its type.
-    fn encoder_where(&self) -> Option<TokenStream> {
+    pub fn encoder_where(&self) -> Option<TokenStream> {
         match self {
             Field::Value(field) => Some(field.encoder_where()),
             _ => None,
         }
     }
 
-    /// Combines an optional already-existing where clause with additional terms for each field's
-    /// encoder to assert that it supports the field's type.
-    pub fn append_wheres<'a>(
-        where_clause: Option<&WhereClause>,
-        fields: impl Iterator<Item = &'a Self>,
-    ) -> TokenStream {
-        // dedup the where clauses by their String values
-        let encoder_wheres: BTreeMap<_, _> = fields
-            .flat_map(|f| f.encoder_where())
-            .map(|where_| (where_.to_string(), where_))
-            .collect();
-        let encoder_wheres: Vec<_> = encoder_wheres.values().collect();
-        if let Some(where_clause) = where_clause {
-            quote! { #where_clause #(, #encoder_wheres)* }
-        } else if encoder_wheres.is_empty() {
-            quote!() // no where clause terms
-        } else {
-            quote! { where #(#encoder_wheres),*}
+    /// Returns the where clause condition asserting that this field's encoder encodes its type in
+    /// distinguished mode.
+    pub fn distinguished_encoder_where(&self) -> Option<TokenStream> {
+        match self {
+            Field::Value(field) => Some(field.distinguished_encoder_where()),
+            _ => None,
         }
     }
 
@@ -138,8 +125,7 @@ impl Field {
         }
     }
 
-    /// Returns an expression which evaluates to the result of merging a decoded
-    /// value into the field.
+    /// Returns an expression which evaluates to the result of decoding a value into the field.
     pub fn decode(&self, ident: TokenStream) -> TokenStream {
         match self {
             Field::Value(scalar) => scalar.decode(ident),

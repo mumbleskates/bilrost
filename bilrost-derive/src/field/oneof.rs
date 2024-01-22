@@ -85,6 +85,20 @@ impl Field {
         )
     }
 
+    /// Returns an expression which evaluates to the result of decoding the oneof field.
+    pub fn decode_distinguished(&self, ident: TokenStream) -> TokenStream {
+        quote!(
+            ::bilrost::encoding::DistinguishedOneof::oneof_decode_field_distinguished(
+                #ident,
+                tag,
+                wire_type,
+                duplicated,
+                buf,
+                ctx,
+            )
+        )
+    }
+
     /// Returns an expression which evaluates to the encoded length of the oneof field.
     pub fn encoded_len(&self, ident: TokenStream) -> TokenStream {
         quote!(::bilrost::encoding::Oneof::oneof_encoded_len(&#ident, tm))

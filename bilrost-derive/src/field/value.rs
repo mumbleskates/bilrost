@@ -177,6 +177,17 @@ impl Field {
         }
     }
 
+    /// Returns the where clause constraint terms for the field's encoder.
+    pub fn distinguished_encoder_where(&self) -> TokenStream {
+        let ty = &self.ty;
+        let encoder = &self.encoder;
+        if self.in_oneof {
+            quote!(#encoder: ::bilrost::encoding::DistinguishedValueEncoder<#ty>)
+        } else {
+            quote!(#encoder: ::bilrost::encoding::DistinguishedEncoder<#ty>)
+        }
+    }
+
     /// Returns methods to embed in the message. `ident` must be the name of the field within the
     /// message struct.
     pub fn methods(&self, ident: &TokenStream) -> Option<TokenStream> {

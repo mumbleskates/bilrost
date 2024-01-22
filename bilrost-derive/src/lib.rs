@@ -2,7 +2,7 @@
 // The `quote!` macro requires deep recursion.
 #![recursion_limit = "4096"]
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::mem::take;
 use std::ops::Deref;
 
@@ -13,7 +13,7 @@ use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use syn::{
     parse_str, Data, DataEnum, DataStruct, DeriveInput, Expr, Fields, FieldsNamed, FieldsUnnamed,
-    Ident, ImplGenerics, Index, Meta, TypeGenerics, Variant,
+    Ident, ImplGenerics, Index, Meta, TypeGenerics, Variant, WhereClause,
 };
 
 use crate::field::Field;
@@ -86,7 +86,7 @@ struct PreprocessedMessage<'a> {
     ident: Ident,
     impl_generics: ImplGenerics<'a>,
     ty_generics: TypeGenerics<'a>,
-    where_clause: TokenStream,
+    where_clause: Option<&'a WhereClause>,
     unsorted_fields: Vec<(TokenStream, Field)>,
     fields: Vec<FieldChunk>,
 }
@@ -259,10 +259,6 @@ fn preprocess_message(input: &DeriveInput) -> Result<PreprocessedMessage, Error>
     drop(sort_group_oneof_tags);
 
     let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
-    // Append the requirement that every field's type is encodable with its corresponding encoder
-    // to our where clause.
-    let where_clause =
-        Field::append_wheres(where_clause, unsorted_fields.iter().map(|(_, field)| field));
 
     Ok(PreprocessedMessage {
         ident,
@@ -272,6 +268,49 @@ fn preprocess_message(input: &DeriveInput) -> Result<PreprocessedMessage, Error>
         unsorted_fields,
         fields: chunks,
     })
+}
+
+/// Combines an optional already-existing where clause with additional terms for each field's
+/// encoder to assert that it supports the field's type.
+fn impl_append_wheres(
+    where_clause: Option<&WhereClause>,
+    field_wheres: impl Iterator<Item = Option<TokenStream>>,
+) -> TokenStream {
+    // dedup the where clauses by their String values
+    let encoder_wheres: BTreeMap<_, _> = field_wheres
+        .flatten()
+        .map(|where_| (where_.to_string(), where_))
+        .collect();
+    let encoder_wheres: Vec<_> = encoder_wheres.values().collect();
+    if let Some(where_clause) = where_clause {
+        quote! { #where_clause #(, #encoder_wheres)* }
+    } else if encoder_wheres.is_empty() {
+        quote!() // no where clause terms
+    } else {
+        quote! { where #(#encoder_wheres),*}
+    }
+}
+
+fn append_encoder_wheres<T>(
+    where_clause: Option<&WhereClause>,
+    fields: &Vec<(T, Field)>,
+) -> TokenStream {
+    impl_append_wheres(
+        where_clause,
+        fields.iter().map(|(_, field)| field.encoder_where()),
+    )
+}
+
+fn append_distinguished_encoder_wheres<T>(
+    where_clause: Option<&WhereClause>,
+    fields: &Vec<(T, Field)>,
+) -> TokenStream {
+    impl_append_wheres(
+        where_clause,
+        fields
+            .iter()
+            .map(|(_, field)| field.distinguished_encoder_where()),
+    )
 }
 
 // TODO(widders): test coverage for completed features:
@@ -297,6 +336,8 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         unsorted_fields,
         fields,
     } = preprocess_message(&input)?;
+
+    let where_clause = append_encoder_wheres(where_clause, &unsorted_fields);
 
     let encoded_len = fields.iter().map(|chunk| match chunk {
         AlwaysOrdered((field_ident, field)) => field.encoded_len(quote!(self.#field_ident)),
@@ -695,19 +736,23 @@ pub fn enumeration(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     try_enumeration(input.into()).unwrap().into()
 }
 
-fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
-    let input: DeriveInput = syn::parse2(input)?;
+struct PreprocessedOneof<'a> {
+    ident: Ident,
+    impl_generics: ImplGenerics<'a>,
+    ty_generics: TypeGenerics<'a>,
+    where_clause: Option<&'a WhereClause>,
+    fields: Vec<(Ident, Field)>,
+    empty_variant: Option<Ident>,
+}
 
-    let ident = input.ident;
+fn preprocess_oneof(input: &DeriveInput) -> Result<PreprocessedOneof, Error> {
+    let ident = input.ident.clone();
 
-    let variants = match input.data {
-        Data::Enum(DataEnum { variants, .. }) => variants,
+    let variants = match &input.data {
+        Data::Enum(DataEnum { variants, .. }) => variants.clone(),
         Data::Struct(..) => bail!("Oneof can not be derived for a struct"),
         Data::Union(..) => bail!("Oneof can not be derived for a union"),
     };
-
-    let generics = &input.generics;
-    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
     // Oneof enums have either zero or one unit variant. If there is no such variant, the Oneof
     // trait is implemented on `Option<T>`, and `None` stands in for no fields being set. If there
@@ -767,7 +812,33 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
             },
         };
     }
-    let fields = fields;
+
+    let generics = &input.generics;
+    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+
+    Ok(PreprocessedOneof {
+        ident,
+        impl_generics,
+        ty_generics,
+        where_clause,
+        fields,
+        empty_variant,
+    })
+}
+
+fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
+    let input: DeriveInput = syn::parse2(input)?;
+
+    let PreprocessedOneof {
+        ident,
+        impl_generics,
+        ty_generics,
+        where_clause,
+        fields,
+        empty_variant,
+    } = preprocess_oneof(&input)?;
+
+    let where_clause = append_encoder_wheres(where_clause, &fields);
 
     let sorted_tags: Vec<u32> = fields
         .iter()
@@ -784,7 +855,6 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
 
     // Append the requirement that every field's type is encodable with its corresponding encoder
     // to our where clause.
-    let where_clause = Field::append_wheres(where_clause, fields.iter().map(|(_, field)| field));
     let impl_wrapper_const_ident =
         parse_str::<Ident>(&("__BILROST_DERIVED_IMPL_ONEOF_FOR_".to_owned() + &ident.to_string()))?;
     let aliases = encoder_alias_header();
