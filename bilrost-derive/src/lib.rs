@@ -13,7 +13,7 @@ use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use syn::{
     parse_str, Data, DataEnum, DataStruct, DeriveInput, Expr, Fields, FieldsNamed, FieldsUnnamed,
-    Ident, Index, Meta, Variant,
+    Ident, ImplGenerics, Index, Meta, TypeGenerics, Variant,
 };
 
 use crate::field::Field;
@@ -67,44 +67,51 @@ fn encoder_alias_header() -> TokenStream {
     }
 }
 
-fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
-    let input: DeriveInput = syn::parse2(input)?;
+enum SortGroupPart {
+    // A set of fields that can be sorted by any of their tags, as they are always contiguous
+    Contiguous(Vec<(TokenStream, Field)>),
+    // A oneof field that needs to be sorted based on its current value's tag
+    Oneof((TokenStream, Field)),
+}
+use SortGroupPart::*;
+enum FieldChunk {
+    // A field that does not need to be sorted
+    AlwaysOrdered((TokenStream, Field)),
+    // A set of fields that must be sorted before emitting
+    SortGroup(Vec<SortGroupPart>),
+}
+use FieldChunk::*;
 
-    let ident = input.ident;
+struct PreprocessedMessage<'a> {
+    ident: Ident,
+    impl_generics: ImplGenerics<'a>,
+    ty_generics: TypeGenerics<'a>,
+    where_clause: TokenStream,
+    unsorted_fields: Vec<(TokenStream, Field)>,
+    fields: Vec<FieldChunk>,
+}
 
-    // TODO(widders): test coverage for completed features:
-    //  * do prop-testing for stronger round-trip guarantees now that the encoding is better
-    //    distinguished
-    //  * unknown fields are forbidden in distinguished decoding
-    //  * map keys and set values must be ascending in distinguished decoding
-    //  * map keys and set values must never recur in any decoding mode with either hash or btree
-    //  * repeated fields must have matching packed-ness in distinguished decoding
+fn preprocess_message(input: &DeriveInput) -> Result<PreprocessedMessage, Error> {
+    let ident = input.ident.clone();
 
-    // TODO(widders): distinguished features
-    //  * derive DistinguishedMessage
-    //      * unknown fields are forbidden
-
-    let variant_data = match input.data {
+    let variant_data = match &input.data {
         Data::Struct(variant_data) => variant_data,
         Data::Enum(..) => bail!("Message can not be derived for an enum"),
         Data::Union(..) => bail!("Message can not be derived for a union"),
     };
 
-    let generics = &input.generics;
-    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
-
     let fields: Vec<syn::Field> = match variant_data {
         DataStruct {
             fields: Fields::Named(FieldsNamed { named: fields, .. }),
             ..
-        } => fields.into_iter().collect(),
+        } => fields.into_iter().cloned().collect(),
         DataStruct {
             fields:
                 Fields::Unnamed(FieldsUnnamed {
                     unnamed: fields, ..
                 }),
             ..
-        } => fields.into_iter().collect(),
+        } => fields.into_iter().cloned().collect(),
         DataStruct {
             fields: Fields::Unit,
             ..
@@ -146,20 +153,6 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         bail!("message {} has duplicate tag {}", ident, duplicate_tag)
     };
 
-    enum SortGroupPart {
-        // A set of fields that can be sorted by any of their tags, as they are always contiguous
-        Contiguous(Vec<(TokenStream, Field)>),
-        // A oneof field that needs to be sorted based on its current value's tag
-        Oneof((TokenStream, Field)),
-    }
-    use SortGroupPart::*;
-    enum FieldChunk {
-        // A field that does not need to be sorted
-        AlwaysOrdered((TokenStream, Field)),
-        // A set of fields that must be sorted before emitting
-        SortGroup(Vec<SortGroupPart>),
-    }
-    use FieldChunk::*;
     let mut chunks = Vec::<FieldChunk>::new();
     let mut fields = unsorted_fields
         .iter()
@@ -264,7 +257,46 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         "fields left over after chunking"
     );
     drop(sort_group_oneof_tags);
-    let fields = chunks;
+
+    let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
+    // Append the requirement that every field's type is encodable with its corresponding encoder
+    // to our where clause.
+    let where_clause =
+        Field::append_wheres(where_clause, unsorted_fields.iter().map(|(_, field)| field));
+
+    Ok(PreprocessedMessage {
+        ident,
+        impl_generics,
+        ty_generics,
+        where_clause,
+        unsorted_fields,
+        fields: chunks,
+    })
+}
+
+// TODO(widders): test coverage for completed features:
+//  * do prop-testing for stronger round-trip guarantees now that the encoding is better
+//    distinguished
+//  * unknown fields are forbidden in distinguished decoding
+//  * map keys and set values must be ascending in distinguished decoding
+//  * map keys and set values must never recur in any decoding mode with either hash or btree
+//  * repeated fields must have matching packed-ness in distinguished decoding
+
+// TODO(widders): distinguished features
+//  * derive DistinguishedMessage
+//      * unknown fields are forbidden
+
+fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
+    let input: DeriveInput = syn::parse2(input)?;
+
+    let PreprocessedMessage {
+        ident,
+        impl_generics,
+        ty_generics,
+        where_clause,
+        unsorted_fields,
+        fields,
+    } = preprocess_message(&input)?;
 
     let encoded_len = fields.iter().map(|chunk| match chunk {
         AlwaysOrdered((field_ident, field)) => field.encoded_len(quote!(self.#field_ident)),
@@ -414,11 +446,6 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
             }
         }
     };
-
-    // Append the requirement that every field's type is encodable with its corresponding encoder
-    // to our where clause.
-    let where_clause =
-        Field::append_wheres(where_clause, unsorted_fields.iter().map(|(_, field)| field));
 
     let static_guards = unsorted_fields
         .iter()
