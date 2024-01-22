@@ -202,17 +202,18 @@ impl Field {
             fn #get(
                 &self
             ) -> <#enumeration_ty as ::bilrost::encoding::EnumerationHelper<#field_ty>>::Output {
-                <#enumeration_ty as ::bilrost::encoding::EnumerationHelper<#field_ty>>
-                ::help_get(self.#ident)
+                <
+                    #enumeration_ty as ::bilrost::encoding::EnumerationHelper<#field_ty>
+                >::help_get(self.#ident)
             }
 
             fn #set(
                 &mut self,
                 val: <#enumeration_ty as ::bilrost::encoding::EnumerationHelper<#field_ty>>::Input,
             ) {
-                self.#ident =
-                    <#enumeration_ty as ::bilrost::encoding::EnumerationHelper<#field_ty>>
-                    ::help_set(val);
+                self.#ident = <
+                    #enumeration_ty as ::bilrost::encoding::EnumerationHelper<#field_ty>
+                >::help_set(val);
             }
         })
     }
