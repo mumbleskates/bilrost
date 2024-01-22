@@ -4,6 +4,7 @@ use alloc::format;
 use core::cmp::{min, Eq, PartialEq};
 use core::convert::TryFrom;
 use core::default::Default;
+use core::fmt::Debug;
 use core::ops::{Deref, DerefMut};
 
 use bytes::buf::Take;
@@ -912,6 +913,46 @@ pub trait DistinuishedOneof: Oneof {
     ) -> Result<(), DecodeError>;
 }
 
+/// Trait used by derived enumeration helper functions to provide getters and setters for integer
+/// fields via their associated `Enumeration` type.
+pub trait EnumerationHelper<FieldType> {
+    type Input;
+    type Output;
+
+    fn help_set(enum_val: Self::Input) -> FieldType;
+    fn help_get(field_val: FieldType) -> Self::Output;
+}
+impl<T> EnumerationHelper<u32> for T
+where
+    T: Into<u32> + TryFrom<u32, Error = DecodeError>,
+{
+    type Input = T;
+    type Output = Result<T, DecodeError>;
+
+    fn help_set(enum_val: Self) -> u32 {
+        enum_val.into()
+    }
+
+    fn help_get(field_val: u32) -> Result<T, DecodeError> {
+        T::try_from(field_val)
+    }
+}
+impl<T> EnumerationHelper<Option<u32>> for T
+where
+    T: Into<u32> + TryFrom<u32, Error = DecodeError>,
+{
+    type Input = Option<T>;
+    type Output = Option<Result<T, DecodeError>>;
+
+    fn help_set(enum_val: Option<T>) -> Option<u32> {
+        enum_val.map(Into::into)
+    }
+
+    fn help_get(field_val: Option<u32>) -> Option<Result<T, DecodeError>> {
+        field_val.map(TryFrom::try_from)
+    }
+}
+
 /// Macro rules for expressly delegating from one encoder to another.
 macro_rules! delegate_encoding {
     (
@@ -1329,7 +1370,8 @@ mod test {
             DecodeContext::default(),
         );
         assert_eq!(
-            res.expect_err("unaligned packed fixed64 decoded without error").to_string(),
+            res.expect_err("unaligned packed fixed64 decoded without error")
+                .to_string(),
             "failed to decode Bilrost message: packed field is not a valid length"
         );
         let res = <Packed<Fixed>>::decode_value_distinguished(
@@ -1338,7 +1380,8 @@ mod test {
             DecodeContext::default(),
         );
         assert_eq!(
-            res.expect_err("unaligned packed fixed64 decoded without error").to_string(),
+            res.expect_err("unaligned packed fixed64 decoded without error")
+                .to_string(),
             "failed to decode Bilrost message: packed field is not a valid length"
         );
     }
@@ -1357,7 +1400,8 @@ mod test {
             DecodeContext::default(),
         );
         assert_eq!(
-            res.expect_err("unaligned packed fixed32 decoded without error").to_string(),
+            res.expect_err("unaligned packed fixed32 decoded without error")
+                .to_string(),
             "failed to decode Bilrost message: packed field is not a valid length"
         );
         let res = <Packed<Fixed>>::decode_value_distinguished(
@@ -1366,7 +1410,8 @@ mod test {
             DecodeContext::default(),
         );
         assert_eq!(
-            res.expect_err("unaligned packed fixed32 decoded without error").to_string(),
+            res.expect_err("unaligned packed fixed32 decoded without error")
+                .to_string(),
             "failed to decode Bilrost message: packed field is not a valid length"
         );
     }
@@ -1388,7 +1433,8 @@ mod test {
             DecodeContext::default(),
         );
         assert_eq!(
-            res.expect_err("unaligned 12-byte map decoded without error").to_string(),
+            res.expect_err("unaligned 12-byte map decoded without error")
+                .to_string(),
             "failed to decode Bilrost message: packed field is not a valid length"
         );
         let res = <Map<Fixed, Fixed>>::decode_value_distinguished(
@@ -1397,7 +1443,8 @@ mod test {
             DecodeContext::default(),
         );
         assert_eq!(
-            res.expect_err("unaligned 12-byte map decoded without error").to_string(),
+            res.expect_err("unaligned 12-byte map decoded without error")
+                .to_string(),
             "failed to decode Bilrost message: packed field is not a valid length"
         );
     }

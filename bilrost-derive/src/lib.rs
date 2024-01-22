@@ -596,20 +596,20 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
             }
         }
 
-        impl #impl_generics ::core::convert::From::<#ident> for u32 #ty_generics #where_clause {
+        impl #impl_generics ::core::convert::From<#ident> for u32 #ty_generics #where_clause {
             fn from(value: #ident) -> u32 {
                 value as u32
             }
         }
 
-        impl #impl_generics ::core::convert::TryFrom::<u32> for #ident #ty_generics #where_clause {
+        impl #impl_generics ::core::convert::TryFrom<u32> for #ident #ty_generics #where_clause {
             type Error = ::bilrost::DecodeError;
 
             fn try_from(value: u32) -> ::core::result::Result<#ident, ::bilrost::DecodeError> {
                 match value {
                     #(#try_from,)*
                     _ => ::core::result::Result::Err(
-                        ::bilrost::DecodeError::new("invalid enumeration value")),
+                        ::bilrost::DecodeError::new("unknown enumeration value")),
                 }
             }
         }
@@ -1193,7 +1193,9 @@ mod test {
     #[test]
     fn test_rejects_struct_and_union_enumerations() {
         let output = try_enumeration(quote!(
-            struct X { x: String }
+            struct X {
+                x: String,
+            }
         ));
         assert_eq!(
             output

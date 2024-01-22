@@ -1,8 +1,10 @@
 use anyhow::{anyhow, bail, Error};
-use proc_macro2::{Ident, TokenStream};
+use proc_macro2::{Ident, Span, TokenStream};
 use quote::quote;
 use std::any::type_name;
-use syn::{parse, parse2, parse_str, Expr, Lit, LitInt, Meta, MetaList, MetaNameValue, Type};
+use syn::{
+    parse, parse2, parse_str, Expr, Index, Lit, LitInt, Meta, MetaList, MetaNameValue, Type,
+};
 
 use crate::field::set_option;
 
@@ -175,28 +177,44 @@ impl Field {
         }
     }
 
-    /// Returns methods to embed in the message.
-    // TODO(widders): update this; it should mostly be the same but we want helpers for going back
-    //  and forth between u32 or Option<u32> and the specified enum type, whatever its requirements
-    //  are.
-    pub fn methods(&self, _ident: &TokenStream) -> Option<TokenStream> {
-        // let enumeration_ty = self.enumeration_ty.as_ref()?;
+    /// Returns methods to embed in the message. `ident` must be the name of the field within the
+    /// message struct.
+    pub fn methods(&self, ident: &TokenStream) -> Option<TokenStream> {
+        let enumeration_ty = self.enumeration_ty.as_ref()?;
 
-        // let mut ident_str = ident.to_string();
-        // if ident_str.starts_with("r#") {
-        //     ident_str = ident_str[2..].to_owned();
-        // }
+        let ident_str = ident.to_string();
+        let ident_str = ident_str.as_str().strip_prefix("r#").unwrap_or(&ident_str);
 
-        // // Prepend `get_` for getter methods of tuple structs.
-        // let get = match parse_str::<Index>(&ident_str) {
-        //     Ok(index) => {
-        //         let get = Ident::new(&format!("get_{}", index.index), Span::call_site());
-        //         quote!(#get)
-        //     }
-        //     Err(_) => quote!(#ident),
-        // };
+        // Prepend `get_` for getter methods of tuple structs.
+        let get = match parse_str::<Index>(&ident_str) {
+            Ok(index) => {
+                let get = Ident::new(&format!("get_{}", index.index), Span::call_site());
+                quote!(#get)
+            }
+            Err(_) => quote!(#ident),
+        };
 
-        None
+        let set = Ident::new(&format!("set_{}", ident_str), Span::call_site());
+
+        let field_ty = &self.ty;
+
+        Some(quote! {
+            fn #get(
+                &self
+            ) -> <#enumeration_ty as ::bilrost::encoding::EnumerationHelper<#field_ty>>::Output {
+                <#enumeration_ty as ::bilrost::encoding::EnumerationHelper<#field_ty>>
+                ::help_get(self.#ident)
+            }
+
+            fn #set(
+                &mut self,
+                val: <#enumeration_ty as ::bilrost::encoding::EnumerationHelper<#field_ty>>::Input,
+            ) {
+                self.#ident =
+                    <#enumeration_ty as ::bilrost::encoding::EnumerationHelper<#field_ty>>
+                    ::help_set(val);
+            }
+        })
     }
 }
 
