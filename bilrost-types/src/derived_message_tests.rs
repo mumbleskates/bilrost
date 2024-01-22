@@ -3,8 +3,8 @@ mod tests {
     extern crate alloc;
 
     use alloc::string::{String, ToString};
-    use alloc::vec;
     use alloc::vec::Vec;
+    use alloc::{format, vec};
     use bilrost::{Enumeration, Message, Oneof};
     use core::default::Default;
     use itertools::{repeat_n, Itertools};
