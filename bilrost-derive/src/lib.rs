@@ -88,7 +88,6 @@ struct PreprocessedMessage<'a> {
     ty_generics: TypeGenerics<'a>,
     where_clause: Option<&'a WhereClause>,
     unsorted_fields: Vec<(TokenStream, Field)>,
-    fields: Vec<FieldChunk>,
 }
 
 fn preprocess_message(input: &DeriveInput) -> Result<PreprocessedMessage, Error> {
@@ -153,10 +152,23 @@ fn preprocess_message(input: &DeriveInput) -> Result<PreprocessedMessage, Error>
         bail!("message {} has duplicate tag {}", ident, duplicate_tag)
     };
 
+    let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
+
+    Ok(PreprocessedMessage {
+        ident,
+        impl_generics,
+        ty_generics,
+        where_clause,
+        unsorted_fields,
+    })
+}
+
+/// Sorts a vec of unsorted fields into discrete chunks that may be ordered together at runtime to
+/// ensure that all their fields are encoded in sorted order.
+fn sort_fields(unsorted_fields: Vec<(TokenStream, Field)>) -> Vec<FieldChunk> {
     let mut chunks = Vec::<FieldChunk>::new();
     let mut fields = unsorted_fields
-        .iter()
-        .cloned()
+        .into_iter()
         .sorted_unstable_by_key(|(_, field)| field.first_tag())
         .peekable();
     // Current vecs we are building for FieldChunk::SortGroup and SortGroupPart::Contiguous
@@ -258,16 +270,7 @@ fn preprocess_message(input: &DeriveInput) -> Result<PreprocessedMessage, Error>
     );
     drop(sort_group_oneof_tags);
 
-    let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
-
-    Ok(PreprocessedMessage {
-        ident,
-        impl_generics,
-        ty_generics,
-        where_clause,
-        unsorted_fields,
-        fields: chunks,
-    })
+    chunks
 }
 
 /// Combines an optional already-existing where clause with additional terms for each field's
@@ -334,9 +337,8 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         ty_generics,
         where_clause,
         unsorted_fields,
-        fields,
     } = preprocess_message(&input)?;
-
+    let fields = sort_fields(unsorted_fields.clone());
     let where_clause = append_encoder_wheres(where_clause, &unsorted_fields);
 
     let encoded_len = fields.iter().map(|chunk| match chunk {
@@ -562,6 +564,86 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
 #[proc_macro_derive(Message, attributes(bilrost))]
 pub fn message(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     try_message(input.into()).unwrap().into()
+}
+
+fn try_distinguished_message(input: TokenStream) -> Result<TokenStream, Error> {
+    let input: DeriveInput = syn::parse2(input)?;
+
+    let PreprocessedMessage {
+        ident,
+        impl_generics,
+        ty_generics,
+        where_clause,
+        unsorted_fields,
+    } = preprocess_message(&input)?;
+    let where_clause = append_distinguished_encoder_wheres(where_clause, &unsorted_fields);
+
+    let decode = unsorted_fields.iter().map(|(field_ident, field)| {
+        let decode = field.decode_distinguished(quote!(value));
+        let tags = field.tags().into_iter().map(|tag| quote!(#tag));
+        let tags = Itertools::intersperse(tags, quote!(|));
+
+        quote! {
+            #(#tags)* => {
+                let mut value = &mut self.#field_ident;
+                #decode.map_err(|mut error| {
+                    error.push(STRUCT_NAME, stringify!(#field_ident));
+                    error
+                })
+            },
+        }
+    });
+
+    let struct_name = if unsorted_fields.is_empty() {
+        quote!()
+    } else {
+        quote!(
+            const STRUCT_NAME: &'static str = stringify!(#ident);
+        )
+    };
+
+    let expanded = quote! {
+        impl #impl_generics ::bilrost::RawDistinguishedMessage
+        for #ident #ty_generics #where_clause {
+            #[allow(unused_variables)]
+            fn raw_decode_field_distinguished<__B>(
+                &mut self,
+                tag: u32,
+                wire_type: ::bilrost::encoding::WireType,
+                duplicated: bool,
+                buf: ::bilrost::encoding::Capped<__B>,
+                ctx: ::bilrost::encoding::DecodeContext,
+            ) -> ::core::result::Result<(), ::bilrost::DecodeError>
+            where
+                __B: ::bilrost::bytes::Buf + ?Sized,
+            {
+                #struct_name
+                match tag {
+                    #(#decode)*
+                    _ => ::bilrost::encoding::skip_field(wire_type, buf),
+                }
+            }
+        }
+    };
+
+    let impl_wrapper_const_ident = parse_str::<Ident>(
+        &("__BILROST_DERIVED_IMPL_DISTINGUISHED_MESSAGE_FOR_".to_owned() + &ident.to_string()),
+    )?;
+    let aliases = encoder_alias_header();
+    let expanded = quote! {
+        const #impl_wrapper_const_ident: () = {
+            #aliases
+
+            #expanded
+        };
+    };
+
+    Ok(expanded)
+}
+
+#[proc_macro_derive(DistinguishedMessage, attributes(bilrost))]
+pub fn distinguished_message(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    try_distinguished_message(input.into()).unwrap().into()
 }
 
 fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
