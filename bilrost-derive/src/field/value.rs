@@ -146,6 +146,34 @@ impl Field {
         }
     }
 
+    /// Returns an expression which evaluates to the result of decoding a value into the field in
+    /// distinguished mode. The given ident must be an &mut that already refers to the destination.
+    pub fn decode_distinguished(&self, ident: TokenStream) -> TokenStream {
+        let encoder = &self.encoder;
+        if self.in_oneof {
+            quote!(
+                <
+                    #encoder as ::bilrost::encoding::DistinguishedFieldEncoder<_>
+                >::decode_field_distinguished(
+                    wire_type,
+                    #ident,
+                    buf,
+                    ctx,
+                )
+            )
+        } else {
+            quote!(
+                <#encoder as ::bilrost::encoding::DistinguishedEncoder<_>>::decode_distinguished(
+                    wire_type,
+                    duplicated,
+                    #ident,
+                    buf,
+                    ctx,
+                )
+            )
+        }
+    }
+
     /// Returns an expression which evaluates to the encoded length of the field. The given ident
     /// must be the location name of the field value, not a reference.
     pub fn encoded_len(&self, ident: TokenStream) -> TokenStream {

@@ -133,6 +133,15 @@ impl Field {
         }
     }
 
+    /// Returns an expression which evaluates to the result of decoding a value into the field in
+    /// distinguished mode.
+    pub fn decode_distinguished(&self, ident: TokenStream) -> TokenStream {
+        match self {
+            Field::Value(scalar) => scalar.decode_distinguished(ident),
+            Field::Oneof(oneof) => oneof.decode_distinguished(ident),
+        }
+    }
+
     /// Returns an expression which evaluates to the encoded length of the field.
     pub fn encoded_len(&self, ident: TokenStream) -> TokenStream {
         match self {
