@@ -416,4 +416,50 @@ mod tests {
             // assert_eq!(out, re_distinguished);
         }
     }
+
+    #[test]
+    fn enumeration_helpers() {
+        #[derive(Clone, Debug, PartialEq, Eq, Enumeration)]
+        enum E {
+            Five = 5,
+            Ten = 10,
+            Fifteen = 15,
+        }
+
+        #[derive(Clone, Debug, PartialEq, Message)]
+        struct HelpedStruct {
+            #[bilrost(enumeration(E))]
+            regular: u32,
+            #[bilrost(enumeration(E))]
+            optional: Option<u32>,
+        }
+
+        let val = HelpedStruct {
+            regular: 5,
+            optional: Some(5),
+        };
+        assert_eq!(val.regular(), Ok(E::Five));
+        assert_eq!(val.optional(), Some(Ok(E::Five)));
+
+        let val = HelpedStruct {
+            regular: 222,
+            optional: Some(222),
+        };
+        assert_eq!(
+            val.regular()
+                .expect_err("bad enumeration value parsed successfully")
+                .to_string(),
+            "unknown enumeration value"
+        );
+        assert_eq!(
+            val.optional()
+                .unwrap()
+                .expect_err("bad enumeration value parsed successfully")
+                .to_string(),
+            "unknown enumeration value"
+        );
+
+        let val = HelpedStruct::default();
+        assert_eq!(val.optional(), None);
+    }
 }
