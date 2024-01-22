@@ -434,6 +434,12 @@ mod tests {
             optional: Option<u32>,
         }
 
+        #[derive(Clone, Debug, PartialEq, Message)]
+        struct StrictStruct {
+            regular: Option<E>,
+            optional: Option<E>,
+        }
+
         let val = HelpedStruct {
             regular: 5,
             optional: Some(5),
@@ -449,17 +455,47 @@ mod tests {
             val.regular()
                 .expect_err("bad enumeration value parsed successfully")
                 .to_string(),
-            "unknown enumeration value"
+            "failed to decode Bilrost message: unknown enumeration value"
         );
         assert_eq!(
             val.optional()
                 .unwrap()
                 .expect_err("bad enumeration value parsed successfully")
                 .to_string(),
-            "unknown enumeration value"
+            "failed to decode Bilrost message: unknown enumeration value"
         );
 
         let val = HelpedStruct::default();
         assert_eq!(val.optional(), None);
+
+        // Demonstrate that the same errors happen when we decode to a struct with strict
+        // enumeration fields, it just happens sooner.
+        for (val, error_path) in [
+            (
+                HelpedStruct {
+                    regular: 222,
+                    optional: None,
+                },
+                "StrictStruct.regular",
+            ),
+            (
+                HelpedStruct {
+                    regular: 5,
+                    optional: Some(222),
+                },
+                "StrictStruct.optional",
+            ),
+        ] {
+            let encoded = val.encode_to_vec();
+            let decoded = StrictStruct::decode(encoded.as_slice());
+            assert_eq!(
+                decoded
+                    .expect_err("decoded an invalid enumeration value without error")
+                    .to_string(),
+                format!(
+                    "failed to decode Bilrost message: {error_path}: unknown enumeration value"
+                )
+            );
+        }
     }
 }
