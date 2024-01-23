@@ -620,7 +620,7 @@ fn try_distinguished_message(input: TokenStream) -> Result<TokenStream, Error> {
                 #struct_name
                 match tag {
                     #(#decode)*
-                    _ => ::bilrost::encoding::skip_field(wire_type, buf),
+                    _ => Err(::bilrost::DecodeError::new("unknown field tag")),
                 }
             }
         }
