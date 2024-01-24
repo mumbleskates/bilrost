@@ -190,19 +190,19 @@ from_uint64(value) {
 });
 varint!(varint_i32, i32,
 to_uint64(value) {
-    ((value << 1) ^ (value >> 31)) as u32 as u64
+    super::i32_to_unsigned(*value) as u64
 },
 from_uint64(value) {
     let value = u32::try_from(value)
         .map_err(|_| DecodeError::new("varint overflows range of i32"))?;
-    ((value >> 1) as i32) ^ (-((value & 1) as i32))
+    super::u32_to_signed(value)
 });
 varint!(varint_i64, i64,
 to_uint64(value) {
-    ((value << 1) ^ (value >> 63)) as u64
+    super::i64_to_unsigned(*value)
 },
 from_uint64(value) {
-    ((value >> 1) as i64) ^ (-((value & 1) as i64))
+    super::u64_to_signed(value)
 });
 
 // General also encodes floating point values.

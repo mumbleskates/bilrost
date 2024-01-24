@@ -183,6 +183,29 @@ fn decode_varint_slow<B: Buf + ?Sized>(buf: &mut B) -> Result<u64, DecodeError> 
     // causes a 5x pessimization. Probably best not to worry about it too much.
 }
 
+/// Zig-zag encoding: These functions implement storing signed in unsigned integers by encoding the
+/// sign bit in the least significant bit.
+
+#[inline]
+fn i32_to_unsigned(value: i32) -> u32 {
+    ((value << 1) ^ (value >> 31)) as u32
+}
+
+#[inline]
+fn u32_to_signed(value: u32) -> i32 {
+    ((value >> 1) as i32) ^ (-((value & 1) as i32))
+}
+
+#[inline]
+fn i64_to_unsigned(value: i64) -> u64 {
+    ((value << 1) ^ (value >> 63)) as u64
+}
+
+#[inline]
+fn u64_to_signed(value: u64) -> i64 {
+    ((value >> 1) as i64) ^ (-((value & 1) as i64))
+}
+
 /// Additional information passed to every decode/merge function.
 ///
 /// The context should be passed by value and can be freely cloned. When passing
