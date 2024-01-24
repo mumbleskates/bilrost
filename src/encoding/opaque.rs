@@ -1,9 +1,13 @@
+use alloc::vec::Vec;
+use core::borrow::{Borrow, BorrowMut};
+use core::ops::{Deref, DerefMut};
+
+use bytes::{Buf, BufMut};
+
 use crate::encoding::{
     encode_varint, encoded_len_varint, Capped, DecodeContext, TagMeasurer, TagWriter, WireType,
 };
 use crate::{DecodeError, Message, RawDistinguishedMessage, RawMessage};
-use alloc::vec::Vec;
-use bytes::{Buf, BufMut};
 
 /// Represents an opaque bilrost field value. Can represent any valid encoded value.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -68,18 +72,59 @@ impl OpaqueValue {
 /// Represents a bilrost field, with its tag and value. `Vec<OpaqueField>` can encode and decode any
 /// valid bilrost message as opaque values, but may panic if its fields are not in ascending tag
 /// order.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct OpaqueField(pub u32, pub OpaqueValue);
+#[derive(Debug, Default, PartialEq, Eq)]
+pub struct OpaqueMessage(pub Vec<(u32, OpaqueValue)>);
 
-/// Sort the fields of an opaque field collection so they are in ascending tag order.
-pub fn sort_opaque_fields(fields: &mut Vec<OpaqueField>) {
-    fields.sort_by_key(|f| f.0)
+impl Deref for OpaqueMessage {
+    type Target = Vec<(u32, OpaqueValue)>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
 }
 
-impl RawMessage for Vec<OpaqueField> {
+impl DerefMut for OpaqueMessage {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl AsRef<Vec<(u32, OpaqueValue)>> for OpaqueMessage {
+    fn as_ref(&self) -> &Vec<(u32, OpaqueValue)> {
+        &self.0
+    }
+}
+
+impl AsMut<Vec<(u32, OpaqueValue)>> for OpaqueMessage {
+    fn as_mut(&mut self) -> &mut Vec<(u32, OpaqueValue)> {
+        &mut self.0
+    }
+}
+
+impl Borrow<Vec<(u32, OpaqueValue)>> for OpaqueMessage {
+    fn borrow(&self) -> &Vec<(u32, OpaqueValue)> {
+        &self.0
+    }
+}
+
+impl BorrowMut<Vec<(u32, OpaqueValue)>> for OpaqueMessage {
+    fn borrow_mut(&mut self) -> &mut Vec<(u32, OpaqueValue)> {
+        &mut self.0
+    }
+}
+
+impl OpaqueMessage {
+    /// Sort the fields of the message so they are in ascending tag order and won't panic when
+    /// encoding.
+    fn sort_fields(&mut self) {
+        self.sort_by_key(|(tag, _)| tag);
+    }
+}
+
+impl RawMessage for OpaqueMessage {
     fn raw_encode<B: BufMut + ?Sized>(&self, buf: &mut B) {
         let mut tw = TagWriter::new();
-        for OpaqueField(tag, value) in self {
+        for (tag, value) in self {
             match value {
                 Varint(val) => {
                     tw.encode_key(*tag, WireType::Varint, buf);
@@ -92,11 +137,11 @@ impl RawMessage for Vec<OpaqueField> {
                 }
                 ThirtyTwoBit(val) => {
                     tw.encode_key(*tag, WireType::ThirtyTwoBit, buf);
-                    buf.put(val);
+                    buf.put(val.as_slice());
                 }
                 SixtyFourBit(val) => {
                     tw.encode_key(*tag, WireType::SixtyFourBit, buf);
-                    buf.put(val);
+                    buf.put(val.as_slice());
                 }
             }
         }
@@ -105,7 +150,7 @@ impl RawMessage for Vec<OpaqueField> {
     fn raw_encoded_len(&self) -> usize {
         let mut tm = TagMeasurer::new();
         let mut total = 0;
-        for OpaqueField(tag, value) in self {
+        for (tag, value) in self {
             match value {
                 Varint(val) => {
                     tm.key_len(*tag) + encoded_len_varint(*val);
@@ -131,13 +176,13 @@ impl RawMessage for Vec<OpaqueField> {
     where
         Self: Sized,
     {
-        self.push(OpaqueField(
+        self.push((
             tag,
             match wire_type {
                 WireType::Varint => Varint(buf.decode_varint()?),
                 WireType::LengthDelimited => {
                     let mut val = Vec::new();
-                    val.put(buf.take_length_delimited()?);
+                    val.put(buf.take_length_delimited()?.take_all());
                     LengthDelimited(val)
                 }
                 WireType::ThirtyTwoBit => {
@@ -154,7 +199,7 @@ impl RawMessage for Vec<OpaqueField> {
     }
 }
 
-impl RawDistinguishedMessage for Vec<OpaqueField> {
+impl RawDistinguishedMessage for OpaqueMessage {
     fn raw_decode_field_distinguished<B: Buf + ?Sized>(
         &mut self,
         tag: u32,
