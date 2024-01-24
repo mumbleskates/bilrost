@@ -690,7 +690,7 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
     }
 
     // If `std::Default` is implemented for the type in a way we can't auto-detect, we make it
-    // possible to trigger implementing the automatic `NewForOverwrite` by including a
+    // possible to prevent implementing the automatic `NewForOverwrite` by including a
     // `bilrost(has_default)` attribute on the type.
     has_default |= bilrost_attrs(input.attrs)?
         .into_iter()
@@ -708,6 +708,8 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
 
     let is_valid_doc = format!("Returns `true` if `value` is a variant of `{}`.", ident);
 
+    // When the type already has a `Default` implementation, we suppress generating a (conflicting)
+    // implementation of `NewForOverwrite`.
     let new_for_overwrite = if has_default {
         quote!()
     } else {
