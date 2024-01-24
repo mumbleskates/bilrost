@@ -1,5 +1,6 @@
 #![allow(clippy::implicit_hasher, clippy::ptr_arg)]
 
+use alloc::borrow::Cow;
 use alloc::format;
 use core::cmp::{min, Eq, PartialEq};
 use core::convert::TryFrom;
@@ -571,22 +572,16 @@ pub fn skip_field<B: Buf + ?Sized>(
 }
 
 // TODO(widders): use this?
-pub enum UnknownField<B: Buf> {
-    Varint { tag: u32, value: u64 },
-    LengthDelimited { tag: u32, len: usize, buf: B },
-    ThirtyTwoBit { tag: u32, value: [u8; 4] },
-    SixtyFourBit { tag: u32, value: [u8; 8] },
+pub enum UnknownValue<'a> {
+    Varint(u64),
+    LengthDelimited(Cow<'a, [u8]>),
+    ThirtyTwoBit([u8; 4]),
+    SixtyFourBit([u8; 8]),
 }
 
-impl<B: Buf> UnknownField<B> {
-    pub fn tag(&self) -> u32 {
-        match *self {
-            UnknownField::Varint { tag, .. } => tag,
-            UnknownField::LengthDelimited { tag, .. } => tag,
-            UnknownField::ThirtyTwoBit { tag, .. } => tag,
-            UnknownField::SixtyFourBit { tag, .. } => tag,
-        }
-    }
+pub struct UnknownField<'a> {
+    pub tag: u32,
+    pub value: UnknownValue<'a>,
 }
 
 /// The core trait for encoding and decoding bilrost data.
