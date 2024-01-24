@@ -20,51 +20,51 @@ pub enum OpaqueValue {
 use OpaqueValue::*;
 
 impl OpaqueValue {
-    fn varint_u64(value: u64) -> Self {
+    pub fn varint_u64(value: u64) -> Self {
         Varint(value)
     }
 
-    fn varint_i64(value: i64) -> Self {
+    pub fn varint_i64(value: i64) -> Self {
         Varint(super::i64_to_unsigned(value))
     }
 
-    fn varint_u32(value: u32) -> Self {
+    pub fn varint_u32(value: u32) -> Self {
         Varint(value.into())
     }
 
-    fn varint_i32(value: i32) -> Self {
+    pub fn varint_i32(value: i32) -> Self {
         Varint(super::i32_to_unsigned(value) as u64)
     }
 
-    fn fixed_u64(value: u64) -> Self {
+    pub fn fixed_u64(value: u64) -> Self {
         SixtyFourBit(value.to_le_bytes())
     }
 
-    fn fixed_i64(value: i64) -> Self {
+    pub fn fixed_i64(value: i64) -> Self {
         SixtyFourBit(value.to_le_bytes())
     }
 
-    fn fixed_u32(value: u32) -> Self {
+    pub fn fixed_u32(value: u32) -> Self {
         ThirtyTwoBit(value.to_le_bytes())
     }
 
-    fn fixed_i32(value: i32) -> Self {
+    pub fn fixed_i32(value: i32) -> Self {
         ThirtyTwoBit(value.to_le_bytes())
     }
 
-    fn f64(value: f64) -> Self {
+    pub fn f64(value: f64) -> Self {
         SixtyFourBit(value.to_le_bytes())
     }
 
-    fn f32(value: f32) -> Self {
+    pub fn f32(value: f32) -> Self {
         ThirtyTwoBit(value.to_le_bytes())
     }
 
-    fn bytes<B: Into<Vec<u8>>>(value: B) -> Self {
+    pub fn bytes<B: Into<Vec<u8>>>(value: B) -> Self {
         LengthDelimited(value.into())
     }
 
-    fn message<M: Message>(value: &M) -> Self {
+    pub fn message<M: Message>(value: &M) -> Self {
         LengthDelimited(value.encode_to_vec())
     }
 }
@@ -113,16 +113,40 @@ impl BorrowMut<Vec<(u32, OpaqueValue)>> for OpaqueMessage {
     }
 }
 
+impl FromIterator<(u32, OpaqueValue)> for OpaqueMessage {
+    fn from_iter<T: IntoIterator<Item = (u32, OpaqueValue)>>(iter: T) -> Self {
+        Self(Vec::from_iter(iter))
+    }
+}
+
+impl IntoIterator for OpaqueMessage {
+    type Item = (u32, OpaqueValue);
+    type IntoIter = alloc::vec::IntoIter<(u32, OpaqueValue)>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a OpaqueMessage {
+    type Item = &'a (u32, OpaqueValue);
+    type IntoIter = core::slice::Iter<'a, (u32, OpaqueValue)>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
 impl OpaqueMessage {
     /// Sort the fields of the message so they are in ascending tag order and won't panic when
     /// encoding.
-    fn sort_fields(&mut self) {
-        self.sort_by_key(|(tag, _)| tag);
+    pub fn sort_fields(&mut self) {
+        self.sort_by_key(|(tag, _)| *tag);
     }
 }
 
 impl RawMessage for OpaqueMessage {
-    fn raw_encode<B: BufMut + ?Sized>(&self, buf: &mut B) {
+    fn raw_encode<B: BufMut + ?Sized>(&self, mut buf: &mut B) {
         let mut tw = TagWriter::new();
         for (tag, value) in self {
             match value {
@@ -133,15 +157,15 @@ impl RawMessage for OpaqueMessage {
                 LengthDelimited(val) => {
                     tw.encode_key(*tag, WireType::LengthDelimited, buf);
                     encode_varint(val.len() as u64, buf);
-                    buf.put(val);
+                    (&mut buf).put(val.as_slice());
                 }
                 ThirtyTwoBit(val) => {
                     tw.encode_key(*tag, WireType::ThirtyTwoBit, buf);
-                    buf.put(val.as_slice());
+                    (&mut buf).put(val.as_slice());
                 }
                 SixtyFourBit(val) => {
                     tw.encode_key(*tag, WireType::SixtyFourBit, buf);
-                    buf.put(val.as_slice());
+                    (&mut buf).put(val.as_slice());
                 }
             }
         }
@@ -151,10 +175,8 @@ impl RawMessage for OpaqueMessage {
         let mut tm = TagMeasurer::new();
         let mut total = 0;
         for (tag, value) in self {
-            match value {
-                Varint(val) => {
-                    tm.key_len(*tag) + encoded_len_varint(*val);
-                }
+            total += match value {
+                Varint(val) => tm.key_len(*tag) + encoded_len_varint(*val),
                 LengthDelimited(val) => {
                     tm.key_len(*tag) + encoded_len_varint(val.len() as u64) + val.len()
                 }
@@ -187,11 +209,13 @@ impl RawMessage for OpaqueMessage {
                 }
                 WireType::ThirtyTwoBit => {
                     let mut val = [0u8; 4];
-                    buf.copy_to_slice(&mut val)
+                    buf.copy_to_slice(&mut val);
+                    ThirtyTwoBit(val)
                 }
                 WireType::SixtyFourBit => {
                     let mut val = [0u8; 8];
-                    buf.copy_to_slice(&mut val)
+                    buf.copy_to_slice(&mut val);
+                    SixtyFourBit(val)
                 }
             },
         ));
