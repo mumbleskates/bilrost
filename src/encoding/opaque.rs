@@ -12,6 +12,8 @@ use crate::{DecodeError, Message, RawDistinguishedMessage, RawMessage};
 /// Represents an opaque bilrost field value. Can represent any valid encoded value.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum OpaqueValue {
+    // TODO(widders): consider storing this as a `[u8; 9]` pre-encoded if it ever becomes useful
+    //  to decode `Message` values directly from this representation.
     Varint(u64),
     LengthDelimited(Vec<u8>),
     ThirtyTwoBit([u8; 4]),
@@ -20,19 +22,19 @@ pub enum OpaqueValue {
 use OpaqueValue::*;
 
 impl OpaqueValue {
-    pub fn varint_u64(value: u64) -> Self {
+    pub fn u64(value: u64) -> Self {
         Varint(value)
     }
 
-    pub fn varint_i64(value: i64) -> Self {
+    pub fn i64(value: i64) -> Self {
         Varint(super::i64_to_unsigned(value))
     }
 
-    pub fn varint_u32(value: u32) -> Self {
+    pub fn u32(value: u32) -> Self {
         Varint(value.into())
     }
 
-    pub fn varint_i32(value: i32) -> Self {
+    pub fn i32(value: i32) -> Self {
         Varint(super::i32_to_unsigned(value) as u64)
     }
 
@@ -64,7 +66,7 @@ impl OpaqueValue {
         ThirtyTwoBit(value.to_le_bytes())
     }
 
-    pub fn bytes<B: Into<Vec<u8>>>(value: B) -> Self {
+    pub fn blob<B: Into<Vec<u8>>>(value: B) -> Self {
         LengthDelimited(value.into())
     }
 
