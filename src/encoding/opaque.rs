@@ -151,6 +151,9 @@ impl OpaqueValue {
 /// Represents a bilrost field, with its tag and value. `Vec<OpaqueField>` can encode and decode any
 /// valid bilrost message as opaque values, but may panic if its fields are not in ascending tag
 /// order.
+///
+/// At present this is still an unstable API, mostly used for internals and testing. Trait
+/// implementations and APIs of `OpaqueMessage` and `OpaqueValue` are subject to change.
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct OpaqueMessage(pub Vec<(u32, OpaqueValue)>);
 
