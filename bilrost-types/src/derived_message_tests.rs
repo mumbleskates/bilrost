@@ -13,87 +13,90 @@ use bilrost::encoding::opaque::OpaqueValue::*;
 use bilrost::encoding::opaque::{OpaqueMessage, OpaqueValue as OV};
 use bilrost::{DistinguishedMessage, Enumeration, Message, Oneof};
 
-fn translates<T: IntoIterator<Item = (u32, OV)>, M: Message + Debug + PartialEq>(from: T, into: M) {
-    let encoded = from.into_iter().collect::<OpaqueMessage>().encode_to_vec();
-    assert_eq!(M::decode(encoded.as_slice()), Ok(into));
-}
+mod assert {
+    use super::*;
 
-fn doesnt_translate<M: Message + Debug + PartialEq>(
-    from: impl IntoIterator<Item = (u32, OV)>,
-    err: &str,
-) {
-    let encoded = from.into_iter().collect::<OpaqueMessage>().encode_to_vec();
-    assert_eq!(
-        M::decode(encoded.as_slice())
-            .expect_err("unexpectedly decoded without error")
-            .to_string(),
-        err
-    );
-}
+    pub(super) fn translates<T, M>(from: T, into: M)
+    where
+        T: IntoIterator<Item = (u32, OV)>,
+        M: Message + Debug + PartialEq,
+    {
+        let encoded = from.into_iter().collect::<OpaqueMessage>().encode_to_vec();
+        assert_eq!(M::decode(encoded.as_slice()), Ok(into));
+    }
 
-fn translates_distinguished<
-    T: IntoIterator<Item = (u32, OV)>,
-    M: DistinguishedMessage + Debug + Eq,
->(
-    from: T,
-    into: M,
-) {
-    let from: OpaqueMessage = from.into_iter().collect();
-    let encoded = from.encode_to_vec();
-    assert_eq!(M::decode(encoded.as_slice()).as_ref(), Ok(&into));
-    assert_eq!(
-        M::decode_distinguished(encoded.as_slice()).as_ref(),
-        Ok(&into)
-    );
-    assert_eq!(
-        encoded,
-        into.encode_to_vec(),
-        "distinguished encoding does not round trip"
-    );
-}
+    pub(super) fn doesnt_translate<M: Message + Debug + PartialEq>(
+        from: impl IntoIterator<Item = (u32, OV)>,
+        err: &str,
+    ) {
+        let encoded = from.into_iter().collect::<OpaqueMessage>().encode_to_vec();
+        assert_eq!(
+            M::decode(encoded.as_slice())
+                .expect_err("unexpectedly decoded without error")
+                .to_string(),
+            err
+        );
+    }
 
-fn translates_only_expedient<
-    T: IntoIterator<Item = (u32, OV)>,
-    M: DistinguishedMessage + Debug + Eq,
->(
-    from: T,
-    into: M,
-    err: &str,
-) {
-    let from: OpaqueMessage = from.into_iter().collect();
-    let encoded = from.encode_to_vec();
-    assert_eq!(M::decode(encoded.as_slice()).as_ref(), Ok(&into));
-    assert_eq!(
-        M::decode_distinguished(encoded.as_slice())
-            .expect_err("unexpectedly decoded in distinguished mode without error")
-            .to_string(),
-        err
-    );
-    assert_ne!(
-        encoded,
-        into.encode_to_vec(),
-        "encoding round tripped, but did not decode distinguished"
-    );
-}
+    pub(super) fn translates_distinguished<T, M>(from: T, into: M)
+    where
+        T: IntoIterator<Item = (u32, OV)>,
+        M: DistinguishedMessage + Debug + Eq,
+    {
+        let from: OpaqueMessage = from.into_iter().collect();
+        let encoded = from.encode_to_vec();
+        assert_eq!(M::decode(encoded.as_slice()).as_ref(), Ok(&into));
+        assert_eq!(
+            M::decode_distinguished(encoded.as_slice()).as_ref(),
+            Ok(&into)
+        );
+        assert_eq!(
+            encoded,
+            into.encode_to_vec(),
+            "distinguished encoding does not round trip"
+        );
+    }
 
-fn never_translates<M: DistinguishedMessage + Debug>(
-    from: impl IntoIterator<Item = (u32, OV)>,
-    err: &str,
-) {
-    let from: OpaqueMessage = from.into_iter().collect();
-    let encoded = from.encode_to_vec();
-    assert_eq!(
-        M::decode(encoded.as_slice())
-            .expect_err("unepectedly decoded in expedient mode without error")
-            .to_string(),
-        err
-    );
-    assert_eq!(
-        M::decode_distinguished(encoded.as_slice())
-            .expect_err("unexpectedly decoded in distinguished mode without error")
-            .to_string(),
-        err
-    );
+    pub(super) fn translates_only_expedient<T, M>(from: T, into: M, err: &str)
+    where
+        T: IntoIterator<Item = (u32, OV)>,
+        M: DistinguishedMessage + Debug + Eq,
+    {
+        let from: OpaqueMessage = from.into_iter().collect();
+        let encoded = from.encode_to_vec();
+        assert_eq!(M::decode(encoded.as_slice()).as_ref(), Ok(&into));
+        assert_eq!(
+            M::decode_distinguished(encoded.as_slice())
+                .expect_err("unexpectedly decoded in distinguished mode without error")
+                .to_string(),
+            err
+        );
+        assert_ne!(
+            encoded,
+            into.encode_to_vec(),
+            "encoding round tripped, but did not decode distinguished"
+        );
+    }
+
+    pub(super) fn never_translates<M: DistinguishedMessage + Debug>(
+        from: impl IntoIterator<Item = (u32, OV)>,
+        err: &str,
+    ) {
+        let from: OpaqueMessage = from.into_iter().collect();
+        let encoded = from.encode_to_vec();
+        assert_eq!(
+            M::decode(encoded.as_slice())
+                .expect_err("unepectedly decoded in expedient mode without error")
+                .to_string(),
+            err
+        );
+        assert_eq!(
+            M::decode_distinguished(encoded.as_slice())
+                .expect_err("unexpectedly decoded in distinguished mode without error")
+                .to_string(),
+            err
+        );
+    }
 }
 
 #[test]
@@ -222,13 +225,13 @@ fn duplicated_field_decoding() {
     #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
     struct Foo(Option<bool>, bool);
 
-    translates_distinguished([(1, OV::bool(false))], Foo(Some(false), false));
-    never_translates::<Foo>(
+    assert::translates_distinguished([(1, OV::bool(false))], Foo(Some(false), false));
+    assert::never_translates::<Foo>(
         [(1, OV::bool(false)), (1, OV::bool(true))],
         "failed to decode Bilrost message: Foo.0: multiple occurrences of non-repeated field",
     );
-    translates_distinguished([(2, OV::bool(true))], Foo(None, true));
-    never_translates::<Foo>(
+    assert::translates_distinguished([(2, OV::bool(true))], Foo(None, true));
+    assert::never_translates::<Foo>(
         [(2, OV::bool(true)), (2, OV::bool(false))],
         "failed to decode Bilrost message: Foo.1: multiple occurrences of non-repeated field",
     );
@@ -239,13 +242,12 @@ fn duplicated_packed_decoding() {
     #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
     struct Foo(#[bilrost(encoder = "packed")] Vec<bool>);
 
-    translates_distinguished([], Foo(vec![]));
-    translates_distinguished([(1, OV::packed([OV::bool(true)]))], Foo(vec![true]));
-    translates_distinguished(
+    assert::translates_distinguished([(1, OV::packed([OV::bool(true)]))], Foo(vec![true]));
+    assert::translates_distinguished(
         [(1, OV::packed([OV::bool(true), OV::bool(false)]))],
         Foo(vec![true, false]),
     );
-    never_translates::<Foo>(
+    assert::never_translates::<Foo>(
         [
             (1, OV::packed([OV::bool(true), OV::bool(false)])),
             (1, OV::packed([OV::bool(false)])),
