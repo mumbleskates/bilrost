@@ -1,3 +1,4 @@
+#![cfg(test)]
 extern crate alloc;
 
 use alloc::string::{String, ToString};
@@ -523,13 +524,10 @@ fn directly_included_message() {
         also: "abc".into(),
     };
     let encoded = val.encode_to_vec();
-    assert_eq!(
-        OuterDirect::decode(encoded.as_slice()),
-        Ok(val.clone()),
-    );
+    assert_eq!(OuterDirect::decode(encoded.as_slice()), Ok(val.clone()));
     assert_eq!(
         OuterDirect::decode_distinguished(encoded.as_slice()),
-        Ok(val.clone()),
+        Ok(val.clone())
     );
     assert_eq!(
         OuterOptional::decode(encoded.as_slice()),
@@ -548,29 +546,35 @@ fn directly_included_message() {
 
     // The inner message is included when it is not fully defaulted
     let val = OuterDirect {
-        inner: Inner { a: "def".into(), b: 0 },
+        inner: Inner {
+            a: "def".into(),
+            b: 0,
+        },
         also: "abc".into(),
     };
     let encoded = val.encode_to_vec();
-    assert_eq!(
-        OuterDirect::decode(encoded.as_slice()),
-        Ok(val.clone()),
-    );
+    assert_eq!(OuterDirect::decode(encoded.as_slice()), Ok(val.clone()),);
     assert_eq!(
         OuterDirect::decode_distinguished(encoded.as_slice()),
-        Ok(val.clone()),
+        Ok(val.clone())
     );
     assert_eq!(
         OuterOptional::decode(encoded.as_slice()),
         Ok(OuterOptional {
-            inner: Some(Inner{a: "def".into(), b: 0}),
+            inner: Some(Inner {
+                a: "def".into(),
+                b: 0
+            }),
             also: Some("abc".into())
         })
     );
     assert_eq!(
         OuterOptional::decode_distinguished(encoded.as_slice()),
         Ok(OuterOptional {
-            inner: Some(Inner{a: "def".into(), b: 0}),
+            inner: Some(Inner {
+                a: "def".into(),
+                b: 0
+            }),
             also: Some("abc".into())
         })
     );
