@@ -114,6 +114,14 @@ pub trait DistinguishedMessage: Message + Eq {
 
 /// `Message` is implemented as a usability layer on top of the basic functionality afforded by
 /// `RawMessage`.
+// TODO(widders): in the future, make it possible to decode with extension Message types for all
+//  fields not covered by the own type. The default extension can be `()`, which always skips in
+//  expedient mode and always errs in distinguished mode; the most permissive possible extension
+//  would then be OpaqueMessage, which losslessly captures all unknown fields. A composing wrapper
+//  type that combines two message types in an overlay can be implemented. This will require an
+//  alternate encoding mode which emits field groups to be sorted in a stricter way, only grouping
+//  truly contiguous runs of field ids so that they can be sorted with any other type's fields at
+//  runtime.
 impl<T> Message for T
 where
     T: RawMessage,
