@@ -4,9 +4,97 @@ extern crate alloc;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use alloc::{format, vec};
-use bilrost::{DistinguishedMessage, Enumeration, Message, Oneof};
 use core::default::Default;
+use core::fmt::Debug;
+
 use itertools::{repeat_n, Itertools};
+
+use bilrost::encoding::opaque::OpaqueValue::*;
+use bilrost::encoding::opaque::{OpaqueMessage, OpaqueValue as OV};
+use bilrost::{DistinguishedMessage, Enumeration, Message, Oneof};
+
+fn translates<T: IntoIterator<Item = (u32, OV)>, M: Message + Debug + PartialEq>(from: T, into: M) {
+    let encoded = from.into_iter().collect::<OpaqueMessage>().encode_to_vec();
+    assert_eq!(M::decode(encoded.as_slice()), Ok(into));
+}
+
+fn doesnt_translate<M: Message + Debug + PartialEq>(
+    from: impl IntoIterator<Item = (u32, OV)>,
+    err: &str,
+) {
+    let encoded = from.into_iter().collect::<OpaqueMessage>().encode_to_vec();
+    assert_eq!(
+        M::decode(encoded.as_slice())
+            .expect_err("unexpectedly decoded without error")
+            .to_string(),
+        err
+    );
+}
+
+fn translates_distinguished<
+    T: IntoIterator<Item = (u32, OV)>,
+    M: DistinguishedMessage + Debug + Eq,
+>(
+    from: T,
+    into: M,
+) {
+    let from: OpaqueMessage = from.into_iter().collect();
+    let encoded = from.encode_to_vec();
+    assert_eq!(M::decode(encoded.as_slice()).as_ref(), Ok(&into));
+    assert_eq!(
+        M::decode_distinguished(encoded.as_slice()).as_ref(),
+        Ok(&into)
+    );
+    assert_eq!(
+        encoded,
+        into.encode_to_vec(),
+        "distinguished encoding does not round trip"
+    );
+}
+
+fn translates_only_expedient<
+    T: IntoIterator<Item = (u32, OV)>,
+    M: DistinguishedMessage + Debug + Eq,
+>(
+    from: T,
+    into: M,
+    err: &str,
+) {
+    let from: OpaqueMessage = from.into_iter().collect();
+    let encoded = from.encode_to_vec();
+    assert_eq!(M::decode(encoded.as_slice()).as_ref(), Ok(&into));
+    assert_eq!(
+        M::decode_distinguished(encoded.as_slice())
+            .expect_err("unexpectedly decoded in distinguished mode without error")
+            .to_string(),
+        err
+    );
+    assert_ne!(
+        encoded,
+        into.encode_to_vec(),
+        "encoding round tripped, but did not decode distinguished"
+    );
+}
+
+fn never_translates<M: DistinguishedMessage + Debug>(
+    from: impl IntoIterator<Item = (u32, OV)>,
+    err: &str,
+) {
+    let from: OpaqueMessage = from.into_iter().collect();
+    let encoded = from.encode_to_vec();
+    assert_eq!(
+        M::decode(encoded.as_slice())
+            .expect_err("unepectedly decoded in expedient mode without error")
+            .to_string(),
+        err
+    );
+    assert_eq!(
+        M::decode_distinguished(encoded.as_slice())
+            .expect_err("unexpectedly decoded in distinguished mode without error")
+            .to_string(),
+        err
+    );
+}
 
 #[test]
 fn derived_message_field_ordering() {
@@ -131,98 +219,39 @@ fn derived_message_field_ordering() {
 
 #[test]
 fn duplicated_field_decoding() {
-    #[derive(Message)]
-    struct Foo {
-        #[bilrost(1)]
-        a: Vec<bool>,
-        #[bilrost(2)]
-        b: Vec<bool>,
-    }
+    #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+    struct Foo(Option<bool>, bool);
 
-    #[derive(Debug, PartialEq, Message)]
-    struct Bar {
-        #[bilrost(1)]
-        a: Option<bool>,
-        #[bilrost(2)]
-        b: bool,
-    }
-
-    let a_single = Foo {
-        a: vec![true],
-        b: vec![],
-    }
-    .encode_to_vec();
-    let a_duplicated = Foo {
-        a: vec![true, false],
-        b: vec![],
-    }
-    .encode_to_vec();
-    let b_single = Foo {
-        a: vec![],
-        b: vec![true],
-    }
-    .encode_to_vec();
-    let b_duplicated = Foo {
-        a: vec![],
-        b: vec![true, false],
-    }
-    .encode_to_vec();
-
-    assert_eq!(
-        Bar::decode(&a_single[..]),
-        Ok(Bar {
-            a: Some(true),
-            b: false
-        })
+    translates_distinguished([(1, OV::bool(false))], Foo(Some(false), false));
+    never_translates::<Foo>(
+        [(1, OV::bool(false)), (1, OV::bool(true))],
+        "failed to decode Bilrost message: Foo.0: multiple occurrences of non-repeated field",
     );
-    assert_eq!(
-        Bar::decode(&a_duplicated[..]).unwrap_err().to_string(),
-        "failed to decode Bilrost message: \
-            Bar.a: multiple occurrences of non-repeated field"
-    );
-    assert_eq!(Bar::decode(&b_single[..]), Ok(Bar { a: None, b: true }));
-    assert_eq!(
-        Bar::decode(&b_duplicated[..]).unwrap_err().to_string(),
-        "failed to decode Bilrost message: \
-            Bar.b: multiple occurrences of non-repeated field"
+    translates_distinguished([(2, OV::bool(true))], Foo(None, true));
+    never_translates::<Foo>(
+        [(2, OV::bool(true)), (2, OV::bool(false))],
+        "failed to decode Bilrost message: Foo.1: multiple occurrences of non-repeated field",
     );
 }
 
 #[test]
 fn duplicated_packed_decoding() {
-    #[derive(Message)]
-    struct Foo {
-        #[bilrost(tag = 1, encoder = "unpacked<vecblob>")]
-        a: Vec<Vec<u8>>,
-    }
+    #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+    struct Foo(#[bilrost(encoder = "packed")] Vec<bool>);
 
-    #[derive(Debug, PartialEq, Message)]
-    struct Bar {
-        #[bilrost(tag = 1, encoder = "packed")]
-        a: Vec<bool>,
-    }
-
-    let single = Foo { a: vec![vec![1]] }.encode_to_vec();
-    let multiple = Foo {
-        a: vec![vec![1, 0]],
-    }
-    .encode_to_vec();
-    let duplicated = Foo {
-        a: vec![vec![1], vec![0]],
-    }
-    .encode_to_vec();
-
-    assert_eq!(Bar::decode(&single[..]), Ok(Bar { a: vec![true] }));
-    assert_eq!(
-        Bar::decode(&multiple[..]),
-        Ok(Bar {
-            a: vec![true, false]
-        })
+    translates_distinguished([], Foo(vec![]));
+    translates_distinguished([(1, OV::packed([OV::bool(true)]))], Foo(vec![true]));
+    translates_distinguished(
+        [(1, OV::packed([OV::bool(true), OV::bool(false)]))],
+        Foo(vec![true, false]),
     );
-    assert_eq!(
-        Bar::decode(&duplicated[..]).unwrap_err().to_string(),
+    never_translates::<Foo>(
+        [
+            (1, OV::packed([OV::bool(true), OV::bool(false)])),
+            (1, OV::packed([OV::bool(false)])),
+        ],
         "failed to decode Bilrost message: \
-            Bar.a: multiple occurrences of packed repeated field"
+        Foo.0: multiple occurrences of packed repeated field",
     );
 }
 
