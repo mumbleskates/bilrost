@@ -296,7 +296,7 @@ fn impl_append_wheres(
 
 fn append_encoder_wheres<T>(
     where_clause: Option<&WhereClause>,
-    fields: &Vec<(T, Field)>,
+    fields: &[(T, Field)],
 ) -> TokenStream {
     impl_append_wheres(
         where_clause,
@@ -306,7 +306,7 @@ fn append_encoder_wheres<T>(
 
 fn append_distinguished_encoder_wheres<T>(
     where_clause: Option<&WhereClause>,
-    fields: &Vec<(T, Field)>,
+    fields: &[(T, Field)],
 ) -> TokenStream {
     impl_append_wheres(
         where_clause,
@@ -684,26 +684,17 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
         // fail to detect that `Default` was implemented we can suppress generating the automatic
         // `NewForOverwrite` with the `bilrost(has_default)` attribute described below; and 3) the
         // `NewForOverwrite` trait is slated to be factored out anyway.
-        if attrs.iter().any(|attr| match &attr.meta {
-            Meta::Path(path) if path.is_ident("default") => true,
-            _ => false,
-        }) {
-            has_default = true;
-        }
+        has_default |= attrs
+            .iter()
+            .any(|attr| matches!(&attr.meta, Meta::Path(path) if path.is_ident("default")));
     }
 
     // If `std::Default` is implemented for the type in a way we can't auto-detect, we make it
     // possible to trigger implementing the automatic `NewForOverwrite` by including a
     // `bilrost(has_default)` attribute on the type.
-    if bilrost_attrs(input.attrs)?
+    has_default |= bilrost_attrs(input.attrs)?
         .into_iter()
-        .any(|attr| match attr {
-            Meta::Path(path) if path.is_ident("has_default") => true,
-            _ => false,
-        })
-    {
-        has_default = true;
-    }
+        .any(|attr| matches!(attr, Meta::Path(path) if path.is_ident("has_default")));
 
     if variants.is_empty() {
         bail!("Enumeration must have at least one variant");
@@ -1234,8 +1225,9 @@ fn try_distinguished_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         }
     };
 
-    let impl_wrapper_const_ident =
-        parse_str::<Ident>(&("__BILROST_DERIVED_IMPL_DISTINGUISHED_ONEOF_FOR_".to_owned() + &ident.to_string()))?;
+    let impl_wrapper_const_ident = parse_str::<Ident>(
+        &("__BILROST_DERIVED_IMPL_DISTINGUISHED_ONEOF_FOR_".to_owned() + &ident.to_string()),
+    )?;
     let aliases = encoder_alias_header();
     let expanded = quote! {
         const #impl_wrapper_const_ident: () = {

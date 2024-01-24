@@ -225,7 +225,7 @@ impl Field {
         let ident_str = ident_str.as_str().strip_prefix("r#").unwrap_or(&ident_str);
 
         // Prepend `get_` for getter methods of tuple structs.
-        let get = match parse_str::<Index>(&ident_str) {
+        let get = match parse_str::<Index>(ident_str) {
             Ok(index) => {
                 let get = Ident::new(&format!("get_{}", index.index), Span::call_site());
                 quote!(#get)
