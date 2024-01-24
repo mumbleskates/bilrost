@@ -285,8 +285,8 @@ pub fn encoded_len_varint(value: u64) -> usize {
 pub enum WireType {
     Varint = 0,
     LengthDelimited = 1,
-    SixtyFourBit = 2,
-    ThirtyTwoBit = 3,
+    ThirtyTwoBit = 2,
+    SixtyFourBit = 3,
 }
 
 impl TryFrom<u64> for WireType {
@@ -297,8 +297,8 @@ impl TryFrom<u64> for WireType {
         match value {
             0 => Ok(WireType::Varint),
             1 => Ok(WireType::LengthDelimited),
-            2 => Ok(WireType::SixtyFourBit),
-            3 => Ok(WireType::ThirtyTwoBit),
+            2 => Ok(WireType::ThirtyTwoBit),
+            3 => Ok(WireType::SixtyFourBit),
             _ => Err(DecodeError::new(format!(
                 "invalid wire type value: {}",
                 value
