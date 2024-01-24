@@ -1,6 +1,5 @@
 #![allow(clippy::implicit_hasher, clippy::ptr_arg)]
 
-use alloc::borrow::Cow;
 use alloc::format;
 use core::cmp::{min, Eq, PartialEq};
 use core::convert::TryFrom;
@@ -16,6 +15,8 @@ use crate::{decode_length_delimiter, DecodeError};
 mod fixed;
 mod general;
 mod map;
+/// Tools for opaque encoding and decoding of any valid bilrost data.
+pub mod opaque;
 mod packed;
 mod unpacked;
 mod value_traits;
@@ -592,19 +593,6 @@ pub fn skip_field<B: Buf + ?Sized>(
 
     buf.advance(len as usize);
     Ok(())
-}
-
-// TODO(widders): use this?
-pub enum UnknownValue<'a> {
-    Varint(u64),
-    LengthDelimited(Cow<'a, [u8]>),
-    ThirtyTwoBit([u8; 4]),
-    SixtyFourBit([u8; 8]),
-}
-
-pub struct UnknownField<'a> {
-    pub tag: u32,
-    pub value: UnknownValue<'a>,
 }
 
 /// The core trait for encoding and decoding bilrost data.
