@@ -9,19 +9,28 @@ pub extern crate alloc;
 // Re-export the bytes crate for use within derived code.
 pub use bytes;
 
+#[cfg(feature = "derive")]
+#[doc(hidden)]
+pub use bilrost_derive::{DistinguishedMessage, DistinguishedOneof, Enumeration, Message, Oneof};
+
 mod error;
 mod message;
-mod name;
 mod types;
 
 #[doc(hidden)]
 pub mod encoding;
 
 pub use crate::error::{DecodeError, EncodeError};
-pub use crate::message::Message;
-pub use crate::name::Name;
+pub use crate::message::{
+    DistinguishedMessage, DistinguishedMessageDyn, Message, MessageDyn, RawDistinguishedMessage,
+    RawMessage,
+};
+
+pub use types::Blob;
 
 use bytes::{Buf, BufMut};
+#[cfg(feature = "extended-diagnostics")]
+use const_panic::concat_panic;
 
 use crate::encoding::{decode_varint, encode_varint, encoded_len_varint};
 
@@ -75,14 +84,22 @@ pub fn decode_length_delimiter<B: Buf>(mut buf: B) -> Result<usize, DecodeError>
         .map_err(|_| DecodeError::new("length delimiter exceeds maximum usize value"))
 }
 
-// Re-export #[derive(Message, Enumeration, Oneof)].
-// Based on serde's equivalent re-export [1], but enabled by default.
-//
-// [1]: https://github.com/serde-rs/serde/blob/v1.0.89/serde/src/lib.rs#L245-L256
-#[cfg(feature = "bilrost-derive")]
-#[allow(unused_imports)]
-#[macro_use]
-extern crate bilrost_derive;
-#[cfg(feature = "bilrost-derive")]
-#[doc(hidden)]
-pub use bilrost_derive::*;
+/// Helper function for derived types, asserting that lists of tags are equal at compile time.
+pub const fn assert_tags_are_equal(failure_description: &str, a: &[u32], b: &[u32]) {
+    if a.len() != b.len() {
+        #[cfg(feature = "extended-diagnostics")]
+        concat_panic!({}: failure_description, ": expected ", a, " but got ", b);
+        #[cfg(not(feature = "extended-diagnostics"))]
+        panic!("{}", failure_description);
+    }
+    let mut i = 0;
+    while i < a.len() {
+        if a[i] != b[i] {
+            #[cfg(feature = "extended-diagnostics")]
+            concat_panic!({}: failure_description, ": expected ", a, " but got ", b);
+            #[cfg(not(feature = "extended-diagnostics"))]
+            panic!("{}", failure_description);
+        }
+        i += 1;
+    }
+}

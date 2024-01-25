@@ -30,11 +30,24 @@ pub use protobuf::*;
 const NANOS_PER_SECOND: i32 = 1_000_000_000;
 const NANOS_MAX: i32 = NANOS_PER_SECOND - 1;
 
+// TODO(widders): Message and into/from impls on time::Duration, time::Instant as optional features
+
 #[cfg(feature = "std")]
 impl std::hash::Hash for Duration {
     fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
         self.seconds.hash(state);
         self.nanos.hash(state);
+    }
+}
+
+impl core::ops::Neg for Duration {
+    type Output = Self;
+
+    fn neg(self) -> Self {
+        Self {
+            seconds: -self.seconds,
+            nanos: -self.nanos,
+        }
     }
 }
 
@@ -233,10 +246,6 @@ impl Timestamp {
                 self.nanos = 0;
             }
         }
-
-        // TODO: should this be checked?
-        // debug_assert!(self.seconds >= -62_135_596_800 && self.seconds <= 253_402_300_799,
-        //               "invalid timestamp: {:?}", self);
     }
 
     /// Normalizes the timestamp to a canonical format, returning the original value if it cannot be

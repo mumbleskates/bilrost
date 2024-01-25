@@ -50,16 +50,13 @@ impl DateTime {
 
     /// Returns `true` if the `DateTime` is a valid calendar date.
     pub(crate) fn is_valid(&self) -> bool {
-        self >= &DateTime::MIN
-            && self <= &DateTime::MAX
-            && self.month > 0
-            && self.month <= 12
-            && self.day > 0
-            && self.day <= days_in_month(self.year, self.month)
-            && self.hour < 24
-            && self.minute < 60
-            && self.second < 60
-            && self.nanos < 1_000_000_000
+        (DateTime::MIN..=DateTime::MAX).contains(self)
+            && (1..=12).contains(&self.month)
+            && (1..=days_in_month(self.year, self.month)).contains(&self.day)
+            && (0..24).contains(&self.hour)
+            && (0..60).contains(&self.minute)
+            && (0..60).contains(&self.second)
+            && (0..1_000_000_000).contains(&self.nanos)
     }
 }
 
@@ -567,7 +564,7 @@ pub(crate) fn parse_duration(s: &str) -> Option<Duration> {
         (seconds, nanos as i32)
     };
 
-    Some(Duration {seconds, nanos})
+    Some(Duration { seconds, nanos })
 }
 
 impl From<DateTime> for Timestamp {
@@ -713,6 +710,18 @@ mod tests {
         assert_eq!(
             "-0008-01-01".parse::<Timestamp>(),
             Timestamp::date(-8, 1, 1),
+        );
+
+        // Huge year
+        assert_eq!(
+            "+198419841-03-07T14:37:18.848829343Z".parse::<Timestamp>(),
+            Timestamp::date_time_nanos(198419841, 3, 7, 14, 37, 18, 848829343),
+        );
+
+        // Very long ago
+        assert_eq!(
+            "-165000000-08-08T08:08:08.08080808Z".parse::<Timestamp>(),
+            Timestamp::date_time_nanos(-165000000, 8, 8, 8, 8, 8, 80808080),
         );
 
         // Plus year

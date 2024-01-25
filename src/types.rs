@@ -1,451 +1,131 @@
-//! Protocol Buffers well-known wrapper types.
-//!
-//! This module provides implementations of `Message` for Rust standard library types which
-//! correspond to a Protobuf well-known wrapper type. The remaining well-known types are defined in
-//! the `bilrost-types` crate in order to avoid a cyclic dependency between `bilrost` and
-//! `bilrost-build`.
-
-use alloc::string::String;
 use alloc::vec::Vec;
+use core::borrow::{Borrow, BorrowMut};
+use core::convert::{AsMut, AsRef, From};
+use core::ops::{Deref, DerefMut};
 
-use ::bytes::{Buf, BufMut, Bytes};
+use bytes::{Buf, BufMut};
 
-use crate::{
-    encoding::{
-        bool, bytes, float32, float64, sint32, sint64, skip_field, string, uint32, uint64, Capped,
-        DecodeContext, TagMeasurer, TagWriter, WireType,
-    },
-    DecodeError, Message,
-};
+use crate::encoding::{skip_field, Capped, DecodeContext, WireType};
+use crate::message::{RawDistinguishedMessage, RawMessage};
+use crate::DecodeError;
 
-/// `google.protobuf.BoolValue`
-impl Message for bool {
-    fn encode_raw<B: BufMut>(&self, buf: &mut B) {
-        if *self {
-            bool::encode(1, self, buf, &mut TagWriter::new());
-        }
+/// Newtype wrapper to act as a simple "bytes data" type in Bilrost. It transparently wraps a
+/// `Vec<u8>` and is fully supported by the `General` encoder.
+///
+/// To use `Vec<u8>` directly, use the `VecBlob` encoder.
+#[derive(Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Debug, Default)]
+#[repr(transparent)]
+pub struct Blob(Vec<u8>);
+
+impl Blob {
+    pub fn new(vec: Vec<u8>) -> Self {
+        Self(vec)
     }
 
-    fn merge_field<B: Buf>(
-        &mut self,
-        tag: u32,
-        wire_type: WireType,
-        duplicated: bool,
-        buf: &mut Capped<B>,
-        ctx: DecodeContext,
-    ) -> Result<(), DecodeError> {
-        if tag == 1 {
-            if duplicated {
-                return Err(DecodeError::new(
-                    "multiple occurrences of non-repeated field",
-                ));
-            }
-            bool::merge(wire_type, self, buf, ctx)
-        } else {
-            skip_field(wire_type, buf)
-        }
-    }
-
-    fn encoded_len(&self) -> usize {
-        if *self {
-            2
-        } else {
-            0
-        }
-    }
-
-    fn clear(&mut self) {
-        *self = false;
+    pub fn into_inner(self) -> Vec<u8> {
+        self.0
     }
 }
 
-/// `google.protobuf.UInt32Value`
-impl Message for u32 {
-    fn encode_raw<B: BufMut>(&self, buf: &mut B) {
-        if *self != 0 {
-            uint32::encode(1, self, buf, &mut TagWriter::new())
-        }
-    }
+impl Deref for Blob {
+    type Target = Vec<u8>;
 
-    fn merge_field<B: Buf>(
-        &mut self,
-        tag: u32,
-        wire_type: WireType,
-        duplicated: bool,
-        buf: &mut Capped<B>,
-        ctx: DecodeContext,
-    ) -> Result<(), DecodeError> {
-        if tag == 1 {
-            if duplicated {
-                return Err(DecodeError::new(
-                    "multiple occurrences of non-repeated field",
-                ));
-            }
-            uint32::merge(wire_type, self, buf, ctx)
-        } else {
-            skip_field(wire_type, buf)
-        }
-    }
-
-    fn encoded_len(&self) -> usize {
-        if *self != 0 {
-            uint32::encoded_len(1, self, &mut TagMeasurer::new())
-        } else {
-            0
-        }
-    }
-
-    fn clear(&mut self) {
-        *self = 0;
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
 
-/// `google.protobuf.UInt64Value`
-impl Message for u64 {
-    fn encode_raw<B: BufMut>(&self, buf: &mut B) {
-        if *self != 0 {
-            uint64::encode(1, self, buf, &mut TagWriter::new())
-        }
-    }
-
-    fn merge_field<B: Buf>(
-        &mut self,
-        tag: u32,
-        wire_type: WireType,
-        duplicated: bool,
-        buf: &mut Capped<B>,
-        ctx: DecodeContext,
-    ) -> Result<(), DecodeError> {
-        if tag == 1 {
-            if duplicated {
-                return Err(DecodeError::new(
-                    "multiple occurrences of non-repeated field",
-                ));
-            }
-            uint64::merge(wire_type, self, buf, ctx)
-        } else {
-            skip_field(wire_type, buf)
-        }
-    }
-
-    fn encoded_len(&self) -> usize {
-        if *self != 0 {
-            uint64::encoded_len(1, self, &mut TagMeasurer::new())
-        } else {
-            0
-        }
-    }
-
-    fn clear(&mut self) {
-        *self = 0;
+impl DerefMut for Blob {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }
 
-/// `google.protobuf.Int32Value`
-impl Message for i32 {
-    fn encode_raw<B: BufMut>(&self, buf: &mut B) {
-        if *self != 0 {
-            sint32::encode(1, self, buf, &mut TagWriter::new())
-        }
-    }
-
-    fn merge_field<B: Buf>(
-        &mut self,
-        tag: u32,
-        wire_type: WireType,
-        duplicated: bool,
-        buf: &mut Capped<B>,
-        ctx: DecodeContext,
-    ) -> Result<(), DecodeError> {
-        if tag == 1 {
-            if duplicated {
-                return Err(DecodeError::new(
-                    "multiple occurrences of non-repeated field",
-                ));
-            }
-            sint32::merge(wire_type, self, buf, ctx)
-        } else {
-            skip_field(wire_type, buf)
-        }
-    }
-
-    fn encoded_len(&self) -> usize {
-        if *self != 0 {
-            sint32::encoded_len(1, self, &mut TagMeasurer::new())
-        } else {
-            0
-        }
-    }
-
-    fn clear(&mut self) {
-        *self = 0;
+impl AsRef<Vec<u8>> for Blob {
+    fn as_ref(&self) -> &Vec<u8> {
+        &self.0
     }
 }
 
-/// `google.protobuf.Int64Value`
-impl Message for i64 {
-    fn encode_raw<B: BufMut>(&self, buf: &mut B) {
-        if *self != 0 {
-            sint64::encode(1, self, buf, &mut TagWriter::new())
-        }
-    }
-
-    fn merge_field<B: Buf>(
-        &mut self,
-        tag: u32,
-        wire_type: WireType,
-        duplicated: bool,
-        buf: &mut Capped<B>,
-        ctx: DecodeContext,
-    ) -> Result<(), DecodeError> {
-        if tag == 1 {
-            if duplicated {
-                return Err(DecodeError::new(
-                    "multiple occurrences of non-repeated field",
-                ));
-            }
-            sint64::merge(wire_type, self, buf, ctx)
-        } else {
-            skip_field(wire_type, buf)
-        }
-    }
-
-    fn encoded_len(&self) -> usize {
-        if *self != 0 {
-            sint64::encoded_len(1, self, &mut TagMeasurer::new())
-        } else {
-            0
-        }
-    }
-
-    fn clear(&mut self) {
-        *self = 0;
+impl AsMut<Vec<u8>> for Blob {
+    fn as_mut(&mut self) -> &mut Vec<u8> {
+        &mut self.0
     }
 }
 
-/// `google.protobuf.FloatValue`
-impl Message for f32 {
-    fn encode_raw<B: BufMut>(&self, buf: &mut B) {
-        if *self != 0.0 {
-            float32::encode(1, self, buf, &mut TagWriter::new())
-        }
-    }
-
-    fn merge_field<B: Buf>(
-        &mut self,
-        tag: u32,
-        wire_type: WireType,
-        duplicated: bool,
-        buf: &mut Capped<B>,
-        ctx: DecodeContext,
-    ) -> Result<(), DecodeError> {
-        if tag == 1 {
-            if duplicated {
-                return Err(DecodeError::new(
-                    "multiple occurrences of non-repeated field",
-                ));
-            }
-            float32::merge(wire_type, self, buf, ctx)
-        } else {
-            skip_field(wire_type, buf)
-        }
-    }
-
-    fn encoded_len(&self) -> usize {
-        if *self != 0.0 {
-            float32::encoded_len(1, self, &mut TagMeasurer::new())
-        } else {
-            0
-        }
-    }
-
-    fn clear(&mut self) {
-        *self = 0.0;
+impl Borrow<Vec<u8>> for Blob {
+    fn borrow(&self) -> &Vec<u8> {
+        &self.0
     }
 }
 
-/// `google.protobuf.DoubleValue`
-impl Message for f64 {
-    fn encode_raw<B: BufMut>(&self, buf: &mut B) {
-        if *self != 0.0 {
-            float64::encode(1, self, buf, &mut TagWriter::new())
-        }
-    }
-
-    fn merge_field<B: Buf>(
-        &mut self,
-        tag: u32,
-        wire_type: WireType,
-        duplicated: bool,
-        buf: &mut Capped<B>,
-        ctx: DecodeContext,
-    ) -> Result<(), DecodeError> {
-        if tag == 1 {
-            if duplicated {
-                return Err(DecodeError::new(
-                    "multiple occurrences of non-repeated field",
-                ));
-            }
-            float64::merge(wire_type, self, buf, ctx)
-        } else {
-            skip_field(wire_type, buf)
-        }
-    }
-
-    fn encoded_len(&self) -> usize {
-        if *self != 0.0 {
-            float64::encoded_len(1, self, &mut TagMeasurer::new())
-        } else {
-            0
-        }
-    }
-
-    fn clear(&mut self) {
-        *self = 0.0;
+impl BorrowMut<Vec<u8>> for Blob {
+    fn borrow_mut(&mut self) -> &mut Vec<u8> {
+        &mut self.0
     }
 }
 
-/// `google.protobuf.StringValue`
-impl Message for String {
-    fn encode_raw<B: BufMut>(&self, buf: &mut B) {
-        if !self.is_empty() {
-            string::encode(1, self, buf, &mut TagWriter::new())
-        }
-    }
-
-    fn merge_field<B: Buf>(
-        &mut self,
-        tag: u32,
-        wire_type: WireType,
-        duplicated: bool,
-        buf: &mut Capped<B>,
-        ctx: DecodeContext,
-    ) -> Result<(), DecodeError> {
-        if tag == 1 {
-            if duplicated {
-                return Err(DecodeError::new(
-                    "multiple occurrences of non-repeated field",
-                ));
-            }
-            string::merge(wire_type, self, buf, ctx)
-        } else {
-            skip_field(wire_type, buf)
-        }
-    }
-
-    fn encoded_len(&self) -> usize {
-        if !self.is_empty() {
-            string::encoded_len(1, self, &mut TagMeasurer::new())
-        } else {
-            0
-        }
-    }
-
-    fn clear(&mut self) {
-        self.clear();
+impl From<Vec<u8>> for Blob {
+    fn from(value: Vec<u8>) -> Self {
+        Blob::new(value)
     }
 }
 
-/// `google.protobuf.BytesValue`
-impl Message for Vec<u8> {
-    fn encode_raw<B: BufMut>(&self, buf: &mut B) {
-        if !self.is_empty() {
-            bytes::encode(1, self, buf, &mut TagWriter::new())
-        }
-    }
-
-    fn merge_field<B: Buf>(
-        &mut self,
-        tag: u32,
-        wire_type: WireType,
-        duplicated: bool,
-        buf: &mut Capped<B>,
-        ctx: DecodeContext,
-    ) -> Result<(), DecodeError> {
-        if tag == 1 {
-            if duplicated {
-                return Err(DecodeError::new(
-                    "multiple occurrences of non-repeated field",
-                ));
-            }
-            bytes::merge(wire_type, self, buf, ctx)
-        } else {
-            skip_field(wire_type, buf)
-        }
-    }
-
-    fn encoded_len(&self) -> usize {
-        if !self.is_empty() {
-            bytes::encoded_len(1, self, &mut TagMeasurer::new())
-        } else {
-            0
-        }
-    }
-
-    fn clear(&mut self) {
-        self.clear();
+impl From<Blob> for Vec<u8> {
+    fn from(value: Blob) -> Self {
+        value.0
     }
 }
 
-/// `google.protobuf.BytesValue`
-impl Message for Bytes {
-    fn encode_raw<B: BufMut>(&self, buf: &mut B) {
-        if !self.is_empty() {
-            bytes::encode(1, self, buf, &mut TagWriter::new())
-        }
+#[cfg(test)]
+impl proptest::arbitrary::Arbitrary for Blob {
+    type Parameters = <Vec<u8> as proptest::arbitrary::Arbitrary>::Parameters;
+    fn arbitrary_with(top: Self::Parameters) -> Self::Strategy {
+        proptest::strategy::Strategy::prop_map(
+            proptest::arbitrary::any_with::<Vec<u8>>(top),
+            Blob::new,
+        )
     }
-
-    fn merge_field<B: Buf>(
-        &mut self,
-        tag: u32,
-        wire_type: WireType,
-        duplicated: bool,
-        buf: &mut Capped<B>,
-        ctx: DecodeContext,
-    ) -> Result<(), DecodeError> {
-        if tag == 1 {
-            if duplicated {
-                return Err(DecodeError::new(
-                    "multiple occurrences of non-repeated field",
-                ));
-            }
-            bytes::merge(wire_type, self, buf, ctx)
-        } else {
-            skip_field(wire_type, buf)
-        }
-    }
-
-    fn encoded_len(&self) -> usize {
-        if !self.is_empty() {
-            bytes::encoded_len(1, self, &mut TagMeasurer::new())
-        } else {
-            0
-        }
-    }
-
-    fn clear(&mut self) {
-        self.clear();
-    }
+    type Strategy = proptest::strategy::Map<
+        <Vec<u8> as proptest::arbitrary::Arbitrary>::Strategy,
+        fn(Vec<u8>) -> Self,
+    >;
 }
 
-/// `google.protobuf.Empty`
-impl Message for () {
-    fn encode_raw<B: BufMut>(&self, _buf: &mut B) {}
+impl RawMessage for () {
+    fn raw_encode<B: BufMut + ?Sized>(&self, _buf: &mut B) {}
 
-    fn merge_field<B: Buf>(
+    fn raw_encoded_len(&self) -> usize {
+        0
+    }
+
+    fn raw_decode_field<B: Buf + ?Sized>(
         &mut self,
         _tag: u32,
         wire_type: WireType,
         _duplicated: bool,
-        buf: &mut Capped<B>,
+        buf: Capped<B>,
         _ctx: DecodeContext,
-    ) -> Result<(), DecodeError> {
+    ) -> Result<(), DecodeError>
+    where
+        Self: Sized,
+    {
         skip_field(wire_type, buf)
     }
+}
 
-    fn encoded_len(&self) -> usize {
-        0
+impl RawDistinguishedMessage for () {
+    fn raw_decode_field_distinguished<B: Buf + ?Sized>(
+        &mut self,
+        _tag: u32,
+        _wire_type: WireType,
+        _duplicated: bool,
+        _buf: Capped<B>,
+        _ctx: DecodeContext,
+    ) -> Result<(), DecodeError>
+    where
+        Self: Sized,
+    {
+        Err(DecodeError::new("field exists for empty message type"))
     }
-
-    fn clear(&mut self) {}
 }
