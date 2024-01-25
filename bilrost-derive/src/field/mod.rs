@@ -96,7 +96,7 @@ impl Field {
                     const _: () = ::bilrost::assert_tags_are_equal(
                         #description,
                         <#oneof_ty as ::bilrost::encoding::Oneof>::FIELD_TAGS,
-                        &[#(#tags,)*],
+                        &[#(#tags),*],
                     );
                 ))
             }
