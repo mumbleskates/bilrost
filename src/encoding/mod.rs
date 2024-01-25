@@ -1250,12 +1250,10 @@ mod test {
                     T: Debug + NewForOverwrite + PartialEq,
                     E: $encoder_trait<T>,
                 {
-                    let mut tw = TagWriter::new();
-                    let mut tm = tw.measurer();
-                    let expected_len = E::encoded_len(tag, &value, &mut tm);
+                    let expected_len = E::encoded_len(tag, &value, &mut TagMeasurer::new());
 
                     let mut buf = BytesMut::with_capacity(expected_len);
-                    E::encode(tag, &value, &mut buf, &mut tw);
+                    E::encode(tag, &value, &mut buf, &mut TagWriter::new());
 
                     let buf = &mut buf.freeze();
                     let mut buf = Capped::new(buf);
@@ -1325,12 +1323,10 @@ mod test {
                     T: Debug + NewForOverwrite + PartialEq,
                     E: $encoder_trait<T>,
                 {
-                    let mut tw = TagWriter::new();
-                    let mut tm = tw.measurer();
-                    let expected_len = E::encoded_len(tag, value.borrow(), &mut tm);
+                    let expected_len = E::encoded_len(tag, value.borrow(), &mut TagMeasurer::new());
 
                     let mut buf = BytesMut::with_capacity(expected_len);
-                    E::encode(tag, value.borrow(), &mut buf, &mut tw);
+                    E::encode(tag, value.borrow(), &mut buf, &mut TagWriter::new());
 
                     let mut tr = TagReader::new();
                     let buf = &mut buf.freeze();
