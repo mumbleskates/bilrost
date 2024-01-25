@@ -1,4 +1,6 @@
 target
+fuzz/corpus/
+fuzz/coverage/
 Cargo.lock
 
 .DS_Store
