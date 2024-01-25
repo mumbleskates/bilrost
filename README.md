@@ -184,7 +184,18 @@ encoder which determines how it is read and written from raw bytes.
 
 #### Expedient vs. Distinguished Encoding
 
-<!-- TODO(widders): explain -->
+It is possible to derive an extended trait, `DistinguishedMessage`, which
+provides a distinguished decoding mode. Decoding in distinguished mode comes
+with an additional guarantee that the resulting message value will re-encode to
+the exact same sequence of bytes, and that *every* different sequence of bytes
+will either decode to a different value or fail to decode. Formally, values of
+the message type are *bijective* to a subset of all byte strings, and all other
+byte strings are considered invalid and will err when decoded (in distinguished
+mode).
+
+Normal ("expedient") decoding may accept other byte strings as valid
+encodings, such as encodings that contain unknown fields or non-canonically
+encoded values. Most of the time, this is what is desired.
 
 #### Field types
 
@@ -224,19 +235,16 @@ several different containers:
 
 <!-- TODO(widders): detail encoders and value-encoders -->
 
-| Encoder       | Value type             | Encoded representation                                                         | Re-nestable |
-|---------------|------------------------|--------------------------------------------------------------------------------|-------------|
-| any encoder   | `Option<T>`            | identical; at least some bytes are always encoded if `Some`, nothing if `None` | no          |
-| `unpacked<E>` | `Vec<T>`               | the same as encoder `E`, one field per value                                   | no          |
-| `unpacked`    | *                      | (the same as `unpacked<general>`)                                              | no          |
-| `packed<E>`   | `Vec<T>`               | length-delimited, successively encoded with `E`                                | yes         |
-| `packed`      | *                      | (the same as `packed<general>`)                                                | yes         |
-| `map<KE, VE>` | `BTreeMap<K, V>`       | length-delimited, alternately encoded with `KE` and `VE`                       | yes         |
-| `map<KE, VE>` | `HashMap<K, V>`        | length-delimited, alternately encoded with `KE` and `VE`                       | yes         |
-| `general`     | `Vec<T>`               | (the same as `unpacked`)                                                       | no          |
-| `general`     | `BTreeMap` & `HashMap` | (the same as `map<general, general>`)                                          | yes         |
-
-<!-- TODO(widders): `Set` types -->
+| Encoder       | Value type                            | Encoded representation                                                         | Re-nestable |
+|---------------|---------------------------------------|--------------------------------------------------------------------------------|-------------|
+| any encoder   | `Option<T>`                           | identical; at least some bytes are always encoded if `Some`, nothing if `None` | no          |
+| `unpacked<E>` | `Vec<T>`, `HashSet<T>`, `BTreeSet<T>` | the same as encoder `E`, one field per value                                   | no          |
+| `unpacked`    | *                                     | (the same as `unpacked<general>`)                                              | no          |
+| `packed<E>`   | `Vec<T>`, `HashSet<T>`, `BTreeSet<T>` | length-delimited, successively encoded with `E`                                | yes         |
+| `packed`      | *                                     | (the same as `packed<general>`)                                                | yes         |
+| `map<KE, VE>` | `BTreeMap<K, V>`, `HashMap<K, V>`     | length-delimited, alternately encoded with `KE` and `VE`                       | yes         |
+| `general`     | `Vec`, `HashSet`, `BTreeSet`          | (the same as `unpacked`)                                                       | no          |
+| `general`     | `BTreeMap`, `HashMap`                 | (the same as `map<general, general>`)                                          | yes         |
 
 #### Compatible Widening
 
