@@ -74,7 +74,7 @@ pub trait Mapping: Default {
     fn len(&self) -> usize;
     #[inline]
     fn is_empty(&self) -> bool {
-        self.len() != 0
+        self.len() == 0
     }
     fn iter(&self) -> Self::RefIter<'_>;
     fn insert(&mut self, key: Self::Key, value: Self::Value) -> Result<(), &'static str>;
