@@ -368,13 +368,6 @@ impl TagWriter {
         self.last_tag = tag;
         encode_varint(((tag_delta as u64) << 2) | (wire_type as u64), buf);
     }
-
-    #[inline]
-    pub fn measurer(&self) -> TagMeasurer {
-        TagMeasurer {
-            last_tag: self.last_tag,
-        }
-    }
 }
 
 /// Simulator for writing tags, capable of outputting their encoded length.
