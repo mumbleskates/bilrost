@@ -250,9 +250,7 @@ pub struct ListValue {
 /// the Joda Time's [`ISODateTimeFormat.dateTime()`](<http://www.joda.org/joda-time/apidocs/org/joda/time/format/ISODateTimeFormat.html#dateTime%2D%2D>) to obtain a formatter capable of generating timestamps in this format.
 #[derive(Clone, Debug, PartialEq, PartialOrd, Message)]
 pub struct Timestamp {
-    /// Represents seconds of UTC time since Unix epoch
-    /// 1970-01-01T00:00:00Z. Must be from 0001-01-01T00:00:00Z to
-    /// 9999-12-31T23:59:59Z inclusive.
+    /// Represents seconds of UTC time since Unix epoch 1970-01-01T00:00:00Z.
     #[bilrost(1)]
     pub seconds: i64,
     /// Non-negative fractions of a second at nanosecond resolution. Negative

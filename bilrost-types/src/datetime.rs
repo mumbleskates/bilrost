@@ -712,6 +712,18 @@ mod tests {
             Timestamp::date(-8, 1, 1),
         );
 
+        // Huge year
+        assert_eq!(
+            "+198419841-03-07T14:37:18.848829343Z".parse::<Timestamp>(),
+            Timestamp::date_time_nanos(198419841, 3, 7, 14, 37, 18, 848829343),
+        );
+
+        // Very long ago
+        assert_eq!(
+            "-165000000-08-08T08:08:08.08080808Z".parse::<Timestamp>(),
+            Timestamp::date_time_nanos(-165000000, 8, 8, 8, 8, 8, 80808080),
+        );
+
         // Plus year
         assert_eq!(
             "+19370-01-01".parse::<Timestamp>(),

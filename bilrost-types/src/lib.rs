@@ -246,10 +246,6 @@ impl Timestamp {
                 self.nanos = 0;
             }
         }
-
-        // TODO: should this be checked?
-        // debug_assert!(self.seconds >= -62_135_596_800 && self.seconds <= 253_402_300_799,
-        //               "invalid timestamp: {:?}", self);
     }
 
     /// Normalizes the timestamp to a canonical format, returning the original value if it cannot be
