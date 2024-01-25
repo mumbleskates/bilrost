@@ -175,7 +175,7 @@ where
     }
 }
 
-// TODO(widders): hashbrown support in a feature
+// TODO(widders): test hashbrown support
 
 #[cfg(test)]
 mod test {

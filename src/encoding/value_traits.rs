@@ -228,6 +228,37 @@ where
     }
 }
 
+#[cfg(feature = "hashbrown")]
+impl<T> Collection for hashbrown::HashSet<T>
+where
+    Self: Default,
+    T: Eq + Hash,
+{
+    type Item = T;
+    type RefIter<'a> = hashbrown::hash_set::Iter<'a, T>
+    where
+        Self::Item: 'a,
+        Self: 'a;
+
+    #[inline]
+    fn len(&self) -> usize {
+        hashbrown::HashSet::len(self)
+    }
+
+    #[inline]
+    fn iter(&self) -> Self::RefIter<'_> {
+        hashbrown::HashSet::iter(self)
+    }
+
+    #[inline]
+    fn insert(&mut self, item: Self::Item) -> Result<(), &'static str> {
+        if !hashbrown::HashSet::insert(self, item) {
+            return Err("values are not unique");
+        }
+        Ok(())
+    }
+}
+
 impl<K, V> Mapping for BTreeMap<K, V>
 where
     Self: Default,
@@ -321,6 +352,41 @@ where
     #[inline]
     fn insert(&mut self, key: K, value: V) -> Result<(), &'static str> {
         if let hash_map::Entry::Vacant(entry) = self.entry(key) {
+            entry.insert(value);
+            Ok(())
+        } else {
+            Err("keys are not unique")
+        }
+    }
+}
+
+#[cfg(feature = "hashbrown")]
+impl<K, V> Mapping for hashbrown::HashMap<K, V>
+where
+    Self: Default,
+    K: Eq + Hash,
+{
+    type Key = K;
+    type Value = V;
+    type RefIter<'a> = hashbrown::hash_map::Iter<'a, K, V>
+    where
+        K: 'a,
+        V: 'a,
+        Self: 'a;
+
+    #[inline]
+    fn len(&self) -> usize {
+        hashbrown::HashMap::len(self)
+    }
+
+    #[inline]
+    fn iter(&self) -> Self::RefIter<'_> {
+        hashbrown::HashMap::iter(self)
+    }
+
+    #[inline]
+    fn insert(&mut self, key: K, value: V) -> Result<(), &'static str> {
+        if let hashbrown::hash_map::Entry::Vacant(entry) = self.entry(key) {
             entry.insert(value);
             Ok(())
         } else {

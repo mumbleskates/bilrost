@@ -39,6 +39,14 @@ delegate_value_encoding!(delegate from (General) to (Map<General, General>)
     for type (HashMap<K, V>)
     with where clause (K: Eq + Hash)
     with generics <K, V>);
+#[cfg(feature = "hashbrown")]
+delegate_encoding!(delegate from (General) to (crate::encoding::Unpacked<General>)
+    for type (hashbrown::HashSet<T>) with generics <T>);
+#[cfg(feature = "hashbrown")]
+delegate_value_encoding!(delegate from (General) to (Map<General, General>)
+    for type (hashbrown::HashMap<K, V>)
+    with where clause (K: Eq + Hash)
+    with generics <K, V>);
 
 /// General encodes plain values only when they are non-default.
 impl<T> Encoder<T> for General
