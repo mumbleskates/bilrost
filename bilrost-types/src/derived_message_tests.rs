@@ -9,7 +9,6 @@ use core::fmt::Debug;
 
 use itertools::{repeat_n, Itertools};
 
-use bilrost::encoding::opaque::OpaqueValue::*;
 use bilrost::encoding::opaque::{OpaqueMessage, OpaqueValue as OV};
 use bilrost::{DistinguishedMessage, Enumeration, Message, Oneof};
 
