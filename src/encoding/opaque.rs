@@ -10,7 +10,7 @@ use crate::encoding::{
 use crate::{DecodeError, Message, RawDistinguishedMessage, RawMessage};
 
 /// Represents an opaque bilrost field value. Can represent any valid encoded value.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum OpaqueValue {
     // TODO(widders): consider storing this as a `[u8; 9]` pre-encoded if it ever becomes useful
     //  to decode `Message` values directly from this representation.
@@ -154,7 +154,7 @@ impl OpaqueValue {
 ///
 /// At present this is still an unstable API, mostly used for internals and testing. Trait
 /// implementations and APIs of `OpaqueMessage` and `OpaqueValue` are subject to change.
-#[derive(Debug, Default, PartialEq, Eq)]
+#[derive(Debug, Default, PartialEq, Eq, Hash)]
 pub struct OpaqueMessage(pub Vec<(u32, OpaqueValue)>);
 
 impl Deref for OpaqueMessage {
