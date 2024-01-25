@@ -66,7 +66,7 @@ impl Field {
     /// Returns the where clause condition asserting that this field's encoder encodes its type.
     pub fn encoder_where(&self) -> Option<TokenStream> {
         match self {
-            Field::Value(field) => Some(field.encoder_where()),
+            Field::Value(field) => field.encoder_where(),
             _ => None,
         }
     }
@@ -75,7 +75,7 @@ impl Field {
     /// distinguished mode.
     pub fn distinguished_encoder_where(&self) -> Option<TokenStream> {
         match self {
-            Field::Value(field) => Some(field.distinguished_encoder_where()),
+            Field::Value(field) => field.distinguished_encoder_where(),
             _ => None,
         }
     }
@@ -198,4 +198,13 @@ where
     }
     *option = Some(value);
     Ok(())
+}
+
+pub fn set_bool(b: &mut bool, message: &str) -> Result<(), Error> {
+    if *b {
+        bail!("{}", message);
+    } else {
+        *b = true;
+        Ok(())
+    }
 }

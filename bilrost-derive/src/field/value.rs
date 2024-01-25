@@ -6,7 +6,7 @@ use syn::{
     parse, parse2, parse_str, Expr, Index, Lit, LitInt, Meta, MetaList, MetaNameValue, Type,
 };
 
-use crate::field::set_option;
+use super::{set_bool, set_option};
 
 /// A scalar protobuf field.
 #[derive(Clone)]
@@ -15,6 +15,12 @@ pub struct Field {
     pub ty: Type,
     pub encoder: Type,
     pub enumeration_ty: Option<Type>,
+    /// If a field is part of a recursion of messages, currently the chain needs to be broken so
+    /// that there is not a cyclic dependency of type constraints on the implementation of `Message`
+    /// or `DistinguishedMessage`. When a field is marked with the "recurses" attribute, it will not
+    /// be checked in the `where` clause of the implementation, and the type must always be
+    /// supported by its encoder.
+    pub recurses: bool,
     /// When a value field is in a oneof, it must always encode a nonzero amount of data. The
     /// encoder must be a ValueEncoder to satisfy this; effectively, Oneof types are much like
     /// several fields whose values are each wrapped in an `Option`, but at most one of them can be
@@ -48,6 +54,7 @@ impl Field {
         let mut tag = None;
         let mut encoder = None;
         let mut enumeration_ty = None;
+        let mut recurses = false;
         let mut unknown_attrs = Vec::new();
 
         for attr in attrs {
@@ -57,6 +64,8 @@ impl Field {
                 set_option(&mut encoder, t, "duplicate encoder attributes")?;
             } else if let Some(t) = named_attr(attr, "enumeration")? {
                 set_option(&mut enumeration_ty, t, "duplicate enumeration attributes")?;
+            } else if word_attr(attr, "recurses") {
+                set_bool(&mut recurses, "duplicate recurses attributes")?;
             } else {
                 unknown_attrs.push(attr);
             }
@@ -81,6 +90,7 @@ impl Field {
             ty: ty.clone(),
             encoder,
             enumeration_ty,
+            recurses,
             in_oneof,
             ident_within_variant,
         })
@@ -195,25 +205,31 @@ impl Field {
     }
 
     /// Returns the where clause constraint terms for the field's encoder.
-    pub fn encoder_where(&self) -> TokenStream {
+    pub fn encoder_where(&self) -> Option<TokenStream> {
+        if self.recurses {
+            return None;
+        }
         let ty = &self.ty;
         let encoder = &self.encoder;
-        if self.in_oneof {
+        Some(if self.in_oneof {
             quote!(#encoder: ::bilrost::encoding::ValueEncoder<#ty>)
         } else {
             quote!(#encoder: ::bilrost::encoding::Encoder<#ty>)
-        }
+        })
     }
 
     /// Returns the where clause constraint terms for the field's encoder.
-    pub fn distinguished_encoder_where(&self) -> TokenStream {
+    pub fn distinguished_encoder_where(&self) -> Option<TokenStream> {
+        if self.recurses {
+            return None;
+        }
         let ty = &self.ty;
         let encoder = &self.encoder;
-        if self.in_oneof {
+        Some(if self.in_oneof {
             quote!(#encoder: ::bilrost::encoding::DistinguishedValueEncoder<#ty>)
         } else {
             quote!(#encoder: ::bilrost::encoding::DistinguishedEncoder<#ty>)
-        }
+        })
     }
 
     /// Returns methods to embed in the message. `ident` must be the name of the field within the
@@ -304,4 +320,13 @@ fn named_attr<T: parse::Parse>(attr: &Meta, attr_name: &str) -> Result<Option<T>
             quote!(#attr),
         )
     })
+}
+
+/// Checks if an attribute matches a word.
+fn word_attr(attr: &Meta, key: &str) -> bool {
+    if let Meta::Path(ref path) = *attr {
+        path.is_ident(key)
+    } else {
+        false
+    }
 }
