@@ -2,15 +2,16 @@
 extern crate alloc;
 
 use alloc::string::{String, ToString};
+use alloc::vec;
 use alloc::vec::Vec;
-use alloc::{format, vec};
 use core::default::Default;
 use core::fmt::Debug;
 
 use itertools::{repeat_n, Itertools};
 
 use bilrost::encoding::opaque::{OpaqueMessage, OpaqueValue as OV};
-use bilrost::{DistinguishedMessage, Enumeration, Message, Oneof};
+use bilrost::DecodeErrorKind::*;
+use bilrost::{DecodeErrorKind, DistinguishedMessage, Enumeration, Message, Oneof};
 
 mod assert {
     use super::*;
@@ -26,13 +27,13 @@ mod assert {
 
     pub(super) fn doesnt_translate<M: Message + Debug + PartialEq>(
         from: impl IntoIterator<Item = (u32, OV)>,
-        err: &str,
+        err: DecodeErrorKind,
     ) {
         let encoded = from.into_iter().collect::<OpaqueMessage>().encode_to_vec();
         assert_eq!(
             M::decode(encoded.as_slice())
                 .expect_err("unexpectedly decoded without error")
-                .to_string(),
+                .kind(),
             err
         );
     }
@@ -56,7 +57,7 @@ mod assert {
         );
     }
 
-    pub(super) fn translates_only_expedient<T, M>(from: T, into: M, err: &str)
+    pub(super) fn translates_only_expedient<T, M>(from: T, into: M, err: DecodeErrorKind)
     where
         T: IntoIterator<Item = (u32, OV)>,
         M: DistinguishedMessage + Debug + Eq,
@@ -67,7 +68,7 @@ mod assert {
         assert_eq!(
             M::decode_distinguished(encoded.as_slice())
                 .expect_err("unexpectedly decoded in distinguished mode without error")
-                .to_string(),
+                .kind(),
             err
         );
         assert_ne!(
@@ -79,20 +80,20 @@ mod assert {
 
     pub(super) fn never_translates<M: DistinguishedMessage + Debug>(
         from: impl IntoIterator<Item = (u32, OV)>,
-        err: &str,
+        err: DecodeErrorKind,
     ) {
         let from: OpaqueMessage = from.into_iter().collect();
         let encoded = from.encode_to_vec();
         assert_eq!(
             M::decode(encoded.as_slice())
                 .expect_err("unepectedly decoded in expedient mode without error")
-                .to_string(),
+                .kind(),
             err
         );
         assert_eq!(
             M::decode_distinguished(encoded.as_slice())
                 .expect_err("unexpectedly decoded in distinguished mode without error")
-                .to_string(),
+                .kind(),
             err
         );
     }
@@ -227,12 +228,12 @@ fn duplicated_field_decoding() {
     assert::translates_distinguished([(1, OV::bool(false))], Foo(Some(false), false));
     assert::never_translates::<Foo>(
         [(1, OV::bool(false)), (1, OV::bool(true))],
-        "failed to decode Bilrost message: Foo.0: multiple occurrences of non-repeated field",
+        UnexpectedlyRepeated,
     );
     assert::translates_distinguished([(2, OV::bool(true))], Foo(None, true));
     assert::never_translates::<Foo>(
         [(2, OV::bool(true)), (2, OV::bool(false))],
-        "failed to decode Bilrost message: Foo.1: multiple occurrences of non-repeated field",
+        UnexpectedlyRepeated,
     );
 }
 
@@ -251,8 +252,7 @@ fn duplicated_packed_decoding() {
             (1, OV::packed([OV::bool(true), OV::bool(false)])),
             (1, OV::packed([OV::bool(false)])),
         ],
-        "failed to decode Bilrost message: \
-        Foo.0: multiple occurrences of packed repeated field",
+        UnexpectedlyRepeated,
     );
 }
 
@@ -300,8 +300,8 @@ fn oneof_field_decoding() {
     assert_eq!(Bar::decode(&a_only[..]), Ok(Bar { ab: Some(A(true)) }));
     assert_eq!(Bar::decode(&b_only[..]), Ok(Bar { ab: Some(B(false)) }));
     assert_eq!(
-        Bar::decode(&both[..]).unwrap_err().to_string(),
-        "failed to decode Bilrost message: Bar.ab: conflicting fields in oneof"
+        Bar::decode(&both[..]).unwrap_err().kind(),
+        ConflictingFields
     );
 }
 
@@ -482,15 +482,15 @@ fn enumeration_helpers() {
     assert_eq!(
         val.regular()
             .expect_err("bad enumeration value parsed successfully")
-            .to_string(),
-        "failed to decode Bilrost message: unknown enumeration value"
+            .kind(),
+        OutOfDomainValue,
     );
     assert_eq!(
         val.optional()
             .unwrap()
             .expect_err("bad enumeration value parsed successfully")
-            .to_string(),
-        "failed to decode Bilrost message: unknown enumeration value"
+            .kind(),
+        OutOfDomainValue,
     );
 
     let val = HelpedStruct::default();
@@ -498,29 +498,23 @@ fn enumeration_helpers() {
 
     // Demonstrate that the same errors happen when we decode to a struct with strict
     // enumeration fields, it just happens sooner.
-    for (val, error_path) in [
-        (
-            HelpedStruct {
-                regular: 222,
-                optional: None,
-            },
-            "StrictStruct.regular",
-        ),
-        (
-            HelpedStruct {
-                regular: 5,
-                optional: Some(222),
-            },
-            "StrictStruct.optional",
-        ),
+    for val in [
+        HelpedStruct {
+            regular: 222,
+            optional: None,
+        },
+        HelpedStruct {
+            regular: 5,
+            optional: Some(222),
+        },
     ] {
         let encoded = val.encode_to_vec();
         let decoded = StrictStruct::decode(encoded.as_slice());
         assert_eq!(
             decoded
                 .expect_err("decoded an invalid enumeration value without error")
-                .to_string(),
-            format!("failed to decode Bilrost message: {error_path}: unknown enumeration value")
+                .kind(),
+            OutOfDomainValue
         );
     }
 }

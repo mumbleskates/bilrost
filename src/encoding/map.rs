@@ -1,3 +1,5 @@
+use bytes::{Buf, BufMut};
+
 use crate::encoding::value_traits::{DistinguishedMapping, Mapping};
 use crate::encoding::{
     check_wire_type, encode_varint, encoded_len_varint, Capped, DecodeContext,
@@ -5,7 +7,7 @@ use crate::encoding::{
     TagMeasurer, TagWriter, ValueEncoder, WireType, Wiretyped,
 };
 use crate::DecodeError;
-use bytes::{Buf, BufMut};
+use crate::DecodeErrorKind::{NotCanonical, Truncated, UnexpectedlyRepeated};
 
 pub struct Map<KE, VE>(KE, VE);
 
@@ -68,7 +70,7 @@ where
         if combined_fixed_size(KE::WIRE_TYPE, VE::WIRE_TYPE).map_or(false, |fixed_size| {
             capped.remaining_before_cap() % fixed_size != 0
         }) {
-            return Err(DecodeError::new("packed field is not a valid length"));
+            return Err(DecodeError::new(Truncated));
         }
         for item in capped.consume(|buf| {
             let mut new_key = K::new_for_overwrite();
@@ -101,7 +103,7 @@ where
         if combined_fixed_size(KE::WIRE_TYPE, VE::WIRE_TYPE).map_or(false, |fixed_size| {
             capped.remaining_before_cap() % fixed_size != 0
         }) {
-            return Err(DecodeError::new("packed field is not a valid length"));
+            return Err(DecodeError::new(Truncated));
         }
         for item in capped.consume(|buf| {
             let mut new_key = K::new_for_overwrite();
@@ -145,7 +147,7 @@ where
     ) -> Result<(), DecodeError> {
         check_wire_type(WireType::LengthDelimited, wire_type)?;
         if duplicated {
-            return Err(DecodeError::new("multiple occurrences of map field"));
+            return Err(DecodeError::new(UnexpectedlyRepeated));
         }
         Self::decode_value(value, buf, ctx)
     }
@@ -165,11 +167,11 @@ where
     ) -> Result<(), DecodeError> {
         check_wire_type(WireType::LengthDelimited, wire_type)?;
         if duplicated {
-            return Err(DecodeError::new("multiple occurrences of map field"));
+            return Err(DecodeError::new(UnexpectedlyRepeated));
         }
         Self::decode_value_distinguished(value, buf, ctx)?;
         if value.is_empty() {
-            return Err(DecodeError::new("map field encoded with no items"));
+            return Err(DecodeError::new(NotCanonical));
         }
         Ok(())
     }

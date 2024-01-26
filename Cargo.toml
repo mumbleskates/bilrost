@@ -35,8 +35,9 @@ exclude = [
 bench = false
 
 [features]
-default = ["derive", "std"]
+default = ["derive", "detailed_errors", "std"]
 derive = ["dep:bilrost-derive"]
+detailed_errors = ["dep:thin-vec"]
 extended-diagnostics = ["dep:const_panic"]
 hashbrown = ["dep:hashbrown"]
 no-recursion-limit = []
@@ -47,6 +48,7 @@ bytes = { version = "1", default-features = false }
 bilrost-derive = { version = "0.12.3", path = "bilrost-derive", optional = true }
 const_panic = { version = "0.2", optional = true }
 hashbrown = { version = ">=0.1.0", optional = true }
+thin-vec = {  version = "0.2", optional = true }
 
 [dev-dependencies]
 criterion = { version = "0.5", default-features = false }

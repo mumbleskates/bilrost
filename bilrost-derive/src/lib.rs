@@ -7,7 +7,6 @@ use std::mem::take;
 use std::ops::Deref;
 
 use anyhow::{bail, Error};
-use field::bilrost_attrs;
 use itertools::Itertools;
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
@@ -16,7 +15,7 @@ use syn::{
     Ident, ImplGenerics, Index, Meta, TypeGenerics, Variant, WhereClause,
 };
 
-use crate::field::Field;
+use self::field::{bilrost_attrs, Field};
 
 mod field;
 
@@ -616,7 +615,7 @@ fn try_distinguished_message(input: TokenStream) -> Result<TokenStream, Error> {
                 #struct_name
                 match tag {
                     #(#decode)*
-                    _ => Err(::bilrost::DecodeError::new("unknown field tag")),
+                    _ => Err(::bilrost::DecodeError::new(::bilrost::DecodeErrorKind::UnknownField)),
                 }
             }
         }
@@ -748,7 +747,7 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
                 match value {
                     #(#try_from,)*
                     _ => ::core::result::Result::Err(
-                        ::bilrost::DecodeError::new("unknown enumeration value")),
+                        ::bilrost::DecodeError::new(::bilrost::DecodeErrorKind::OutOfDomainValue)),
                 }
             }
         }
@@ -780,7 +779,8 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
             ) -> Result<(), ::bilrost::DecodeError> {
                 let int_value = <u32 as ::core::convert::TryFrom<_>>::try_from(buf.decode_varint()?)
                     .map_err(|_| ::bilrost::DecodeError::new(
-                        "varint for enumeration overflows range of u32"))?;
+                        ::bilrost::DecodeErrorKind::OutOfDomainValue
+                    ))?;
                 *value = <#ident #ty_generics as ::core::convert::TryFrom<_>>::try_from(int_value)?;
                 Ok(())
             }
@@ -964,7 +964,9 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
                     #ident::#variant_ident #with_value => {
                         #decode
                     }
-                    _ => Err(::bilrost::DecodeError::new("conflicting fields in oneof")),
+                    _ => Err(::bilrost::DecodeError::new(
+                        ::bilrost::DecodeErrorKind::ConflictingFields
+                    )),
                 }
             }
         });
@@ -1055,7 +1057,9 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
                     ::core::option::Option::Some(#ident::#variant_ident #with_value) => {
                         #decode
                     }
-                    _ => Err(::bilrost::DecodeError::new("conflicting fields in oneof")),
+                    _ => Err(::bilrost::DecodeError::new(
+                        ::bilrost::DecodeErrorKind::ConflictingFields
+                    )),
                 }
             }
         });
@@ -1154,7 +1158,9 @@ fn try_distinguished_oneof(input: TokenStream) -> Result<TokenStream, Error> {
                     #ident::#variant_ident #with_value => {
                         #decode
                     }
-                    _ => Err(::bilrost::DecodeError::new("conflicting fields in oneof")),
+                    _ => Err(::bilrost::DecodeError::new(
+                        ::bilrost::DecodeErrorKind::ConflictingFields
+                    )),
                 }
             }
         });
@@ -1199,7 +1205,9 @@ fn try_distinguished_oneof(input: TokenStream) -> Result<TokenStream, Error> {
                     ::core::option::Option::Some(#ident::#variant_ident #with_value) => {
                         #decode
                     }
-                    _ => Err(::bilrost::DecodeError::new("conflicting fields in oneof")),
+                    _ => Err(::bilrost::DecodeError::new(
+                        ::bilrost::DecodeErrorKind::ConflictingFields
+                    )),
                 }
             }
         });

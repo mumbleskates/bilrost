@@ -1,5 +1,6 @@
 #![allow(clippy::implicit_hasher, clippy::ptr_arg)]
 
+#[cfg(all(test, not(feature = "std")))]
 use alloc::format;
 use core::cmp::{min, Eq, PartialEq};
 use core::convert::TryFrom;
@@ -10,6 +11,9 @@ use core::ops::{Deref, DerefMut};
 use bytes::buf::Take;
 use bytes::{Buf, BufMut};
 
+use crate::DecodeErrorKind::{
+    InvalidVarint, TagOverflowed, Truncated, UnexpectedlyRepeated, WrongWireType,
+};
 use crate::{decode_length_delimiter, DecodeError};
 
 mod fixed;
@@ -61,7 +65,7 @@ pub fn decode_varint<B: Buf + ?Sized>(buf: &mut B) -> Result<u64, DecodeError> {
     let bytes = buf.chunk();
     let len = bytes.len();
     if len == 0 {
-        return Err(DecodeError::new("invalid varint"));
+        return Err(DecodeError::new(Truncated));
     }
 
     let byte = bytes[0];
@@ -145,7 +149,7 @@ fn decode_varint_slice(bytes: &[u8]) -> Result<(u64, usize), DecodeError> {
 
     b = unsafe { *bytes.get_unchecked(8) };
     if (b as u32) + ((value >> 56) as u32) > 0xff {
-        Err(DecodeError::new("overflowed varint"))
+        Err(DecodeError::new(InvalidVarint))
     } else {
         Ok((value + (u64::from(b) << 56), 9))
     }
@@ -167,7 +171,7 @@ fn decode_varint_slow<B: Buf + ?Sized>(buf: &mut B) -> Result<u64, DecodeError> 
     // We only reach here if every byte so far had its high bit set. We've either reached the end of
     // the buffer or the ninth byte. If it's the former, the varint qualifies as truncated.
     if !buf.has_remaining() {
-        return Err(DecodeError::new("truncated varint"));
+        return Err(DecodeError::new(Truncated));
     }
     // The decoding process for bijective varints is largely the same as for non-bijective, except
     // we simply don't remove the MSB from each byte before adding it to the decoded value. Thus,
@@ -177,8 +181,7 @@ fn decode_varint_slow<B: Buf + ?Sized>(buf: &mut B) -> Result<u64, DecodeError> 
     // generalizing the encoding to more than 64 bit numbers would always be zero, and if there is a
     // desire to encode varints greater than 64 bits in size it is more efficient to use a
     // length-prefixed encoding, which is just the blob wiretype.
-    u64::checked_add(value, u64::from(buf.get_u8()) << 56)
-        .ok_or(DecodeError::new("overflowed varint"))
+    u64::checked_add(value, u64::from(buf.get_u8()) << 56).ok_or(DecodeError::new(InvalidVarint))
     // There is probably a reason why using u64::checked_add here seems to cause decoding even
     // smaller varints to bench faster, while using it in the fast-path in decode_varint_slice
     // causes a 5x pessimization. Probably best not to worry about it too much.
@@ -257,7 +260,9 @@ impl DecodeContext {
     pub(crate) fn limit_reached(&self) -> Result<(), DecodeError> {
         #[cfg(not(feature = "no-recursion-limit"))]
         if self.recurse_count == 0 {
-            return Err(DecodeError::new("recursion limit reached"));
+            return Err(DecodeError::new(
+                crate::DecodeErrorKind::RecursionLimitReached,
+            ));
         }
         Ok(())
     }
@@ -314,20 +319,15 @@ pub enum WireType {
     SixtyFourBit = 3,
 }
 
-impl TryFrom<u64> for WireType {
-    type Error = DecodeError;
-
+impl From<u64> for WireType {
     #[inline]
-    fn try_from(value: u64) -> Result<Self, Self::Error> {
-        match value {
-            0 => Ok(WireType::Varint),
-            1 => Ok(WireType::LengthDelimited),
-            2 => Ok(WireType::ThirtyTwoBit),
-            3 => Ok(WireType::SixtyFourBit),
-            _ => Err(DecodeError::new(format!(
-                "invalid wire type value: {}",
-                value
-            ))),
+    fn from(value: u64) -> Self {
+        match value & 0b11 {
+            0 => WireType::Varint,
+            1 => WireType::LengthDelimited,
+            2 => WireType::ThirtyTwoBit,
+            3 => WireType::SixtyFourBit,
+            _ => unreachable!(),
         }
     }
 }
@@ -410,13 +410,12 @@ impl TagReader {
         buf: &mut B,
     ) -> Result<(u32, WireType), DecodeError> {
         let key = decode_varint(buf)?;
-        let tag_delta =
-            u32::try_from(key >> 2).map_err(|_| DecodeError::new("field key overflowed"))?;
+        let tag_delta = u32::try_from(key >> 2).map_err(|_| DecodeError::new(TagOverflowed))?;
         let tag = self
             .last_tag
             .checked_add(tag_delta)
-            .ok_or_else(|| DecodeError::new("tag overflowed"))?;
-        let wire_type = WireType::try_from(key & 0b11).unwrap();
+            .ok_or_else(|| DecodeError::new(TagOverflowed))?;
+        let wire_type = WireType::from(key);
         self.last_tag = tag;
         Ok((tag, wire_type))
     }
@@ -427,10 +426,7 @@ impl TagReader {
 #[inline]
 pub fn check_wire_type(expected: WireType, actual: WireType) -> Result<(), DecodeError> {
     if expected != actual {
-        return Err(DecodeError::new(format!(
-            "invalid wire type: {:?} (expected {:?})",
-            actual, expected
-        )));
+        return Err(DecodeError::new(WrongWireType));
     }
     Ok(())
 }
@@ -458,7 +454,7 @@ impl<'a, B: 'a + Buf + ?Sized> Capped<'a, B> {
         let len = decode_length_delimiter(&mut *buf)?;
         let remaining = buf.remaining();
         if len > remaining {
-            return Err(DecodeError::new("field truncated"));
+            return Err(DecodeError::new(Truncated));
         }
         Ok(Self {
             buf,
@@ -480,11 +476,11 @@ impl<'a, B: 'a + Buf + ?Sized> Capped<'a, B> {
         let len = decode_length_delimiter(&mut *self.buf)?;
         let remaining = self.buf.remaining();
         if len > remaining {
-            return Err(DecodeError::new("field truncated"));
+            return Err(DecodeError::new(Truncated));
         }
         let extra_bytes_remaining = remaining - len;
         if extra_bytes_remaining < self.extra_bytes_remaining {
-            return Err(DecodeError::new("field truncated"));
+            return Err(DecodeError::new(Truncated));
         }
         Ok(Capped {
             buf: self.buf,
@@ -549,7 +545,7 @@ where
         }
         let res = (self.reader)(&mut self.capped);
         if res.is_ok() && self.capped.buf.remaining() < self.capped.extra_bytes_remaining {
-            return Some(Err(DecodeError::new("delimited length exceeded")));
+            return Some(Err(DecodeError::new(Truncated)));
         }
         Some(res)
     }
@@ -581,7 +577,7 @@ pub fn skip_field<B: Buf + ?Sized>(
     };
 
     if len > buf.remaining() as u64 {
-        return Err(DecodeError::new("field truncated"));
+        return Err(DecodeError::new(Truncated));
     }
 
     buf.advance(len as usize);
@@ -772,9 +768,7 @@ where
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         if duplicated {
-            return Err(DecodeError::new(
-                "multiple occurrences of non-repeated field",
-            ));
+            return Err(DecodeError::new(UnexpectedlyRepeated));
         }
         Self::decode_field(
             wire_type,
@@ -801,9 +795,7 @@ where
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         if duplicated {
-            return Err(DecodeError::new(
-                "multiple occurrences of non-repeated field",
-            ));
+            return Err(DecodeError::new(UnexpectedlyRepeated));
         }
         Self::decode_field_distinguished(
             wire_type,
@@ -1399,8 +1391,8 @@ mod test {
         );
         assert_eq!(
             res.expect_err("unaligned packed fixed64 decoded without error")
-                .to_string(),
-            "failed to decode Bilrost message: packed field is not a valid length"
+                .kind(),
+            Truncated
         );
         let res = <Packed<Fixed>>::decode_value_distinguished(
             &mut parsed,
@@ -1409,8 +1401,8 @@ mod test {
         );
         assert_eq!(
             res.expect_err("unaligned packed fixed64 decoded without error")
-                .to_string(),
-            "failed to decode Bilrost message: packed field is not a valid length"
+                .kind(),
+            Truncated
         );
     }
 
@@ -1429,8 +1421,8 @@ mod test {
         );
         assert_eq!(
             res.expect_err("unaligned packed fixed32 decoded without error")
-                .to_string(),
-            "failed to decode Bilrost message: packed field is not a valid length"
+                .kind(),
+            Truncated
         );
         let res = <Packed<Fixed>>::decode_value_distinguished(
             &mut parsed,
@@ -1439,8 +1431,8 @@ mod test {
         );
         assert_eq!(
             res.expect_err("unaligned packed fixed32 decoded without error")
-                .to_string(),
-            "failed to decode Bilrost message: packed field is not a valid length"
+                .kind(),
+            Truncated
         );
     }
 
@@ -1462,8 +1454,8 @@ mod test {
         );
         assert_eq!(
             res.expect_err("unaligned 12-byte map decoded without error")
-                .to_string(),
-            "failed to decode Bilrost message: packed field is not a valid length"
+                .kind(),
+            Truncated
         );
         let res = <Map<Fixed, Fixed>>::decode_value_distinguished(
             &mut parsed,
@@ -1472,8 +1464,8 @@ mod test {
         );
         assert_eq!(
             res.expect_err("unaligned 12-byte map decoded without error")
-                .to_string(),
-            "failed to decode Bilrost message: packed field is not a valid length"
+                .kind(),
+            Truncated
         );
     }
 

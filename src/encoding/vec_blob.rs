@@ -8,6 +8,7 @@ use crate::encoding::{
     FieldEncoder, TagMeasurer, TagWriter, ValueEncoder, WireType, Wiretyped,
 };
 use crate::DecodeError;
+use crate::DecodeErrorKind::{NotCanonical, UnexpectedlyRepeated};
 
 /// `VecBlob` implements encoding for blob values directly into `Vec<u8>`, and provides the base
 /// implementation for that functionality. `Vec<u8>` cannot generically dispatch to `General`'s
@@ -79,9 +80,7 @@ impl Encoder<Vec<u8>> for VecBlob {
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         if duplicated {
-            return Err(DecodeError::new(
-                "multiple occurrences of non-repeated field",
-            ));
+            return Err(DecodeError::new(UnexpectedlyRepeated));
         }
         Self::decode_field(wire_type, value, buf, ctx)
     }
@@ -97,15 +96,11 @@ impl DistinguishedEncoder<Vec<u8>> for VecBlob {
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         if duplicated {
-            return Err(DecodeError::new(
-                "multiple occurrences of non-repeated field",
-            ));
+            return Err(DecodeError::new(UnexpectedlyRepeated));
         }
         Self::decode_field_distinguished(wire_type, value, buf, ctx)?;
         if value.is_empty() {
-            return Err(DecodeError::new(
-                "plain field was encoded with its zero value",
-            ));
+            return Err(DecodeError::new(NotCanonical));
         }
         Ok(())
     }

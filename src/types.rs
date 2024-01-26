@@ -8,6 +8,7 @@ use bytes::{Buf, BufMut};
 use crate::encoding::{skip_field, Capped, DecodeContext, WireType};
 use crate::message::{RawDistinguishedMessage, RawMessage};
 use crate::DecodeError;
+use crate::DecodeErrorKind::UnknownField;
 
 /// Newtype wrapper to act as a simple "bytes data" type in Bilrost. It transparently wraps a
 /// `Vec<u8>` and is fully supported by the `General` encoder.
@@ -126,6 +127,6 @@ impl RawDistinguishedMessage for () {
     where
         Self: Sized,
     {
-        Err(DecodeError::new("field exists for empty message type"))
+        Err(DecodeError::new(UnknownField))
     }
 }

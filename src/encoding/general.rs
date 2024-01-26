@@ -16,6 +16,7 @@ use crate::encoding::{
     Encoder, FieldEncoder, Map, TagMeasurer, TagWriter, ValueEncoder, WireType, Wiretyped,
 };
 use crate::message::{merge, merge_distinguished, RawDistinguishedMessage, RawMessage};
+use crate::DecodeErrorKind::{InvalidValue, NotCanonical, OutOfDomainValue, UnexpectedlyRepeated};
 use crate::{Blob, DecodeError};
 
 pub struct General;
@@ -79,9 +80,7 @@ where
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         if duplicated {
-            return Err(DecodeError::new(
-                "multiple occurrences of non-repeated field",
-            ));
+            return Err(DecodeError::new(UnexpectedlyRepeated));
         }
         Self::decode_field(wire_type, value, buf, ctx)
     }
@@ -103,15 +102,11 @@ where
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         if duplicated {
-            return Err(DecodeError::new(
-                "multiple occurrences of non-repeated field",
-            ));
+            return Err(DecodeError::new(UnexpectedlyRepeated));
         }
         Self::decode_field_distinguished(wire_type, value, buf, ctx)?;
         if *value == T::default() {
-            return Err(DecodeError::new(
-                "plain field was encoded with its zero value",
-            ));
+            return Err(DecodeError::new(NotCanonical));
         }
         Ok(())
     }
@@ -179,7 +174,7 @@ from_uint64(value) {
     match value {
         0 => false,
         1 => true,
-        _ => return Err(DecodeError::new("invalid varint value for bool"))
+        _ => return Err(DecodeError::new(OutOfDomainValue))
     }
 });
 varint!(varint_u32, u32,
@@ -187,7 +182,7 @@ to_uint64(value) {
     *value as u64
 },
 from_uint64(value) {
-    u32::try_from(value).map_err(|_| DecodeError::new("varint overflows range of u32"))?
+    u32::try_from(value).map_err(|_| DecodeError::new(OutOfDomainValue))?
 });
 varint!(varint_u64, u64,
 to_uint64(value) {
@@ -202,7 +197,7 @@ to_uint64(value) {
 },
 from_uint64(value) {
     let value = u32::try_from(value)
-        .map_err(|_| DecodeError::new("varint overflows range of i32"))?;
+        .map_err(|_| DecodeError::new(OutOfDomainValue))?;
     super::u32_to_signed(value)
 });
 varint!(varint_i64, i64,
@@ -272,9 +267,7 @@ impl ValueEncoder<String> for General {
                     mem::forget(drop_guard);
                     Ok(())
                 }
-                Err(_) => Err(DecodeError::new(
-                    "invalid string value: data is not UTF-8 encoded",
-                )),
+                Err(_) => Err(DecodeError::new(InvalidValue)),
             }
         }
     }

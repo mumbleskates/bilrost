@@ -20,7 +20,7 @@ mod types;
 #[doc(hidden)]
 pub mod encoding;
 
-pub use crate::error::{DecodeError, EncodeError};
+pub use crate::error::{DecodeError, DecodeErrorKind, EncodeError};
 pub use crate::message::{
     DistinguishedMessage, DistinguishedMessageDyn, Message, MessageDyn, RawDistinguishedMessage,
     RawMessage,
@@ -81,7 +81,7 @@ pub fn length_delimiter_len(length: usize) -> usize {
 pub fn decode_length_delimiter<B: Buf>(mut buf: B) -> Result<usize, DecodeError> {
     decode_varint(&mut buf)?
         .try_into()
-        .map_err(|_| DecodeError::new("length delimiter exceeds maximum usize value"))
+        .map_err(|_| DecodeError::new(DecodeErrorKind::Oversize))
 }
 
 /// Helper function for derived types, asserting that lists of tags are equal at compile time.

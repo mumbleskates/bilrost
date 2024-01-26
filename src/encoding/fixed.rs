@@ -1,13 +1,14 @@
 use alloc::vec::Vec;
 
+use bytes::{Buf, BufMut};
+
 use crate::encoding::{
     delegate_encoding, Capped, DecodeContext, DistinguishedEncoder, DistinguishedFieldEncoder,
     DistinguishedValueEncoder, Encoder, FieldEncoder, TagMeasurer, TagWriter, ValueEncoder,
     WireType, Wiretyped,
 };
 use crate::DecodeError;
-
-use bytes::{Buf, BufMut};
+use crate::DecodeErrorKind::{NotCanonical, Truncated, UnexpectedlyRepeated};
 
 pub struct Fixed;
 
@@ -44,7 +45,7 @@ macro_rules! fixed_width_common {
                 _ctx: DecodeContext,
             ) -> Result<(), DecodeError> {
                 if buf.remaining() < $wire_type.fixed_size().unwrap() {
-                    return Err(DecodeError::new("field truncated"));
+                    return Err(DecodeError::new(Truncated));
                 }
                 *value = buf.$get();
                 Ok(())
@@ -100,9 +101,7 @@ macro_rules! fixed_width_int {
                 ctx: DecodeContext,
             ) -> Result<(), DecodeError> {
                 if duplicated {
-                    return Err(DecodeError::new(
-                        "multiple occurrences of non-repeated field",
-                    ));
+                    return Err(DecodeError::new(UnexpectedlyRepeated));
                 }
                 Self::decode_field(wire_type, value, buf, ctx)
             }
@@ -118,15 +117,11 @@ macro_rules! fixed_width_int {
                 ctx: DecodeContext,
             ) -> Result<(), DecodeError> {
                 if duplicated {
-                    return Err(DecodeError::new(
-                        "multiple occurrences of non-repeated field",
-                    ));
+                    return Err(DecodeError::new(UnexpectedlyRepeated));
                 }
                 Self::decode_field_distinguished(wire_type, value, buf, ctx)?;
                 if *value == 0 {
-                    return Err(DecodeError::new(
-                        "plain field was encoded with its zero value",
-                    ));
+                    return Err(DecodeError::new(NotCanonical));
                 }
                 Ok(())
             }
@@ -178,9 +173,7 @@ macro_rules! fixed_width_float {
                 ctx: DecodeContext,
             ) -> Result<(), DecodeError> {
                 if duplicated {
-                    return Err(DecodeError::new(
-                        "multiple occurrences of non-repeated field",
-                    ));
+                    return Err(DecodeError::new(UnexpectedlyRepeated));
                 }
                 Self::decode_field(wire_type, value, buf, ctx)
             }

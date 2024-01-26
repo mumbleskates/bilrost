@@ -1,3 +1,5 @@
+use bytes::{Buf, BufMut};
+
 use crate::encoding::value_traits::{Collection, DistinguishedCollection};
 use crate::encoding::{
     encode_varint, encoded_len_varint, Capped, DecodeContext, DistinguishedEncoder,
@@ -5,8 +7,7 @@ use crate::encoding::{
     NewForOverwrite, TagMeasurer, TagWriter, ValueEncoder, WireType, Wiretyped,
 };
 use crate::DecodeError;
-
-use bytes::{Buf, BufMut};
+use crate::DecodeErrorKind::{NotCanonical, Truncated, UnexpectedlyRepeated};
 
 pub struct Packed<E = General>(E);
 
@@ -43,7 +44,7 @@ where
         if E::WIRE_TYPE.fixed_size().map_or(false, |fixed_size| {
             capped.remaining_before_cap() % fixed_size != 0
         }) {
-            return Err(DecodeError::new("packed field is not a valid length"));
+            return Err(DecodeError::new(Truncated));
         }
         for val in capped.consume(|buf| {
             let mut new_val = T::new_for_overwrite();
@@ -71,7 +72,7 @@ where
         if E::WIRE_TYPE.fixed_size().map_or(false, |fixed_size| {
             capped.remaining_before_cap() % fixed_size != 0
         }) {
-            return Err(DecodeError::new("packed field is not a valid length"));
+            return Err(DecodeError::new(Truncated));
         }
         for val in capped.consume(|buf| {
             let mut new_val = T::new_for_overwrite();
@@ -119,9 +120,7 @@ where
         if wire_type == WireType::LengthDelimited {
             // We've encountered the expected length-delimited type: decode it in packed format.
             if duplicated {
-                return Err(DecodeError::new(
-                    "multiple occurrences of packed repeated field",
-                ));
+                return Err(DecodeError::new(UnexpectedlyRepeated));
             }
             Self::decode_value(value, buf, ctx)
         } else {
@@ -149,13 +148,11 @@ where
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         if duplicated {
-            return Err(DecodeError::new(
-                "multiple occurrences of packed repeated field",
-            ));
+            return Err(DecodeError::new(UnexpectedlyRepeated));
         }
         Self::decode_field_distinguished(wire_type, value, buf, ctx)?;
         if value.is_empty() {
-            return Err(DecodeError::new("packed field encoded with no values"));
+            return Err(DecodeError::new(NotCanonical));
         }
         Ok(())
     }

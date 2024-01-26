@@ -7,6 +7,7 @@ use crate::encoding::{
     TagMeasurer, TagWriter, ValueEncoder, WireType,
 };
 use crate::DecodeError;
+use crate::DecodeErrorKind::UnexpectedlyRepeated;
 
 pub struct Unpacked<E = General>(E);
 
@@ -44,9 +45,7 @@ where
             // We've encountered a length-delimited field when we aren't expecting one; try decoding
             // it in packed format instead.
             if duplicated {
-                return Err(DecodeError::new(
-                    "multiple occurrences of packed repeated field",
-                ));
+                return Err(DecodeError::new(UnexpectedlyRepeated));
             }
             Packed::<E>::decode_value(value, buf, ctx)
         } else {

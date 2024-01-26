@@ -5,6 +5,9 @@ use core::hash::Hash;
 #[cfg(feature = "std")]
 use std::collections::{hash_map, hash_set, HashMap, HashSet};
 
+use crate::DecodeErrorKind;
+use crate::DecodeErrorKind::{NotCanonical, UnexpectedlyRepeated};
+
 /// Trait for cheaply producing a new value that will always be overwritten, rather than a value
 /// that really serves as a zero-valued default. This is implemented for types that can be present
 /// optionally (in Option or Vec, for instance) but don't have a Default value, such as
@@ -46,7 +49,7 @@ pub trait Collection: Default {
         self.len() == 0
     }
     fn iter(&self) -> Self::RefIter<'_>;
-    fn insert(&mut self, item: Self::Item) -> Result<(), &'static str>;
+    fn insert(&mut self, item: Self::Item) -> Result<(), DecodeErrorKind>;
 }
 
 /// Trait for collections that store multiple items and have a distinguished representation, such as
@@ -58,7 +61,7 @@ pub trait DistinguishedCollection: Collection + Eq {
         Self: 'a;
 
     fn reversed(&self) -> Self::ReverseIter<'_>;
-    fn insert_distinguished(&mut self, item: Self::Item) -> Result<(), &'static str>;
+    fn insert_distinguished(&mut self, item: Self::Item) -> Result<(), DecodeErrorKind>;
 }
 
 /// Trait for associative containers, such as `BTreeMap` and `HashMap`.
@@ -77,7 +80,7 @@ pub trait Mapping: Default {
         self.len() == 0
     }
     fn iter(&self) -> Self::RefIter<'_>;
-    fn insert(&mut self, key: Self::Key, value: Self::Value) -> Result<(), &'static str>;
+    fn insert(&mut self, key: Self::Key, value: Self::Value) -> Result<(), DecodeErrorKind>;
 }
 
 /// Trait for associative containers with a distinguished representation. Returns an error if the
@@ -94,7 +97,7 @@ pub trait DistinguishedMapping: Mapping {
         &mut self,
         key: Self::Key,
         value: Self::Value,
-    ) -> Result<(), &'static str>;
+    ) -> Result<(), DecodeErrorKind>;
 }
 
 impl<T> Collection for Vec<T> {
@@ -115,7 +118,7 @@ impl<T> Collection for Vec<T> {
     }
 
     #[inline]
-    fn insert(&mut self, item: T) -> Result<(), &'static str> {
+    fn insert(&mut self, item: T) -> Result<(), DecodeErrorKind> {
         Vec::push(self, item);
         Ok(())
     }
@@ -136,7 +139,7 @@ where
     }
 
     #[inline]
-    fn insert_distinguished(&mut self, item: Self::Item) -> Result<(), &'static str> {
+    fn insert_distinguished(&mut self, item: Self::Item) -> Result<(), DecodeErrorKind> {
         Vec::push(self, item);
         Ok(())
     }
@@ -164,9 +167,9 @@ where
     }
 
     #[inline]
-    fn insert(&mut self, item: Self::Item) -> Result<(), &'static str> {
+    fn insert(&mut self, item: Self::Item) -> Result<(), DecodeErrorKind> {
         if !BTreeSet::insert(self, item) {
-            return Err("values are not unique");
+            return Err(UnexpectedlyRepeated);
         }
         Ok(())
     }
@@ -188,9 +191,9 @@ where
     }
 
     #[inline]
-    fn insert_distinguished(&mut self, item: Self::Item) -> Result<(), &'static str> {
+    fn insert_distinguished(&mut self, item: Self::Item) -> Result<(), DecodeErrorKind> {
         if Some(&item) <= self.last() {
-            return Err("values are not unique and ascending");
+            return Err(NotCanonical);
         }
         self.insert(item);
         Ok(())
@@ -220,9 +223,9 @@ where
     }
 
     #[inline]
-    fn insert(&mut self, item: Self::Item) -> Result<(), &'static str> {
+    fn insert(&mut self, item: Self::Item) -> Result<(), DecodeErrorKind> {
         if !HashSet::insert(self, item) {
-            return Err("values are not unique");
+            return Err(UnexpectedlyRepeated);
         }
         Ok(())
     }
@@ -251,9 +254,9 @@ where
     }
 
     #[inline]
-    fn insert(&mut self, item: Self::Item) -> Result<(), &'static str> {
+    fn insert(&mut self, item: Self::Item) -> Result<(), DecodeErrorKind> {
         if !hashbrown::HashSet::insert(self, item) {
-            return Err("values are not unique");
+            return Err(UnexpectedlyRepeated);
         }
         Ok(())
     }
@@ -283,12 +286,12 @@ where
     }
 
     #[inline]
-    fn insert(&mut self, key: K, value: V) -> Result<(), &'static str> {
+    fn insert(&mut self, key: K, value: V) -> Result<(), DecodeErrorKind> {
         if let btree_map::Entry::Vacant(entry) = self.entry(key) {
             entry.insert(value);
             Ok(())
         } else {
-            Err("keys are not unique")
+            Err(UnexpectedlyRepeated)
         }
     }
 }
@@ -314,10 +317,10 @@ where
         &mut self,
         key: Self::Key,
         value: Self::Value,
-    ) -> Result<(), &'static str> {
+    ) -> Result<(), DecodeErrorKind> {
         if let Some((last_key, _)) = self.last_key_value() {
             if &key <= last_key {
-                return Err("keys are not unique and ascending");
+                return Err(NotCanonical);
             }
         }
         self.insert(key, value);
@@ -350,12 +353,12 @@ where
     }
 
     #[inline]
-    fn insert(&mut self, key: K, value: V) -> Result<(), &'static str> {
+    fn insert(&mut self, key: K, value: V) -> Result<(), DecodeErrorKind> {
         if let hash_map::Entry::Vacant(entry) = self.entry(key) {
             entry.insert(value);
             Ok(())
         } else {
-            Err("keys are not unique")
+            Err(UnexpectedlyRepeated)
         }
     }
 }
@@ -385,12 +388,12 @@ where
     }
 
     #[inline]
-    fn insert(&mut self, key: K, value: V) -> Result<(), &'static str> {
+    fn insert(&mut self, key: K, value: V) -> Result<(), DecodeErrorKind> {
         if let hashbrown::hash_map::Entry::Vacant(entry) = self.entry(key) {
             entry.insert(value);
             Ok(())
         } else {
-            Err("keys are not unique")
+            Err(UnexpectedlyRepeated)
         }
     }
 }

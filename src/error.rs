@@ -1,10 +1,59 @@
 //! Bilrost encoding and decoding errors.
 
-use alloc::borrow::Cow;
-use alloc::boxed::Box;
-use alloc::vec::Vec;
-
 use core::fmt;
+
+/// Bilrost message decoding error types.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum DecodeErrorKind {
+    /// Decoded data was truncated.
+    Truncated,
+    /// Invalid varint. (The only invalid varints are ones that would encode values > u64::MAX.)
+    InvalidVarint,
+    /// A field key encoded a tag greater than u32::MAX.
+    TagOverflowed,
+    /// A field's wire type was encountered that cannot encode a valid value.
+    WrongWireType,
+    /// Value was out of domain for its type.
+    OutOfDomainValue,
+    /// Value was invalid, such as non-UTF-8 data in a `String` field.
+    InvalidValue,
+    /// Conflicting mutually exclusive fields.
+    ConflictingFields,
+    /// A field or part of a value occurred multiple times when it should not.
+    UnexpectedlyRepeated,
+    /// A value was not encoded canonically. (Distinguished-mode error)
+    NotCanonical,
+    /// Unknown fields were encountered. (Distinguished-mode error)
+    UnknownField,
+    /// Recursion limit was reached when parsing.
+    RecursionLimitReached,
+    /// Size of a length-delimited region exceeds what is supported on this platform.
+    Oversize,
+    /// Something else.
+    Other,
+}
+use DecodeErrorKind::*;
+
+impl fmt::Display for DecodeErrorKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            Truncated => "message or region truncated",
+            InvalidVarint => "invalid varint",
+            TagOverflowed => "tag overflowed",
+            WrongWireType => "wire type not understood by encoder",
+            OutOfDomainValue => "value out of domain",
+            InvalidValue => "invalid value",
+            ConflictingFields => "conflicting mutually-exclusive fields",
+            UnexpectedlyRepeated => "unexpectedly repeated item",
+            NotCanonical => "value not encoded canonically",
+            UnknownField => "unknown field",
+            RecursionLimitReached => "recursion limit reached",
+            Oversize => "region too large to decode",
+            Other => "other error",
+        })
+    }
+}
 
 /// A Bilrost message decoding error.
 ///
@@ -13,17 +62,13 @@ use core::fmt;
 /// general it is not possible to exactly pinpoint why data is malformed.
 #[derive(Clone, PartialEq, Eq)]
 pub struct DecodeError {
-    inner: Box<Inner>,
-}
-
-#[derive(Clone, PartialEq, Eq)]
-struct Inner {
     /// A 'best effort' root cause description.
-    description: Cow<'static, str>,
+    kind: DecodeErrorKind,
+    #[cfg(feature = "detailed_errors")]
     /// A stack of (message, field) name pairs, which identify the specific
     /// message type and field where decoding failed. The stack contains an
     /// entry per level of nesting.
-    stack: Vec<(&'static str, &'static str)>,
+    stack: thin_vec::ThinVec<(&'static str, &'static str)>,
 }
 
 impl DecodeError {
@@ -32,13 +77,17 @@ impl DecodeError {
     /// Meant to be used only by `Message` implementations.
     #[doc(hidden)]
     #[cold]
-    pub fn new(description: impl Into<Cow<'static, str>>) -> DecodeError {
+    pub fn new(kind: DecodeErrorKind) -> DecodeError {
         DecodeError {
-            inner: Box::new(Inner {
-                description: description.into(),
-                stack: Vec::new(),
-            }),
+            kind,
+            #[cfg(feature = "detailed_errors")]
+            stack: Default::default(),
         }
+    }
+
+    /// Returns the kind of this error.
+    pub fn kind(&self) -> DecodeErrorKind {
+        self.kind
     }
 
     /// Pushes a (message, field) name location pair on to the location stack.
@@ -46,26 +95,30 @@ impl DecodeError {
     /// Meant to be used only by `Message` implementations.
     #[doc(hidden)]
     pub fn push(&mut self, message: &'static str, field: &'static str) {
-        self.inner.stack.push((message, field));
+        #[cfg(feature = "detailed_errors")]
+        self.stack.push((message, field));
+        _ = (message, field);
     }
 }
 
 impl fmt::Debug for DecodeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("DecodeError")
-            .field("description", &self.inner.description)
-            .field("stack", &self.inner.stack)
-            .finish()
+        let mut s = f.debug_struct("DecodeError");
+        s.field("description", &self.kind);
+        #[cfg(feature = "detailed_errors")]
+        s.field("stack", &self.stack);
+        s.finish()
     }
 }
 
 impl fmt::Display for DecodeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("failed to decode Bilrost message: ")?;
-        for &(message, field) in &self.inner.stack {
+        #[cfg(feature = "detailed_errors")]
+        for (message, field) in self.stack.iter() {
             write!(f, "{}.{}: ", message, field)?;
         }
-        f.write_str(&self.inner.description)
+        self.kind.fmt(f)
     }
 }
 
