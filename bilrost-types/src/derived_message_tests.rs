@@ -231,17 +231,26 @@ fn derived_message_field_ordering() {
 #[test]
 fn preserves_floating_point_negative_zero() {
     #[derive(Debug, PartialEq, Message)]
-    struct Foo32(f32, f64);
-    encodes(Foo32(0.0, 0.0), []);
-    assert_eq!(
-        OpaqueMessage::decode([6u8, 0, 0, 0, 0x80, 7, 0, 0, 0, 0, 0, 0, 0, 0x80].as_slice()),
-        Ok(OpaqueMessage::new([
+    struct Foo(f32, f64);
+
+    encodes(Foo(0.0, 0.0), []);
+    encodes(
+        Foo(-0.0, -0.0),
+        [
             (1, OV::ThirtyTwoBit([0, 0, 0, 0x80])),
             (2, OV::SixtyFourBit([0, 0, 0, 0, 0, 0, 0, 0x80])),
-        ]))
+        ],
     );
+
+    #[derive(Debug, PartialEq, Message)]
+    struct Bar(
+        #[bilrost(encoder(fixed))] f32,
+        #[bilrost(encoder(fixed))] f64,
+    );
+
+    encodes(Bar(0.0, 0.0), []);
     encodes(
-        Foo32(-0.0, -0.0),
+        Bar(-0.0, -0.0),
         [
             (1, OV::ThirtyTwoBit([0, 0, 0, 0x80])),
             (2, OV::SixtyFourBit([0, 0, 0, 0, 0, 0, 0, 0x80])),

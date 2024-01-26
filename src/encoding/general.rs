@@ -12,8 +12,9 @@ use bytes::{Buf, BufMut, Bytes};
 
 use crate::encoding::{
     delegate_encoding, delegate_value_encoding, encode_varint, encoded_len_varint, Capped,
-    DecodeContext, DistinguishedEncoder, DistinguishedFieldEncoder, DistinguishedValueEncoder,
-    Encoder, FieldEncoder, Map, TagMeasurer, TagWriter, ValueEncoder, WireType, Wiretyped,
+    DecodeContext, EqualDefaultAlwaysEmpty, DistinguishedEncoder, DistinguishedFieldEncoder,
+    DistinguishedValueEncoder, Encoder, FieldEncoder, HasEmptyState, Map, TagMeasurer, TagWriter,
+    ValueEncoder, WireType, Wiretyped,
 };
 use crate::message::{merge, merge_distinguished, RawDistinguishedMessage, RawMessage};
 use crate::DecodeErrorKind::{InvalidValue, NotCanonical, OutOfDomainValue, UnexpectedlyRepeated};
@@ -53,18 +54,18 @@ delegate_value_encoding!(delegate from (General) to (Map<General, General>)
 impl<T> Encoder<T> for General
 where
     General: ValueEncoder<T>,
-    T: Default + PartialEq,
+    T: HasEmptyState,
 {
     #[inline]
     fn encode<B: BufMut + ?Sized>(tag: u32, value: &T, buf: &mut B, tw: &mut TagWriter) {
-        if *value != T::default() {
+        if !value.is_empty() {
             Self::encode_field(tag, value, buf, tw);
         }
     }
 
     #[inline]
     fn encoded_len(tag: u32, value: &T, tm: &mut TagMeasurer) -> usize {
-        if *value != T::default() {
+        if !value.is_empty() {
             Self::field_encoded_len(tag, value, tm)
         } else {
             0
@@ -120,6 +121,8 @@ macro_rules! varint {
         to_uint64($to_uint64_value:ident) $to_uint64:expr,
         from_uint64($from_uint64_value:ident) $from_uint64:expr
     ) => {
+        impl EqualDefaultAlwaysEmpty for $ty {}
+
         impl Wiretyped<$ty> for General {
             const WIRE_TYPE: WireType = WireType::Varint;
         }
@@ -212,6 +215,8 @@ from_uint64(value) {
 delegate_value_encoding!(delegate from (General) to (crate::encoding::Fixed) for type (f32));
 delegate_value_encoding!(delegate from (General) to (crate::encoding::Fixed) for type (f64));
 
+impl EqualDefaultAlwaysEmpty for String {}
+
 impl Wiretyped<String> for General {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
 }
@@ -300,6 +305,8 @@ mod string {
     );
 }
 
+impl EqualDefaultAlwaysEmpty for Bytes {}
+
 impl Wiretyped<Bytes> for General {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
 }
@@ -354,6 +361,8 @@ mod bytes_blob {
         WireType::LengthDelimited
     );
 }
+
+impl EqualDefaultAlwaysEmpty for Blob {}
 
 impl Wiretyped<Blob> for General {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;

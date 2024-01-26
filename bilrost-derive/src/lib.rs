@@ -489,7 +489,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         .iter()
         .filter_map(|(field_ident, field)| field.tag_list_guard(field_ident.to_string()));
 
-    let field_idents = unsorted_fields.iter().map(|(field_ident, _)| field_ident);
+    let field_idents: Vec<_> = unsorted_fields.iter().map(|(field_ident, _)| field_ident).collect();
 
     let expanded = quote! {
         #(#static_guards)*
@@ -535,6 +535,13 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
                 Self {
                     #(#field_idents: ::core::default::Default::default(),)*
                 }
+            }
+        }
+
+        impl #impl_generics ::bilrost::encoding::HasEmptyState
+        for #ident #ty_generics #where_clause {
+            fn is_empty(&self) -> bool {
+                true #(&& ::bilrost::encoding::HasEmptyState::is_empty(&self.#field_idents))*
             }
         }
     };
@@ -714,8 +721,8 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
     } else {
         let (first_variant, _) = variants.first().unwrap();
         quote! {
-            impl ::bilrost::encoding::NewForOverwrite
-            for #impl_generics #ident #ty_generics #where_clause {
+            impl #impl_generics ::bilrost::encoding::NewForOverwrite
+            for #ident #ty_generics #where_clause {
                 fn new_for_overwrite() -> Self {
                     Self::#first_variant
                 }
@@ -734,7 +741,7 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
             }
         }
 
-        impl #impl_generics ::core::convert::From<#ident> for u32 #ty_generics #where_clause {
+        impl #impl_generics ::core::convert::From<#ident #ty_generics> for u32 #where_clause {
             fn from(value: #ident) -> u32 {
                 value as u32
             }
@@ -754,26 +761,26 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
 
         #new_for_overwrite
 
-        impl #impl_generics ::bilrost::encoding::Wiretyped<#ident>
-        for ::bilrost::encoding::General {
+        impl #impl_generics ::bilrost::encoding::Wiretyped<#ident #ty_generics>
+        for ::bilrost::encoding::General #where_clause {
             const WIRE_TYPE: ::bilrost::encoding::WireType = ::bilrost::encoding::WireType::Varint;
         }
 
-        impl #impl_generics ::bilrost::encoding::ValueEncoder<#ident>
-        for ::bilrost::encoding::General {
+        impl #impl_generics ::bilrost::encoding::ValueEncoder<#ident #ty_generics>
+        for ::bilrost::encoding::General #where_clause {
             #[inline]
             fn encode_value<B: ::bilrost::bytes::BufMut + ?Sized>(value: &#ident, buf: &mut B) {
                 ::bilrost::encoding::encode_varint(u32::from(value.clone()) as u64, buf);
             }
 
             #[inline]
-            fn value_encoded_len(value: &#ident) -> usize {
+            fn value_encoded_len(value: &#ident #ty_generics) -> usize {
                 ::bilrost::encoding::encoded_len_varint(u32::from(value.clone()) as u64)
             }
 
             #[inline]
             fn decode_value<B: ::bilrost::bytes::Buf + ?Sized>(
-                value: &mut #ident,
+                value: &mut #ident #ty_generics,
                 mut buf: ::bilrost::encoding::Capped<B>,
                 _ctx: ::bilrost::encoding::DecodeContext,
             ) -> Result<(), ::bilrost::DecodeError> {
@@ -786,8 +793,8 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
             }
         }
 
-        impl ::bilrost::encoding::DistinguishedValueEncoder<#ident>
-        for ::bilrost::encoding::General {
+        impl #impl_generics ::bilrost::encoding::DistinguishedValueEncoder<#ident #ty_generics>
+        for ::bilrost::encoding::General #where_clause {
             #[inline]
             fn decode_value_distinguished<B: ::bilrost::bytes::Buf + ?Sized>(
                 value: &mut #ident,
@@ -797,6 +804,9 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
                 <Self as ::bilrost::encoding::ValueEncoder<#ident>>::decode_value(value, buf, ctx)
             }
         }
+
+        impl #impl_generics ::bilrost::encoding::EqualDefaultAlwaysEmpty
+        for #ident #ty_generics #where_clause {}
     };
 
     Ok(expanded)
@@ -1025,14 +1035,18 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
                     }
                 }
 
-                impl ::core::default::Default for #ident #ty_generics #where_clause {
+                impl #impl_generics ::core::default::Default for #ident #ty_generics #where_clause {
                     fn default() -> Self {
                         #ident::#empty_ident
                     }
                 }
+
+                impl #impl_generics ::bilrost::encoding::EqualDefaultAlwaysEmpty
+                for #ident #ty_generics #where_clause {}
             };
         }
     } else {
+        // The oneof enum has no "empty" unit variant, so we implement the "non-empty" trait.
         let current_tag = fields.iter().map(|(variant_ident, field)| {
             let tag = field.tags()[0];
             let ignored = field.with_value(quote!(_));

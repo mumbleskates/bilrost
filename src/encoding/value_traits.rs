@@ -35,6 +35,37 @@ where
     }
 }
 
+/// Trait for types that have a state that is considered "empty". Such a state be a *subset* of the
+/// values that are considered equal to the type's `Default` value, hence the need for a separate
+/// trait.
+///
+/// This type must be implemented for every type encodable as a directly included field in a bilrost
+/// message, and must be equal to the type's `Default` value. Since this is almost always exactly
+/// the same as "equal to default," the empty convenience trait `EqualDefaultAlwaysEmpty` can be
+/// implemented on a type to cause it to consider its `Default` value to be always empty.
+///
+/// This specifically enables preservation of negative zero floating point values in all encoders.
+pub trait HasEmptyState {
+    fn is_empty(&self) -> bool;
+}
+
+/// Marker trait indicating that the `Default` value for a type is always considered empty.
+pub trait EqualDefaultAlwaysEmpty {}
+impl<T> HasEmptyState for T
+where
+    T: EqualDefaultAlwaysEmpty + Default + PartialEq,
+{
+    fn is_empty(&self) -> bool {
+        *self == Self::default()
+    }
+}
+
+impl<T> HasEmptyState for Option<T> {
+    fn is_empty(&self) -> bool {
+        Self::is_none(self)
+    }
+}
+
 /// Trait for containers that store multiple items such as `Vec`, `BTreeSet`, and `HashSet`
 pub trait Collection: Default {
     type Item;
@@ -100,6 +131,12 @@ pub trait DistinguishedMapping: Mapping {
     ) -> Result<(), DecodeErrorKind>;
 }
 
+impl<T> HasEmptyState for Vec<T> {
+    fn is_empty(&self) -> bool {
+        Self::is_empty(self)
+    }
+}
+
 impl<T> Collection for Vec<T> {
     type Item = T;
     type RefIter<'a> = core::slice::Iter<'a, T>
@@ -142,6 +179,12 @@ where
     fn insert_distinguished(&mut self, item: Self::Item) -> Result<(), DecodeErrorKind> {
         Vec::push(self, item);
         Ok(())
+    }
+}
+
+impl<T> HasEmptyState for BTreeSet<T> {
+    fn is_empty(&self) -> bool {
+        Self::is_empty(self)
     }
 }
 
@@ -201,6 +244,13 @@ where
 }
 
 #[cfg(feature = "std")]
+impl<T> HasEmptyState for HashSet<T> {
+    fn is_empty(&self) -> bool {
+        Self::is_empty(self)
+    }
+}
+
+#[cfg(feature = "std")]
 impl<T> Collection for HashSet<T>
 where
     Self: Default,
@@ -232,6 +282,13 @@ where
 }
 
 #[cfg(feature = "hashbrown")]
+impl<T> HasEmptyState for hashbrown::HashSet<T> {
+    fn is_empty(&self) -> bool {
+        Self::is_empty(self)
+    }
+}
+
+#[cfg(feature = "hashbrown")]
 impl<T> Collection for hashbrown::HashSet<T>
 where
     Self: Default,
@@ -259,6 +316,12 @@ where
             return Err(UnexpectedlyRepeated);
         }
         Ok(())
+    }
+}
+
+impl<K, V> HasEmptyState for BTreeMap<K, V> {
+    fn is_empty(&self) -> bool {
+        Self::is_empty(self)
     }
 }
 
@@ -329,6 +392,13 @@ where
 }
 
 #[cfg(feature = "std")]
+impl<K, V> HasEmptyState for HashMap<K, V> {
+    fn is_empty(&self) -> bool {
+        Self::is_empty(self)
+    }
+}
+
+#[cfg(feature = "std")]
 impl<K, V> Mapping for HashMap<K, V>
 where
     Self: Default,
@@ -360,6 +430,13 @@ where
         } else {
             Err(UnexpectedlyRepeated)
         }
+    }
+}
+
+#[cfg(feature = "hashbrown")]
+impl<K, V> HasEmptyState for hashbrown::HashMap<K, V> {
+    fn is_empty(&self) -> bool {
+        Self::is_empty(self)
     }
 }
 

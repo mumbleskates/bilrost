@@ -2,6 +2,7 @@ use alloc::vec::Vec;
 
 use bytes::{Buf, BufMut};
 
+use crate::encoding::value_traits::HasEmptyState;
 use crate::encoding::{
     delegate_encoding, Capped, DecodeContext, DistinguishedEncoder, DistinguishedFieldEncoder,
     DistinguishedValueEncoder, Encoder, FieldEncoder, TagMeasurer, TagWriter, ValueEncoder,
@@ -145,18 +146,24 @@ macro_rules! fixed_width_float {
     ) => {
         fixed_width_common!($ty, $wire_type, $put, $get);
 
+        impl HasEmptyState for $ty {
+            #[inline]
+            fn is_empty(&self) -> bool {
+                // Preserve -0.0. This is actually the original motivation for `HasEmptyState`.
+                self.to_bits() == 0
+            }
+        }
+
         impl Encoder<$ty> for Fixed {
             #[inline]
             fn encode<B: BufMut + ?Sized>(tag: u32, value: &$ty, buf: &mut B, tw: &mut TagWriter) {
-                // Preserve -0.0
-                if value.to_bits() != 0 {
+                if !value.is_empty() {
                     Self::encode_field(tag, value, buf, tw);
                 }
             }
 
             #[inline]
             fn encoded_len(tag: u32, value: &$ty, tm: &mut TagMeasurer) -> usize {
-                // Preserve -0.0
                 if value.to_bits() != 0 {
                     Self::field_encoded_len(tag, value, tm)
                 } else {
