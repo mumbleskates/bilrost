@@ -1205,7 +1205,7 @@ pub(crate) use check_type_test_functions;
 
 #[cfg(test)]
 mod test {
-    use alloc::collections::BTreeMap;
+    use alloc::collections::{BTreeMap, BTreeSet};
     use alloc::string::{String, ToString};
     use alloc::vec::Vec;
     use core::borrow::Borrow;
@@ -1214,6 +1214,7 @@ mod test {
     use proptest::{prelude::*, test_runner::TestCaseResult};
 
     use crate::encoding::*;
+    use crate::DecodeErrorKind::NotCanonical;
 
     fn check_legal_remaining(tag: u32, wire_type: WireType, remaining: usize) -> TestCaseResult {
         match wire_type {
@@ -1375,6 +1376,111 @@ mod test {
     }
     check_type!(expedient, Encoder, decode);
     check_type!(distinguished, DistinguishedEncoder, decode_distinguished);
+
+    fn present_and_defaulted_errs<T, E>()
+    where
+        T: Default + Eq,
+        E: Encoder<Option<T>> + DistinguishedEncoder<T>,
+    {
+        let mut encoded = <Vec<u8>>::new();
+        <E as Encoder<Option<T>>>::encode(
+            123,
+            &Some(T::default()),
+            &mut encoded,
+            &mut TagWriter::new(),
+        );
+        let mut buf = &*encoded;
+        let mut capped = Capped::new(&mut buf);
+        let (tag, wire_type) = TagReader::new().decode_key(capped.buf()).unwrap();
+        assert_eq!(tag, 123);
+        assert_eq!(
+            E::decode_distinguished(
+                wire_type,
+                false,
+                &mut T::default(),
+                capped,
+                DecodeContext::default()
+            )
+            .expect_err("decoding a plain field with an encoded defaulted value should fail")
+            .kind(),
+            NotCanonical
+        );
+    }
+
+    #[test]
+    fn test_present_and_defaulted() {
+        // Any value that's present not in an `Option` that is not omitted must err when decoded in
+        // distinguished mode
+        present_and_defaulted_errs::<u32, General>();
+        present_and_defaulted_errs::<u64, General>();
+        present_and_defaulted_errs::<i32, General>();
+        present_and_defaulted_errs::<i64, General>();
+        present_and_defaulted_errs::<u32, Fixed>();
+        present_and_defaulted_errs::<u64, Fixed>();
+        present_and_defaulted_errs::<i32, Fixed>();
+        present_and_defaulted_errs::<i64, Fixed>();
+        present_and_defaulted_errs::<bool, General>();
+        present_and_defaulted_errs::<String, General>();
+        present_and_defaulted_errs::<crate::Blob, General>();
+        present_and_defaulted_errs::<Vec<u8>, VecBlob>();
+
+        present_and_defaulted_errs::<Vec<u32>, Packed<General>>();
+        present_and_defaulted_errs::<Vec<u64>, Packed<General>>();
+        present_and_defaulted_errs::<Vec<i32>, Packed<General>>();
+        present_and_defaulted_errs::<Vec<i64>, Packed<General>>();
+        present_and_defaulted_errs::<Vec<u32>, Packed<Fixed>>();
+        present_and_defaulted_errs::<Vec<u64>, Packed<Fixed>>();
+        present_and_defaulted_errs::<Vec<i32>, Packed<Fixed>>();
+        present_and_defaulted_errs::<Vec<i64>, Packed<Fixed>>();
+        present_and_defaulted_errs::<Vec<bool>, Packed<General>>();
+        present_and_defaulted_errs::<Vec<String>, Packed<General>>();
+        present_and_defaulted_errs::<Vec<crate::Blob>, Packed<General>>();
+        present_and_defaulted_errs::<Vec<Vec<u8>>, Packed<VecBlob>>();
+
+        present_and_defaulted_errs::<BTreeSet<u32>, Packed<General>>();
+        present_and_defaulted_errs::<BTreeSet<u64>, Packed<General>>();
+        present_and_defaulted_errs::<BTreeSet<i32>, Packed<General>>();
+        present_and_defaulted_errs::<BTreeSet<i64>, Packed<General>>();
+        present_and_defaulted_errs::<BTreeSet<u32>, Packed<Fixed>>();
+        present_and_defaulted_errs::<BTreeSet<u64>, Packed<Fixed>>();
+        present_and_defaulted_errs::<BTreeSet<i32>, Packed<Fixed>>();
+        present_and_defaulted_errs::<BTreeSet<i64>, Packed<Fixed>>();
+        present_and_defaulted_errs::<BTreeSet<bool>, Packed<General>>();
+        present_and_defaulted_errs::<BTreeSet<String>, Packed<General>>();
+        present_and_defaulted_errs::<BTreeSet<crate::Blob>, Packed<General>>();
+        present_and_defaulted_errs::<BTreeSet<Vec<u8>>, Packed<VecBlob>>();
+
+        present_and_defaulted_errs::<BTreeMap<u32, u32>, Map<General, General>>();
+        present_and_defaulted_errs::<BTreeMap<u64, u64>, Map<General, General>>();
+        present_and_defaulted_errs::<BTreeMap<i32, i32>, Map<General, General>>();
+        present_and_defaulted_errs::<BTreeMap<i64, i64>, Map<General, General>>();
+        present_and_defaulted_errs::<BTreeMap<u32, u32>, Map<Fixed, Fixed>>();
+        present_and_defaulted_errs::<BTreeMap<u64, u64>, Map<Fixed, Fixed>>();
+        present_and_defaulted_errs::<BTreeMap<i32, i32>, Map<Fixed, Fixed>>();
+        present_and_defaulted_errs::<BTreeMap<i64, i64>, Map<Fixed, Fixed>>();
+        present_and_defaulted_errs::<BTreeMap<bool, bool>, Map<General, General>>();
+        present_and_defaulted_errs::<BTreeMap<String, String>, Map<General, General>>();
+        present_and_defaulted_errs::<BTreeMap<crate::Blob, crate::Blob>, Map<General, General>>();
+        present_and_defaulted_errs::<BTreeMap<Vec<u8>, Vec<u8>>, Map<VecBlob, VecBlob>>();
+
+        present_and_defaulted_errs::<Vec<BTreeMap<u32, u32>>, Packed<Map<General, General>>>();
+        present_and_defaulted_errs::<Vec<BTreeMap<u64, u64>>, Packed<Map<General, General>>>();
+        present_and_defaulted_errs::<Vec<BTreeMap<i32, i32>>, Packed<Map<General, General>>>();
+        present_and_defaulted_errs::<Vec<BTreeMap<i64, i64>>, Packed<Map<General, General>>>();
+        present_and_defaulted_errs::<Vec<BTreeMap<u32, u32>>, Packed<Map<Fixed, Fixed>>>();
+        present_and_defaulted_errs::<Vec<BTreeMap<u64, u64>>, Packed<Map<Fixed, Fixed>>>();
+        present_and_defaulted_errs::<Vec<BTreeMap<i32, i32>>, Packed<Map<Fixed, Fixed>>>();
+        present_and_defaulted_errs::<Vec<BTreeMap<i64, i64>>, Packed<Map<Fixed, Fixed>>>();
+        present_and_defaulted_errs::<Vec<BTreeMap<bool, bool>>, Packed<Map<General, General>>>();
+        present_and_defaulted_errs::<Vec<BTreeMap<String, String>>, Packed<Map<General, General>>>(
+        );
+        present_and_defaulted_errs::<
+            Vec<BTreeMap<crate::Blob, crate::Blob>>,
+            Packed<Map<General, General>>,
+        >();
+        present_and_defaulted_errs::<Vec<BTreeMap<Vec<u8>, Vec<u8>>>, Packed<Map<VecBlob, VecBlob>>>(
+        );
+    }
 
     #[test]
     fn unaligned_fixed64_packed() {
