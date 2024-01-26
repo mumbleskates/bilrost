@@ -16,20 +16,20 @@ use bilrost::{DecodeErrorKind, DistinguishedMessage, Enumeration, Message, Oneof
 mod assert {
     use super::*;
 
-    pub(super) fn translates<T, M>(from: T, into: M)
+    pub(super) fn decodes<T, M>(from: T, into: M)
     where
         T: IntoIterator<Item = (u32, OV)>,
         M: Message + Debug + PartialEq,
     {
-        let encoded = from.into_iter().collect::<OpaqueMessage>().encode_to_vec();
+        let encoded = OpaqueMessage::new(from).encode_to_vec();
         assert_eq!(M::decode(encoded.as_slice()), Ok(into));
     }
 
-    pub(super) fn doesnt_translate<M: Message + Debug + PartialEq>(
+    pub(super) fn doesnt_decode<M: Message + Debug + PartialEq>(
         from: impl IntoIterator<Item = (u32, OV)>,
         err: DecodeErrorKind,
     ) {
-        let encoded = from.into_iter().collect::<OpaqueMessage>().encode_to_vec();
+        let encoded = OpaqueMessage::new(from).encode_to_vec();
         assert_eq!(
             M::decode(encoded.as_slice())
                 .expect_err("unexpectedly decoded without error")
@@ -38,12 +38,12 @@ mod assert {
         );
     }
 
-    pub(super) fn translates_distinguished<T, M>(from: T, into: M)
+    pub(super) fn decodes_distinguished<T, M>(from: T, into: M)
     where
         T: IntoIterator<Item = (u32, OV)>,
         M: DistinguishedMessage + Debug + Eq,
     {
-        let from: OpaqueMessage = from.into_iter().collect();
+        let from = OpaqueMessage::new(from);
         let encoded = from.encode_to_vec();
         assert_eq!(M::decode(encoded.as_slice()).as_ref(), Ok(&into));
         assert_eq!(
@@ -57,12 +57,12 @@ mod assert {
         );
     }
 
-    pub(super) fn translates_only_expedient<T, M>(from: T, into: M, err: DecodeErrorKind)
+    pub(super) fn decodes_only_expedient<T, M>(from: T, into: M, err: DecodeErrorKind)
     where
         T: IntoIterator<Item = (u32, OV)>,
         M: DistinguishedMessage + Debug + Eq,
     {
-        let from: OpaqueMessage = from.into_iter().collect();
+        let from = OpaqueMessage::new(from);
         let encoded = from.encode_to_vec();
         assert_eq!(M::decode(encoded.as_slice()).as_ref(), Ok(&into));
         assert_eq!(
@@ -78,11 +78,11 @@ mod assert {
         );
     }
 
-    pub(super) fn never_translates<M: DistinguishedMessage + Debug>(
+    pub(super) fn never_decodes<M: DistinguishedMessage + Debug>(
         from: impl IntoIterator<Item = (u32, OV)>,
         err: DecodeErrorKind,
     ) {
-        let from: OpaqueMessage = from.into_iter().collect();
+        let from = OpaqueMessage::new(from);
         let encoded = from.encode_to_vec();
         assert_eq!(
             M::decode(encoded.as_slice())
@@ -97,6 +97,14 @@ mod assert {
             err
         );
     }
+}
+
+fn encodes<M: Message, T: IntoIterator<Item = (u32, OV)>>(value: M, becomes: T) {
+    let encoded = value.encode_to_vec();
+    assert_eq!(
+        OpaqueMessage::decode(&*encoded),
+        Ok(OpaqueMessage::new(becomes))
+    );
 }
 
 #[test]
@@ -221,17 +229,38 @@ fn derived_message_field_ordering() {
 }
 
 #[test]
+fn preserves_floating_point_negative_zero() {
+    #[derive(Debug, PartialEq, Message)]
+    struct Foo32(f32, f64);
+    encodes(Foo32(0.0, 0.0), []);
+    assert_eq!(
+        OpaqueMessage::decode([6u8, 0, 0, 0, 0x80, 7, 0, 0, 0, 0, 0, 0, 0, 0x80].as_slice()),
+        Ok(OpaqueMessage::new([
+            (1, OV::ThirtyTwoBit([0, 0, 0, 0x80])),
+            (2, OV::SixtyFourBit([0, 0, 0, 0, 0, 0, 0, 0x80])),
+        ]))
+    );
+    encodes(
+        Foo32(-0.0, -0.0),
+        [
+            (1, OV::ThirtyTwoBit([0, 0, 0, 0x80])),
+            (2, OV::SixtyFourBit([0, 0, 0, 0, 0, 0, 0, 0x80])),
+        ],
+    );
+}
+
+#[test]
 fn duplicated_field_decoding() {
     #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
     struct Foo(Option<bool>, bool);
 
-    assert::translates_distinguished([(1, OV::bool(false))], Foo(Some(false), false));
-    assert::never_translates::<Foo>(
+    assert::decodes_distinguished([(1, OV::bool(false))], Foo(Some(false), false));
+    assert::never_decodes::<Foo>(
         [(1, OV::bool(false)), (1, OV::bool(true))],
         UnexpectedlyRepeated,
     );
-    assert::translates_distinguished([(2, OV::bool(true))], Foo(None, true));
-    assert::never_translates::<Foo>(
+    assert::decodes_distinguished([(2, OV::bool(true))], Foo(None, true));
+    assert::never_decodes::<Foo>(
         [(2, OV::bool(true)), (2, OV::bool(false))],
         UnexpectedlyRepeated,
     );
@@ -242,12 +271,12 @@ fn duplicated_packed_decoding() {
     #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
     struct Foo(#[bilrost(encoder = "packed")] Vec<bool>);
 
-    assert::translates_distinguished([(1, OV::packed([OV::bool(true)]))], Foo(vec![true]));
-    assert::translates_distinguished(
+    assert::decodes_distinguished([(1, OV::packed([OV::bool(true)]))], Foo(vec![true]));
+    assert::decodes_distinguished(
         [(1, OV::packed([OV::bool(true), OV::bool(false)]))],
         Foo(vec![true, false]),
     );
-    assert::never_translates::<Foo>(
+    assert::never_decodes::<Foo>(
         [
             (1, OV::packed([OV::bool(true), OV::bool(false)])),
             (1, OV::packed([OV::bool(false)])),
