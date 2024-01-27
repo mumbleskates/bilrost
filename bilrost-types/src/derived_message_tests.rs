@@ -605,13 +605,21 @@ fn enumeration_helpers() {
 
 #[test]
 fn enumeration_value_limits() {
+    const TEN: u32 = 10;
+
     #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Enumeration)]
+    #[repr(u8)]
     enum Foo {
         A = 0,
+        #[bilrost = 5]
+        D,
+        #[bilrost(TEN)]
         #[default]
-        D = 5,
-        Z = 4294967295,
+        T,
+        #[bilrost(u32::MAX)]
+        Z,
     }
+    assert_eq!(core::mem::size_of::<Foo>(), 1);
 
     #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
     struct Bar(Foo);
@@ -619,14 +627,14 @@ fn enumeration_value_limits() {
     assert_eq!(u32::from(Foo::A), 0);
     assert_eq!(u32::from(Foo::Z), u32::MAX);
     assert::encodes(Bar(Foo::A), [(1, OV::u32(0))]);
-    assert::encodes(Bar(Foo::D), []);
+    assert::encodes(Bar(Foo::D), [(1, OV::u32(5))]);
+    assert::encodes(Bar(Foo::T), []);
     assert::encodes(Bar(Foo::Z), [(1, OV::u32(u32::MAX))]);
     assert::decodes_distinguished([(1, OV::u32(0))], Bar(Foo::A));
-    assert::decodes_distinguished([], Bar(Foo::D));
-    assert::decodes_only_expedient([(1, OV::u32(5))], Bar(Foo::D), NotCanonical);
+    assert::decodes_distinguished([(1, OV::u32(5))], Bar(Foo::D));
+    assert::decodes_distinguished([], Bar(Foo::T));
+    assert::decodes_only_expedient([(1, OV::u32(10))], Bar(Foo::T), NotCanonical);
     assert::decodes_distinguished([(1, OV::u32(u32::MAX))], Bar(Foo::Z));
-
-    // TODO(widders): enumeration with attr values
 }
 
 #[test]

@@ -6,14 +6,14 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::mem::take;
 use std::ops::Deref;
 
-use anyhow::{bail, Error};
+use anyhow::{anyhow, bail, Error};
 use itertools::Itertools;
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use syn::{
-    parse_str, Attribute, Data, DataEnum, DataStruct, DeriveInput, Expr, ExprLit, Fields,
-    FieldsNamed, FieldsUnnamed, Ident, ImplGenerics, Index, Lit, Meta, MetaList,
-    MetaNameValue, TypeGenerics, Variant, WhereClause,
+    parse2, parse_str, Attribute, Data, DataEnum, DataStruct, DeriveInput, Expr, Fields,
+    FieldsNamed, FieldsUnnamed, Ident, ImplGenerics, Index, Meta, MetaList, MetaNameValue,
+    TypeGenerics, Variant, WhereClause,
 };
 
 use self::field::{bilrost_attrs, Field};
@@ -326,7 +326,7 @@ fn append_distinguished_encoder_wheres<T>(
 //  * repeated fields must have matching packed-ness in distinguished decoding
 
 fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
-    let input: DeriveInput = syn::parse2(input)?;
+    let input: DeriveInput = parse2(input)?;
 
     let PreprocessedMessage {
         ident,
@@ -574,7 +574,7 @@ pub fn message(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 }
 
 fn try_distinguished_message(input: TokenStream) -> Result<TokenStream, Error> {
-    let input: DeriveInput = syn::parse2(input)?;
+    let input: DeriveInput = parse2(input)?;
 
     let PreprocessedMessage {
         ident,
@@ -654,7 +654,7 @@ pub fn distinguished_message(input: proc_macro::TokenStream) -> proc_macro::Toke
 }
 
 fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
-    let input: DeriveInput = syn::parse2(input)?;
+    let input: DeriveInput = parse2(input)?;
     let ident = input.ident;
 
     let generics = &input.generics;
@@ -684,13 +684,16 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
             }
         }
 
-        let discriminant_expr = discriminant.map(|(_, expr)| expr);
-        let attribute_expr = variant_attr(&attrs);
-        let variant_number_expr = match (discriminant_expr, attribute_expr) {
-            (Some(expr), None) | (None, Some(expr)) => expr,
-            _ => bail!("Enumeration variants must have a numeric value in one of their explicit discriminant or their attributes"),
-        };
-        variants.push((ident, variant_number_expr));
+        let expr = discriminant
+            .map(|(_, expr)| expr)
+            .xor(variant_attr(&attrs)?)
+            .ok_or_else(|| {
+                anyhow!(
+                    "Enumeration variants must have a discriminant or a #[bilrost(..)] \
+                    attribute with a constant value"
+                )
+            })?;
+        variants.push((ident, expr));
 
         // Detect whether `Default` is being derived by looking for the #[default] attribute. This
         // isn't foolproof, but it's good enough for most cases and 1) if we falsely detect that
@@ -715,6 +718,8 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
     }
 
     let is_valid = variants.iter().map(|(_, value)| quote!(#value => true));
+
+    let to_u32 = variants.iter().map(|(variant, value)| quote!(#ident::#variant => #value));
 
     let try_from = variants
         .iter()
@@ -742,6 +747,7 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
         impl #impl_generics #ident #ty_generics #where_clause {
             #[doc=#is_valid_doc]
             pub fn is_valid(value: u32) -> bool {
+                #[forbid(unreachable_patterns)]
                 match value {
                     #(#is_valid,)*
                     _ => false,
@@ -751,7 +757,9 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
 
         impl #impl_generics ::core::convert::From<#ident #ty_generics> for u32 #where_clause {
             fn from(value: #ident) -> u32 {
-                value as u32
+                match value {
+                    #(#to_u32,)*
+                }
             }
         }
 
@@ -759,6 +767,7 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
             type Error = ::bilrost::DecodeError;
 
             fn try_from(value: u32) -> ::core::result::Result<#ident, ::bilrost::DecodeError> {
+                #[forbid(unreachable_patterns)]
                 match value {
                     #(#try_from,)*
                     _ => ::core::result::Result::Err(
@@ -823,6 +832,26 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
 #[proc_macro_derive(Enumeration, attributes(bilrost))]
 pub fn enumeration(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     try_enumeration(input.into()).unwrap().into()
+}
+
+/// Get the numeric variant value for an enumeration from attrs.
+fn variant_attr(attrs: &Vec<Attribute>) -> Result<Option<Expr>, Error> {
+    let mut result: Option<Expr> = None;
+    for attr in attrs {
+        if attr.meta.path().is_ident("bilrost") {
+            let expr = match &attr.meta {
+                Meta::List(MetaList { tokens, .. }) => parse2(tokens.clone())?,
+                Meta::NameValue(MetaNameValue { value, .. }) => value.clone(),
+                _ => bail!("attribute on enumeration variant should be its represented value"),
+            };
+            set_option(
+                &mut result,
+                expr,
+                "duplicate value attributes on enumeration variant",
+            )?;
+        }
+    }
+    Ok(result)
 }
 
 struct PreprocessedOneof<'a> {
@@ -916,7 +945,7 @@ fn preprocess_oneof(input: &DeriveInput) -> Result<PreprocessedOneof, Error> {
 }
 
 fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
-    let input: DeriveInput = syn::parse2(input)?;
+    let input: DeriveInput = parse2(input)?;
 
     let PreprocessedOneof {
         ident,
@@ -1149,7 +1178,7 @@ pub fn oneof(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 }
 
 fn try_distinguished_oneof(input: TokenStream) -> Result<TokenStream, Error> {
-    let input: DeriveInput = syn::parse2(input)?;
+    let input: DeriveInput = parse2(input)?;
 
     let PreprocessedOneof {
         ident,
@@ -1277,33 +1306,6 @@ pub fn distinguished_oneof(input: proc_macro::TokenStream) -> proc_macro::TokenS
     try_distinguished_oneof(input.into()).unwrap().into()
 }
 
-/// Get the numeric variant value for an enumeration from attrs.
-fn variant_attr(attrs: &Vec<Attribute>) -> Option<TokenStream> {
-    let mut result: Option<TokenStream> = None;
-    for attr in attrs {
-        if attr.meta.path().is_ident("bilrost") {
-            let tokens = match &attr.meta {
-                Meta::List(MetaList { tokens, .. }) => tokens,
-                Meta::NameValue(MetaNameValue {
-                    value:
-                        Expr::Lit(ExprLit {
-                            lit: Lit::Str(str_value),
-                            ..
-                        }),
-                    ..
-                }) => parse_str(str_value.value()),
-                _ => bail!("attribute on enumeration variant should be its represented value"),
-            };
-            set_option(
-                &mut result,
-                tokens,
-                "duplicate value attributes on enumeration variant",
-            )?;
-        }
-    }
-    result
-}
-
 #[cfg(test)]
 mod test {
     use crate::{try_enumeration, try_message, try_oneof};
@@ -1345,7 +1347,7 @@ mod test {
 
     #[test]
     fn test_basic_message() {
-        let output = try_message(quote! {
+        _ = try_message(quote! {
             pub struct Struct {
                 #[bilrost(3)]
                 pub fields: BTreeMap<String, i64>,
@@ -1356,8 +1358,8 @@ mod test {
                 #[bilrost(2)]
                 pub baz: bool,
             }
-        });
-        output.unwrap();
+        })
+        .unwrap();
     }
 
     #[test]
@@ -1430,19 +1432,19 @@ mod test {
 
     #[test]
     fn test_tuple_message() {
-        let output = try_message(quote! {
+        _ = try_message(quote! {
             struct Tuple(
                 #[bilrost(5)] bool,
                 #[bilrost(0)] String,
                 i64,
             );
-        });
-        output.unwrap();
+        })
+        .unwrap();
     }
 
     #[test]
     fn test_overlapping_message() {
-        let output = try_message(quote! {
+        _ = try_message(quote! {
             struct Struct {
                 #[bilrost(0)]
                 zero: bool,
@@ -1469,8 +1471,8 @@ mod test {
                 #[bilrost(50)]
                 fifty: bool,
             }
-        });
-        output.unwrap();
+        })
+        .unwrap();
     }
 
     #[test]
@@ -1575,20 +1577,41 @@ mod test {
     }
 
     #[test]
-    fn test_rejects_variant_without_discriminant_in_enumeration() {
-        let output = try_enumeration(quote!(
-            enum X {
+    fn test_accepts_mixed_values_in_enumeration() {
+        _ = try_enumeration(quote!(
+            enum X<T> {
                 A = 1,
-                B = 2,
+                #[bilrost = 1 + 1]
+                B,
+                #[bilrost(2 + 1)]
                 C,
-                D = 4,
+                #[bilrost(SomeType<T>::SOME_CONSTANT)]
+                D,
+            }
+        ))
+        .unwrap();
+    }
+
+    #[test]
+    fn test_rejects_variant_without_value_in_enumeration() {
+        let output = try_enumeration(quote!(
+            enum X<T> {
+                A = 1,
+                #[bilrost = 1 + 1]
+                B,
+                #[bilrost(2 + 1)]
+                C,
+                #[bilrost(SomeType<T>::SOME_CONSTANT)]
+                D,
+                HasNoValue,
             }
         ));
         assert_eq!(
             output
                 .expect_err("variant without discriminant not detected")
                 .to_string(),
-            "Enumeration variants must have a discriminant"
+            "Enumeration variants must have a discriminant or a #[bilrost(..)] attribute with a \
+            constant value"
         );
     }
 
