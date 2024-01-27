@@ -63,6 +63,10 @@ impl OpaqueValue {
         ThirtyTwoBit(value.to_le_bytes())
     }
 
+    pub fn string<T: AsRef<str>>(value: T) -> Self {
+        LengthDelimited(value.as_ref().as_bytes().into())
+    }
+
     pub fn blob<B: Into<Vec<u8>>>(value: B) -> Self {
         LengthDelimited(value.into())
     }

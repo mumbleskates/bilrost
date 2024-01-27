@@ -20,6 +20,7 @@ mod derived_message_tests {
     use bilrost::encoding::opaque::{OpaqueMessage, OpaqueValue as OV};
     use bilrost::DecodeErrorKind::*;
     use bilrost::{DecodeErrorKind, DistinguishedMessage, Enumeration, Message, Oneof};
+    use bilrost_derive::DistinguishedOneof;
 
     trait IntoOpaqueMessage {
         fn into_opaque_message(self) -> OpaqueMessage;
@@ -37,6 +38,12 @@ mod derived_message_tests {
     impl<const N: usize> IntoOpaqueMessage for [(u32, OV); N] {
         fn into_opaque_message(self) -> OpaqueMessage {
             OpaqueMessage::from_iter(self)
+        }
+    }
+
+    impl<'a> IntoOpaqueMessage for &'a [(u32, OV)] {
+        fn into_opaque_message(self) -> OpaqueMessage {
+            OpaqueMessage::from_iter(self.iter().cloned())
         }
     }
 
@@ -69,7 +76,7 @@ mod derived_message_tests {
 
         pub(super) fn doesnt_decode<M>(from: impl IntoOpaqueMessage, err: DecodeErrorKind)
         where
-            M: Message + Debug + PartialEq,
+            M: Message + Debug,
         {
             let encoded = from.into_opaque_message().encode_to_vec();
             assert_eq!(
@@ -146,6 +153,8 @@ mod derived_message_tests {
             );
         }
     }
+
+    // Tests for encoding rigor
 
     #[test]
     fn derived_message_field_ordering() {
@@ -268,6 +277,86 @@ mod derived_message_tests {
         }
     }
 
+    // Varint tests
+
+    #[test]
+    fn parsing_varints() {
+        #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+        struct Foo(u32, i32, u64, i64);
+
+        assert::decodes_distinguished([], Foo::default());
+        assert::decodes_distinguished(
+            [
+                (1, OV::Varint(1)),
+                (2, OV::Varint(1)),
+                (3, OV::Varint(1)),
+                (4, OV::Varint(1)),
+            ],
+            Foo(1, -1, 1, -1),
+        );
+        for fixed_value in [
+            [(1, OV::fixed_u32(1))],
+            [(2, OV::fixed_i32(1))],
+            [(3, OV::fixed_u64(1))],
+            [(4, OV::fixed_i64(1))],
+        ] {
+            // Currently it is not supported to parse fixed-width values into varint fields.
+            assert::never_decodes::<Foo>(fixed_value, WrongWireType);
+        }
+    }
+
+    // Fixed width int tests
+
+    #[test]
+    fn parsing_fixed_width_ints() {
+        #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+        struct Foo(
+            #[bilrost(encoder(fixed))] u32,
+            #[bilrost(encoder(fixed))] i32,
+            #[bilrost(encoder(fixed))] u64,
+            #[bilrost(encoder(fixed))] i64,
+        );
+
+        assert::decodes_distinguished([], Foo::default());
+        assert::decodes_distinguished(
+            [
+                (1, OV::fixed_u32(1)),
+                (2, OV::fixed_u32(1)),
+                (3, OV::fixed_u64(1)),
+                (4, OV::fixed_u64(1)),
+            ],
+            Foo(1, 1, 1, 1),
+        );
+        for varint_value in [
+            [(1, OV::Varint(1))],
+            [(2, OV::Varint(1))],
+            [(3, OV::Varint(1))],
+            [(4, OV::Varint(1))],
+        ] {
+            // Currently it is not supported to parse varint values into varint fields.
+            assert::never_decodes::<Foo>(varint_value, WrongWireType);
+        }
+    }
+
+    // Floating point tests
+
+    #[test]
+    fn parsing_floats() {
+        #[derive(Debug, Message)]
+        struct Foo(f32, f64);
+
+        #[derive(Debug, Message)]
+        struct Bar(
+            #[bilrost(encoder(fixed))] f32,
+            #[bilrost(encoder(fixed))] f64,
+        );
+
+        for wrong_size_value in &[[(1, OV::f64(1.0))], [(2, OV::f32(2.0))]] {
+            assert::doesnt_decode::<Foo>(wrong_size_value, WrongWireType);
+            assert::doesnt_decode::<Bar>(wrong_size_value, WrongWireType);
+        }
+    }
+
     #[test]
     fn preserves_floating_point_special_values() {
         let present_zeros = [(1, OV::fixed_u32(0)), (2, OV::fixed_u64(0))];
@@ -343,6 +432,11 @@ mod derived_message_tests {
         assert_eq!((decoded.0.to_bits(), decoded.1.to_bits()), (0, 0));
     }
 
+    // TODO(widders): string tests
+    // TODO(widders): bytes tests
+
+    // Repeated field tests
+
     #[test]
     fn duplicated_field_decoding() {
         #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
@@ -379,17 +473,14 @@ mod derived_message_tests {
         );
     }
 
+    // TODO(widders): map tests
+    // TODO(widders): collection tests -- vec, sets
+
+    // Oneof tests
+
     #[test]
     fn oneof_field_decoding() {
-        #[derive(Message)]
-        struct Foo {
-            #[bilrost(1)]
-            a: Option<bool>,
-            #[bilrost(2)]
-            b: Option<bool>,
-        }
-
-        #[derive(Debug, PartialEq, Oneof)]
+        #[derive(Debug, PartialEq, Eq, Oneof, DistinguishedOneof)]
         enum AB {
             #[bilrost(1)]
             A(bool),
@@ -398,39 +489,20 @@ mod derived_message_tests {
         }
         use AB::*;
 
-        #[derive(Debug, PartialEq, Message)]
-        struct Bar {
-            #[bilrost(oneof = "1, 2")]
-            ab: Option<AB>,
-        }
+        #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+        struct Foo(#[bilrost(oneof = "1, 2")] Option<AB>);
 
-        let a_only = Foo {
-            a: Some(true),
-            b: None,
-        }
-        .encode_to_vec();
-        let b_only = Foo {
-            a: None,
-            b: Some(false),
-        }
-        .encode_to_vec();
-        let both = Foo {
-            a: Some(false),
-            b: Some(true),
-        }
-        .encode_to_vec();
-
-        assert_eq!(Bar::decode(&a_only[..]), Ok(Bar { ab: Some(A(true)) }));
-        assert_eq!(Bar::decode(&b_only[..]), Ok(Bar { ab: Some(B(false)) }));
-        assert_eq!(
-            Bar::decode(&both[..]).unwrap_err().kind(),
-            ConflictingFields
+        assert::decodes_distinguished([(1, OV::bool(true))], Foo(Some(A(true))));
+        assert::decodes_distinguished([(2, OV::bool(false))], Foo(Some(B(false))));
+        assert::never_decodes::<Foo>(
+            [(1, OV::bool(false)), (2, OV::bool(true))],
+            ConflictingFields,
         );
     }
 
     #[test]
     fn oneof_optioned_fields_encode_empty() {
-        #[derive(Debug, PartialEq, Oneof)]
+        #[derive(Clone, Debug, PartialEq, Eq, Oneof, DistinguishedOneof)]
         enum Abc {
             #[bilrost(1)]
             A(String),
@@ -441,91 +513,80 @@ mod derived_message_tests {
         }
         use Abc::*;
 
-        #[derive(Debug, PartialEq, Message)]
-        struct Foo {
-            #[bilrost(oneof(1, 2, 3))]
-            abc: Option<Abc>,
-        }
+        #[derive(Clone, Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+        struct Foo(#[bilrost(oneof(1, 2, 3))] Option<Abc>);
 
-        for value in [
-            Foo { abc: None },
-            Foo {
-                abc: Some(A(Default::default())),
-            },
-            Foo {
-                abc: Some(A("something".to_string())),
-            },
-            Foo {
-                abc: Some(B {
+        assert::decodes_distinguished([], Foo(None));
+
+        for (opaque, value) in &[
+            ([(1, OV::string(""))], Foo(Some(A(Default::default())))),
+            (
+                [(1, OV::string("something"))],
+                Foo(Some(A("something".to_string()))),
+            ),
+            (
+                [(2, OV::u32(0))],
+                Foo(Some(B {
                     named: Default::default(),
-                }),
-            },
-            Foo {
-                abc: Some(B { named: 123 }),
-            },
-            Foo {
-                abc: Some(C(Default::default())),
-            },
-            Foo {
-                abc: Some(C(vec![false])),
-            },
+                })),
+            ),
+            ([(2, OV::u32(123))], Foo(Some(B { named: 123 }))),
+            ([(3, OV::packed([]))], Foo(Some(C(Default::default())))),
+            (
+                [(3, OV::packed([OV::bool(false), OV::bool(true)]))],
+                Foo(Some(C(vec![false, true]))),
+            ),
         ] {
-            let encoded = value.encode_to_vec();
-            let decoded = Foo::decode(encoded.as_slice()).unwrap();
-            assert_eq!(value, decoded);
+            assert::decodes_distinguished(opaque, value.clone());
         }
     }
 
     #[test]
     fn oneof_plain_fields_encode_empty() {
         /// Oneofs that have an empty variant
-        #[derive(Debug, PartialEq, Oneof)]
+        #[derive(Clone, Debug, PartialEq, Eq, Oneof, DistinguishedOneof)]
         enum Abc {
-            /// No fields
             Empty,
             #[bilrost(1)]
             A(String),
             #[bilrost(2)]
-            B { named: u32 },
+            B {
+                named: u32,
+            },
             #[bilrost(tag = 3, encoder = "packed")]
             C(Vec<bool>),
         }
         use Abc::*;
 
-        #[derive(Debug, PartialEq, Message)]
-        struct Foo {
-            #[bilrost(oneof(1, 2, 3))]
-            abc: Abc,
-        }
+        #[derive(Clone, Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+        struct Foo(#[bilrost(oneof(1, 2, 3))] Abc);
 
-        for value in [
-            Foo { abc: Empty },
-            Foo {
-                abc: A(Default::default()),
-            },
-            Foo {
-                abc: A("something".to_string()),
-            },
-            Foo {
-                abc: B {
+        assert::decodes_distinguished([], Foo(Empty));
+
+        for (opaque, value) in &[
+            ([(1, OV::string(""))], Foo(A(Default::default()))),
+            (
+                [(1, OV::string("something"))],
+                Foo(A("something".to_string())),
+            ),
+            (
+                [(2, OV::u32(0))],
+                Foo(B {
                     named: Default::default(),
-                },
-            },
-            Foo {
-                abc: B { named: 123 },
-            },
-            Foo {
-                abc: C(Default::default()),
-            },
-            Foo {
-                abc: C(vec![false]),
-            },
+                }),
+            ),
+            ([(2, OV::u32(123))], Foo(B { named: 123 })),
+            ([(3, OV::packed([]))], Foo(C(Default::default()))),
+            (
+                [(3, OV::packed([OV::bool(false), OV::bool(true)]))],
+                Foo(C(vec![false, true])),
+            ),
         ] {
-            let encoded = value.encode_to_vec();
-            let decoded = Foo::decode(encoded.as_slice()).unwrap();
-            assert_eq!(value, decoded);
+            assert::decodes_distinguished(opaque, value.clone());
         }
     }
+
+    // Enumeration tests
 
     #[test]
     fn enumeration_decoding() {
@@ -675,6 +736,8 @@ mod derived_message_tests {
         assert::decodes_only_expedient([(1, OV::u32(10))], Bar(Foo::T), NotCanonical);
         assert::decodes_distinguished([(1, OV::u32(u32::MAX))], Bar(Foo::Z));
     }
+
+    // Nested message tests
 
     #[test]
     fn directly_included_message() {
