@@ -263,34 +263,4 @@ mod test {
             );
         }
     }
-
-    // TODO(widders): more tests
-    // map_tests!(keys: [
-    //     (u32, uint32),
-    //     (u64, uint64),
-    //     (i32, sint32),
-    //     (i64, sint64),
-    //     (u32, ufixed32),
-    //     (u64, ufixed64),
-    //     (i32, sfixed32),
-    //     (i64, sfixed64),
-    //     (bool, bool),
-    //     (String, string),
-    //     (Vec<u8>, bytes)
-    // ],
-    // vals: [
-    //     (f32, float32),
-    //     (f64, float64),
-    //     (u32, uint32),
-    //     (u64, uint64),
-    //     (i32, sint32),
-    //     (i64, sint64),
-    //     (u32, ufixed32),
-    //     (u64, ufixed64),
-    //     (i32, sfixed32),
-    //     (i64, sfixed64),
-    //     (bool, bool),
-    //     (String, string),
-    //     (Vec<u8>, bytes)
-    // ]);
 }
