@@ -163,8 +163,8 @@ macro_rules! varint {
 
         #[cfg(test)]
         mod $name {
-            crate::encoding::check_type_test!(General, expedient, $ty, WireType::Varint);
-            crate::encoding::check_type_test!(General, distinguished, $ty, WireType::Varint);
+            crate::encoding::test::check_type_test!(General, expedient, $ty, WireType::Varint);
+            crate::encoding::test::check_type_test!(General, distinguished, $ty, WireType::Varint);
         }
     };
 }
@@ -290,7 +290,7 @@ impl DistinguishedValueEncoder<String> for General {
 
 #[cfg(test)]
 mod string {
-    use crate::encoding::check_type_test;
+    use crate::encoding::test::check_type_test;
     check_type_test!(
         General,
         expedient,
@@ -345,18 +345,18 @@ impl DistinguishedValueEncoder<Bytes> for General {
 
 #[cfg(test)]
 mod bytes_blob {
-    use crate::encoding::check_type_test;
+    use crate::encoding::test::check_type_test;
     check_type_test!(
         General,
         expedient,
-        from Vec<u8>,
+        from alloc::vec::Vec<u8>,
         into bytes::Bytes,
         WireType::LengthDelimited
     );
     check_type_test!(
         General,
         distinguished,
-        from Vec<u8>,
+        from alloc::vec::Vec<u8>,
         into bytes::Bytes,
         WireType::LengthDelimited
     );
@@ -402,7 +402,7 @@ impl DistinguishedValueEncoder<Blob> for General {
 
 #[cfg(test)]
 mod blob {
-    use crate::encoding::check_type_test;
+    use crate::encoding::test::check_type_test;
     check_type_test!(General, expedient, crate::Blob, WireType::LengthDelimited);
     check_type_test!(
         General,

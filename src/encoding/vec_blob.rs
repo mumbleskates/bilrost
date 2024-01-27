@@ -3,7 +3,7 @@ use alloc::vec::Vec;
 use bytes::{Buf, BufMut};
 
 use crate::encoding::{
-    check_type_test, delegate_encoding, encode_varint, encoded_len_varint, Capped, DecodeContext,
+    delegate_encoding, encode_varint, encoded_len_varint, Capped, DecodeContext,
     DistinguishedEncoder, DistinguishedFieldEncoder, DistinguishedValueEncoder, Encoder,
     FieldEncoder, TagMeasurer, TagWriter, ValueEncoder, WireType, Wiretyped,
 };
@@ -109,5 +109,9 @@ impl DistinguishedEncoder<Vec<u8>> for VecBlob {
 delegate_encoding!(delegate from (VecBlob) to (crate::encoding::Unpacked<VecBlob>)
     for type (Vec<Vec<u8>>) including distinguished);
 
-check_type_test!(VecBlob, expedient, Vec<u8>, WireType::LengthDelimited);
-check_type_test!(VecBlob, distinguished, Vec<u8>, WireType::LengthDelimited);
+#[cfg(test)]
+mod test {
+    use crate::encoding::test::check_type_test;
+    check_type_test!(VecBlob, expedient, alloc::vec::Vec<u8>, WireType::LengthDelimited);
+    check_type_test!(VecBlob, distinguished, alloc::vec::Vec<u8>, WireType::LengthDelimited);
+}

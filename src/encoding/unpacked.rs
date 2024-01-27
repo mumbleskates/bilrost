@@ -82,3 +82,68 @@ where
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod test {
+    use alloc::string::String;
+    use alloc::vec::Vec;
+
+    use proptest::proptest;
+
+    use crate::encoding::test::{distinguished, expedient};
+    use crate::encoding::{Fixed, Unpacked, WireType};
+
+    proptest! {
+        #[test]
+        fn varint(value: Vec<u64>, tag: u32) {
+            expedient::check_type_unpacked::<Vec<u64>, Unpacked>(
+                value.clone(),
+                tag,
+                WireType::Varint,
+            )?;
+            distinguished::check_type_unpacked::<Vec<u64>, Unpacked>(value, tag, WireType::Varint)?;
+        }
+
+        #[test]
+        fn length_delimited(value: Vec<String>, tag: u32) {
+            expedient::check_type_unpacked::<Vec<String>, Unpacked>(
+                value.clone(),
+                tag,
+                WireType::LengthDelimited,
+            )?;
+            distinguished::check_type_unpacked::<Vec<String>, Unpacked>(
+                value,
+                tag,
+                WireType::LengthDelimited,
+            )?;
+        }
+
+        #[test]
+        fn fixed32(value: Vec<u32>, tag: u32) {
+            expedient::check_type_unpacked::<Vec<u32>, Unpacked<Fixed>>(
+                value.clone(),
+                tag,
+                WireType::ThirtyTwoBit,
+            )?;
+            distinguished::check_type_unpacked::<Vec<u32>, Unpacked<Fixed>>(
+                value,
+                tag,
+                WireType::ThirtyTwoBit,
+            )?;
+        }
+
+        #[test]
+        fn fixed64(value: Vec<u64>, tag: u32) {
+            expedient::check_type_unpacked::<Vec<u64>, Unpacked<Fixed>>(
+                value.clone(),
+                tag,
+                WireType::SixtyFourBit,
+            )?;
+            distinguished::check_type_unpacked::<Vec<u64>, Unpacked<Fixed>>(
+                value,
+                tag,
+                WireType::SixtyFourBit,
+            )?;
+        }
+    }
+}

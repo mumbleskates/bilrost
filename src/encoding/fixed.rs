@@ -130,8 +130,8 @@ macro_rules! fixed_width_int {
 
         #[cfg(test)]
         mod $test_name {
-            crate::encoding::check_type_test!(Fixed, expedient, $ty, $wire_type);
-            crate::encoding::check_type_test!(Fixed, distinguished, $ty, $wire_type);
+            crate::encoding::test::check_type_test!(Fixed, expedient, $ty, $wire_type);
+            crate::encoding::test::check_type_test!(Fixed, distinguished, $ty, $wire_type);
         }
     };
 }
@@ -188,10 +188,10 @@ macro_rules! fixed_width_float {
 
         #[cfg(test)]
         mod $test_name {
-            crate::encoding::check_type_test!(Fixed, expedient, $ty, $wire_type);
+            crate::encoding::test::check_type_test!(Fixed, expedient, $ty, $wire_type);
 
             mod delegated_from_general {
-                crate::encoding::check_type_test!(General, expedient, $ty, $wire_type);
+                crate::encoding::test::check_type_test!(General, expedient, $ty, $wire_type);
             }
         }
     };
