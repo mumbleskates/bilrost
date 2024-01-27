@@ -14,7 +14,6 @@
 mod datetime;
 #[rustfmt::skip]
 mod protobuf;
-mod derived_message_tests;
 
 use core::convert::TryFrom;
 use core::fmt;
