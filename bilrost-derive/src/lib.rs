@@ -11,8 +11,9 @@ use itertools::Itertools;
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use syn::{
-    parse_str, Data, DataEnum, DataStruct, DeriveInput, Expr, Fields, FieldsNamed, FieldsUnnamed,
-    Ident, ImplGenerics, Index, Meta, TypeGenerics, Variant, WhereClause,
+    parse_str, Attribute, Data, DataEnum, DataStruct, DeriveInput, Expr, ExprLit, Fields,
+    FieldsNamed, FieldsUnnamed, Ident, ImplGenerics, Index, Lit, Meta, MetaList,
+    MetaNameValue, TypeGenerics, Variant, WhereClause,
 };
 
 use self::field::{bilrost_attrs, Field};
@@ -79,6 +80,7 @@ enum FieldChunk {
     // A set of fields that must be sorted before emitting
     SortGroup(Vec<SortGroupPart>),
 }
+use crate::field::set_option;
 use FieldChunk::*;
 
 struct PreprocessedMessage<'a> {
@@ -489,7 +491,10 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         .iter()
         .filter_map(|(field_ident, field)| field.tag_list_guard(field_ident.to_string()));
 
-    let field_idents: Vec<_> = unsorted_fields.iter().map(|(field_ident, _)| field_ident).collect();
+    let field_idents: Vec<_> = unsorted_fields
+        .iter()
+        .map(|(field_ident, _)| field_ident)
+        .collect();
 
     let expanded = quote! {
         #(#static_guards)*
@@ -679,10 +684,13 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
             }
         }
 
-        match discriminant {
-            Some((_, expr)) => variants.push((ident, expr)),
-            None => bail!("Enumeration variants must have a discriminant"),
-        }
+        let discriminant_expr = discriminant.map(|(_, expr)| expr);
+        let attribute_expr = variant_attr(&attrs);
+        let variant_number_expr = match (discriminant_expr, attribute_expr) {
+            (Some(expr), None) | (None, Some(expr)) => expr,
+            _ => bail!("Enumeration variants must have a numeric value in one of their explicit discriminant or their attributes"),
+        };
+        variants.push((ident, variant_number_expr));
 
         // Detect whether `Default` is being derived by looking for the #[default] attribute. This
         // isn't foolproof, but it's good enough for most cases and 1) if we falsely detect that
@@ -1267,6 +1275,33 @@ fn try_distinguished_oneof(input: TokenStream) -> Result<TokenStream, Error> {
 #[proc_macro_derive(DistinguishedOneof, attributes(bilrost))]
 pub fn distinguished_oneof(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     try_distinguished_oneof(input.into()).unwrap().into()
+}
+
+/// Get the numeric variant value for an enumeration from attrs.
+fn variant_attr(attrs: &Vec<Attribute>) -> Option<TokenStream> {
+    let mut result: Option<TokenStream> = None;
+    for attr in attrs {
+        if attr.meta.path().is_ident("bilrost") {
+            let tokens = match &attr.meta {
+                Meta::List(MetaList { tokens, .. }) => tokens,
+                Meta::NameValue(MetaNameValue {
+                    value:
+                        Expr::Lit(ExprLit {
+                            lit: Lit::Str(str_value),
+                            ..
+                        }),
+                    ..
+                }) => parse_str(str_value.value()),
+                _ => bail!("attribute on enumeration variant should be its represented value"),
+            };
+            set_option(
+                &mut result,
+                tokens,
+                "duplicate value attributes on enumeration variant",
+            )?;
+        }
+    }
+    result
 }
 
 #[cfg(test)]
