@@ -21,7 +21,7 @@ mod assert {
         T: IntoIterator<Item = (u32, OV)>,
         M: Message + Debug + PartialEq,
     {
-        let encoded = OpaqueMessage::new(from).encode_to_vec();
+        let encoded = OpaqueMessage::from_iter(from).encode_to_vec();
         assert_eq!(M::decode(encoded.as_slice()), Ok(into));
     }
 
@@ -29,7 +29,7 @@ mod assert {
         from: impl IntoIterator<Item = (u32, OV)>,
         err: DecodeErrorKind,
     ) {
-        let encoded = OpaqueMessage::new(from).encode_to_vec();
+        let encoded = OpaqueMessage::from_iter(from).encode_to_vec();
         assert_eq!(
             M::decode(encoded.as_slice())
                 .expect_err("unexpectedly decoded without error")
@@ -43,7 +43,7 @@ mod assert {
         T: IntoIterator<Item = (u32, OV)>,
         M: DistinguishedMessage + Debug + Eq,
     {
-        let from = OpaqueMessage::new(from);
+        let from = OpaqueMessage::from_iter(from);
         let encoded = from.encode_to_vec();
         assert_eq!(M::decode(encoded.as_slice()).as_ref(), Ok(&into));
         assert_eq!(
@@ -62,7 +62,7 @@ mod assert {
         T: IntoIterator<Item = (u32, OV)>,
         M: DistinguishedMessage + Debug + Eq,
     {
-        let from = OpaqueMessage::new(from);
+        let from = OpaqueMessage::from_iter(from);
         let encoded = from.encode_to_vec();
         assert_eq!(M::decode(encoded.as_slice()).as_ref(), Ok(&into));
         assert_eq!(
@@ -82,7 +82,7 @@ mod assert {
         from: impl IntoIterator<Item = (u32, OV)>,
         err: DecodeErrorKind,
     ) {
-        let from = OpaqueMessage::new(from);
+        let from = OpaqueMessage::from_iter(from);
         let encoded = from.encode_to_vec();
         assert_eq!(
             M::decode(encoded.as_slice())
@@ -102,8 +102,13 @@ mod assert {
         let encoded = value.encode_to_vec();
         assert_eq!(
             OpaqueMessage::decode(&*encoded),
-            Ok(OpaqueMessage::new(becomes))
+            Ok(OpaqueMessage::from_iter(becomes))
         );
+    }
+
+    pub(super) fn opaque_to<M: Message>(from: &(impl Clone + IntoIterator<Item = (u32, OV)>)) -> M {
+        M::decode(&*OpaqueMessage::from_iter(from.clone()).encode_to_vec())
+            .expect("failed to decode")
     }
 }
 
@@ -230,29 +235,31 @@ fn derived_message_field_ordering() {
 
 #[test]
 fn preserves_floating_point_special_values() {
-    let present_zeros = OpaqueMessage::new([(1, OV::fixed_u32(0)), (2, OV::fixed_u64(0))]);
-    let negative_zeros = OpaqueMessage::new([
+    let present_zeros = [(1, OV::fixed_u32(0)), (2, OV::fixed_u64(0))];
+    let negative_zeros = [
         (1, OV::ThirtyTwoBit([0, 0, 0, 0x80])),
         (2, OV::SixtyFourBit([0, 0, 0, 0, 0, 0, 0, 0x80])),
-    ]);
-    let infinities =
-        OpaqueMessage::new([(1, OV::f32(f32::INFINITY)), (2, OV::f64(f64::NEG_INFINITY))]);
-    let nans = OpaqueMessage::new([
+    ];
+    let infinities = [(1, OV::f32(f32::INFINITY)), (2, OV::f64(f64::NEG_INFINITY))];
+    let nans = [
         (1, OV::fixed_u32(0xffff_4321)),
         (2, OV::fixed_u64(0x7fff_dead_beef_cafe)),
-    ]);
+    ];
 
     #[derive(Debug, PartialEq, Message)]
     struct Foo(f32, f64);
 
     assert::encodes(Foo(0.0, 0.0), []);
     assert::encodes(Foo(-0.0, -0.0), negative_zeros.clone());
-    let decoded = Foo::decode(&*negative_zeros.encode_to_vec()).unwrap();
+    let decoded = assert::opaque_to::<Foo>(&negative_zeros);
     assert_eq!(
         (decoded.0.to_bits(), decoded.1.to_bits()),
         (0x8000_0000, 0x8000_0000_0000_0000)
     );
-    assert::encodes(Foo(f32::INFINITY, f64::NEG_INFINITY), infinities.clone());
+    assert::encodes(
+        Foo(f32::INFINITY, f64::NEG_INFINITY),
+        infinities.iter().cloned(),
+    );
     assert::decodes(infinities.clone(), Foo(f32::INFINITY, f64::NEG_INFINITY));
     assert::encodes(
         Foo(
@@ -261,14 +268,14 @@ fn preserves_floating_point_special_values() {
         ),
         nans.clone(),
     );
-    let decoded = Foo::decode(&*nans.encode_to_vec()).unwrap();
+    let decoded = assert::opaque_to::<Foo>(&nans);
     assert_eq!(
         (decoded.0.to_bits(), decoded.1.to_bits()),
         (0xffff_4321, 0x7fff_dead_beef_cafe)
     );
     // Zeros that are encoded anyway still decode without error, because we are
     // necessarily in expedient mode (floats don't impl `Eq`)
-    let decoded = Foo::decode(&*present_zeros.encode_to_vec()).unwrap();
+    let decoded = assert::opaque_to::<Foo>(&present_zeros);
     assert_eq!((decoded.0.to_bits(), decoded.1.to_bits()), (0, 0));
 
     #[derive(Debug, PartialEq, Message)]
@@ -279,7 +286,7 @@ fn preserves_floating_point_special_values() {
 
     assert::encodes(Bar(0.0, 0.0), []);
     assert::encodes(Bar(-0.0, -0.0), negative_zeros.clone());
-    let decoded = Bar::decode(&*negative_zeros.encode_to_vec()).unwrap();
+    let decoded = assert::opaque_to::<Bar>(&negative_zeros);
     assert_eq!(
         (decoded.0.to_bits(), decoded.1.to_bits()),
         (0x8000_0000, 0x8000_0000_0000_0000)
@@ -293,14 +300,14 @@ fn preserves_floating_point_special_values() {
         ),
         nans.clone(),
     );
-    let decoded = Bar::decode(&*nans.encode_to_vec()).unwrap();
+    let decoded = assert::opaque_to::<Bar>(&nans);
     assert_eq!(
         (decoded.0.to_bits(), decoded.1.to_bits()),
         (0xffff_4321, 0x7fff_dead_beef_cafe)
     );
     // Zeros that are encoded anyway still decode without error, because we are
     // necessarily in expedient mode (floats don't impl `Eq`)
-    let decoded = Bar::decode(&*present_zeros.encode_to_vec()).unwrap();
+    let decoded = assert::opaque_to::<Bar>(&present_zeros);
     assert_eq!((decoded.0.to_bits(), decoded.1.to_bits()), (0, 0));
 }
 

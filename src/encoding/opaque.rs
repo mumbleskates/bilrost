@@ -1,7 +1,6 @@
 use alloc::vec::Vec;
-use core::borrow::{Borrow, BorrowMut};
-use core::ops::{Deref, DerefMut};
 
+use btreemultimap::BTreeMultiMap;
 use bytes::{Buf, BufMut};
 
 use crate::encoding::{
@@ -12,8 +11,6 @@ use crate::{DecodeError, Message, RawDistinguishedMessage, RawMessage};
 /// Represents an opaque bilrost field value. Can represent any valid encoded value.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum OpaqueValue {
-    // TODO(widders): consider storing this as a `[u8; 9]` pre-encoded if it ever becomes useful
-    //  to decode `Message` values directly from this representation.
     Varint(u64),
     LengthDelimited(Vec<u8>),
     ThirtyTwoBit([u8; 4]),
@@ -148,94 +145,14 @@ impl OpaqueValue {
     }
 }
 
-/// Represents a bilrost field, with its tag and value. `Vec<OpaqueField>` can encode and decode any
-/// valid bilrost message as opaque values, but may panic if its fields are not in ascending tag
-/// order.
+/// Represents a bilrost field, with its tag and value. `OpaqueMessage` can encode and decode *any*
+/// potentially valid bilrost message as opaque values, and will re-encode the exact same bytes.
+/// Likewise, any state representable by `OpaqueMessage` encodes a potentially valid bilrost
+/// message.
 ///
 /// At present this is still an unstable API, mostly used for internals and testing. Trait
 /// implementations and APIs of `OpaqueMessage` and `OpaqueValue` are subject to change.
-#[derive(Debug, Default, PartialEq, Eq, Hash)]
-pub struct OpaqueMessage(pub Vec<(u32, OpaqueValue)>);
-
-impl Deref for OpaqueMessage {
-    type Target = Vec<(u32, OpaqueValue)>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DerefMut for OpaqueMessage {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
-impl AsRef<Vec<(u32, OpaqueValue)>> for OpaqueMessage {
-    fn as_ref(&self) -> &Vec<(u32, OpaqueValue)> {
-        &self.0
-    }
-}
-
-impl AsMut<Vec<(u32, OpaqueValue)>> for OpaqueMessage {
-    fn as_mut(&mut self) -> &mut Vec<(u32, OpaqueValue)> {
-        &mut self.0
-    }
-}
-
-impl Borrow<Vec<(u32, OpaqueValue)>> for OpaqueMessage {
-    fn borrow(&self) -> &Vec<(u32, OpaqueValue)> {
-        &self.0
-    }
-}
-
-impl BorrowMut<Vec<(u32, OpaqueValue)>> for OpaqueMessage {
-    fn borrow_mut(&mut self) -> &mut Vec<(u32, OpaqueValue)> {
-        &mut self.0
-    }
-}
-
-impl FromIterator<(u32, OpaqueValue)> for OpaqueMessage {
-    fn from_iter<T: IntoIterator<Item = (u32, OpaqueValue)>>(iter: T) -> Self {
-        Self(Vec::from_iter(iter))
-    }
-}
-
-impl IntoIterator for OpaqueMessage {
-    type Item = (u32, OpaqueValue);
-    type IntoIter = alloc::vec::IntoIter<(u32, OpaqueValue)>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.into_iter()
-    }
-}
-
-impl<'a> IntoIterator for &'a OpaqueMessage {
-    type Item = &'a (u32, OpaqueValue);
-    type IntoIter = core::slice::Iter<'a, (u32, OpaqueValue)>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.iter()
-    }
-}
-
-impl OpaqueMessage {
-    /// Creates a new empty message.
-    pub fn empty() -> Self {
-        Default::default()
-    }
-
-    /// Creates a new message with the given fields.
-    pub fn new<T: IntoIterator<Item = (u32, OpaqueValue)>>(from: T) -> Self {
-        from.into_iter().collect()
-    }
-
-    /// Sort the fields of the message so they are in ascending tag order and won't panic when
-    /// encoding.
-    pub fn sort_fields(&mut self) {
-        self.sort_by_key(|(tag, _)| *tag);
-    }
-}
+pub type OpaqueMessage = BTreeMultiMap<u32, OpaqueValue>;
 
 impl RawMessage for OpaqueMessage {
     fn raw_encode<B: BufMut + ?Sized>(&self, buf: &mut B) {
@@ -263,7 +180,7 @@ impl RawMessage for OpaqueMessage {
     where
         Self: Sized,
     {
-        self.push((tag, OpaqueValue::decode_value(wire_type, buf)?));
+        self.insert(tag, OpaqueValue::decode_value(wire_type, buf)?);
         Ok(())
     }
 }

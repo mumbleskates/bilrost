@@ -26,5 +26,6 @@ std = ["bilrost/std"]
 bilrost = { version = "0.12.3", path = "..", default-features = false, features = ["derive"] }
 
 [dev-dependencies]
+bilrost = { version = "0.12.3", path = "..", default-features = false, features = ["derive", "opaque"] }
 itertools = { version = ">=0.10, <0.13", default-features = false, features = ["use_alloc"] }
 proptest = "1"

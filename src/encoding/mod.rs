@@ -20,6 +20,7 @@ mod fixed;
 mod general;
 mod map;
 /// Tools for opaque encoding and decoding of any valid bilrost data.
+#[cfg(feature = "opaque")]
 pub mod opaque;
 mod packed;
 mod unpacked;
