@@ -604,6 +604,32 @@ fn enumeration_helpers() {
 }
 
 #[test]
+fn enumeration_value_limits() {
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Enumeration)]
+    enum Foo {
+        A = 0,
+        #[default]
+        D = 5,
+        Z = 4294967295,
+    }
+
+    #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+    struct Bar(Foo);
+
+    assert_eq!(u32::from(Foo::A), 0);
+    assert_eq!(u32::from(Foo::Z), u32::MAX);
+    assert::encodes(Bar(Foo::A), [(1, OV::u32(0))]);
+    assert::encodes(Bar(Foo::D), []);
+    assert::encodes(Bar(Foo::Z), [(1, OV::u32(u32::MAX))]);
+    assert::decodes_distinguished([(1, OV::u32(0))], Bar(Foo::A));
+    assert::decodes_distinguished([], Bar(Foo::D));
+    assert::decodes_only_expedient([(1, OV::u32(5))], Bar(Foo::D), NotCanonical);
+    assert::decodes_distinguished([(1, OV::u32(u32::MAX))], Bar(Foo::Z));
+
+    // TODO(widders): enumeration with attr values
+}
+
+#[test]
 fn directly_included_message() {
     #[derive(Clone, Debug, PartialEq, Eq, Message, DistinguishedMessage)]
     struct Inner {
