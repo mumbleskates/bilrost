@@ -12,8 +12,8 @@ use bytes::{Buf, BufMut, Bytes};
 
 use crate::encoding::{
     delegate_encoding, delegate_value_encoding, encode_varint, encoded_len_varint, Capped,
-    DecodeContext, EqualDefaultAlwaysEmpty, DistinguishedEncoder, DistinguishedFieldEncoder,
-    DistinguishedValueEncoder, Encoder, FieldEncoder, HasEmptyState, Map, TagMeasurer, TagWriter,
+    DecodeContext, DistinguishedEncoder, DistinguishedFieldEncoder, DistinguishedValueEncoder,
+    Encoder, EqualDefaultAlwaysEmpty, FieldEncoder, HasEmptyState, Map, TagMeasurer, TagWriter,
     ValueEncoder, WireType, Wiretyped,
 };
 use crate::message::{merge, merge_distinguished, RawDistinguishedMessage, RawMessage};

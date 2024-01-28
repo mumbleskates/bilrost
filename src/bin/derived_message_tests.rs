@@ -1,5 +1,6 @@
 //! This file should contain most of the specific tests for the observed behavior and available
-//! types of bilrost messages and their fields.
+//! types of bilrost messages and their fields. If there's an observed behavior in a type of message
+//! or field that we implement, we want to demonstrate it here.
 
 fn main() {
     println!("This file is meant to contain tests, so we can use the proc macros within it.")
@@ -18,9 +19,9 @@ mod derived_message_tests {
     use itertools::{repeat_n, Itertools};
 
     use bilrost::encoding::opaque::{OpaqueMessage, OpaqueValue as OV};
+    use bilrost::encoding::HasEmptyState;
     use bilrost::DecodeErrorKind::*;
     use bilrost::{DecodeErrorKind, DistinguishedMessage, Enumeration, Message, Oneof};
-    use bilrost::encoding::HasEmptyState;
     use bilrost_derive::DistinguishedOneof;
 
     trait IntoOpaqueMessage {
@@ -318,12 +319,32 @@ mod derived_message_tests {
             [(2, OV::fixed_u64(1))],
             [(3, OV::fixed_u64(1))],
             [(4, OV::fixed_u64(1))],
-            // Length-delimited values don't represent integers
-            // TODO(widders): proptests for encoders that they immediately abandon wrong wiretypes.
-            //  simple examples that those values are rejected here.
+            // Length-delimited values don't represent integers either.
+            [(1, OV::string("1"))],
+            [(2, OV::string("1"))],
+            [(3, OV::string("1"))],
+            [(4, OV::string("1"))],
         ] {
             assert::never_decodes::<Foo>(fixed_value, WrongWireType);
         }
+        for out_of_range in [u32::MAX as u64 + 1, 1_000_000_000_000, u64::MAX] {
+            assert::never_decodes::<Foo>([(1, OV::u64(out_of_range))], OutOfDomainValue);
+            assert::never_decodes::<Foo>([(2, OV::u64(out_of_range))], OutOfDomainValue);
+        }
+    }
+
+    #[test]
+    fn bools() {
+        #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+        struct Foo(bool);
+
+        assert_eq!(OV::bool(false), OV::Varint(0));
+        assert_eq!(OV::bool(true), OV::Varint(1));
+
+        assert::decodes_distinguished([], Foo(false));
+        assert::decodes_only_expedient([(1, OV::bool(false))], Foo(false), NotCanonical);
+        assert::decodes_distinguished([(1, OV::bool(true))], Foo(true));
+        assert::never_decodes::<Foo>([(1, OV::Varint(2))], OutOfDomainValue);
     }
 
     // Fixed width int tests
@@ -471,7 +492,7 @@ mod derived_message_tests {
             )],
         );
         let decoded = Outer::from_opaque(Outer(Inner(-0.0)).encode_to_vec());
-        assert_eq!(decoded.0.0.to_bits(), (-0.0f32).to_bits());
+        assert_eq!(decoded.0 .0.to_bits(), (-0.0f32).to_bits());
     }
 
     // TODO(widders): string tests

@@ -1145,7 +1145,8 @@ mod test {
     use proptest::{prelude::*, test_runner::TestCaseResult};
 
     use crate::encoding::*;
-    use crate::DecodeErrorKind::NotCanonical;
+    use crate::Blob;
+    use crate::DecodeErrorKind::{NotCanonical, OutOfDomainValue, WrongWireType};
 
     /// Generalized proptest macro. Kind must be either `expedient`, `hashable`, or `distinguished`.
     macro_rules! check_type_test {
@@ -1385,7 +1386,7 @@ mod test {
         present_and_defaulted_errs::<i64, Fixed>();
         present_and_defaulted_errs::<bool, General>();
         present_and_defaulted_errs::<String, General>();
-        present_and_defaulted_errs::<crate::Blob, General>();
+        present_and_defaulted_errs::<Blob, General>();
         present_and_defaulted_errs::<Vec<u8>, VecBlob>();
 
         present_and_defaulted_errs::<Vec<u32>, Packed<General>>();
@@ -1398,7 +1399,7 @@ mod test {
         present_and_defaulted_errs::<Vec<i64>, Packed<Fixed>>();
         present_and_defaulted_errs::<Vec<bool>, Packed<General>>();
         present_and_defaulted_errs::<Vec<String>, Packed<General>>();
-        present_and_defaulted_errs::<Vec<crate::Blob>, Packed<General>>();
+        present_and_defaulted_errs::<Vec<Blob>, Packed<General>>();
         present_and_defaulted_errs::<Vec<Vec<u8>>, Packed<VecBlob>>();
 
         present_and_defaulted_errs::<BTreeSet<u32>, Packed<General>>();
@@ -1411,7 +1412,7 @@ mod test {
         present_and_defaulted_errs::<BTreeSet<i64>, Packed<Fixed>>();
         present_and_defaulted_errs::<BTreeSet<bool>, Packed<General>>();
         present_and_defaulted_errs::<BTreeSet<String>, Packed<General>>();
-        present_and_defaulted_errs::<BTreeSet<crate::Blob>, Packed<General>>();
+        present_and_defaulted_errs::<BTreeSet<Blob>, Packed<General>>();
         present_and_defaulted_errs::<BTreeSet<Vec<u8>>, Packed<VecBlob>>();
 
         present_and_defaulted_errs::<BTreeMap<u32, u32>, Map<General, General>>();
@@ -1424,7 +1425,7 @@ mod test {
         present_and_defaulted_errs::<BTreeMap<i64, i64>, Map<Fixed, Fixed>>();
         present_and_defaulted_errs::<BTreeMap<bool, bool>, Map<General, General>>();
         present_and_defaulted_errs::<BTreeMap<String, String>, Map<General, General>>();
-        present_and_defaulted_errs::<BTreeMap<crate::Blob, crate::Blob>, Map<General, General>>();
+        present_and_defaulted_errs::<BTreeMap<Blob, Blob>, Map<General, General>>();
         present_and_defaulted_errs::<BTreeMap<Vec<u8>, Vec<u8>>, Map<VecBlob, VecBlob>>();
 
         present_and_defaulted_errs::<Vec<BTreeMap<u32, u32>>, Packed<Map<General, General>>>();
@@ -1438,10 +1439,7 @@ mod test {
         present_and_defaulted_errs::<Vec<BTreeMap<bool, bool>>, Packed<Map<General, General>>>();
         present_and_defaulted_errs::<Vec<BTreeMap<String, String>>, Packed<Map<General, General>>>(
         );
-        present_and_defaulted_errs::<
-            Vec<BTreeMap<crate::Blob, crate::Blob>>,
-            Packed<Map<General, General>>,
-        >();
+        present_and_defaulted_errs::<Vec<BTreeMap<Blob, Blob>>, Packed<Map<General, General>>>();
         present_and_defaulted_errs::<Vec<BTreeMap<Vec<u8>, Vec<u8>>>, Packed<Map<VecBlob, VecBlob>>>(
         );
     }
@@ -1725,5 +1723,193 @@ mod test {
             .expect_err("decoding truncated 8 bytes succeeded");
         decode_varint_slow(&mut truncated_eight_bytes)
             .expect_err("slow decoding truncated 8 bytes succeeded");
+    }
+
+    fn check_rejects_wrong_wire_type<T: NewForOverwrite, E: Encoder<T>>(wire_type: WireType) {
+        let mut out = T::new_for_overwrite();
+        assert_eq!(
+            E::decode(
+                wire_type,
+                false,
+                &mut out,
+                Capped::new(&mut [0u8; 0].as_slice()),
+                DecodeContext::default()
+            ),
+            Err(DecodeError::new(WrongWireType))
+        );
+    }
+
+    fn check_rejects_wrong_wire_type_distinguished<
+        T: NewForOverwrite,
+        E: DistinguishedEncoder<T>,
+    >(
+        wire_type: WireType,
+    ) {
+        let mut out = T::new_for_overwrite();
+        assert_eq!(
+            E::decode_distinguished(
+                wire_type,
+                false,
+                &mut out,
+                Capped::new(&mut [0u8; 0].as_slice()),
+                DecodeContext::default()
+            ),
+            Err(DecodeError::new(WrongWireType))
+        );
+        check_rejects_wrong_wire_type::<T, E>(wire_type);
+    }
+
+    #[test]
+    fn varints_reject_wrong_wire_type() {
+        for wire_type in [
+            WireType::LengthDelimited,
+            WireType::ThirtyTwoBit,
+            WireType::SixtyFourBit,
+        ] {
+            check_rejects_wrong_wire_type_distinguished::<u32, General>(wire_type);
+            check_rejects_wrong_wire_type_distinguished::<u64, General>(wire_type);
+            check_rejects_wrong_wire_type_distinguished::<i32, General>(wire_type);
+            check_rejects_wrong_wire_type_distinguished::<i64, General>(wire_type);
+            check_rejects_wrong_wire_type_distinguished::<bool, General>(wire_type);
+        }
+    }
+
+    #[test]
+    fn floats_reject_wrong_wire_type() {
+        for wire_type in [
+            WireType::Varint,
+            WireType::LengthDelimited,
+            WireType::SixtyFourBit,
+        ] {
+            check_rejects_wrong_wire_type::<f32, General>(wire_type);
+            check_rejects_wrong_wire_type::<f32, Fixed>(wire_type);
+        }
+        for wire_type in [
+            WireType::Varint,
+            WireType::LengthDelimited,
+            WireType::ThirtyTwoBit,
+        ] {
+            check_rejects_wrong_wire_type::<f64, General>(wire_type);
+            check_rejects_wrong_wire_type::<f64, Fixed>(wire_type);
+        }
+    }
+
+    #[test]
+    fn variable_length_values_reject_wrong_wire_type() {
+        for wire_type in [
+            WireType::Varint,
+            WireType::ThirtyTwoBit,
+            WireType::SixtyFourBit,
+        ] {
+            check_rejects_wrong_wire_type_distinguished::<String, General>(wire_type);
+            check_rejects_wrong_wire_type_distinguished::<Blob, General>(wire_type);
+            check_rejects_wrong_wire_type_distinguished::<Vec<u8>, VecBlob>(wire_type);
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn u32_in_u64(value: u32) {
+            let mut buf = Vec::<u8>::new();
+            General::encode_value(&value, &mut buf);
+            let mut out = 0u64;
+            prop_assert!(General::decode_value(
+                &mut out,
+                Capped::new(&mut &*buf),
+                DecodeContext::default(),
+            ).is_ok());
+            prop_assert_eq!(out, value as u64);
+        }
+
+        #[test]
+        fn i32_in_i64(value: i32) {
+            let mut buf = Vec::<u8>::new();
+            General::encode_value(&value, &mut buf);
+            let mut out = 0i64;
+            prop_assert!(General::decode_value(
+                &mut out,
+                Capped::new(&mut &*buf),
+                DecodeContext::default(),
+            ).is_ok());
+            prop_assert_eq!(out, value as i64);
+        }
+
+        #[test]
+        fn u64_in_u32(value: u32) {
+            let value = value as u64;
+            let mut buf = Vec::<u8>::new();
+            General::encode_value(&value, &mut buf);
+            let mut out = 0u32;
+            prop_assert!(General::decode_value(
+                &mut out,
+                Capped::new(&mut &*buf),
+                DecodeContext::default(),
+            ).is_ok());
+            prop_assert_eq!(out as u64, value);
+        }
+
+        #[test]
+        fn i64_in_i32(value: i32) {
+            let value = value as i64;
+            let mut buf = Vec::<u8>::new();
+            General::encode_value(&value, &mut buf);
+            let mut out = 0i32;
+            prop_assert!(General::decode_value(
+                &mut out,
+                Capped::new(&mut &*buf),
+                DecodeContext::default(),
+            ).is_ok());
+            prop_assert_eq!(out as i64, value);
+        }
+
+        #[test]
+        fn u32_out_of_range(value in u32::MAX as u64 + 1..) {
+            let mut buf = Vec::<u8>::new();
+            General::encode_value(&value, &mut buf);
+            let mut out = 0u32;
+            prop_assert_eq!(
+                General::decode_value(
+                    &mut out,
+                    Capped::new(&mut &*buf),
+                    DecodeContext::default(),
+                ),
+                Err(DecodeError::new(OutOfDomainValue))
+            );
+        }
+
+        #[test]
+        fn i32_out_of_range(
+            low_value in ..i32::MIN as i64 - 1,
+            high_value in i32::MAX as i64 + 1..,
+        ) {
+            for value in [low_value, high_value] {
+                let mut buf = Vec::<u8>::new();
+                General::encode_value(&value, &mut buf);
+                let mut out = 0i32;
+                prop_assert_eq!(
+                    General::decode_value(
+                        &mut out,
+                        Capped::new(&mut &*buf),
+                        DecodeContext::default(),
+                    ),
+                    Err(DecodeError::new(OutOfDomainValue))
+                );
+            }
+        }
+
+        #[test]
+        fn bool_out_of_range(varint in 2u64..) {
+            let mut buf = Vec::<u8>::new();
+            encode_varint(varint, &mut buf);
+            let mut out = false;
+            prop_assert_eq!(
+                General::decode_value(
+                    &mut out,
+                    Capped::new(&mut &*buf),
+                    DecodeContext::default(),
+                ),
+                Err(DecodeError::new(OutOfDomainValue))
+            );
+        }
     }
 }
