@@ -19,9 +19,11 @@ mod derived_message_tests {
     use itertools::{repeat_n, Itertools};
 
     use bilrost::encoding::opaque::{OpaqueMessage, OpaqueValue as OV};
-    use bilrost::encoding::HasEmptyState;
+    use bilrost::encoding::{encode_varint, HasEmptyState};
     use bilrost::DecodeErrorKind::*;
-    use bilrost::{DecodeErrorKind, DistinguishedMessage, Enumeration, Message, Oneof};
+    use bilrost::{
+        DecodeError, DecodeErrorKind, DistinguishedMessage, Enumeration, Message, Oneof,
+    };
     use bilrost_derive::DistinguishedOneof;
 
     trait IntoOpaqueMessage {
@@ -332,6 +334,83 @@ mod derived_message_tests {
                 maximum: Some(false),
             },
             UnknownField,
+        );
+    }
+
+    #[test]
+    fn message_catting_behavior() {
+        // We can show that when messages are catted together, the fields stay ascending
+        let first = [
+            (0, OV::string("zero")),
+            (1, OV::string("one")),
+            (2, OV::string("two")),
+        ]
+        .into_opaque_message()
+        .encode_to_vec();
+        let second = [
+            (0, OV::string("zero again")),
+            (1, OV::string("one again")),
+            (2, OV::string("two again")),
+        ]
+        .into_opaque_message()
+        .encode_to_vec();
+        let mut combined = first;
+        combined.extend(second);
+        assert_eq!(
+            combined.into_opaque_message(),
+            [
+                (0, OV::string("zero")),
+                (1, OV::string("one")),
+                (2, OV::string("two")),
+                // When the messages are concatenated, the second message's tags are offset by the
+                // tag of the last field in the prior message, because they are encoded as deltas in
+                // the field key.
+                (2, OV::string("zero again")),
+                (3, OV::string("one again")),
+                (4, OV::string("two again")),
+            ]
+            .into_opaque_message()
+        );
+    }
+
+    #[test]
+    fn rejects_overflowed_tags() {
+        let maximum_tag = [(u32::MAX, OV::bool(true))]
+            .into_opaque_message()
+            .encode_to_vec();
+        let one_more_tag = [(1, OV::string("too much"))]
+            .into_opaque_message()
+            .encode_to_vec();
+        let mut combined = maximum_tag;
+        combined.extend(one_more_tag);
+        // Nothing should ever be able to decode this message; it's not a valid encoding.
+        assert_eq!(
+            OpaqueMessage::decode(&mut combined.as_slice()),
+            Err(DecodeError::new(TagOverflowed))
+        );
+        assert_eq!(
+            <()>::decode(&mut combined.as_slice()),
+            Err(DecodeError::new(TagOverflowed))
+        );
+
+        let mut first_tag_too_big = Vec::new();
+        encode_varint((u32::MAX as u64 + 1) << 2, &mut first_tag_too_big);
+        // Nothing should ever be able to decode this message either; it's not a valid encoding.
+        assert_eq!(
+            OpaqueMessage::decode(&mut first_tag_too_big.as_slice()),
+            Err(DecodeError::new(TagOverflowed))
+        );
+        assert_eq!(
+            <()>::decode(&mut first_tag_too_big.as_slice()),
+            Err(DecodeError::new(TagOverflowed))
+        );
+        assert_eq!(
+            OpaqueMessage::decode_distinguished(&mut first_tag_too_big.as_slice()),
+            Err(DecodeError::new(TagOverflowed))
+        );
+        assert_eq!(
+            <()>::decode_distinguished(&mut first_tag_too_big.as_slice()),
+            Err(DecodeError::new(TagOverflowed))
         );
     }
 
