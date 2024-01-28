@@ -170,7 +170,6 @@ mod derived_message_tests {
     }
 
     // TODO(widders): test coverage for completed features:
-    //  * unknown fields are forbidden in distinguished decoding
     //  * map keys and set values must be ascending in distinguished decoding
     //  * map keys and set values must never recur in any decoding mode with either hash or btree
     //  * repeated fields must have matching packed-ness in distinguished decoding
@@ -875,6 +874,86 @@ mod derived_message_tests {
                 }),
                 also: Some("abc".into()),
             },
+        );
+    }
+
+    #[test]
+    fn reject_unknown_fields_distinguished() {
+        #[derive(Debug, PartialEq, Eq, Oneof, DistinguishedOneof)]
+        enum InnerOneof {
+            Empty,
+            #[bilrost(3)]
+            Three(String),
+            #[bilrost(5)]
+            Five(i32),
+            #[bilrost(7)]
+            Seven(bool),
+        }
+        use InnerOneof::*;
+
+        #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+        struct Nested(i64);
+
+        #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+        struct Foo {
+            #[bilrost(0)]
+            zero: String,
+            #[bilrost(1)]
+            one: u64,
+            #[bilrost(4)]
+            four: Option<Nested>,
+            #[bilrost(oneof(3, 5, 7))]
+            oneof: InnerOneof,
+        }
+
+        assert::decodes_distinguished(
+            [
+                (0, OV::string("hello")),
+                (4, OV::message(&OpaqueMessage::from_iter([
+                    (1, OV::i64(555)),
+                ]))),
+                (7, OV::bool(false)),
+            ],
+            Foo {
+                zero: "hello".into(),
+                four: Some(Nested(555)),
+                oneof: Seven(false),
+                ..Default::default()
+            },
+        );
+        assert::decodes_only_expedient(
+            [
+                (0, OV::string("hello")),
+                (2, OV::u32(123)), // Unknown field
+                (4, OV::message(&OpaqueMessage::from_iter([
+                    (1, OV::i64(555)),
+                ]))),
+                (7, OV::bool(false)),
+            ],
+            Foo {
+                zero: "hello".into(),
+                four: Some(Nested(555)),
+                oneof: Seven(false),
+                ..Default::default()
+            },
+            UnknownField,
+        );
+        assert::decodes_only_expedient(
+            [
+                (0, OV::string("hello")),
+                (4, OV::message(&OpaqueMessage::from_iter([
+                    (0, OV::string("unknown")), // Unknown field
+                    (1, OV::i64(555)),
+                ]))),
+                (7, OV::bool(false)),
+            ],
+            Foo {
+                zero: "hello".into(),
+                four: Some(Nested(555)),
+                oneof: Seven(false),
+                ..Default::default()
+            },
+            UnknownField,
         );
     }
 }
