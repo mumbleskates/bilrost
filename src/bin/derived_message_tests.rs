@@ -360,8 +360,8 @@ mod derived_message_tests {
         .encode_to_vec();
         let mut combined = first;
         combined.extend(second);
-        assert_eq!(
-            combined.into_opaque_message(),
+        assert::decodes_distinguished(
+            combined,
             [
                 (0, OV::string("zero")),
                 (1, OV::string("one")),
@@ -373,7 +373,7 @@ mod derived_message_tests {
                 (3, OV::string("one again")),
                 (4, OV::string("two again")),
             ]
-            .into_opaque_message()
+            .into_opaque_message(),
         );
     }
 
