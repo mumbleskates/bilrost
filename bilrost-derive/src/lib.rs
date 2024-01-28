@@ -118,7 +118,7 @@ fn preprocess_message(input: &DeriveInput) -> Result<PreprocessedMessage, Error>
         } => Vec::new(),
     };
 
-    let mut next_tag: u32 = 1;
+    let mut next_tag = Some(1);
     let unsorted_fields: Vec<(TokenStream, Field)> = fields
         .into_iter()
         .enumerate()
@@ -132,7 +132,7 @@ fn preprocess_message(input: &DeriveInput) -> Result<PreprocessedMessage, Error>
             });
             match Field::new(field.ty, field.attrs, next_tag) {
                 Ok(Some(field)) => {
-                    next_tag = field.tags().iter().max().map(|t| t + 1).unwrap_or(next_tag);
+                    next_tag = field.last_tag().checked_add(1);
                     Some(Ok((field_ident, field)))
                 }
                 Ok(None) => None,

@@ -22,7 +22,11 @@ impl Field {
     ///
     /// If the meta items are invalid, an error will be returned.
     /// If the field should be ignored, `None` is returned.
-    pub fn new(ty: Type, attrs: Vec<Attribute>, inferred_tag: u32) -> Result<Option<Field>, Error> {
+    pub fn new(
+        ty: Type,
+        attrs: Vec<Attribute>,
+        inferred_tag: Option<u32>,
+    ) -> Result<Option<Field>, Error> {
         let attrs = bilrost_attrs(attrs)?;
 
         // TODO: check for ignore attribute.

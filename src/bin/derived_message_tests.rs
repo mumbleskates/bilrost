@@ -297,6 +297,44 @@ mod derived_message_tests {
         }
     }
 
+    #[test]
+    fn field_tag_limits() {
+        #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+        struct Foo {
+            #[bilrost(0)]
+            minimum: Option<bool>,
+            #[bilrost(4294967295)]
+            maximum: Option<bool>,
+        }
+        assert::decodes_distinguished(
+            [(0, OV::bool(false)), (u32::MAX, OV::bool(true))],
+            Foo {
+                minimum: Some(false),
+                maximum: Some(true),
+            },
+        );
+        assert::never_decodes::<Foo>(
+            [(0, OV::bool(false)), (0, OV::bool(true))],
+            UnexpectedlyRepeated,
+        );
+        assert::never_decodes::<Foo>(
+            [(u32::MAX, OV::bool(false)), (u32::MAX, OV::bool(true))],
+            UnexpectedlyRepeated,
+        );
+        assert::decodes_only_expedient(
+            [
+                (0, OV::bool(true)),
+                (234234234, OV::string("unknown")), // unknown field
+                (u32::MAX, OV::bool(false)),
+            ],
+            Foo {
+                minimum: Some(true),
+                maximum: Some(false),
+            },
+            UnknownField,
+        );
+    }
+
     // Varint tests
 
     #[test]
@@ -909,9 +947,10 @@ mod derived_message_tests {
         assert::decodes_distinguished(
             [
                 (0, OV::string("hello")),
-                (4, OV::message(&OpaqueMessage::from_iter([
-                    (1, OV::i64(555)),
-                ]))),
+                (
+                    4,
+                    OV::message(&OpaqueMessage::from_iter([(1, OV::i64(555))])),
+                ),
                 (7, OV::bool(false)),
             ],
             Foo {
@@ -925,9 +964,10 @@ mod derived_message_tests {
             [
                 (0, OV::string("hello")),
                 (2, OV::u32(123)), // Unknown field
-                (4, OV::message(&OpaqueMessage::from_iter([
-                    (1, OV::i64(555)),
-                ]))),
+                (
+                    4,
+                    OV::message(&OpaqueMessage::from_iter([(1, OV::i64(555))])),
+                ),
                 (7, OV::bool(false)),
             ],
             Foo {
@@ -941,10 +981,13 @@ mod derived_message_tests {
         assert::decodes_only_expedient(
             [
                 (0, OV::string("hello")),
-                (4, OV::message(&OpaqueMessage::from_iter([
-                    (0, OV::string("unknown")), // Unknown field
-                    (1, OV::i64(555)),
-                ]))),
+                (
+                    4,
+                    OV::message(&OpaqueMessage::from_iter([
+                        (0, OV::string("unknown")), // Unknown field
+                        (1, OV::i64(555)),
+                    ])),
+                ),
                 (7, OV::bool(false)),
             ],
             Foo {

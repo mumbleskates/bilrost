@@ -32,8 +32,8 @@ pub struct Field {
 }
 
 impl Field {
-    pub fn new(ty: &Type, attrs: &[Meta], inferred_tag: u32) -> Result<Field, Error> {
-        Field::new_impl(ty, attrs, Some(inferred_tag), false, None)
+    pub fn new(ty: &Type, attrs: &[Meta], inferred_tag: Option<u32>) -> Result<Field, Error> {
+        Field::new_impl(ty, attrs, inferred_tag, false, None)
     }
 
     pub fn new_in_oneof(
