@@ -184,49 +184,55 @@ mod test {
     mod btree {
         mod general {
             use crate::encoding::test::check_type_test;
+            use crate::encoding::{General, Map};
+            use alloc::collections::BTreeMap;
             check_type_test!(
                 Map<General, General>,
                 expedient,
-                alloc::collections::BTreeMap<u64, f32>,
-                WireType::LengthDelimited
+                BTreeMap<u64, f32>,
+                LengthDelimited
             );
             check_type_test!(
                 Map<General, General>,
                 distinguished,
-                alloc::collections::BTreeMap<u32, i32>,
-                WireType::LengthDelimited
+                BTreeMap<u32, i32>,
+                LengthDelimited
             );
         }
 
         mod fixed {
             use crate::encoding::test::check_type_test;
+            use crate::encoding::{Fixed, Map};
+            use alloc::collections::BTreeMap;
             check_type_test!(
                 Map<Fixed, Fixed>,
                 expedient,
-                alloc::collections::BTreeMap<u64, f32>,
-                WireType::LengthDelimited
+                BTreeMap<u64, f32>,
+                LengthDelimited
             );
             check_type_test!(
                 Map<Fixed, Fixed>,
                 distinguished,
-                alloc::collections::BTreeMap<u32, i32>,
-                WireType::LengthDelimited
+                BTreeMap<u32, i32>,
+                LengthDelimited
             );
         }
 
         mod delegated_from_general {
             use crate::encoding::test::check_type_test;
+            use crate::encoding::General;
+            use alloc::collections::BTreeMap;
             check_type_test!(
                 General,
                 expedient,
-                alloc::collections::BTreeMap<bool, f32>,
-                WireType::LengthDelimited
+                BTreeMap<bool, f32>,
+                LengthDelimited
             );
             check_type_test!(
                 General,
                 distinguished,
-                alloc::collections::BTreeMap<bool, u32>,
-                WireType::LengthDelimited
+                BTreeMap<bool, u32>,
+                LengthDelimited
             );
         }
     }
@@ -235,31 +241,37 @@ mod test {
     mod hash {
         mod general {
             use crate::encoding::test::check_type_test;
+            use crate::encoding::{General, Map};
+            use std::collections::HashMap;
             check_type_test!(
                 Map<General, General>,
                 expedient,
-                std::collections::HashMap<u64, f32>,
-                WireType::LengthDelimited
+                HashMap<u64, f32>,
+                LengthDelimited
             );
         }
 
         mod fixed {
             use crate::encoding::test::check_type_test;
+            use crate::encoding::{Fixed, Map};
+            use std::collections::HashMap;
             check_type_test!(
                 Map<Fixed, Fixed>,
                 expedient,
-                std::collections::HashMap<u64, f32>,
-                WireType::LengthDelimited
+                HashMap<u64, f32>,
+                LengthDelimited
             );
         }
 
         mod delegated_from_general {
             use crate::encoding::test::check_type_test;
+            use crate::encoding::General;
+            use std::collections::HashMap;
             check_type_test!(
                 General,
                 expedient,
-                std::collections::HashMap<bool, u32>,
-                WireType::LengthDelimited
+                HashMap<bool, u32>,
+                LengthDelimited
             );
         }
     }

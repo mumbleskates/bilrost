@@ -112,6 +112,8 @@ delegate_encoding!(delegate from (VecBlob) to (crate::encoding::Unpacked<VecBlob
 #[cfg(test)]
 mod test {
     use crate::encoding::test::check_type_test;
-    check_type_test!(VecBlob, expedient, alloc::vec::Vec<u8>, WireType::LengthDelimited);
-    check_type_test!(VecBlob, distinguished, alloc::vec::Vec<u8>, WireType::LengthDelimited);
+    use crate::encoding::VecBlob;
+    use alloc::vec::Vec;
+    check_type_test!(VecBlob, expedient, Vec<u8>, LengthDelimited);
+    check_type_test!(VecBlob, distinguished, Vec<u8>, LengthDelimited);
 }

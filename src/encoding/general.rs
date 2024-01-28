@@ -163,8 +163,9 @@ macro_rules! varint {
 
         #[cfg(test)]
         mod $name {
-            crate::encoding::test::check_type_test!(General, expedient, $ty, WireType::Varint);
-            crate::encoding::test::check_type_test!(General, distinguished, $ty, WireType::Varint);
+            use crate::encoding::General;
+            crate::encoding::test::check_type_test!(General, expedient, $ty, Varint);
+            crate::encoding::test::check_type_test!(General, distinguished, $ty, Varint);
         }
     };
 }
@@ -290,19 +291,10 @@ impl DistinguishedValueEncoder<String> for General {
 
 #[cfg(test)]
 mod string {
+    use super::{General, String};
     use crate::encoding::test::check_type_test;
-    check_type_test!(
-        General,
-        expedient,
-        alloc::string::String,
-        WireType::LengthDelimited
-    );
-    check_type_test!(
-        General,
-        distinguished,
-        alloc::string::String,
-        WireType::LengthDelimited
-    );
+    check_type_test!(General, expedient, String, LengthDelimited);
+    check_type_test!(General, distinguished, String, LengthDelimited);
 }
 
 impl EqualDefaultAlwaysEmpty for Bytes {}
@@ -345,21 +337,10 @@ impl DistinguishedValueEncoder<Bytes> for General {
 
 #[cfg(test)]
 mod bytes_blob {
+    use super::{Bytes, General, Vec};
     use crate::encoding::test::check_type_test;
-    check_type_test!(
-        General,
-        expedient,
-        from alloc::vec::Vec<u8>,
-        into bytes::Bytes,
-        WireType::LengthDelimited
-    );
-    check_type_test!(
-        General,
-        distinguished,
-        from alloc::vec::Vec<u8>,
-        into bytes::Bytes,
-        WireType::LengthDelimited
-    );
+    check_type_test!(General, expedient, from Vec<u8>, into Bytes, LengthDelimited);
+    check_type_test!(General, distinguished, from Vec<u8>, into Bytes, LengthDelimited);
 }
 
 impl EqualDefaultAlwaysEmpty for Blob {}
@@ -402,14 +383,10 @@ impl DistinguishedValueEncoder<Blob> for General {
 
 #[cfg(test)]
 mod blob {
+    use super::{Blob, General};
     use crate::encoding::test::check_type_test;
-    check_type_test!(General, expedient, crate::Blob, WireType::LengthDelimited);
-    check_type_test!(
-        General,
-        distinguished,
-        crate::Blob,
-        WireType::LengthDelimited
-    );
+    check_type_test!(General, expedient, Blob, LengthDelimited);
+    check_type_test!(General, distinguished, Blob, LengthDelimited);
 }
 
 impl<T> Wiretyped<T> for General

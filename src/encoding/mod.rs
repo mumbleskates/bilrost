@@ -1150,17 +1150,18 @@ mod test {
 
     /// Generalized proptest macro. Kind must be either `expedient`, `hashable`, or `distinguished`.
     macro_rules! check_type_test {
-        ($encoder:ty, $kind:ident, $ty:ty, $wire_type:expr) => {
+        ($encoder:ty, $kind:ident, $ty:ty, $wire_type:ident) => {
             crate::encoding::test::check_type_test!($encoder, $kind, from $ty, into $ty, $wire_type);
         };
-        ($encoder:ty, $kind:ident, from $from_ty:ty, into $into_ty:ty, $wire_type:expr) => {
+        ($encoder:ty, $kind:ident, from $from_ty:ty, into $into_ty:ty, $wire_type:ident) => {
             #[cfg(test)]
             mod $kind {
                 use proptest::prelude::*;
 
                 use crate::encoding::test::$kind::check_type;
+                use crate::encoding::WireType::*;
                 #[allow(unused_imports)]
-                use crate::encoding::{General, Fixed, Map, Packed, VecBlob, WireType};
+                use super::*;
 
                 proptest! {
                     #[test]

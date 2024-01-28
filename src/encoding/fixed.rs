@@ -20,12 +20,12 @@ delegate_encoding!(delegate from (Fixed) to (crate::encoding::Unpacked<Fixed>) f
 macro_rules! fixed_width_common {
     (
         $ty:ty,
-        $wire_type:expr,
+        $wire_type:ident,
         $put:ident,
         $get:ident
     ) => {
         impl Wiretyped<$ty> for Fixed {
-            const WIRE_TYPE: WireType = $wire_type;
+            const WIRE_TYPE: WireType = WireType::$wire_type;
         }
 
         impl ValueEncoder<$ty> for Fixed {
@@ -36,7 +36,7 @@ macro_rules! fixed_width_common {
 
             #[inline]
             fn value_encoded_len(_value: &$ty) -> usize {
-                $wire_type.fixed_size().unwrap()
+                WireType::$wire_type.fixed_size().unwrap()
             }
 
             #[inline]
@@ -45,7 +45,7 @@ macro_rules! fixed_width_common {
                 mut buf: Capped<B>,
                 _ctx: DecodeContext,
             ) -> Result<(), DecodeError> {
-                if buf.remaining() < $wire_type.fixed_size().unwrap() {
+                if buf.remaining() < WireType::$wire_type.fixed_size().unwrap() {
                     return Err(DecodeError::new(Truncated));
                 }
                 *value = buf.$get();
@@ -59,7 +59,7 @@ macro_rules! fixed_width_int {
     (
         $test_name:ident,
         $ty:ty,
-        $wire_type:expr,
+        $wire_type:ident,
         $put:ident,
         $get:ident
     ) => {
@@ -130,6 +130,8 @@ macro_rules! fixed_width_int {
 
         #[cfg(test)]
         mod $test_name {
+            use crate::encoding::Fixed;
+
             crate::encoding::test::check_type_test!(Fixed, expedient, $ty, $wire_type);
             crate::encoding::test::check_type_test!(Fixed, distinguished, $ty, $wire_type);
         }
@@ -140,7 +142,7 @@ macro_rules! fixed_width_float {
     (
         $test_name:ident,
         $ty:ty,
-        $wire_type:expr,
+        $wire_type:ident,
         $put:ident,
         $get:ident
     ) => {
@@ -188,42 +190,20 @@ macro_rules! fixed_width_float {
 
         #[cfg(test)]
         mod $test_name {
+            use crate::encoding::Fixed;
             crate::encoding::test::check_type_test!(Fixed, expedient, $ty, $wire_type);
 
             mod delegated_from_general {
+                use crate::encoding::General;
                 crate::encoding::test::check_type_test!(General, expedient, $ty, $wire_type);
             }
         }
     };
 }
 
-fixed_width_float!(f32, f32, WireType::ThirtyTwoBit, put_f32_le, get_f32_le);
-fixed_width_float!(f64, f64, WireType::SixtyFourBit, put_f64_le, get_f64_le);
-fixed_width_int!(
-    fixed_u32,
-    u32,
-    WireType::ThirtyTwoBit,
-    put_u32_le,
-    get_u32_le
-);
-fixed_width_int!(
-    fixed_u64,
-    u64,
-    WireType::SixtyFourBit,
-    put_u64_le,
-    get_u64_le
-);
-fixed_width_int!(
-    fixed_i32,
-    i32,
-    WireType::ThirtyTwoBit,
-    put_i32_le,
-    get_i32_le
-);
-fixed_width_int!(
-    fixed_i64,
-    i64,
-    WireType::SixtyFourBit,
-    put_i64_le,
-    get_i64_le
-);
+fixed_width_float!(f32, f32, ThirtyTwoBit, put_f32_le, get_f32_le);
+fixed_width_float!(f64, f64, SixtyFourBit, put_f64_le, get_f64_le);
+fixed_width_int!(fixed_u32, u32, ThirtyTwoBit, put_u32_le, get_u32_le);
+fixed_width_int!(fixed_u64, u64, SixtyFourBit, put_u64_le, get_u64_le);
+fixed_width_int!(fixed_i32, i32, ThirtyTwoBit, put_i32_le, get_i32_le);
+fixed_width_int!(fixed_i64, i64, SixtyFourBit, put_i64_le, get_i64_le);
