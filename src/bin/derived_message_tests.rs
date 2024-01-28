@@ -20,6 +20,7 @@ mod derived_message_tests {
     use bilrost::encoding::opaque::{OpaqueMessage, OpaqueValue as OV};
     use bilrost::DecodeErrorKind::*;
     use bilrost::{DecodeErrorKind, DistinguishedMessage, Enumeration, Message, Oneof};
+    use bilrost::encoding::HasEmptyState;
     use bilrost_derive::DistinguishedOneof;
 
     trait IntoOpaqueMessage {
@@ -44,6 +45,12 @@ mod derived_message_tests {
     impl<'a> IntoOpaqueMessage for &'a [(u32, OV)] {
         fn into_opaque_message(self) -> OpaqueMessage {
             OpaqueMessage::from_iter(self.iter().cloned())
+        }
+    }
+
+    impl IntoOpaqueMessage for Vec<u8> {
+        fn into_opaque_message(self) -> OpaqueMessage {
+            OpaqueMessage::decode(self.as_slice()).expect("did not decode")
         }
     }
 
@@ -102,6 +109,7 @@ mod derived_message_tests {
                 into.encode_to_vec(),
                 "distinguished encoding does not round trip"
             );
+            assert_eq!(into.encoded_len(), encoded.len(), "encoded_len was wrong");
         }
 
         pub(super) fn decodes_only_expedient<M>(
@@ -119,10 +127,15 @@ mod derived_message_tests {
                     .kind(),
                 err
             );
+            let round_tripped = into.encode_to_vec();
             assert_ne!(
-                encoded,
-                into.encode_to_vec(),
+                encoded, round_tripped,
                 "encoding round tripped, but did not decode distinguished"
+            );
+            assert_eq!(
+                into.encoded_len(),
+                round_tripped.len(),
+                "encoded_len was wrong"
             );
         }
 
@@ -151,6 +164,7 @@ mod derived_message_tests {
                 OpaqueMessage::decode(&*encoded),
                 Ok(becomes.into_opaque_message())
             );
+            assert_eq!(value.encoded_len(), encoded.len(), "encoded_len was wrong");
         }
     }
 
@@ -272,7 +286,7 @@ mod derived_message_tests {
             let encoded_len = out.encoded_len();
             let encoded = out.encode_to_vec();
             assert_eq!(encoded.len(), encoded_len);
-            let re = Struct::decode(&encoded[..]).unwrap();
+            let re = Struct::decode(encoded.as_slice()).unwrap();
             assert_eq!(out, re);
         }
     }
@@ -430,6 +444,27 @@ mod derived_message_tests {
         // necessarily in expedient mode (floats don't impl `Eq`)
         let decoded = Bar::from_opaque(&present_zeros);
         assert_eq!((decoded.0.to_bits(), decoded.1.to_bits()), (0, 0));
+    }
+
+    #[test]
+    fn floating_point_zero_is_present_nested() {
+        #[derive(Debug, Message)]
+        struct Inner(f32);
+
+        #[derive(Debug, Message)]
+        struct Outer(Inner);
+
+        assert!(!Inner(-0.0).is_empty());
+        assert!(!Outer(Inner(-0.0)).is_empty());
+        assert::encodes(
+            Outer(Inner(-0.0)),
+            [(
+                1,
+                OV::message(&OpaqueMessage::from_iter([(1, OV::f32(-0.0))])),
+            )],
+        );
+        let decoded = Outer::from_opaque(Outer(Inner(-0.0)).encode_to_vec());
+        assert_eq!(decoded.0.0.to_bits(), (-0.0f32).to_bits());
     }
 
     // TODO(widders): string tests
@@ -591,42 +626,32 @@ mod derived_message_tests {
     #[test]
     fn enumeration_decoding() {
         #[derive(Clone, Debug, PartialEq, Eq, Enumeration)]
-        enum E {
+        enum NoDefault {
             Five = 5,
             Ten = 10,
             Fifteen = 15,
         }
+        use NoDefault::*;
 
         #[derive(Clone, Debug, Default, PartialEq, Eq, Enumeration)]
-        enum F {
+        enum HasDefault {
             #[default]
             Big = 1000,
             Bigger = 1_000_000,
             Biggest = 1_000_000_000,
         }
+        use HasDefault::*;
 
         #[derive(Clone, Debug, PartialEq, Eq, Message, DistinguishedMessage)]
-        struct EnumStruct {
-            no_default: Option<E>,
-            has_default: F,
-        }
+        struct Foo(Option<NoDefault>, HasDefault);
 
-        for (no_default, has_default) in [None, Some(E::Five), Some(E::Ten), Some(E::Fifteen)]
-            .into_iter()
-            .cartesian_product([F::Big, F::Bigger, F::Biggest])
-        {
-            let out = EnumStruct {
-                no_default,
-                has_default,
-            };
-            let encoded_len = out.encoded_len();
-            let encoded = out.encode_to_vec();
-            assert_eq!(encoded.len(), encoded_len);
-            let re = EnumStruct::decode(encoded.as_slice()).unwrap();
-            assert_eq!(out, re);
-            let re_distinguished = EnumStruct::decode_distinguished(encoded.as_slice()).unwrap();
-            assert_eq!(out, re_distinguished);
-        }
+        assert::decodes_distinguished([], Foo(None, Big));
+        assert::decodes_distinguished([(1, OV::u32(5))], Foo(Some(Five), Big));
+        assert::decodes_distinguished([(1, OV::u32(10))], Foo(Some(Ten), Big));
+        assert::decodes_distinguished([(1, OV::u32(15))], Foo(Some(Fifteen), Big));
+        assert::decodes_only_expedient([(2, OV::u32(1000))], Foo(None, Big), NotCanonical);
+        assert::decodes_distinguished([(2, OV::u32(1_000_000))], Foo(None, Bigger));
+        assert::decodes_distinguished([(2, OV::u32(1_000_000_000))], Foo(None, Biggest));
     }
 
     #[test]
@@ -638,18 +663,12 @@ mod derived_message_tests {
             Fifteen = 15,
         }
 
-        #[derive(Clone, Debug, PartialEq, Message)]
+        #[derive(Clone, Debug, PartialEq, Eq, Message, DistinguishedMessage)]
         struct HelpedStruct {
             #[bilrost(enumeration(E))]
             regular: u32,
             #[bilrost(enumeration(E))]
             optional: Option<u32>,
-        }
-
-        #[derive(Clone, Debug, PartialEq, Message)]
-        struct StrictStruct {
-            regular: Option<E>,
-            optional: Option<E>,
         }
 
         let val = HelpedStruct {
@@ -663,6 +682,7 @@ mod derived_message_tests {
             regular: 222,
             optional: Some(222),
         };
+        assert::decodes_distinguished([(1, OV::u32(222)), (2, OV::u32(222))], val.clone());
         assert_eq!(
             val.regular()
                 .expect_err("bad enumeration value parsed successfully")
@@ -682,6 +702,9 @@ mod derived_message_tests {
 
         // Demonstrate that the same errors happen when we decode to a struct with strict
         // enumeration fields, it just happens sooner.
+        #[derive(Clone, Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+        struct StrictStruct(Option<E>, Option<E>);
+
         for val in [
             HelpedStruct {
                 regular: 222,
@@ -692,14 +715,7 @@ mod derived_message_tests {
                 optional: Some(222),
             },
         ] {
-            let encoded = val.encode_to_vec();
-            let decoded = StrictStruct::decode(encoded.as_slice());
-            assert_eq!(
-                decoded
-                    .expect_err("decoded an invalid enumeration value without error")
-                    .kind(),
-                OutOfDomainValue
-            );
+            assert::never_decodes::<StrictStruct>(val.encode_to_vec(), OutOfDomainValue);
         }
     }
 
@@ -763,64 +779,68 @@ mod derived_message_tests {
         // defaulted.
 
         // When the inner message is default, it doesn't encode.
-        let val = OuterDirect {
-            inner: Default::default(),
-            also: "abc".into(),
-        };
-        let encoded = val.encode_to_vec();
-        assert_eq!(OuterDirect::decode(encoded.as_slice()), Ok(val.clone()));
-        assert_eq!(
-            OuterDirect::decode_distinguished(encoded.as_slice()),
-            Ok(val.clone())
+        assert::decodes_distinguished(
+            [(2, OV::string("abc"))],
+            OuterDirect {
+                inner: Default::default(),
+                also: "abc".into(),
+            },
         );
-        assert_eq!(
-            OuterOptional::decode(encoded.as_slice()),
-            Ok(OuterOptional {
+        assert::decodes_distinguished(
+            [(2, OV::string("abc"))],
+            OuterOptional {
                 inner: None,
-                also: Some("abc".into())
-            })
+                also: Some("abc".into()),
+            },
         );
-        assert_eq!(
-            OuterOptional::decode_distinguished(encoded.as_slice()),
-            Ok(OuterOptional {
-                inner: None,
-                also: Some("abc".into())
-            })
+
+        // When the inner message is present in the encoding but defaulted, it's only canonical when
+        // the field is optioned.
+        assert::decodes_only_expedient(
+            [(1, OV::message(&OpaqueMessage::from_iter([])))],
+            OuterDirect::default(),
+            NotCanonical,
+        );
+        assert::decodes_distinguished(
+            [(1, OV::message(&OpaqueMessage::from_iter([])))],
+            OuterOptional {
+                inner: Some(Default::default()),
+                also: None,
+            },
         );
 
         // The inner message is included when it is not fully defaulted
-        let val = OuterDirect {
-            inner: Inner {
-                a: "def".into(),
-                b: 0,
+        assert::decodes_distinguished(
+            [
+                (
+                    1,
+                    OV::message(&OpaqueMessage::from_iter([(1, OV::string("def"))])),
+                ),
+                (2, OV::string("abc")),
+            ],
+            OuterDirect {
+                inner: Inner {
+                    a: "def".into(),
+                    b: 0,
+                },
+                also: "abc".into(),
             },
-            also: "abc".into(),
-        };
-        let encoded = val.encode_to_vec();
-        assert_eq!(OuterDirect::decode(encoded.as_slice()), Ok(val.clone()),);
-        assert_eq!(
-            OuterDirect::decode_distinguished(encoded.as_slice()),
-            Ok(val.clone())
         );
-        assert_eq!(
-            OuterOptional::decode(encoded.as_slice()),
-            Ok(OuterOptional {
+        assert::decodes_distinguished(
+            [
+                (
+                    1,
+                    OV::message(&OpaqueMessage::from_iter([(1, OV::string("def"))])),
+                ),
+                (2, OV::string("abc")),
+            ],
+            OuterOptional {
                 inner: Some(Inner {
                     a: "def".into(),
-                    b: 0
+                    b: 0,
                 }),
-                also: Some("abc".into())
-            })
-        );
-        assert_eq!(
-            OuterOptional::decode_distinguished(encoded.as_slice()),
-            Ok(OuterOptional {
-                inner: Some(Inner {
-                    a: "def".into(),
-                    b: 0
-                }),
-                also: Some("abc".into())
-            })
+                also: Some("abc".into()),
+            },
         );
     }
 }
