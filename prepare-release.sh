@@ -4,7 +4,7 @@
 # commit and tag. The commit and tag are not automatically pushed, nor are the
 # crates published (see publish-release.sh).
 
-set -ex
+set -euxo pipefail
 
 if [ "$#" -ne 1 ]
 then
