@@ -169,6 +169,12 @@ mod derived_message_tests {
         }
     }
 
+    // TODO(widders): test coverage for completed features:
+    //  * unknown fields are forbidden in distinguished decoding
+    //  * map keys and set values must be ascending in distinguished decoding
+    //  * map keys and set values must never recur in any decoding mode with either hash or btree
+    //  * repeated fields must have matching packed-ness in distinguished decoding
+
     // Tests for encoding rigor
 
     #[test]

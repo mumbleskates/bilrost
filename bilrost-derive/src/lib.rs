@@ -317,14 +317,6 @@ fn append_distinguished_encoder_wheres<T>(
     )
 }
 
-// TODO(widders): test coverage for completed features:
-//  * do prop-testing for stronger round-trip guarantees now that the encoding is better
-//    distinguished
-//  * unknown fields are forbidden in distinguished decoding
-//  * map keys and set values must be ascending in distinguished decoding
-//  * map keys and set values must never recur in any decoding mode with either hash or btree
-//  * repeated fields must have matching packed-ness in distinguished decoding
-
 fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     let input: DeriveInput = parse2(input)?;
 
