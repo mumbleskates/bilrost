@@ -309,12 +309,19 @@ mod derived_message_tests {
             Foo(1, -1, 1, -1),
         );
         for fixed_value in [
-            [(1, OV::fixed_u32(1))],
-            [(2, OV::fixed_i32(1))],
-            [(3, OV::fixed_u64(1))],
-            [(4, OV::fixed_i64(1))],
-        ] {
             // Currently it is not supported to parse fixed-width values into varint fields.
+            [(1, OV::fixed_u32(1))],
+            [(2, OV::fixed_u32(1))],
+            [(3, OV::fixed_u32(1))],
+            [(4, OV::fixed_u32(1))],
+            [(1, OV::fixed_u64(1))],
+            [(2, OV::fixed_u64(1))],
+            [(3, OV::fixed_u64(1))],
+            [(4, OV::fixed_u64(1))],
+            // Length-delimited values don't represent integers
+            // TODO(widders): proptests for encoders that they immediately abandon wrong wiretypes.
+            //  simple examples that those values are rejected here.
+        ] {
             assert::never_decodes::<Foo>(fixed_value, WrongWireType);
         }
     }
