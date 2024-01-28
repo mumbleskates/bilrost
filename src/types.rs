@@ -1,3 +1,5 @@
+use alloc::borrow::Cow;
+use alloc::boxed::Box;
 use alloc::vec::Vec;
 use core::borrow::{Borrow, BorrowMut};
 use core::convert::{AsMut, AsRef, From};
@@ -75,6 +77,48 @@ impl From<Vec<u8>> for Blob {
 impl From<Blob> for Vec<u8> {
     fn from(value: Blob) -> Self {
         value.0
+    }
+}
+
+impl From<&[u8]> for Blob {
+    fn from(value: &[u8]) -> Self {
+        Self(value.into())
+    }
+}
+
+impl From<&mut [u8]> for Blob {
+    fn from(value: &mut [u8]) -> Self {
+        Self(value.into())
+    }
+}
+
+impl<const N: usize> From<&[u8; N]> for Blob {
+    fn from(value: &[u8; N]) -> Self {
+        Self(value.into())
+    }
+}
+
+impl<const N: usize> From<[u8; N]> for Blob {
+    fn from(value: [u8; N]) -> Self {
+        Self(value.into())
+    }
+}
+
+impl<'a> From<Cow<'a, [u8]>> for Blob {
+    fn from(value: Cow<'a, [u8]>) -> Self {
+        Self(value.into())
+    }
+}
+
+impl From<Box<[u8]>> for Blob {
+    fn from(value: Box<[u8]>) -> Self {
+        Self(value.into())
+    }
+}
+
+impl From<&str> for Blob {
+    fn from(value: &str) -> Self {
+        Self(value.into())
     }
 }
 
