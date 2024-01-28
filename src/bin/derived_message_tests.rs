@@ -529,10 +529,7 @@ mod derived_message_tests {
         assert!(!Outer(Inner(-0.0)).is_empty());
         assert::encodes(
             Outer(Inner(-0.0)),
-            [(
-                1,
-                OV::message(&OpaqueMessage::from_iter([(1, OV::f32(-0.0))])),
-            )],
+            [(1, OV::message(&[(1, OV::f32(-0.0))].into_opaque_message()))],
         );
         let decoded = Outer::from_opaque(Outer(Inner(-0.0)).encode_to_vec());
         assert_eq!(decoded.0 .0.to_bits(), (-0.0f32).to_bits());
@@ -868,12 +865,12 @@ mod derived_message_tests {
         // When the inner message is present in the encoding but defaulted, it's only canonical when
         // the field is optioned.
         assert::decodes_only_expedient(
-            [(1, OV::message(&OpaqueMessage::from_iter([])))],
+            [(1, OV::message(&[].into_opaque_message()))],
             OuterDirect::default(),
             NotCanonical,
         );
         assert::decodes_distinguished(
-            [(1, OV::message(&OpaqueMessage::from_iter([])))],
+            [(1, OV::message(&[].into_opaque_message()))],
             OuterOptional {
                 inner: Some(Default::default()),
                 also: None,
@@ -885,7 +882,7 @@ mod derived_message_tests {
             [
                 (
                     1,
-                    OV::message(&OpaqueMessage::from_iter([(1, OV::string("def"))])),
+                    OV::message(&[(1, OV::string("def"))].into_opaque_message()),
                 ),
                 (2, OV::string("abc")),
             ],
@@ -901,7 +898,7 @@ mod derived_message_tests {
             [
                 (
                     1,
-                    OV::message(&OpaqueMessage::from_iter([(1, OV::string("def"))])),
+                    OV::message(&[(1, OV::string("def"))].into_opaque_message()),
                 ),
                 (2, OV::string("abc")),
             ],
@@ -947,10 +944,7 @@ mod derived_message_tests {
         assert::decodes_distinguished(
             [
                 (0, OV::string("hello")),
-                (
-                    4,
-                    OV::message(&OpaqueMessage::from_iter([(1, OV::i64(555))])),
-                ),
+                (4, OV::message(&[(1, OV::i64(555))].into_opaque_message())),
                 (7, OV::bool(false)),
             ],
             Foo {
@@ -964,10 +958,7 @@ mod derived_message_tests {
             [
                 (0, OV::string("hello")),
                 (2, OV::u32(123)), // Unknown field
-                (
-                    4,
-                    OV::message(&OpaqueMessage::from_iter([(1, OV::i64(555))])),
-                ),
+                (4, OV::message(&[(1, OV::i64(555))].into_opaque_message())),
                 (7, OV::bool(false)),
             ],
             Foo {
@@ -983,10 +974,13 @@ mod derived_message_tests {
                 (0, OV::string("hello")),
                 (
                     4,
-                    OV::message(&OpaqueMessage::from_iter([
-                        (0, OV::string("unknown")), // Unknown field
-                        (1, OV::i64(555)),
-                    ])),
+                    OV::message(
+                        &[
+                            (0, OV::string("unknown")), // Unknown field
+                            (1, OV::i64(555)),
+                        ]
+                        .into_opaque_message(),
+                    ),
                 ),
                 (7, OV::bool(false)),
             ],
