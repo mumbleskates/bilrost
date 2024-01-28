@@ -1912,5 +1912,15 @@ mod test {
                 Err(DecodeError::new(OutOfDomainValue))
             );
         }
+
+        #[test]
+        fn field_key_too_big(tag in u32::MAX as u64 + 1..) {
+            let mut buf = Vec::<u8>::new();
+            encode_varint(tag << 2, &mut buf);
+            prop_assert_eq!(
+                TagReader::new().decode_key(&mut buf.as_slice()),
+                Err(DecodeError::new(TagOverflowed))
+            );
+        }
     }
 }
