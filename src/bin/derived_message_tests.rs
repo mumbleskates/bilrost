@@ -20,7 +20,10 @@ mod derived_message_tests {
 
     use bilrost::encoding::opaque::{OpaqueMessage, OpaqueValue as OV};
     use bilrost::encoding::{encode_varint, HasEmptyState};
-    use bilrost::DecodeErrorKind::*;
+    use bilrost::DecodeErrorKind::{
+        ConflictingFields, InvalidValue, NotCanonical, OutOfDomainValue, TagOverflowed, Truncated,
+        UnexpectedlyRepeated, UnknownField, WrongWireType,
+    };
     use bilrost::{
         DecodeError, DecodeErrorKind, DistinguishedMessage, Enumeration, Message, Oneof,
     };
@@ -175,6 +178,7 @@ mod derived_message_tests {
     //  * map keys and set values must be ascending in distinguished decoding
     //  * map keys and set values must never recur in any decoding mode with either hash or btree
     //  * repeated fields must have matching packed-ness in distinguished decoding
+    //  * truncated value and nested messages
 
     // Tests for encoding rigor
 
@@ -614,7 +618,7 @@ mod derived_message_tests {
         assert_eq!(decoded.0 .0.to_bits(), (-0.0f32).to_bits());
     }
 
-    // TODO(widders): string tests
+    // TODO(widders): string tests (including InvalidValue)
     // TODO(widders): bytes tests
 
     // Repeated field tests
