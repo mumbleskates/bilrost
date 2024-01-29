@@ -48,7 +48,7 @@ mod derived_message_tests {
         }
     }
 
-    impl<'a> IntoOpaqueMessage for &'a [(u32, OV)] {
+    impl IntoOpaqueMessage for &[(u32, OV)] {
         fn into_opaque_message(self) -> OpaqueMessage {
             OpaqueMessage::from_iter(self.iter().cloned())
         }
@@ -172,13 +172,34 @@ mod derived_message_tests {
             );
             assert_eq!(value.encoded_len(), encoded.len(), "encoded_len was wrong");
         }
+
+        pub(super) fn is_invalid<M: Message + Debug>(
+            value: impl AsRef<[u8]>,
+            err: DecodeErrorKind,
+        ) {
+            assert_eq!(
+                M::decode(&mut value.as_ref())
+                    .expect_err("decoded without error")
+                    .kind(),
+                err
+            );
+        }
+
+        pub(super) fn is_invalid_distinguished<M: DistinguishedMessage + Debug>(
+            value: impl AsRef<[u8]>,
+            err: DecodeErrorKind,
+        ) {
+            assert_eq!(
+                M::decode_distinguished(&mut value.as_ref())
+                    .expect_err("decoded without error")
+                    .kind(),
+                err
+            );
+        }
     }
 
     // TODO(widders): test coverage for completed features:
-    //  * map keys and set values must be ascending in distinguished decoding
-    //  * map keys and set values must never recur in any decoding mode with either hash or btree
-    //  * repeated fields must have matching packed-ness in distinguished decoding
-    //  * truncated value and nested messages
+    //  * truncated values and nested messages
 
     // Tests for encoding rigor
 
@@ -388,34 +409,17 @@ mod derived_message_tests {
         let mut combined = maximum_tag;
         combined.extend(one_more_tag);
         // Nothing should ever be able to decode this message; it's not a valid encoding.
-        assert_eq!(
-            OpaqueMessage::decode(&mut combined.as_slice()),
-            Err(DecodeError::new(TagOverflowed))
-        );
-        assert_eq!(
-            <()>::decode(&mut combined.as_slice()),
-            Err(DecodeError::new(TagOverflowed))
-        );
+        assert::is_invalid::<OpaqueMessage>(&combined, TagOverflowed);
+        assert::is_invalid::<()>(&combined, TagOverflowed);
 
         let mut first_tag_too_big = Vec::new();
+        // This is the first varint that's always an invalid field key.
         encode_varint((u32::MAX as u64 + 1) << 2, &mut first_tag_too_big);
         // Nothing should ever be able to decode this message either; it's not a valid encoding.
-        assert_eq!(
-            OpaqueMessage::decode(&mut first_tag_too_big.as_slice()),
-            Err(DecodeError::new(TagOverflowed))
-        );
-        assert_eq!(
-            <()>::decode(&mut first_tag_too_big.as_slice()),
-            Err(DecodeError::new(TagOverflowed))
-        );
-        assert_eq!(
-            OpaqueMessage::decode_distinguished(&mut first_tag_too_big.as_slice()),
-            Err(DecodeError::new(TagOverflowed))
-        );
-        assert_eq!(
-            <()>::decode_distinguished(&mut first_tag_too_big.as_slice()),
-            Err(DecodeError::new(TagOverflowed))
-        );
+        assert::is_invalid::<OpaqueMessage>(&first_tag_too_big, TagOverflowed);
+        assert::is_invalid_distinguished::<OpaqueMessage>(&first_tag_too_big, TagOverflowed);
+        assert::is_invalid::<()>(&first_tag_too_big, TagOverflowed);
+        assert::is_invalid_distinguished::<()>(&first_tag_too_big, TagOverflowed);
     }
 
     // Varint tests
@@ -660,7 +664,11 @@ mod derived_message_tests {
     }
 
     // TODO(widders): map tests
+    //  * map keys must never recur
+    //  * map keys and set values must be ascending in distinguished decoding
     // TODO(widders): collection tests -- vec, sets
+    //  * set values must never recur
+    //  * repeated fields must have matching packed-ness in distinguished decoding
 
     // Oneof tests
 
