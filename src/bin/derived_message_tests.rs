@@ -19,7 +19,10 @@ mod derived_message_tests {
     use itertools::{repeat_n, Itertools};
 
     use bilrost::encoding::opaque::{OpaqueMessage, OpaqueValue as OV};
-    use bilrost::encoding::{encode_varint, DistinguishedOneof, HasEmptyState, Oneof};
+    use bilrost::encoding::{
+        encode_varint, DistinguishedEncoder, DistinguishedOneof, DistinguishedValueEncoder,
+        HasEmptyState, Oneof, ValueEncoder,
+    };
     use bilrost::DecodeErrorKind::{
         ConflictingFields, InvalidValue, NotCanonical, OutOfDomainValue, TagOverflowed, Truncated,
         UnexpectedlyRepeated, UnknownField, WrongWireType,
@@ -697,6 +700,59 @@ mod derived_message_tests {
         );
         let decoded = Outer::from_opaque(Outer(Inner(-0.0)).encode_to_vec());
         assert_eq!(decoded.0 .0.to_bits(), (-0.0f32).to_bits());
+    }
+
+    #[test]
+    fn truncated_fixed() {
+        #[derive(Debug, PartialEq, Eq, Oneof, DistinguishedOneof)]
+        enum A<T> {
+            Empty,
+            #[bilrost(tag(1), encoder(fixed))]
+            One(T),
+        }
+
+        #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+        struct Foo<T>(#[bilrost(oneof(1))] A<T>, #[bilrost(encoder(fixed))] T);
+
+        fn check_fixed_truncation<T>(val: OV)
+        where
+            T: Debug + Default + Eq + HasEmptyState,
+            bilrost::encoding::Fixed:
+                DistinguishedEncoder<T> + ValueEncoder<T> + DistinguishedValueEncoder<T>,
+        {
+            let valid_direct = [(1, val.clone())].into_opaque_message().encode_to_vec();
+            let valid_in_oneof = [(2, val.clone())].into_opaque_message().encode_to_vec();
+            assert::is_invalid::<Foo<T>>(&valid_direct[..valid_direct.len() - 1], Truncated);
+            assert::is_invalid::<Foo<T>>(&valid_in_oneof[..valid_direct.len() - 1], Truncated);
+            assert::is_invalid_distinguished::<Foo<T>>(
+                &valid_direct[..valid_direct.len() - 1],
+                Truncated,
+            );
+            assert::is_invalid_distinguished::<Foo<T>>(
+                &valid_in_oneof[..valid_direct.len() - 1],
+                Truncated,
+            );
+            assert::is_invalid::<OpaqueMessage>(&valid_direct[..valid_direct.len() - 1], Truncated);
+            assert::is_invalid::<OpaqueMessage>(
+                &valid_in_oneof[..valid_direct.len() - 1],
+                Truncated,
+            );
+            assert::is_invalid_distinguished::<OpaqueMessage>(
+                &valid_direct[..valid_direct.len() - 1],
+                Truncated,
+            );
+            assert::is_invalid_distinguished::<OpaqueMessage>(
+                &valid_in_oneof[..valid_direct.len() - 1],
+                Truncated,
+            );
+            assert::is_invalid::<()>(&valid_direct[..valid_direct.len() - 1], Truncated);
+            assert::is_invalid::<()>(&valid_in_oneof[..valid_direct.len() - 1], Truncated);
+        }
+
+        check_fixed_truncation::<u32>(OV::fixed_u32(0x1234abcd));
+        check_fixed_truncation::<i32>(OV::fixed_u32(0x1234abcd));
+        check_fixed_truncation::<u64>(OV::fixed_u64(0x1234deadbeefcafe));
+        check_fixed_truncation::<i64>(OV::fixed_u64(0x1234deadbeefcafe));
     }
 
     // TODO(widders): string tests (including InvalidValue)

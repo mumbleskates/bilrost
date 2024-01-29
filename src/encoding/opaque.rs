@@ -6,6 +6,7 @@ use bytes::{Buf, BufMut};
 use crate::encoding::{
     encode_varint, encoded_len_varint, Capped, DecodeContext, TagMeasurer, TagWriter, WireType,
 };
+use crate::DecodeErrorKind::Truncated;
 use crate::{DecodeError, Message, RawDistinguishedMessage, RawMessage};
 
 /// Represents an opaque bilrost field value. Can represent any valid encoded value.
@@ -136,11 +137,17 @@ impl OpaqueValue {
                 LengthDelimited(val)
             }
             WireType::ThirtyTwoBit => {
+                if buf.remaining_before_cap() < 4 {
+                    return Err(DecodeError::new(Truncated));
+                }
                 let mut val = [0u8; 4];
                 buf.copy_to_slice(&mut val);
                 ThirtyTwoBit(val)
             }
             WireType::SixtyFourBit => {
+                if buf.remaining_before_cap() < 8 {
+                    return Err(DecodeError::new(Truncated));
+                }
                 let mut val = [0u8; 8];
                 buf.copy_to_slice(&mut val);
                 SixtyFourBit(val)
