@@ -95,7 +95,7 @@ pub struct Duration {
 #[derive(Clone, Debug, PartialEq, Message)]
 pub struct Struct {
     /// Unordered map of dynamically typed values.
-    #[bilrost(1)]
+    #[bilrost(tag = 1, recurses)]
     pub fields: BTreeMap<String, Value>,
 }
 
@@ -145,7 +145,7 @@ pub mod value {
 #[derive(Clone, Debug, PartialEq, Message)]
 pub struct ListValue {
     /// Repeated field of dynamically typed values.
-    #[bilrost(tag = 1, encoder = "packed")]
+    #[bilrost(tag = 1, encoder = "packed", recurses)]
     pub values: Vec<Value>,
 }
 

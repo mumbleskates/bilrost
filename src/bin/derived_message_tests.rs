@@ -19,14 +19,12 @@ mod derived_message_tests {
     use itertools::{repeat_n, Itertools};
 
     use bilrost::encoding::opaque::{OpaqueMessage, OpaqueValue as OV};
-    use bilrost::encoding::{encode_varint, HasEmptyState};
+    use bilrost::encoding::{encode_varint, DistinguishedOneof, HasEmptyState, Oneof};
     use bilrost::DecodeErrorKind::{
         ConflictingFields, InvalidValue, NotCanonical, OutOfDomainValue, TagOverflowed, Truncated,
         UnexpectedlyRepeated, UnknownField, WrongWireType,
     };
-    use bilrost::{
-        DecodeError, DecodeErrorKind, DistinguishedMessage, Enumeration, Message, Oneof,
-    };
+    use bilrost::{DecodeErrorKind, DistinguishedMessage, Enumeration, Message, Oneof};
     use bilrost_derive::DistinguishedOneof;
 
     trait IntoOpaqueMessage {
@@ -200,6 +198,47 @@ mod derived_message_tests {
 
     // TODO(widders): test coverage for completed features:
     //  * truncated values and nested messages
+
+    // Tests for derived trait bounds
+
+    #[test]
+    fn derived_trait_bounds() {
+        #[allow(dead_code)]
+        struct X; // Not encodable
+
+        #[derive(PartialEq, Eq, Oneof, DistinguishedOneof)]
+        enum A<T> {
+            Empty,
+            #[bilrost(1)]
+            One(bool),
+            #[bilrost(2)]
+            Two(T),
+        }
+        static_assertions::assert_impl_all!(A<bool>: Oneof, DistinguishedOneof);
+        static_assertions::assert_impl_all!(A<f32>: Oneof);
+        static_assertions::assert_not_impl_any!(A<f32>: DistinguishedOneof);
+        static_assertions::assert_not_impl_any!(A<X>: Oneof, DistinguishedOneof);
+
+        #[derive(PartialEq, Eq, Message, DistinguishedMessage)]
+        struct Inner<U>(U);
+        static_assertions::assert_impl_all!(Inner<bool>: Message, DistinguishedMessage);
+        static_assertions::assert_impl_all!(Inner<f32>: Message);
+        static_assertions::assert_not_impl_any!(Inner<f32>: DistinguishedMessage);
+        static_assertions::assert_not_impl_any!(Inner<X>: Message, DistinguishedMessage);
+
+        #[derive(PartialEq, Eq, Message, DistinguishedMessage)]
+        struct Foo<T, U, V>(#[bilrost(oneof(1, 2))] A<T>, Inner<U>, V);
+        static_assertions::assert_impl_all!(Foo<bool, bool, bool>: Message, DistinguishedMessage);
+        static_assertions::assert_impl_all!(Foo<f32, bool, bool>: Message);
+        static_assertions::assert_impl_all!(Foo<bool, f32, bool>: Message);
+        static_assertions::assert_impl_all!(Foo<bool, bool, f32>: Message);
+        static_assertions::assert_not_impl_any!(Foo<f32, bool, bool>: DistinguishedMessage);
+        static_assertions::assert_not_impl_any!(Foo<bool, f32, bool>: DistinguishedMessage);
+        static_assertions::assert_not_impl_any!(Foo<bool, bool, f32>: DistinguishedMessage);
+        static_assertions::assert_not_impl_any!(Foo<X, bool, bool>: Message, DistinguishedMessage);
+        static_assertions::assert_not_impl_any!(Foo<bool, X, bool>: Message, DistinguishedMessage);
+        static_assertions::assert_not_impl_any!(Foo<bool, bool, X>: Message, DistinguishedMessage);
+    }
 
     // Tests for encoding rigor
 

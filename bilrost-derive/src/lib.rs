@@ -278,42 +278,48 @@ fn sort_fields(unsorted_fields: Vec<(TokenStream, Field)>) -> Vec<FieldChunk> {
 /// encoder to assert that it supports the field's type.
 fn impl_append_wheres(
     where_clause: Option<&WhereClause>,
-    field_wheres: impl Iterator<Item = Option<TokenStream>>,
+    self_where: Option<TokenStream>,
+    field_wheres: impl Iterator<Item = TokenStream>,
 ) -> TokenStream {
     // dedup the where clauses by their String values
     let encoder_wheres: BTreeMap<_, _> = field_wheres
-        .flatten()
         .map(|where_| (where_.to_string(), where_))
         .collect();
-    let encoder_wheres: Vec<_> = encoder_wheres.values().collect();
+    let appended_wheres: Vec<_> = self_where.iter().chain(encoder_wheres.values()).collect();
     if let Some(where_clause) = where_clause {
-        quote! { #where_clause #(, #encoder_wheres)* }
-    } else if encoder_wheres.is_empty() {
+        quote! { #where_clause #(, #appended_wheres)* }
+    } else if appended_wheres.is_empty() {
         quote!() // no where clause terms
     } else {
-        quote! { where #(#encoder_wheres),*}
+        quote! { where #(#appended_wheres),*}
     }
 }
 
-fn append_encoder_wheres<T>(
+fn append_expedient_encoder_wheres<T>(
     where_clause: Option<&WhereClause>,
+    self_where: Option<TokenStream>,
     fields: &[(T, Field)],
 ) -> TokenStream {
     impl_append_wheres(
         where_clause,
-        fields.iter().map(|(_, field)| field.encoder_where()),
+        self_where,
+        fields
+            .iter()
+            .flat_map(|(_, field)| field.expedient_where_terms()),
     )
 }
 
 fn append_distinguished_encoder_wheres<T>(
     where_clause: Option<&WhereClause>,
+    self_where: Option<TokenStream>,
     fields: &[(T, Field)],
 ) -> TokenStream {
     impl_append_wheres(
         where_clause,
+        self_where,
         fields
             .iter()
-            .map(|(_, field)| field.distinguished_encoder_where()),
+            .flat_map(|(_, field)| field.distinguished_where_terms()),
     )
 }
 
@@ -328,7 +334,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         unsorted_fields,
     } = preprocess_message(&input)?;
     let fields = sort_fields(unsorted_fields.clone());
-    let where_clause = append_encoder_wheres(where_clause, &unsorted_fields);
+    let where_clause = append_expedient_encoder_wheres(where_clause, None, &unsorted_fields);
 
     let encoded_len = fields.iter().map(|chunk| match chunk {
         AlwaysOrdered((field_ident, field)) => field.encoded_len(quote!(self.#field_ident)),
@@ -441,7 +447,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     });
 
     let decode = unsorted_fields.iter().map(|(field_ident, field)| {
-        let decode = field.decode(quote!(value));
+        let decode = field.decode_expedient(quote!(value));
         let tags = field.tags().into_iter().map(|tag| quote!(#tag));
         let tags = Itertools::intersperse(tags, quote!(|));
 
@@ -489,9 +495,9 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         .collect();
 
     let expanded = quote! {
-        #(#static_guards)*
-
         impl #impl_generics ::bilrost::RawMessage for #ident #ty_generics #where_clause {
+            const __ASSERTIONS: () = { #(#static_guards)* };
+
             #[allow(unused_variables)]
             fn raw_encode<__B>(&self, buf: &mut __B)
             where
@@ -575,7 +581,7 @@ fn try_distinguished_message(input: TokenStream) -> Result<TokenStream, Error> {
         where_clause,
         unsorted_fields,
     } = preprocess_message(&input)?;
-    let where_clause = append_distinguished_encoder_wheres(where_clause, &unsorted_fields);
+    let where_clause = append_distinguished_encoder_wheres(where_clause, None, &unsorted_fields);
 
     let decode = unsorted_fields.iter().map(|(field_ident, field)| {
         let decode = field.decode_distinguished(quote!(value));
@@ -711,7 +717,9 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
 
     let is_valid = variants.iter().map(|(_, value)| quote!(#value => true));
 
-    let to_u32 = variants.iter().map(|(variant, value)| quote!(#ident::#variant => #value));
+    let to_u32 = variants
+        .iter()
+        .map(|(variant, value)| quote!(#ident::#variant => #value));
 
     let try_from = variants
         .iter()
@@ -948,7 +956,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         empty_variant,
     } = preprocess_oneof(&input)?;
 
-    let where_clause = append_encoder_wheres(where_clause, &fields);
+    let where_clause = append_expedient_encoder_wheres(where_clause, None, &fields);
 
     let sorted_tags: Vec<u32> = fields
         .iter()
@@ -987,7 +995,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
 
         let decode = fields.iter().map(|(variant_ident, field)| {
             let tag = field.first_tag();
-            let decode = field.decode(quote!(value));
+            let decode = field.decode_expedient(quote!(value));
             let with_new_value = field.with_value(quote!(new_value));
             let with_value = field.with_value(quote!(value));
             quote! {
@@ -1070,8 +1078,13 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
                     }
                 }
 
-                impl #impl_generics ::bilrost::encoding::EqualDefaultAlwaysEmpty
-                for #ident #ty_generics #where_clause {}
+                impl #impl_generics ::bilrost::encoding::HasEmptyState
+                for #ident #ty_generics #where_clause {
+                    #[inline]
+                    fn is_empty(&self) -> bool {
+                        matches!(self, #ident::#empty_ident)
+                    }
+                }
             };
         }
     } else {
@@ -1084,7 +1097,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
 
         let decode = fields.iter().map(|(variant_ident, field)| {
             let tag = field.first_tag();
-            let decode = field.decode(quote!(value));
+            let decode = field.decode_expedient(quote!(value));
             let with_new_value = field.with_value(quote!(new_value));
             let with_value = field.with_value(quote!(value));
             quote! {
@@ -1180,12 +1193,15 @@ fn try_distinguished_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         fields,
         empty_variant,
     } = preprocess_oneof(&input)?;
-    let where_clause = append_distinguished_encoder_wheres(where_clause, &fields);
-
     let expanded = if let Some(empty_ident) = empty_variant {
+        let where_clause = append_distinguished_encoder_wheres(
+            where_clause,
+            Some(quote!(Self: ::bilrost::encoding::Oneof)),
+            &fields,
+        );
         let decode = fields.iter().map(|(variant_ident, field)| {
             let tag = field.first_tag();
-            let decode = field.decode(quote!(value));
+            let decode = field.decode_distinguished(quote!(value));
             let with_new_value = field.with_value(quote!(new_value));
             let with_value = field.with_value(quote!(value));
             quote! {
@@ -1230,9 +1246,10 @@ fn try_distinguished_oneof(input: TokenStream) -> Result<TokenStream, Error> {
             }
         }
     } else {
+        let where_clause = append_distinguished_encoder_wheres(where_clause, None, &fields);
         let decode = fields.iter().map(|(variant_ident, field)| {
             let tag = field.first_tag();
-            let decode = field.decode(quote!(value));
+            let decode = field.decode_distinguished(quote!(value));
             let with_new_value = field.with_value(quote!(new_value));
             let with_value = field.with_value(quote!(value));
             quote! {

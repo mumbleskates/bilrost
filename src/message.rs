@@ -316,6 +316,8 @@ where
 /// Trait to be implemented by messages, which have knowledge of their fields' tags and encoding.
 /// The methods of this trait are meant to only be used by the `Message` implementation.
 pub trait RawMessage: Default {
+    const __ASSERTIONS: ();
+
     /// Encodes the message to a buffer.
     ///
     /// This method will panic if the buffer has insufficient capacity.
@@ -361,6 +363,8 @@ impl<T> RawMessage for Box<T>
 where
     T: RawMessage,
 {
+    const __ASSERTIONS: () = ();
+
     fn raw_encode<B: BufMut + ?Sized>(&self, buf: &mut B) {
         (**self).raw_encode(buf)
     }

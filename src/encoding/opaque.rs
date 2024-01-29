@@ -159,6 +159,8 @@ impl OpaqueValue {
 pub type OpaqueMessage = BTreeMultiMap<u32, OpaqueValue>;
 
 impl RawMessage for OpaqueMessage {
+    const __ASSERTIONS: () = ();
+
     fn raw_encode<B: BufMut + ?Sized>(&self, buf: &mut B) {
         let mut tw = TagWriter::new();
         for (tag, value) in self {

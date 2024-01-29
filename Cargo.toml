@@ -59,6 +59,7 @@ itertools = "0.12"
 log = "0.4"
 proptest = "1"
 rand = "0.8"
+static_assertions = "1"
 
 [profile.bench]
 debug = true

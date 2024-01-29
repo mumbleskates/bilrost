@@ -111,9 +111,10 @@ impl Field {
     pub fn encode(&self, ident: TokenStream) -> TokenStream {
         let tag = self.tag;
         let encoder = &self.encoder;
+        let ty = &self.ty;
         if self.in_oneof {
             quote! {
-                <#encoder as ::bilrost::encoding::FieldEncoder<_>>::encode_field(
+                <#encoder as ::bilrost::encoding::FieldEncoder<#ty>>::encode_field(
                     #tag,
                     &#ident,
                     buf,
@@ -122,18 +123,19 @@ impl Field {
             }
         } else {
             quote! {
-                <#encoder as ::bilrost::encoding::Encoder<_>>::encode(#tag, &#ident, buf, tw);
+                <#encoder as ::bilrost::encoding::Encoder<#ty>>::encode(#tag, &#ident, buf, tw);
             }
         }
     }
 
     /// Returns an expression which evaluates to the result of merging a decoded value into the
     /// field. The given ident must be an &mut that already refers to the destination.
-    pub fn decode(&self, ident: TokenStream) -> TokenStream {
+    pub fn decode_expedient(&self, ident: TokenStream) -> TokenStream {
         let encoder = &self.encoder;
+        let ty = &self.ty;
         if self.in_oneof {
             quote!(
-                <#encoder as ::bilrost::encoding::FieldEncoder<_>>::decode_field(
+                <#encoder as ::bilrost::encoding::FieldEncoder<#ty>>::decode_field(
                     wire_type,
                     #ident,
                     buf,
@@ -142,7 +144,7 @@ impl Field {
             )
         } else {
             quote!(
-                <#encoder as ::bilrost::encoding::Encoder<_>>::decode(
+                <#encoder as ::bilrost::encoding::Encoder<#ty>>::decode(
                     wire_type,
                     duplicated,
                     #ident,
@@ -157,10 +159,11 @@ impl Field {
     /// distinguished mode. The given ident must be an &mut that already refers to the destination.
     pub fn decode_distinguished(&self, ident: TokenStream) -> TokenStream {
         let encoder = &self.encoder;
+        let ty = &self.ty;
         if self.in_oneof {
             quote!(
                 <
-                    #encoder as ::bilrost::encoding::DistinguishedFieldEncoder<_>
+                    #encoder as ::bilrost::encoding::DistinguishedFieldEncoder<#ty>
                 >::decode_field_distinguished(
                     wire_type,
                     #ident,
@@ -170,7 +173,7 @@ impl Field {
             )
         } else {
             quote!(
-                <#encoder as ::bilrost::encoding::DistinguishedEncoder<_>>::decode_distinguished(
+                <#encoder as ::bilrost::encoding::DistinguishedEncoder<#ty>>::decode_distinguished(
                     wire_type,
                     duplicated,
                     #ident,
@@ -186,9 +189,10 @@ impl Field {
     pub fn encoded_len(&self, ident: TokenStream) -> TokenStream {
         let tag = self.tag;
         let encoder = &self.encoder;
+        let ty = &self.ty;
         if self.in_oneof {
             quote! {
-                <#encoder as ::bilrost::encoding::FieldEncoder<_>>::field_encoded_len(
+                <#encoder as ::bilrost::encoding::FieldEncoder<#ty>>::field_encoded_len(
                     #tag,
                     &#ident,
                     tm,
@@ -196,37 +200,52 @@ impl Field {
             }
         } else {
             quote! {
-                <#encoder as ::bilrost::encoding::Encoder<_>>::encoded_len(#tag, &#ident, tm)
+                <#encoder as ::bilrost::encoding::Encoder<#ty>>::encoded_len(#tag, &#ident, tm)
             }
         }
     }
 
     /// Returns the where clause constraint terms for the field's encoder.
-    pub fn encoder_where(&self) -> Option<TokenStream> {
+    pub fn expedient_where_terms(&self) -> Vec<TokenStream> {
         if self.recurses {
-            return None;
+            return vec![];
         }
         let ty = &self.ty;
         let encoder = &self.encoder;
-        Some(if self.in_oneof {
-            quote!(#encoder: ::bilrost::encoding::ValueEncoder<#ty>)
+        if self.in_oneof {
+            vec![
+                quote!(#encoder: ::bilrost::encoding::ValueEncoder<#ty>),
+                quote!(#ty: ::bilrost::encoding::NewForOverwrite),
+            ]
         } else {
-            quote!(#encoder: ::bilrost::encoding::Encoder<#ty>)
-        })
+            vec![
+                quote!(#encoder: ::bilrost::encoding::Encoder<#ty>),
+                quote!(#ty: ::core::default::Default),
+                quote!(#ty: ::bilrost::encoding::HasEmptyState),
+            ]
+        }
     }
 
     /// Returns the where clause constraint terms for the field's encoder.
-    pub fn distinguished_encoder_where(&self) -> Option<TokenStream> {
+    pub fn distinguished_where_terms(&self) -> Vec<TokenStream> {
         if self.recurses {
-            return None;
+            return vec![];
         }
         let ty = &self.ty;
         let encoder = &self.encoder;
-        Some(if self.in_oneof {
-            quote!(#encoder: ::bilrost::encoding::DistinguishedValueEncoder<#ty>)
+        if self.in_oneof {
+            vec![
+                quote!(#encoder: ::bilrost::encoding::DistinguishedValueEncoder<#ty>),
+                quote!(#ty: ::bilrost::encoding::NewForOverwrite),
+                quote!(#ty: ::core::cmp::Eq),
+            ]
         } else {
-            quote!(#encoder: ::bilrost::encoding::DistinguishedEncoder<#ty>)
-        })
+            vec![
+                quote!(#encoder: ::bilrost::encoding::DistinguishedEncoder<#ty>),
+                quote!(#ty: ::core::default::Default),
+                quote!(#ty: ::bilrost::encoding::HasEmptyState),
+            ]
+        }
     }
 
     /// Returns methods to embed in the message. `ident` must be the name of the field within the

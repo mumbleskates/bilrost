@@ -810,7 +810,7 @@ where
 
 /// Trait to be implemented by (or more commonly derived for) oneofs, which have knowledge of their
 /// variants' tags and encoding.
-pub trait Oneof: Default {
+pub trait Oneof: Default + HasEmptyState {
     const FIELD_TAGS: &'static [u32];
 
     /// Encodes the fields of the oneof into the given buffer.

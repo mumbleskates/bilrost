@@ -72,7 +72,7 @@ impl Field {
     }
 
     /// Returns an expression which evaluates to the result of decoding the oneof field.
-    pub fn decode(&self, ident: TokenStream) -> TokenStream {
+    pub fn decode_expedient(&self, ident: TokenStream) -> TokenStream {
         quote!(
             ::bilrost::encoding::Oneof::oneof_decode_field(
                 #ident,
@@ -108,5 +108,17 @@ impl Field {
     /// field in the oneof.
     pub fn current_tag(&self, ident: TokenStream) -> TokenStream {
         quote!(::bilrost::encoding::Oneof::oneof_current_tag(&#ident))
+    }
+
+    /// Returns the where clause constraint term for the field really implementing the oneof trait.
+    pub fn expedient_where_terms(&self) -> Vec<TokenStream> {
+        let ty = &self.ty;
+        vec![quote!(#ty: ::bilrost::encoding::Oneof)]
+    }
+
+    /// Returns the where clause constraint term for the field really implementing the oneof trait.
+    pub fn distinguished_where_terms(&self) -> Vec<TokenStream> {
+        let ty = &self.ty;
+        vec![quote!(#ty: ::bilrost::encoding::DistinguishedOneof)]
     }
 }

@@ -72,19 +72,19 @@ impl Field {
     }
 
     /// Returns the where clause condition asserting that this field's encoder encodes its type.
-    pub fn encoder_where(&self) -> Option<TokenStream> {
+    pub fn expedient_where_terms(&self) -> Vec<TokenStream> {
         match self {
-            Field::Value(field) => field.encoder_where(),
-            _ => None,
+            Field::Value(field) => field.expedient_where_terms(),
+            Field::Oneof(field) => field.expedient_where_terms(),
         }
     }
 
     /// Returns the where clause condition asserting that this field's encoder encodes its type in
     /// distinguished mode.
-    pub fn distinguished_encoder_where(&self) -> Option<TokenStream> {
+    pub fn distinguished_where_terms(&self) -> Vec<TokenStream> {
         match self {
-            Field::Value(field) => field.distinguished_encoder_where(),
-            _ => None,
+            Field::Value(field) => field.distinguished_where_terms(),
+            Field::Oneof(field) => field.distinguished_where_terms(),
         }
     }
 
@@ -101,7 +101,7 @@ impl Field {
                 let description = description.as_str();
                 // Static assertion pattern borrowed from static_assertions crate.
                 Some(quote!(
-                    const _: () = ::bilrost::assert_tags_are_equal(
+                    ::bilrost::assert_tags_are_equal(
                         #description,
                         <#oneof_ty as ::bilrost::encoding::Oneof>::FIELD_TAGS,
                         &[#(#tags),*],
@@ -134,10 +134,10 @@ impl Field {
     }
 
     /// Returns an expression which evaluates to the result of decoding a value into the field.
-    pub fn decode(&self, ident: TokenStream) -> TokenStream {
+    pub fn decode_expedient(&self, ident: TokenStream) -> TokenStream {
         match self {
-            Field::Value(scalar) => scalar.decode(ident),
-            Field::Oneof(oneof) => oneof.decode(ident),
+            Field::Value(scalar) => scalar.decode_expedient(ident),
+            Field::Oneof(oneof) => oneof.decode_expedient(ident),
         }
     }
 

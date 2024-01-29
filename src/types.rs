@@ -138,6 +138,8 @@ impl proptest::arbitrary::Arbitrary for Blob {
 }
 
 impl RawMessage for () {
+    const __ASSERTIONS: () = ();
+
     fn raw_encode<B: BufMut + ?Sized>(&self, _buf: &mut B) {}
 
     fn raw_encoded_len(&self) -> usize {
