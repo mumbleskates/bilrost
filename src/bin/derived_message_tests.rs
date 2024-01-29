@@ -461,6 +461,28 @@ mod derived_message_tests {
         assert::is_invalid_distinguished::<()>(&first_tag_too_big, TagOverflowed);
     }
 
+    #[test]
+    fn truncated_field_and_tag() {
+        #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+        struct Foo(#[bilrost(100)] String, #[bilrost(1_000_000)] u64);
+
+        let buf = [(100, OV::string("abc")), (1_000_000, OV::Varint(1))]
+            .into_opaque_message()
+            .encode_to_vec();
+        // Remove the last field's value and part of its key
+        assert::is_invalid::<Foo>(&buf[..buf.len() - 2], Truncated);
+        assert::is_invalid::<OpaqueMessage>(&buf[..buf.len() - 2], Truncated);
+        assert::is_invalid::<()>(&buf[..buf.len() - 2], Truncated);
+        assert::is_invalid_distinguished::<Foo>(&buf[..buf.len() - 2], Truncated);
+        assert::is_invalid_distinguished::<OpaqueMessage>(&buf[..buf.len() - 2], Truncated);
+        // Just remove the value from the last field
+        assert::is_invalid::<Foo>(&buf[..buf.len() - 1], Truncated);
+        assert::is_invalid::<OpaqueMessage>(&buf[..buf.len() - 1], Truncated);
+        assert::is_invalid::<()>(&buf[..buf.len() - 1], Truncated);
+        assert::is_invalid_distinguished::<Foo>(&buf[..buf.len() - 1], Truncated);
+        assert::is_invalid_distinguished::<OpaqueMessage>(&buf[..buf.len() - 1], Truncated);
+    }
+
     // Varint tests
 
     #[test]
@@ -514,6 +536,22 @@ mod derived_message_tests {
         assert::decodes_only_expedient([(1, OV::bool(false))], Foo(false), NotCanonical);
         assert::decodes_distinguished([(1, OV::bool(true))], Foo(true));
         assert::never_decodes::<Foo>([(1, OV::Varint(2))], OutOfDomainValue);
+    }
+
+    #[test]
+    fn truncated_varint() {
+        #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+        struct Foo<T>(#[bilrost(1_000_000)] T);
+
+        let buf = [(1, OV::Varint(1_000_000))]
+            .into_opaque_message()
+            .encode_to_vec();
+        assert::is_invalid::<OpaqueMessage>(&buf[..buf.len() - 1], Truncated);
+        assert::is_invalid::<Foo<u32>>(&buf[..buf.len() - 1], Truncated);
+        assert::is_invalid::<Foo<u64>>(&buf[..buf.len() - 1], Truncated);
+        assert::is_invalid::<Foo<i32>>(&buf[..buf.len() - 1], Truncated);
+        assert::is_invalid::<Foo<i64>>(&buf[..buf.len() - 1], Truncated);
+        assert::is_invalid::<Foo<bool>>(&buf[..buf.len() - 1], Truncated);
     }
 
     // Fixed width int tests
