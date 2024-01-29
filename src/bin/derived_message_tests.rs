@@ -1082,20 +1082,20 @@ mod derived_message_tests {
 
     #[test]
     fn reject_unknown_fields_distinguished() {
+        #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+        struct Nested(i64);
+
         #[derive(Debug, PartialEq, Eq, Oneof, DistinguishedOneof)]
         enum InnerOneof {
             Empty,
             #[bilrost(3)]
-            Three(String),
+            Three(Nested),
             #[bilrost(5)]
             Five(i32),
             #[bilrost(7)]
             Seven(bool),
         }
         use InnerOneof::*;
-
-        #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
-        struct Nested(i64);
 
         #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
         struct Foo {
@@ -1112,13 +1112,13 @@ mod derived_message_tests {
         assert::decodes_distinguished(
             [
                 (0, OV::string("hello")),
+                (3, OV::message(&[(1, OV::i64(301))].into_opaque_message())),
                 (4, OV::message(&[(1, OV::i64(555))].into_opaque_message())),
-                (7, OV::bool(false)),
             ],
             Foo {
                 zero: "hello".into(),
                 four: Some(Nested(555)),
-                oneof: Seven(false),
+                oneof: Three(Nested(301)),
                 ..Default::default()
             },
         );
@@ -1126,13 +1126,13 @@ mod derived_message_tests {
             [
                 (0, OV::string("hello")),
                 (2, OV::u32(123)), // Unknown field
+                (3, OV::message(&[(1, OV::i64(301))].into_opaque_message())),
                 (4, OV::message(&[(1, OV::i64(555))].into_opaque_message())),
-                (7, OV::bool(false)),
             ],
             Foo {
                 zero: "hello".into(),
                 four: Some(Nested(555)),
-                oneof: Seven(false),
+                oneof: Three(Nested(301)),
                 ..Default::default()
             },
             UnknownField,
@@ -1140,6 +1140,7 @@ mod derived_message_tests {
         assert::decodes_only_expedient(
             [
                 (0, OV::string("hello")),
+                (3, OV::message(&[(1, OV::i64(301))].into_opaque_message())),
                 (
                     4,
                     OV::message(
@@ -1150,12 +1151,34 @@ mod derived_message_tests {
                         .into_opaque_message(),
                     ),
                 ),
-                (7, OV::bool(false)),
             ],
             Foo {
                 zero: "hello".into(),
                 four: Some(Nested(555)),
-                oneof: Seven(false),
+                oneof: Three(Nested(301)),
+                ..Default::default()
+            },
+            UnknownField,
+        );
+        assert::decodes_only_expedient(
+            [
+                (0, OV::string("hello")),
+                (
+                    3,
+                    OV::message(
+                        &[
+                            (0, OV::string("unknown")), // unknown field
+                            (1, OV::i64(301)),
+                        ]
+                        .into_opaque_message(),
+                    ),
+                ),
+                (4, OV::message(&[(1, OV::i64(555))].into_opaque_message())),
+            ],
+            Foo {
+                zero: "hello".into(),
+                four: Some(Nested(555)),
+                oneof: Three(Nested(301)),
                 ..Default::default()
             },
             UnknownField,
