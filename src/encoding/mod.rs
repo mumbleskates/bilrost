@@ -75,9 +75,14 @@ pub fn decode_varint<B: Buf + ?Sized>(buf: &mut B) -> Result<u64, DecodeError> {
         buf.advance(1);
         Ok(u64::from(byte))
     } else if len >= 9 || bytes[len - 1] < 0x80 {
-        let (value, advance) = decode_varint_slice(bytes)?;
+        // If we read an invalid varint from a contiguous slice, we still want to advance the buffer
+        // by the bytes we looked at, to be maximally consistent.
+        let (result, advance) = match decode_varint_slice(bytes) {
+            Ok((ok, advance)) => (Ok(ok), advance),
+            Err(err) => (Err(err), 9), // Invalid varints are always 9 bytes
+        };
         buf.advance(advance);
-        Ok(value)
+        result
     } else {
         decode_varint_slow(buf)
     }
@@ -409,9 +414,9 @@ impl TagReader {
     #[inline(always)]
     pub fn decode_key<B: Buf + ?Sized>(
         &mut self,
-        buf: &mut B,
+        mut buf: Capped<B>,
     ) -> Result<(u32, WireType), DecodeError> {
-        let key = decode_varint(buf)?;
+        let key = buf.decode_varint()?;
         let tag_delta = u32::try_from(key >> 2).map_err(|_| DecodeError::new(TagOverflowed))?;
         let tag = self
             .last_tag
@@ -512,7 +517,15 @@ impl<'a, B: 'a + Buf + ?Sized> Capped<'a, B> {
 
     #[inline]
     pub fn decode_varint(&mut self) -> Result<u64, DecodeError> {
-        decode_varint(self.buf)
+        decode_varint(self.buf).map_err(|err| {
+            // Varints are always decoded greedily from the underlying buffer, so we want to
+            // transform any non-truncation errors into Truncated to pretend that we stopped sooner.
+            if err.kind() == InvalidVarint && self.over_cap() {
+                DecodeError::new(Truncated)
+            } else {
+                err
+            }
+        })
     }
 
     /// Returns the number of bytes left before the cap.
@@ -521,6 +534,11 @@ impl<'a, B: 'a + Buf + ?Sized> Capped<'a, B> {
         self.buf
             .remaining()
             .saturating_sub(self.extra_bytes_remaining)
+    }
+
+    #[inline]
+    pub fn over_cap(&self) -> bool {
+        self.buf.remaining() < self.extra_bytes_remaining
     }
 }
 
@@ -1232,7 +1250,7 @@ mod test {
                     }
 
                     let (decoded_tag, decoded_wire_type) = tr
-                        .decode_key(buf.buf())
+                        .decode_key(buf.lend())
                         .map_err(|error| TestCaseError::fail(error.to_string()))?;
                     prop_assert_eq!(
                         tag,
@@ -1303,7 +1321,7 @@ mod test {
                     let mut not_first = false;
                     while buf.has_remaining() {
                         let (decoded_tag, decoded_wire_type) = tr
-                            .decode_key(buf.buf())
+                            .decode_key(buf.lend())
                             .map_err(|error| TestCaseError::fail(error.to_string()))?;
 
                         prop_assert_eq!(
@@ -1357,7 +1375,7 @@ mod test {
         );
         let mut buf = &*encoded;
         let mut capped = Capped::new(&mut buf);
-        let (tag, wire_type) = TagReader::new().decode_key(capped.buf()).unwrap();
+        let (tag, wire_type) = TagReader::new().decode_key(capped.lend()).unwrap();
         assert_eq!(tag, 123);
         assert_eq!(
             E::decode_distinguished(
@@ -1918,7 +1936,7 @@ mod test {
             let mut buf = Vec::<u8>::new();
             encode_varint(tag << 2, &mut buf);
             prop_assert_eq!(
-                TagReader::new().decode_key(&mut buf.as_slice()),
+                TagReader::new().decode_key(Capped::new(&mut buf.as_slice())),
                 Err(DecodeError::new(TagOverflowed))
             );
         }

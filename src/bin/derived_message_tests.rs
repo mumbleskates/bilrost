@@ -557,6 +557,33 @@ mod derived_message_tests {
         assert::is_invalid::<Foo<bool>>(&buf[..buf.len() - 1], Truncated);
     }
 
+    #[test]
+    fn truncated_nested_varint() {
+        #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+        struct Inner(u64);
+
+        #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+        struct Outer(Inner);
+
+        let truncated_inner_invalid =
+            // \x05: field 1, length-delimited; \x04: 4 bytes; \x04: field 1, varint;
+            // \xff...: data that will be greedily decoded as an invalid varint.
+            b"\x05\x04\x04\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff";
+        let truncated_inner_valid =
+            // \x05: field 1, length-delimited; \x04: 4 bytes; \x04: field 1, varint;
+            // \xff...: data that will be greedily decoded as an valid varint that still runs over.
+            b"\x05\x04\x04\xff\xff\xff\xff\xff\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09";
+
+        // The desired result is that we can tell the difference between the inner region being
+        // truncated before the varint ends and finding an invalid varint fully inside the inner
+        // region.
+        assert::is_invalid::<Outer>(truncated_inner_invalid, Truncated);
+        assert::is_invalid_distinguished::<Outer>(truncated_inner_invalid, Truncated);
+        // When decoding a varint succeeds but runs over, we want to detect that too.
+        assert::is_invalid::<Outer>(truncated_inner_valid, Truncated);
+        assert::is_invalid_distinguished::<Outer>(truncated_inner_valid, Truncated);
+    }
+
     // Fixed width int tests
 
     #[test]
@@ -720,33 +747,41 @@ mod derived_message_tests {
             bilrost::encoding::Fixed:
                 DistinguishedEncoder<T> + ValueEncoder<T> + DistinguishedValueEncoder<T>,
         {
-            let valid_direct = [(1, val.clone())].into_opaque_message().encode_to_vec();
-            let valid_in_oneof = [(2, val.clone())].into_opaque_message().encode_to_vec();
-            assert::is_invalid::<Foo<T>>(&valid_direct[..valid_direct.len() - 1], Truncated);
-            assert::is_invalid::<Foo<T>>(&valid_in_oneof[..valid_direct.len() - 1], Truncated);
-            assert::is_invalid_distinguished::<Foo<T>>(
-                &valid_direct[..valid_direct.len() - 1],
-                Truncated,
-            );
-            assert::is_invalid_distinguished::<Foo<T>>(
-                &valid_in_oneof[..valid_direct.len() - 1],
-                Truncated,
-            );
-            assert::is_invalid::<OpaqueMessage>(&valid_direct[..valid_direct.len() - 1], Truncated);
-            assert::is_invalid::<OpaqueMessage>(
-                &valid_in_oneof[..valid_direct.len() - 1],
-                Truncated,
-            );
-            assert::is_invalid_distinguished::<OpaqueMessage>(
-                &valid_direct[..valid_direct.len() - 1],
-                Truncated,
-            );
-            assert::is_invalid_distinguished::<OpaqueMessage>(
-                &valid_in_oneof[..valid_direct.len() - 1],
-                Truncated,
-            );
-            assert::is_invalid::<()>(&valid_direct[..valid_direct.len() - 1], Truncated);
-            assert::is_invalid::<()>(&valid_in_oneof[..valid_direct.len() - 1], Truncated);
+            let mut direct = [(1, val.clone())].into_opaque_message().encode_to_vec();
+            let mut in_oneof = [(2, val.clone())].into_opaque_message().encode_to_vec();
+            // Truncate by 1 byte
+            direct.pop();
+            in_oneof.pop();
+            assert::is_invalid::<Foo<T>>(&direct, Truncated);
+            assert::is_invalid::<Foo<T>>(&in_oneof, Truncated);
+            assert::is_invalid_distinguished::<Foo<T>>(&direct, Truncated);
+            assert::is_invalid_distinguished::<Foo<T>>(&in_oneof, Truncated);
+            assert::is_invalid::<OpaqueMessage>(&direct, Truncated);
+            assert::is_invalid::<OpaqueMessage>(&in_oneof, Truncated);
+            assert::is_invalid_distinguished::<OpaqueMessage>(&direct, Truncated);
+            assert::is_invalid_distinguished::<OpaqueMessage>(&in_oneof, Truncated);
+            assert::is_invalid::<()>(&direct, Truncated);
+            assert::is_invalid::<()>(&in_oneof, Truncated);
+
+            #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+            struct Outer<T>(Foo<T>, String);
+
+            let direct_nested = [
+                (1, OV::blob(direct)),
+                (2, OV::string("more data after that")),
+            ]
+            .into_opaque_message()
+            .encode_to_vec();
+            let in_oneof_nested = [
+                (1, OV::blob(in_oneof)),
+                (2, OV::string("more data after that")),
+            ]
+            .into_opaque_message()
+            .encode_to_vec();
+            assert::is_invalid::<Outer<T>>(&direct_nested, Truncated);
+            assert::is_invalid::<Outer<T>>(&in_oneof_nested, Truncated);
+            assert::is_invalid_distinguished::<Outer<T>>(&direct_nested, Truncated);
+            assert::is_invalid_distinguished::<Outer<T>>(&in_oneof_nested, Truncated);
         }
 
         check_fixed_truncation::<u32>(OV::fixed_u32(0x1234abcd));

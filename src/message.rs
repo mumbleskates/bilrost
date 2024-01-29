@@ -19,7 +19,7 @@ pub(crate) fn merge<T: RawMessage, B: Buf + ?Sized>(
     let tr = &mut TagReader::new();
     let mut last_tag = None::<u32>;
     buf.consume(|buf| {
-        let (tag, wire_type) = tr.decode_key(buf.buf())?;
+        let (tag, wire_type) = tr.decode_key(buf.lend())?;
         let duplicated = last_tag == Some(tag);
         last_tag = Some(tag);
         value.raw_decode_field(tag, wire_type, duplicated, buf.lend(), ctx.clone())
@@ -38,7 +38,7 @@ pub(crate) fn merge_distinguished<T: RawDistinguishedMessage, B: Buf + ?Sized>(
     let tr = &mut TagReader::new();
     let mut last_tag = None::<u32>;
     buf.consume(|buf| {
-        let (tag, wire_type) = tr.decode_key(buf.buf())?;
+        let (tag, wire_type) = tr.decode_key(buf.lend())?;
         let duplicated = last_tag == Some(tag);
         last_tag = Some(tag);
         value.raw_decode_field_distinguished(tag, wire_type, duplicated, buf.lend(), ctx.clone())

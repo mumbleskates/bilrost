@@ -1,6 +1,8 @@
 use std::mem;
 
-use bilrost::encoding::{decode_varint, encode_varint, encoded_len_varint, TagReader, WireType};
+use bilrost::encoding::{
+    decode_varint, encode_varint, encoded_len_varint, Capped, TagReader, WireType,
+};
 use bilrost::DecodeError;
 use bytes::Buf;
 use criterion::{Criterion, Throughput};
@@ -86,15 +88,16 @@ fn benchmark_decode_key(criterion: &mut Criterion, name: &str, mut values: Vec<u
             let decode_values = values.clone();
 
             move |b| {
-                let mut buf = Vec::with_capacity(decode_values.len() * 10);
+                let mut buf = Vec::with_capacity(decode_values.len() * 9);
                 for &value in &decode_values {
                     encode_varint(value, &mut buf);
                 }
 
                 b.iter(|| {
-                    let mut buf = &mut buf.as_slice();
+                    let mut to_decode = buf.as_slice();
+                    let mut buf = Capped::new(&mut to_decode);
                     while buf.has_remaining() {
-                        let result = TagReader::new().decode_key(&mut buf);
+                        let result = TagReader::new().decode_key(buf.lend());
                         debug_assert!(result.is_ok());
                         criterion::black_box(&result);
                     }
