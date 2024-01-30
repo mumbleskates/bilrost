@@ -1,6 +1,6 @@
 [package]
 name = "bilrost"
-version = "0.12.3"
+version = "0.999.0"
 authors = [
     "Dan Burkert <dan@danburkert.com>",
     "Lucio Franco <luciofranco14@gmail.com",
@@ -45,7 +45,7 @@ opaque = ["dep:btreemultimap"]
 std = []
 
 [dependencies]
-bilrost-derive = { version = "0.12.3", path = "bilrost-derive", optional = true }
+bilrost-derive = { version = "0.999.0", path = "bilrost-derive", optional = true }
 btreemultimap = { version = "0.1", optional = true }
 bytes = { version = "1", default-features = false }
 const_panic = { version = "0.2", optional = true }
