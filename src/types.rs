@@ -94,7 +94,7 @@ impl From<&mut [u8]> for Blob {
 
 impl<const N: usize> From<&[u8; N]> for Blob {
     fn from(value: &[u8; N]) -> Self {
-        Self(value.into())
+        Self(value.as_slice().into())
     }
 }
 

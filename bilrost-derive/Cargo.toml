@@ -13,7 +13,7 @@ documentation = "https://docs.rs/bilrost-derive"
 readme = "README.md"
 description = "A compact protobuf-like serializer and deserializer for the Rust Language."
 edition = "2021"
-rust-version = "1.65"
+rust-version = "1.70"
 
 [lib]
 proc_macro = true
