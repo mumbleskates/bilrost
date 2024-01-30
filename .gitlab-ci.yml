@@ -24,6 +24,7 @@ lint:
     - rustup component add clippy
     - cargo clippy --all --all-targets --all-features
     - cargo clippy --all --all-targets --no-default-features
+    - cargo fmt --all --check
 
 test:
   stage: test
