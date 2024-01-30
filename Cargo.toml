@@ -54,6 +54,7 @@ thin-vec = { version = "0.2", optional = true }
 
 [dev-dependencies]
 criterion = { version = "0.4", default-features = false } # MSRV: can't use 0.5
+half = ">=2.2.1, <2.3" # MSRV: pinning `half` below 2.3
 itertools = "0.12"
 proptest = "1"
 rand = "0.8"
