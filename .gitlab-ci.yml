@@ -37,7 +37,7 @@ test:
 
 test-msrv:
   image: rust:1.70
-  stage: test-old
+  stage: test-msrv
   script:
     - cargo test --workspace --all-targets --all-features
     - cargo test --workspace --doc
