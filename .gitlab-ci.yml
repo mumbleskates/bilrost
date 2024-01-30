@@ -17,6 +17,7 @@ cache:
 
 stages:
   - test
+  - test-msrv
 
 lint:
   stage: test
@@ -28,6 +29,15 @@ lint:
 
 test:
   stage: test
+  script:
+    - cargo test --workspace --all-targets --all-features
+    - cargo test --workspace --doc
+    - cargo test --workspace --all-targets --no-default-features
+    - cargo test --workspace --doc --no-default-features
+
+test-msrv:
+  image: rust:1.70
+  stage: test-old
   script:
     - cargo test --workspace --all-targets --all-features
     - cargo test --workspace --doc
