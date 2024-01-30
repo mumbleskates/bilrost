@@ -235,7 +235,8 @@ where
 
     #[inline]
     fn insert_distinguished(&mut self, item: Self::Item) -> Result<(), DecodeErrorKind> {
-        if Some(&item) <= self.last() {
+        // MSRV: can't use .last()
+        if Some(&item) <= self.iter().next_back() {
             return Err(NotCanonical);
         }
         self.insert(item);
@@ -381,10 +382,8 @@ where
         key: Self::Key,
         value: Self::Value,
     ) -> Result<(), DecodeErrorKind> {
-        if let Some((last_key, _)) = self.last_key_value() {
-            if &key <= last_key {
-                return Err(NotCanonical);
-            }
+        if Some(&key) <= self.keys().next_back() {
+            return Err(NotCanonical);
         }
         self.insert(key, value);
         Ok(())

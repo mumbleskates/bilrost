@@ -186,11 +186,12 @@ fn sort_fields(unsorted_fields: Vec<(TokenStream, Field)>) -> Vec<FieldChunk> {
         let last_tag = field.last_tag();
         // Check if this field is a oneof with tags interleaved with other fields' tags. If true,
         // this field must always be emitted into a sort group.
-        let overlaps = next_field.is_some_and(|(_, next_field)| last_tag > next_field.first_tag());
+        let overlaps =
+            matches!(next_field, Some((_, next_field)) if last_tag > next_field.first_tag());
         // Check if this field is already in a range we know requires runtime sorting.
-        let in_current_sort_group = sort_group_oneof_tags
-            .last()
-            .is_some_and(|end| *end > first_tag);
+        // MSRV: can't use .last()
+        let in_current_sort_group =
+            matches!(sort_group_oneof_tags.iter().next_back(), Some(&end) if end > first_tag);
 
         if in_current_sort_group {
             // We're still building a sort group.
@@ -246,8 +247,12 @@ fn sort_fields(unsorted_fields: Vec<(TokenStream, Field)>) -> Vec<FieldChunk> {
             }
         }
 
-        if let Some(sort_group_end) = sort_group_oneof_tags.last().copied() {
-            if !next_field.is_some_and(|(_, next_field)| next_field.first_tag() < sort_group_end) {
+        // MSRV: can't use .last()
+        if let Some(&sort_group_end) = sort_group_oneof_tags.iter().next_back() {
+            if !matches!(
+                next_field,
+                Some((_, next_field)) if next_field.first_tag() < sort_group_end
+            ) {
                 // We've been building a sort group, but we just reached the end.
                 if !current_contiguous_group.is_empty() {
                     current_sort_group.push(Contiguous(take(&mut current_contiguous_group)));
