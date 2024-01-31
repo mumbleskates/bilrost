@@ -438,28 +438,40 @@ impl fmt::Display for Timestamp {
 #[cfg(feature = "prost-types")]
 impl From<Duration> for prost_types::Duration {
     fn from(value: Duration) -> Self {
-        prost_types::Duration{seconds: value.seconds, nanos: value.nanos}
+        prost_types::Duration {
+            seconds: value.seconds,
+            nanos: value.nanos,
+        }
     }
 }
 
 #[cfg(feature = "prost-types")]
 impl From<prost_types::Duration> for Duration {
     fn from(value: prost_types::Duration) -> Self {
-        Duration{seconds: value.seconds, nanos: value.nanos}
+        Duration {
+            seconds: value.seconds,
+            nanos: value.nanos,
+        }
     }
 }
 
 #[cfg(feature = "prost-types")]
 impl From<Timestamp> for prost_types::Timestamp {
     fn from(value: Timestamp) -> Self {
-        prost_types::Timestamp{seconds: value.seconds, nanos: value.nanos}
+        prost_types::Timestamp {
+            seconds: value.seconds,
+            nanos: value.nanos,
+        }
     }
 }
 
 #[cfg(feature = "prost-types")]
 impl From<prost_types::Timestamp> for Timestamp {
     fn from(value: prost_types::Timestamp) -> Self {
-        Timestamp{seconds: value.seconds, nanos: value.nanos}
+        Timestamp {
+            seconds: value.seconds,
+            nanos: value.nanos,
+        }
     }
 }
 
