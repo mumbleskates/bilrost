@@ -13,14 +13,14 @@
 
 mod datetime;
 #[rustfmt::skip]
-mod protobuf;
+mod types;
 
 use core::convert::TryFrom;
 use core::fmt;
 use core::str::FromStr;
 use core::time;
 
-pub use protobuf::*;
+pub use types::*;
 
 // The Protobuf `Duration` and `Timestamp` types can't delegate to the standard library equivalents
 // because the Protobuf versions are signed. To make them easier to work with, `From` conversions
