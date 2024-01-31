@@ -514,8 +514,8 @@ impl From<Value> for prost_types::Value {
             kind: Some(match value.kind {
                 value::Kind::Null => prost_types::value::Kind::NullValue(0),
                 value::Kind::Float(value) => prost_types::value::Kind::NumberValue(value),
-                value::Kind::Signed(value) => prost_types::value::Kind::NumberValue(value.into()),
-                value::Kind::Unsigned(value) => prost_types::value::Kind::NumberValue(value.into()),
+                value::Kind::Signed(value) => prost_types::value::Kind::NumberValue(value as f64),
+                value::Kind::Unsigned(value) => prost_types::value::Kind::NumberValue(value as f64),
                 value::Kind::String(value) => prost_types::value::Kind::StringValue(value),
                 value::Kind::Bool(value) => prost_types::value::Kind::BoolValue(value),
                 value::Kind::Struct(items) => prost_types::value::Kind::StructValue(items.into()),
