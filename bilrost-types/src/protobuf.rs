@@ -209,21 +209,6 @@ pub struct Value {
     pub kind: value::Kind,
 }
 
-/// `Struct` represents a structured data value, consisting of fields
-/// which map to dynamically typed values. In some languages, `Struct`
-/// might be supported by a native representation. For example, in
-/// scripting languages like JS a struct is represented as an
-/// object. The details of that representation are described together
-/// with the proto support for the language.
-///
-/// The JSON representation for `Struct` is JSON object.
-#[derive(Clone, Debug, PartialEq, Message)]
-pub struct Struct {
-    /// Unordered map of dynamically typed values.
-    #[bilrost(tag = 1, recurses)]
-    pub fields: BTreeMap<String, Value>,
-}
-
 /// Nested message and enum types in `Value`.
 pub mod value {
     use super::String;
@@ -233,22 +218,38 @@ pub mod value {
     pub enum Kind {
         /// Represents a JSON null value.
         Null,
-        /// Represents a float64 value.
         #[bilrost(1)]
-        NumberValue(f64),
-        /// Represents a string value.
+        Float(f64),
         #[bilrost(2)]
-        StringValue(String),
-        /// Represents a boolean value.
+        Signed(i64),
         #[bilrost(3)]
-        BoolValue(bool),
-        /// Represents a structured value.
+        Unsigned(u64),
         #[bilrost(4)]
-        StructValue(super::Struct),
-        /// Represents a repeated `Value`.
+        String(String),
         #[bilrost(5)]
-        ListValue(super::ListValue),
+        Bool(bool),
+        /// Represents a structured value.
+        #[bilrost(6)]
+        Struct(super::StructValue),
+        /// Represents a repeated `Value`.
+        #[bilrost(7)]
+        List(super::ListValue),
     }
+}
+
+/// `Struct` represents a structured data value, consisting of fields
+/// which map to dynamically typed values. In some languages, `Struct`
+/// might be supported by a native representation. For example, in
+/// scripting languages like JS a struct is represented as an
+/// object. The details of that representation are described together
+/// with the proto support for the language.
+///
+/// The JSON representation for `Struct` is JSON object.
+#[derive(Clone, Debug, PartialEq, Message)]
+pub struct StructValue {
+    /// Unordered map of dynamically typed values.
+    #[bilrost(tag = 1, recurses)]
+    pub fields: BTreeMap<String, Value>,
 }
 
 /// `ListValue` is a wrapper around a repeated field of values.
