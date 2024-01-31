@@ -20,10 +20,14 @@ doctest = false
 
 [features]
 default = ["std"]
+prost-types = ["dep:prost-types"]
+serde_json = ["dep:serde_json"]
 std = ["bilrost/std"]
 
 [dependencies]
 bilrost = { version = "0.999.0", path = "..", default-features = false, features = ["derive"] }
+prost-types = { version = "0.12", default-features = false, optional = true }
+serde_json = { version = "1", default-features = false, features = ["alloc"], optional = true }
 
 [dev-dependencies]
 bilrost = { version = "0.999.0", path = "..", default-features = false, features = ["derive", "opaque"] }

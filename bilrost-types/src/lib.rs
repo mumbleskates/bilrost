@@ -435,6 +435,73 @@ impl fmt::Display for Timestamp {
     }
 }
 
+#[cfg(feature = "serde_json")]
+impl From<serde_json::Value> for Value {
+    fn from(from: serde_json::Value) -> Self {
+        use value::Kind::*;
+        Value {
+            kind: match from {
+                serde_json::Value::Null => Null,
+                serde_json::Value::Bool(value) => Bool(value),
+                serde_json::Value::Number(number) => {
+                    if number.is_i64() {
+                        Signed(number.as_i64().unwrap())
+                    } else if number.is_u64() {
+                        Unsigned(number.as_u64().unwrap())
+                    } else {
+                        Float(number.as_f64().unwrap())
+                    }
+                }
+                serde_json::Value::String(value) => String(value),
+                serde_json::Value::Array(values) => List(ListValue {
+                    values: values.into_iter().map(Into::into).collect(),
+                }),
+                serde_json::Value::Object(items) => Struct(StructValue {
+                    fields: items
+                        .into_iter()
+                        .map(|(key, value)| (key, value.into()))
+                        .collect(),
+                }),
+            },
+        }
+    }
+}
+
+#[cfg(feature = "serde_json")]
+impl TryFrom<Value> for serde_json::Value {
+    type Error = ();
+
+    fn try_from(value: Value) -> Result<Self, ()> {
+        Ok(match value.kind {
+            value::Kind::Null => serde_json::Value::Null,
+            value::Kind::Float(value) => {
+                serde_json::Value::Number(serde_json::Number::from_f64(value).ok_or(())?)
+            }
+            value::Kind::Signed(value) => {
+                serde_json::Value::Number(serde_json::Number::from(value))
+            }
+            value::Kind::Unsigned(value) => {
+                serde_json::Value::Number(serde_json::Number::from(value))
+            }
+            value::Kind::String(value) => serde_json::Value::String(value),
+            value::Kind::Bool(value) => serde_json::Value::Bool(value),
+            value::Kind::Struct(items) => serde_json::Value::Object(
+                items
+                    .fields
+                    .into_iter()
+                    .map(|(key, value)| Ok((key, value.try_into()?)))
+                    .collect::<Result<_, _>>()?,
+            ),
+            value::Kind::List(list) => serde_json::Value::Array(
+                list.values
+                    .into_iter()
+                    .map(TryInto::try_into)
+                    .collect::<Result<_, _>>()?,
+            ),
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
