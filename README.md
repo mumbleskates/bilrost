@@ -2,11 +2,10 @@
 
 <!-- TODO(widders): normalize capitalization of "bilrost" -->
 
-`bilrost` is a
+Bilrost is a
 [Protocol Buffers](https://developers.google.com/protocol-buffers/)-alike
 encoding for the [Rust Language](https://www.rust-lang.org/). It is a direct
-fork of
-[`prost`](https://github.com/tokio-rs/prost). Like `prost`, bilrost can
+fork of [`prost`](https://github.com/tokio-rs/prost). Like `prost`, bilrost can
 enable writing simple, idiomatic Rust code with `derive` macros that serializes
 and deserializes structs as portable and durable binary data, using an encoding
 scheme similar to that of protocol buffers but slightly different and mutually
@@ -104,6 +103,8 @@ TODO: fill out this outline for a better introduction
         * maps in protobuf were a pain and seem like a bodge
         * theoretically it's possible to widen that schema into a repeated
           nested message with more fields, but this is almost never done
+
+### Comparisons to protobuf
 
 * All varints (including tag fields and lengths) use
   [bijective numeration](https://en.wikipedia.org/wiki/Bijective_numeration),
