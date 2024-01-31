@@ -84,71 +84,6 @@ pub struct Duration {
     pub nanos: i32,
 }
 
-/// `Struct` represents a structured data value, consisting of fields
-/// which map to dynamically typed values. In some languages, `Struct`
-/// might be supported by a native representation. For example, in
-/// scripting languages like JS a struct is represented as an
-/// object. The details of that representation are described together
-/// with the proto support for the language.
-///
-/// The JSON representation for `Struct` is JSON object.
-#[derive(Clone, Debug, PartialEq, Message)]
-pub struct Struct {
-    /// Unordered map of dynamically typed values.
-    #[bilrost(tag = 1, recurses)]
-    pub fields: BTreeMap<String, Value>,
-}
-
-/// `Value` represents a dynamically typed value which can be either
-/// null, a number, a string, a boolean, a recursive struct value, or a
-/// list of values. A producer of value is expected to set one of these
-/// variants. Absence of any variant indicates an error.
-///
-/// The JSON representation for `Value` is JSON value.
-#[derive(Clone, Debug, PartialEq, Message)]
-pub struct Value {
-    /// The kind of value. None represents JSON `null`.
-    #[bilrost(oneof(1, 2, 3, 4, 5))]
-    pub kind: value::Kind,
-}
-
-/// Nested message and enum types in `Value`.
-pub mod value {
-    use super::String;
-
-    /// The kind of value.
-    #[derive(Clone, Debug, PartialEq, bilrost::Oneof)]
-    pub enum Kind {
-        /// Represents a JSON null value.
-        Null,
-        /// Represents a float64 value.
-        #[bilrost(1)]
-        NumberValue(f64),
-        /// Represents a string value.
-        #[bilrost(2)]
-        StringValue(String),
-        /// Represents a boolean value.
-        #[bilrost(3)]
-        BoolValue(bool),
-        /// Represents a structured value.
-        #[bilrost(4)]
-        StructValue(super::Struct),
-        /// Represents a repeated `Value`.
-        #[bilrost(5)]
-        ListValue(super::ListValue),
-    }
-}
-
-/// `ListValue` is a wrapper around a repeated field of values.
-///
-/// The JSON representation for `ListValue` is JSON array.
-#[derive(Clone, Debug, PartialEq, Message)]
-pub struct ListValue {
-    /// Repeated field of dynamically typed values.
-    #[bilrost(tag = 1, encoder = "packed", recurses)]
-    pub values: Vec<Value>,
-}
-
 /// A Timestamp represents a point in time independent of any time zone or local
 /// calendar, encoded as a count of seconds and fractions of seconds at
 /// nanosecond resolution. The count is relative to an epoch at UTC midnight on
@@ -259,4 +194,69 @@ pub struct Timestamp {
     /// inclusive.
     #[bilrost(tag = 2, encoder = "fixed")]
     pub nanos: i32,
+}
+
+/// `Value` represents a dynamically typed value which can be either
+/// null, a number, a string, a boolean, a recursive struct value, or a
+/// list of values. A producer of value is expected to set one of these
+/// variants. Absence of any variant indicates an error.
+///
+/// The JSON representation for `Value` is JSON value.
+#[derive(Clone, Debug, PartialEq, Message)]
+pub struct Value {
+    /// The kind of value. None represents JSON `null`.
+    #[bilrost(oneof(1, 2, 3, 4, 5, 6, 7))]
+    pub kind: value::Kind,
+}
+
+/// `Struct` represents a structured data value, consisting of fields
+/// which map to dynamically typed values. In some languages, `Struct`
+/// might be supported by a native representation. For example, in
+/// scripting languages like JS a struct is represented as an
+/// object. The details of that representation are described together
+/// with the proto support for the language.
+///
+/// The JSON representation for `Struct` is JSON object.
+#[derive(Clone, Debug, PartialEq, Message)]
+pub struct Struct {
+    /// Unordered map of dynamically typed values.
+    #[bilrost(tag = 1, recurses)]
+    pub fields: BTreeMap<String, Value>,
+}
+
+/// Nested message and enum types in `Value`.
+pub mod value {
+    use super::String;
+
+    /// The kind of value.
+    #[derive(Clone, Debug, PartialEq, bilrost::Oneof)]
+    pub enum Kind {
+        /// Represents a JSON null value.
+        Null,
+        /// Represents a float64 value.
+        #[bilrost(1)]
+        NumberValue(f64),
+        /// Represents a string value.
+        #[bilrost(2)]
+        StringValue(String),
+        /// Represents a boolean value.
+        #[bilrost(3)]
+        BoolValue(bool),
+        /// Represents a structured value.
+        #[bilrost(4)]
+        StructValue(super::Struct),
+        /// Represents a repeated `Value`.
+        #[bilrost(5)]
+        ListValue(super::ListValue),
+    }
+}
+
+/// `ListValue` is a wrapper around a repeated field of values.
+///
+/// The JSON representation for `ListValue` is JSON array.
+#[derive(Clone, Debug, PartialEq, Message)]
+pub struct ListValue {
+    /// Repeated field of dynamically typed values.
+    #[bilrost(tag = 1, encoder = "packed", recurses)]
+    pub values: Vec<Value>,
 }
