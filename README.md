@@ -349,23 +349,54 @@ pub enum Gender {
 
 ## FAQ
 
-1. **Could `bilrost` be implemented as a serializer for
+1. **Why another one?**
+
+Because I can make one that does what I want.
+
+Protobuf, for all its power and grace, is burdened with decades of legacy in
+both stored data and usage in practice
+that [prevent it from changing](https://www.hyrumslaw.com/). Bizarre corner case
+behaviors in practice that were originally implemented out of expediency have
+deeply ramified themselves into the official specification of the encoding (such
+as how repeated presence of nested messages in a non-repeated field merges them
+together, etc.).
+
+With a careful approach to a newer standard, we can solve many of these problems
+and make a very similar encoding that is far more robust against shenanigans and
+edge cases with little overhead (if fields are unordered, detecting that they
+have repeated requires overhead, but if they *must* be ordered it is trivial).
+Along with this, with only a little more work, we also achieve inherent
+canonicalization for our distinguished message types. Accomplishing the same
+thing in Protobuf is an onerous task, and one I have almost never seen correctly
+described in the wild. Quite a few people have, as the saying goes, tried and
+died.
+
+tl;dr: I had the conceit that I could make the protobuf encoding better. For my
+personal purposes, this is true. Perhaps the same will be even true for you as
+well.
+
+2. **Could the bilrost encoding be implemented as a serializer for
    [Serde](https://serde.rs/)?**
 
-Probably not, however I would like to hear from a Serde expert on the matter.
-There are two complications with trying to serialize Protobuf messages with
-Serde:
+Probably not, though `serde` experts are free to weigh in. There are multiple
+complications with trying to serialize bilrost messages with Serde:
 
 - Bilrost fields bear a numbered tag, and currently there appears to be no
   mechanism suitable for this in `serde`.
-- The mapping from `bilrost` message field's type to its Rust encoding is not
-  1-to-1. As a result, trait-based approaches to dispatching don't work very
-  well. Example: four different Protobuf field encoders can handle a
-  Rust `Vec<i32>`, each producing a different encoded
-  representation: `general`, `fixed`, `packed<general>`, and `packed<fixed>`.
+- Bilrost fields are also associated with a specific encoder, such as `general`
+  or `fixed`, which may alter their encoding. Purely trait-based dispatch will
+  work poorly for this, especially when the values become nested within other
+  data structures like maps and `Vec` and encoders may begin to look
+  like `map<general, packed<fixed>>`.
+- Bilrost messages must encode their fields in tag order, which may (in the case
+  of `oneof` fields) vary depending on their value, and it's not clear how or if
+  this could be solved in `serde`.
+- Bilrost has both expedient and distinguished encoding modes, and promises that
+  encoding a message that implements `DistinguishedMessage` always produces
+  canonical output. This may be beyond what is practical to implement.
 
-  But it is possible to place `serde` derive tags onto the generated types, so
-  the same structure can support both `bilrost` and `Serde`.
+Despite all this, it is possible to place `serde` derive tags onto the generated
+types, so the same structure can support both `bilrost` and `Serde`.
 
 ## Why *Bilrost?*
 
