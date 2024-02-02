@@ -333,6 +333,8 @@ fn append_distinguished_encoder_wheres<T>(
 fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     let input: DeriveInput = parse2(input)?;
 
+    // TODO(widders): allow explicit custom default with an attr; perhaps only for a single field?
+
     let PreprocessedMessage {
         ident,
         impl_generics,
@@ -770,6 +772,7 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
             }
         }
 
+        // TODO(widders): Error = u32
         impl #impl_generics ::core::convert::TryFrom<u32> for #ident #ty_generics #where_clause {
             type Error = ::bilrost::DecodeError;
 

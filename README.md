@@ -270,9 +270,43 @@ also change the bytes of the encoding, but expedient decoding will still work.
 
 #### Enumerations
 
-All enumeration types convert to and from the Rust `u32` type.
+`bilrost` can derive an enumeration type from an `enum` with no fields in its
+variants, where each variant has either
+ * an explicit discriminant that is a valid `u32` value, or
+ * a `#[bilrost = 123]` or `#[bilrost(123)]` attribute that specifies a valid
+   `u32` const expression (here with the example value `123`).
 
-<!-- TODO(widders): document what else there is about enums and their deriver -->
+```rust
+const FOUR: u32 = 4;
+
+#[derive(Clone, PartialEq, Eq, bilrost::Enumeration)]
+#[repr(u8)] // The type needn't have a u32 repr
+enum Foo {
+    One = 1,
+    #[bilrost = 2]
+    Two,
+    #[bilrost(3)]
+    Three,
+    #[bilrost(FOUR)]
+    Four,
+}
+```
+
+All enumeration types are encoded and decoded by conversion to and from the Rust
+`u32` type, using `Into<u32>` and `TryFrom<u32, Error = bilrost::DecodeError>`.
+In addition to deriving trait impls with `Enumeration`, the following additional
+traits are also mandatory: `Clone` and `Eq` (and thus `PartialEq` as well).
+
+Enumeration types are not required to implement `Default`, but they may. It is
+strongly recommended, but not mandatory, that the default variant be one that
+has a discriminant value of zero (`0`). If a different discriminant value is
+used, it may not be possible to change an enum type in a field to a `u32` to
+support decoding unknown enumeration values. This is because the default value
+of each field in a bilrost struct always encodes and decodes from no data, and
+changing the type to one where the default value represents a different number
+would change the meaning of every encoding in which that field is default.
+
+<!-- TODO(widders): document enumeration helpers -->
 
 #### Oneof Fields
 
@@ -300,15 +334,17 @@ and field annotations.
 
 ### Tag Inference for Existing Types
 
-Bilrost automatically infers tags for the struct.
-
-Fields are tagged sequentially in the order they
-are specified, starting with `1`.
+If not otherwise specified, fields are tagged sequentially in the order they
+are specified in the struct, starting with `1`.
 
 You may skip tags which have been reserved, or where there are gaps between
 sequentially occurring tag values by specifying the tag number to skip to with
 the `tag` attribute on the first field after the gap. The following fields will
 be tagged sequentially starting from the next number.
+
+When defining message types for interoperation, or when fields are likely to
+be added, removed, or shuffled, it may be good practice to explicitly specify
+the tags of all fields in a struct instead, but this is not mandatory.
 
 <!-- TODO(widders): fix this example -->
 
@@ -338,8 +374,10 @@ struct Person {
     pub maiden_name: String, // tag=18
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Enumeration)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Enumeration)]
+#[non_exhaustive]
 pub enum Gender {
+    #[default]
     Unknown = 0,
     Female = 1,
     Male = 2,
