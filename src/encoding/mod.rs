@@ -1572,7 +1572,7 @@ mod test {
 
     #[test]
     fn varint() {
-        fn check(value: u64, mut encoded: &[u8]) {
+        fn check(value: u64, encoded: &[u8]) {
             // Small buffer.
             let mut buf = Vec::with_capacity(1);
             encode_varint(value, &mut buf);
@@ -1585,11 +1585,10 @@ mod test {
 
             assert_eq!(encoded_len_varint(value), encoded.len());
 
-            let roundtrip_value =
-                decode_varint(&mut <&[u8]>::clone(&encoded)).expect("decoding failed");
+            let roundtrip_value = decode_varint(&mut &*encoded).expect("decoding failed");
             assert_eq!(value, roundtrip_value);
 
-            let roundtrip_value = decode_varint_slow(&mut encoded).expect("slow decoding failed");
+            let roundtrip_value = decode_varint_slow(&mut &*encoded).expect("slow decoding failed");
             assert_eq!(value, roundtrip_value);
         }
 
@@ -1708,40 +1707,94 @@ mod test {
 
     #[test]
     fn varint_overflow() {
-        let mut u64_max_plus_one: &[u8] = &[0x80, 0xFF, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE];
+        let u64_max_plus_one: &[u8] = &[0x80, 0xFF, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE];
 
-        decode_varint(&mut u64_max_plus_one).expect_err("decoding u64::MAX + 1 succeeded");
-        decode_varint_slow(&mut u64_max_plus_one)
-            .expect_err("slow decoding u64::MAX + 1 succeeded");
+        assert_eq!(
+            decode_varint(&mut &*u64_max_plus_one)
+                .expect_err("decoding u64::MAX + 1 succeeded")
+                .kind(),
+            InvalidVarint
+        );
+        assert_eq!(
+            decode_varint_slow(&mut &*u64_max_plus_one)
+                .expect_err("slow decoding u64::MAX + 1 succeeded")
+                .kind(),
+            InvalidVarint
+        );
 
-        let mut u64_over_max: &[u8] = &[0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF];
+        let u64_over_max: &[u8] = &[0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF];
 
-        decode_varint(&mut u64_over_max).expect_err("decoding over-max succeeded");
-        decode_varint_slow(&mut u64_over_max).expect_err("slow decoding over-max succeeded");
+        assert_eq!(
+            decode_varint(&mut &*u64_over_max)
+                .expect_err("decoding over-max succeeded")
+                .kind(),
+            InvalidVarint
+        );
+        assert_eq!(
+            decode_varint_slow(&mut &*u64_over_max)
+                .expect_err("slow decoding over-max succeeded")
+                .kind(),
+            InvalidVarint
+        );
     }
 
     #[test]
     fn varint_truncated() {
-        let mut truncated_one_byte: &[u8] = &[0x80];
-        decode_varint(&mut truncated_one_byte).expect_err("decoding truncated 1 byte succeeded");
-        decode_varint_slow(&mut truncated_one_byte)
-            .expect_err("slow decoding truncated 1 byte succeeded");
+        let truncated_one_byte: &[u8] = &[0x80];
+        assert_eq!(
+            decode_varint(&mut &*truncated_one_byte)
+                .expect_err("decoding truncated 1 byte succeeded")
+                .kind(),
+            Truncated
+        );
+        assert_eq!(
+            decode_varint_slow(&mut &*truncated_one_byte)
+                .expect_err("slow decoding truncated 1 byte succeeded")
+                .kind(),
+            Truncated
+        );
 
-        let mut truncated_two_bytes: &[u8] = &[0x80, 0xFF];
-        decode_varint(&mut truncated_two_bytes).expect_err("decoding truncated 6 bytes succeeded");
-        decode_varint_slow(&mut truncated_two_bytes)
-            .expect_err("slow decoding truncated 6 bytes succeeded");
+        let truncated_two_bytes: &[u8] = &[0x80, 0xFF];
+        assert_eq!(
+            decode_varint(&mut &*truncated_two_bytes)
+                .expect_err("decoding truncated 6 bytes succeeded")
+                .kind(),
+            Truncated
+        );
+        assert_eq!(
+            decode_varint_slow(&mut &*truncated_two_bytes)
+                .expect_err("slow decoding truncated 6 bytes succeeded")
+                .kind(),
+            Truncated
+        );
 
-        let mut truncated_six_bytes: &[u8] = &[0x80, 0x81, 0x82, 0x8A, 0x8B, 0x8C];
-        decode_varint(&mut truncated_six_bytes).expect_err("decoding truncated 6 bytes succeeded");
-        decode_varint_slow(&mut truncated_six_bytes)
-            .expect_err("slow decoding truncated 6 bytes succeeded");
+        let truncated_six_bytes: &[u8] = &[0x80, 0x81, 0x82, 0x8A, 0x8B, 0x8C];
+        assert_eq!(
+            decode_varint(&mut &*truncated_six_bytes)
+                .expect_err("decoding truncated 6 bytes succeeded")
+                .kind(),
+            Truncated
+        );
+        assert_eq!(
+            decode_varint_slow(&mut &*truncated_six_bytes)
+                .expect_err("slow decoding truncated 6 bytes succeeded")
+                .kind(),
+            Truncated
+        );
 
-        let mut truncated_eight_bytes: &[u8] = &[0x80, 0x81, 0x82, 0x8A, 0x8B, 0x8C, 0xBE, 0xEF];
-        decode_varint(&mut truncated_eight_bytes)
-            .expect_err("decoding truncated 8 bytes succeeded");
-        decode_varint_slow(&mut truncated_eight_bytes)
-            .expect_err("slow decoding truncated 8 bytes succeeded");
+        let truncated_eight_bytes: &[u8] = &[0x80, 0x81, 0x82, 0x8A, 0x8B, 0x8C, 0xBE, 0xEF];
+        assert_eq!(
+            decode_varint(&mut &*truncated_eight_bytes)
+                .expect_err("decoding truncated 8 bytes succeeded")
+                .kind(),
+            Truncated
+        );
+        assert_eq!(
+            decode_varint_slow(&mut &*truncated_eight_bytes)
+                .expect_err("slow decoding truncated 8 bytes succeeded")
+                .kind(),
+            Truncated
+        );
     }
 
     fn check_rejects_wrong_wire_type<T: NewForOverwrite, E: Encoder<T>>(wire_type: WireType) {
