@@ -198,6 +198,17 @@ pub struct Timestamp {
     pub nanos: i32,
 }
 
+impl Timestamp {
+    pub const MIN: Self = Timestamp {
+        seconds: i64::MIN,
+        nanos: 0,
+    };
+    pub const MAX: Self = Timestamp {
+        seconds: i64::MAX,
+        nanos: 999999999,
+    };
+}
+
 /// `Value` represents a dynamically typed value which can be either
 /// null, a number, a string, a boolean, a recursive struct value, or a
 /// list of values. A producer of value is expected to set one of these

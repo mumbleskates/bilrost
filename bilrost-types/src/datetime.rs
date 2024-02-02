@@ -569,11 +569,23 @@ pub(crate) fn parse_duration(s: &str) -> Option<Duration> {
 
 impl From<DateTime> for Timestamp {
     fn from(date_time: DateTime) -> Timestamp {
-        let seconds = date_time_to_seconds(&date_time);
-        let nanos = date_time.nanos;
-        Timestamp {
-            seconds,
-            nanos: nanos as i32,
+        const TOO_LOW_YEAR: i64 = DateTime::MIN.year - 1;
+        const TOO_HIGH_YEAR: i64 = DateTime::MAX.year + 1;
+        match date_time.year {
+            i64::MIN..=TOO_LOW_YEAR => {
+                Timestamp::MIN
+            }
+            TOO_HIGH_YEAR..=i64::MAX => {
+                Timestamp::MAX
+            }
+            _ => {
+                let seconds = date_time_to_seconds(&date_time);
+                let nanos = date_time.nanos;
+                Timestamp {
+                    seconds,
+                    nanos: nanos as i32,
+                }
+            }
         }
     }
 }

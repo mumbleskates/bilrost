@@ -633,6 +633,96 @@ mod tests {
     #[cfg(feature = "std")]
     use std::time::{self, SystemTime, UNIX_EPOCH};
 
+    use crate::datetime::DateTime;
+
+    #[test]
+    fn check_crashing_datetimes() {
+        assert_eq!(
+            Timestamp::from(DateTime {
+                year: i64::from_le_bytes([178, 2, 0, 0, 0, 0, 0, 128]),
+                month: 2,
+                day: 2,
+                hour: 8,
+                minute: 58,
+                second: 8,
+                nanos: u32::from_le_bytes([0, 0, 0, 50]),
+            }),
+            Timestamp::MIN
+        );
+        assert_eq!(
+            Timestamp::from(DateTime {
+                year: i64::from_le_bytes([132, 7, 0, 0, 0, 0, 0, 128]),
+                month: 2,
+                day: 2,
+                hour: 8,
+                minute: 58,
+                second: 8,
+                nanos: u32::from_le_bytes([0, 0, 0, 50]),
+            }),
+            Timestamp::MIN
+        );
+        assert_eq!(
+            Timestamp::from(DateTime {
+                year: i64::from_le_bytes([80, 96, 32, 240, 99, 0, 32, 180]),
+                month: 1,
+                day: 18,
+                hour: 19,
+                minute: 26,
+                second: 8,
+                nanos: u32::from_le_bytes([0, 0, 0, 50]),
+            }),
+            Timestamp::MIN
+        );
+        assert_eq!(
+            Timestamp::from(DateTime {
+                year: DateTime::MIN.year - 1,
+                month: 0,
+                day: 0,
+                hour: 0,
+                minute: 0,
+                second: 0,
+                nanos: 0,
+            }),
+            Timestamp::MIN
+        );
+        assert_eq!(
+            Timestamp::from(DateTime {
+                year: i64::MIN,
+                month: 0,
+                day: 0,
+                hour: 0,
+                minute: 0,
+                second: 0,
+                nanos: 0,
+            }),
+            Timestamp::MIN
+        );
+        assert_eq!(
+            Timestamp::from(DateTime {
+                year: DateTime::MAX.year + 1,
+                month: u8::MAX,
+                day: u8::MAX,
+                hour: u8::MAX,
+                minute: u8::MAX,
+                second: u8::MAX,
+                nanos: u32::MAX,
+            }),
+            Timestamp::MAX
+        );
+        assert_eq!(
+            Timestamp::from(DateTime {
+                year: i64::MAX,
+                month: u8::MAX,
+                day: u8::MAX,
+                hour: u8::MAX,
+                minute: u8::MAX,
+                second: u8::MAX,
+                nanos: u32::MAX,
+            }),
+            Timestamp::MAX
+        );
+    }
+
     #[cfg(feature = "std")]
     proptest! {
         #[test]
