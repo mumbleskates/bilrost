@@ -1,3 +1,4 @@
+use alloc::borrow::Cow;
 use alloc::collections::{btree_map, btree_set, BTreeMap, BTreeSet};
 use alloc::vec::Vec;
 #[cfg(feature = "std")]
@@ -182,7 +183,61 @@ where
     }
 }
 
-// TODO(widders): COW<[T]>; via feature: smallvec, tinyvec, thin-vec
+impl<'a, T> HasEmptyState for Cow<'a, [T]>
+where
+    [T]: ToOwned<Owned = Vec<T>>,
+{
+    fn is_empty(&self) -> bool {
+        <[T]>::is_empty(self)
+    }
+}
+
+impl<'a, T> Collection for Cow<'a, [T]>
+where
+    [T]: ToOwned<Owned = Vec<T>>,
+{
+    type Item = T;
+    type RefIter<'b> = core::slice::Iter<'b, T>
+    where
+        T: 'b,
+        Self: 'b;
+    fn len(&self) -> usize {
+        <[T]>::len(self)
+    }
+
+    fn iter(&self) -> Self::RefIter<'_> {
+        <[T]>::iter(self)
+    }
+
+    fn insert(&mut self, item: Self::Item) -> Result<(), DecodeErrorKind> {
+        self.to_mut().push(item);
+        Ok(())
+    }
+}
+
+impl<'a, T> DistinguishedCollection for Cow<'a, [T]>
+where
+    T: Eq,
+    [T]: ToOwned<Owned = Vec<T>>,
+{
+    type ReverseIter<'b> = core::iter::Rev<core::slice::Iter<'b, T>>
+        where
+            Self::Item: 'b,
+            Self: 'b;
+
+    #[inline]
+    fn reversed(&self) -> Self::ReverseIter<'_> {
+        <[T]>::iter(self).rev()
+    }
+
+    #[inline]
+    fn insert_distinguished(&mut self, item: Self::Item) -> Result<(), DecodeErrorKind> {
+        self.to_mut().push(item);
+        Ok(())
+    }
+}
+
+// TODO(widders): via feature: smallvec, tinyvec, thin-vec
 
 impl<T> HasEmptyState for BTreeSet<T> {
     fn is_empty(&self) -> bool {

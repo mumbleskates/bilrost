@@ -109,6 +109,8 @@ impl DistinguishedEncoder<Vec<u8>> for VecBlob {
 delegate_encoding!(delegate from (VecBlob) to (crate::encoding::Unpacked<VecBlob>)
     for type (Vec<Vec<u8>>) including distinguished);
 
+// TODO(widders): Cow<[u8]>
+
 #[cfg(test)]
 mod test {
     use crate::encoding::test::check_type_test;
