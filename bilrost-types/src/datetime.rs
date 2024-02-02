@@ -574,12 +574,8 @@ impl From<DateTime> for Timestamp {
         const TOO_LOW_YEAR: i64 = DateTime::MIN.year - 1;
         const TOO_HIGH_YEAR: i64 = DateTime::MAX.year + 1;
         match date_time.year {
-            i64::MIN..=TOO_LOW_YEAR => {
-                Timestamp::MIN
-            }
-            TOO_HIGH_YEAR..=i64::MAX => {
-                Timestamp::MAX
-            }
+            i64::MIN..=TOO_LOW_YEAR => Timestamp::MIN,
+            TOO_HIGH_YEAR..=i64::MAX => Timestamp::MAX,
             _ => {
                 let seconds = date_time_to_seconds(&date_time);
                 let nanos = date_time.nanos;

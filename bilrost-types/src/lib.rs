@@ -721,6 +721,10 @@ mod tests {
             }),
             Timestamp::MAX
         );
+        assert_eq!(Timestamp::from(DateTime::MIN), Timestamp::MIN);
+        assert_eq!(Timestamp::from(DateTime::MAX), Timestamp::MAX);
+        assert_eq!(DateTime::from(Timestamp::MIN), DateTime::MIN);
+        assert_eq!(DateTime::from(Timestamp::MAX), DateTime::MAX);
     }
 
     #[cfg(feature = "std")]
@@ -742,6 +746,15 @@ mod tests {
             if let Ok(system_time) = SystemTime::try_from(timestamp.clone()) {
                 prop_assert_eq!(Timestamp::from(system_time), timestamp);
             }
+        }
+
+        #[test]
+        fn check_timestamp_datetime_roundtrip(seconds: i64, nanos: i32) {
+            let mut timestamp = Timestamp { seconds, nanos };
+            timestamp.normalize();
+            let timestamp = timestamp;
+            let datetime: DateTime = timestamp.clone().into();
+            prop_assert_eq!(Timestamp::from(datetime), timestamp);
         }
 
         #[test]
