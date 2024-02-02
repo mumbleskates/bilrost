@@ -182,6 +182,8 @@ where
     }
 }
 
+// TODO(widders): COW<[T]>; via feature: smallvec, tinyvec, thin-vec
+
 impl<T> HasEmptyState for BTreeSet<T> {
     fn is_empty(&self) -> bool {
         Self::is_empty(self)
