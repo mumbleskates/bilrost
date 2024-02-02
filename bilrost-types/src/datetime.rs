@@ -91,6 +91,8 @@ impl fmt::Display for DateTime {
     }
 }
 
+// TODO(widders): fuzz testing for this, the other direction, and other ostensibly infallible
+//  functionality
 impl From<Timestamp> for DateTime {
     /// musl's [`__secs_to_tm`][1] converted to Rust via [c2rust][2] and then cleaned up by hand.
     ///
