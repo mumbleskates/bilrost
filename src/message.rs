@@ -340,6 +340,8 @@ pub trait RawMessage: Default {
 
     /// Clears the message, resetting all fields to their default.
     fn clear(&mut self) {
+        // TODO(widders): derived piecewise clearing and replace-from decoding to reuse allocated
+        //  storage. this will probably mean reinstating the unsafety in the String parser
         *self = Self::default();
     }
 }
