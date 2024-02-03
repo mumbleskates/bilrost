@@ -249,8 +249,8 @@ Many alternative types are also available for both scalar values and containers!
 | Value type | Alternative              | Supporting encoder | Feature to enable |
 |------------|--------------------------|--------------------|-------------------|
 | `Vec<u8>`  | `Blob`*                  | `general`          | (none)            |
-| `Vec<u8>`  | `Bytes`                  | `general`          | (none)            |
 | `Vec<u8>`  | `Cow<[u8]>`              | `vecblob`          | (none)            |
+| `Vec<u8>`  | `Bytes`                  | `general`          | (none)            |
 | `String`   | `Cow<str>`               | `general`          | (none)            |
 | `String`   | `bytestring::ByteString` | `general`          | "bytestring"      |
 
