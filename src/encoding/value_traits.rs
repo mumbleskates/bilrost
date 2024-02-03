@@ -1,6 +1,7 @@
 use alloc::borrow::Cow;
 use alloc::collections::{btree_map, btree_set, BTreeMap, BTreeSet};
 use alloc::vec::Vec;
+use core::cmp::Ordering::{Equal, Greater, Less};
 #[cfg(feature = "std")]
 use core::hash::Hash;
 #[cfg(feature = "std")]
@@ -292,11 +293,14 @@ where
     #[inline]
     fn insert_distinguished(&mut self, item: Self::Item) -> Result<(), DecodeErrorKind> {
         // MSRV: can't use .last()
-        if Some(&item) <= self.iter().next_back() {
-            return Err(NotCanonical);
+        match Some(&item).cmp(&self.iter().next_back()) {
+            Less => Err(NotCanonical),
+            Equal => Err(UnexpectedlyRepeated),
+            Greater => {
+                self.insert(item);
+                Ok(())
+            }
         }
-        self.insert(item);
-        Ok(())
     }
 }
 
@@ -438,11 +442,14 @@ where
         key: Self::Key,
         value: Self::Value,
     ) -> Result<(), DecodeErrorKind> {
-        if Some(&key) <= self.keys().next_back() {
-            return Err(NotCanonical);
+        match Some(&key).cmp(&self.keys().next_back()) {
+            Less => Err(NotCanonical),
+            Equal => Err(UnexpectedlyRepeated),
+            Greater => {
+                self.insert(key, value);
+                Ok(())
+            }
         }
-        self.insert(key, value);
-        Ok(())
     }
 }
 
