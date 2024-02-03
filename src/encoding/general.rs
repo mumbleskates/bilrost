@@ -357,7 +357,8 @@ mod bytestring_string {
     use super::{General, String};
     use crate::encoding::test::check_type_test;
     check_type_test!(General, expedient, from String, into bytestring::ByteString, LengthDelimited);
-    check_type_test!(General, distinguished, from String, into bytestring::ByteString, LengthDelimited);
+    check_type_test!(General, distinguished, from String, into bytestring::ByteString,
+        LengthDelimited);
 }
 
 impl EqualDefaultAlwaysEmpty for Bytes {}
