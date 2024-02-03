@@ -1000,10 +1000,12 @@ macro_rules! delegate_encoding {
     (
         delegate from ($from_ty:ty) to ($to_ty:ty) for type ($value_ty:ty)
         $(with generics ($($value_generics:tt)*))?
+        $(with where clause ($($where_clause:tt)*))? 
     ) => {
         impl$(<$($value_generics)*>)? $crate::encoding::Encoder<$value_ty> for $from_ty
         where
             $to_ty: $crate::encoding::Encoder<$value_ty>,
+            $($($where_clause)*)?
         {
             #[inline]
             fn encode<B: $crate::bytes::BufMut + ?Sized>(
@@ -1040,10 +1042,12 @@ macro_rules! delegate_encoding {
     (
         delegate from ($from_ty:ty) to ($to_ty:ty) for type ($value_ty:ty) including distinguished
         $(with generics ($($value_generics:tt)*))?
+        $(with where clause ($($where_clause:tt)*))?
     ) => {
         delegate_encoding!(
             delegate from ($from_ty) to ($to_ty) for type ($value_ty)
             $(with generics ($($value_generics)*))?
+            $(with where clause ($($where_clause)*))?
         );
 
         impl$(<$($value_generics)*>)? $crate::encoding::DistinguishedEncoder<$value_ty>
@@ -1051,6 +1055,7 @@ macro_rules! delegate_encoding {
         where
             $to_ty: $crate::encoding::DistinguishedEncoder<$value_ty>,
             Self: $crate::encoding::Encoder<$value_ty>,
+            $($($where_clause)*)?
         {
             #[inline]
             fn decode_distinguished<B: $crate::bytes::Buf + ?Sized>(

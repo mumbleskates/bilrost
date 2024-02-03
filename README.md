@@ -246,19 +246,17 @@ several different containers:
 
 Many alternative types are also available for both scalar values and containers!
 
-| Value type | Alternative              | Feature to enable |
-|------------|--------------------------|-------------------|
-| `Vec<u8>`  | `Blob`*                  | (none)            |
-| `Vec<u8>`  | `Bytes`                  | (none)            |
-| `Vec<u8>`  | `Cow<[u8]>`              | (none)            |
-| `String`   | `Cow<str>`               | (none)            |
-| `String`   | `bytestring::ByteString` | "bytestring"      |
+| Value type | Alternative              | Supporting encoder | Feature to enable |
+|------------|--------------------------|--------------------|-------------------|
+| `Vec<u8>`  | `Blob`*                  | `general`          | (none)            |
+| `Vec<u8>`  | `Bytes`                  | `general`          | (none)            |
+| `Vec<u8>`  | `Cow<[u8]>`              | `vecblob`          | (none)            |
+| `String`   | `Cow<str>`               | `general`          | (none)            |
+| `String`   | `bytestring::ByteString` | `general`          | "bytestring"      |
 
 *`bilrost::Blob` is a transparent wrapper for `Vec<u8>` in that is a drop-in
 replacement in most situations. If nothing but `Vec<u8>` will do, the `vecblob`
-encoder will encode a plain `Vec<u8>` as a bytes value.
-
-All listed alternative types are supported by the `general` encoder.
+encoder will still encode a plain `Vec<u8>` as its bytes value.
 
 | Container type | Alternative              | Feature to enable |
 |----------------|--------------------------|-------------------|
@@ -268,9 +266,9 @@ All listed alternative types are supported by the `general` encoder.
 | `BTreeMap<T>`  | `hashbrown::HashMap<T>`* | "hashbrown"       |
 | `BTreeSet<T>`  | `hashbrown::HashSet<T>`* | "hashbrown"       |
 
-*Hashtable-based maps and sets are implemented, but are not compatible with
+*Hash-table-based maps and sets are implemented, but are not compatible with
 distinguished encoding or decoding. If distinguished encoding is required, a
-container which stores its values ordered must be used.
+container which stores its values in sorted order must be used.
 
 #### Compatible Widening
 

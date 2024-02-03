@@ -185,7 +185,7 @@ where
 
 impl<T> HasEmptyState for Cow<'_, [T]>
 where
-    [T]: ToOwned<Owned = Vec<T>>,
+    T: Clone,
 {
     fn is_empty(&self) -> bool {
         <[T]>::is_empty(self)
@@ -194,7 +194,7 @@ where
 
 impl<T> Collection for Cow<'_, [T]>
 where
-    [T]: ToOwned<Owned = Vec<T>>,
+    T: Clone,
 {
     type Item = T;
     type RefIter<'a> = core::slice::Iter<'a, T>
@@ -217,8 +217,7 @@ where
 
 impl<T> DistinguishedCollection for Cow<'_, [T]>
 where
-    T: Eq,
-    [T]: ToOwned<Owned = Vec<T>>,
+    T: Clone + Eq,
 {
     type ReverseIter<'a> = core::iter::Rev<core::slice::Iter<'a, T>>
         where

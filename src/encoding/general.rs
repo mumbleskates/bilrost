@@ -14,7 +14,7 @@ use crate::encoding::{
     delegate_encoding, delegate_value_encoding, encode_varint, encoded_len_varint, Capped,
     DecodeContext, DistinguishedEncoder, DistinguishedFieldEncoder, DistinguishedValueEncoder,
     Encoder, EqualDefaultAlwaysEmpty, FieldEncoder, HasEmptyState, Map, TagMeasurer, TagWriter,
-    ValueEncoder, VecBlob, WireType, Wiretyped,
+    Unpacked, ValueEncoder, VecBlob, WireType, Wiretyped,
 };
 use crate::message::{merge, merge_distinguished, RawDistinguishedMessage, RawMessage};
 use crate::DecodeErrorKind::{InvalidValue, NotCanonical, OutOfDomainValue, UnexpectedlyRepeated};
@@ -24,9 +24,12 @@ pub struct General;
 
 // General implements unpacked encodings by default, but only for select collection types. Other
 // implementers of the `Collection` trait must use Unpacked or Packed.
-delegate_encoding!(delegate from (General) to (crate::encoding::Unpacked<General>)
+delegate_encoding!(delegate from (General) to (Unpacked<General>)
     for type (Vec<T>) including distinguished with generics (T));
-delegate_encoding!(delegate from (General) to (crate::encoding::Unpacked<General>)
+delegate_encoding!(delegate from (General) to (Unpacked<General>)
+    for type (Cow<'a, [T]>) including distinguished with generics ('a, T)
+    with where clause (T: Clone));
+delegate_encoding!(delegate from (General) to (Unpacked<General>)
     for type (BTreeSet<T>) including distinguished with generics (T));
 delegate_value_encoding!(delegate from (General) to (Map<General, General>)
     for type (BTreeMap<K, V>) including distinguished
@@ -34,7 +37,7 @@ delegate_value_encoding!(delegate from (General) to (Map<General, General>)
     with where clause for distinguished (V: Eq)
     with generics (K, V));
 #[cfg(feature = "std")]
-delegate_encoding!(delegate from (General) to (crate::encoding::Unpacked<General>)
+delegate_encoding!(delegate from (General) to (Unpacked<General>)
     for type (HashSet<T>) with generics (T));
 #[cfg(feature = "std")]
 delegate_value_encoding!(delegate from (General) to (Map<General, General>)
@@ -42,7 +45,7 @@ delegate_value_encoding!(delegate from (General) to (Map<General, General>)
     with where clause (K: Eq + Hash)
     with generics (K, V));
 #[cfg(feature = "hashbrown")]
-delegate_encoding!(delegate from (General) to (crate::encoding::Unpacked<General>)
+delegate_encoding!(delegate from (General) to (Unpacked<General>)
     for type (hashbrown::HashSet<T>) with generics (T));
 #[cfg(feature = "hashbrown")]
 delegate_value_encoding!(delegate from (General) to (Map<General, General>)
