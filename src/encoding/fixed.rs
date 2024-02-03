@@ -14,7 +14,7 @@ use crate::DecodeErrorKind::{NotCanonical, Truncated, UnexpectedlyRepeated};
 pub struct Fixed;
 
 delegate_encoding!(delegate from (Fixed) to (crate::encoding::Unpacked<Fixed>) for type (Vec<T>)
-    including distinguished with generics <T>);
+    including distinguished with generics (T));
 
 /// Macros which emit implementations for fixed width numeric encoding.
 macro_rules! fixed_width_common {

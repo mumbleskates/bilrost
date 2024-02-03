@@ -25,30 +25,30 @@ pub struct General;
 // General implements unpacked encodings by default, but only for select collection types. Other
 // implementers of the `Collection` trait must use Unpacked or Packed.
 delegate_encoding!(delegate from (General) to (crate::encoding::Unpacked<General>)
-    for type (Vec<T>) including distinguished with generics <T>);
+    for type (Vec<T>) including distinguished with generics (T));
 delegate_encoding!(delegate from (General) to (crate::encoding::Unpacked<General>)
-    for type (BTreeSet<T>) including distinguished with generics <T>);
+    for type (BTreeSet<T>) including distinguished with generics (T));
 delegate_value_encoding!(delegate from (General) to (Map<General, General>)
     for type (BTreeMap<K, V>) including distinguished
     with where clause for expedient (K: Ord)
     with where clause for distinguished (V: Eq)
-    with generics <K, V>);
+    with generics (K, V));
 #[cfg(feature = "std")]
 delegate_encoding!(delegate from (General) to (crate::encoding::Unpacked<General>)
-    for type (HashSet<T>) with generics <T>);
+    for type (HashSet<T>) with generics (T));
 #[cfg(feature = "std")]
 delegate_value_encoding!(delegate from (General) to (Map<General, General>)
     for type (HashMap<K, V>)
     with where clause (K: Eq + Hash)
-    with generics <K, V>);
+    with generics (K, V));
 #[cfg(feature = "hashbrown")]
 delegate_encoding!(delegate from (General) to (crate::encoding::Unpacked<General>)
-    for type (hashbrown::HashSet<T>) with generics <T>);
+    for type (hashbrown::HashSet<T>) with generics (T));
 #[cfg(feature = "hashbrown")]
 delegate_value_encoding!(delegate from (General) to (Map<General, General>)
     for type (hashbrown::HashMap<K, V>)
     with where clause (K: Eq + Hash)
-    with generics <K, V>);
+    with generics (K, V));
 
 /// General encodes plain values only when they are non-default.
 impl<T> Encoder<T> for General
