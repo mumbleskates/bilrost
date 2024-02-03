@@ -57,9 +57,13 @@ impl fmt::Display for DecodeErrorKind {
 
 /// A Bilrost message decoding error.
 ///
-/// `DecodeError` indicates that the input buffer does not contain a valid
-/// Bilrost message. The error details should be considered 'best effort': in
-/// general it is not possible to exactly pinpoint why data is malformed.
+/// `DecodeError` indicates that the input buffer does not contain a valid Bilrost message. The
+/// error details should be considered 'best effort': in general it is not possible to exactly
+/// pinpoint why data is malformed.
+///
+/// `DecodeError` is 1 word plus 1 byte in size with the "detailed_errors" feature enabled; without
+/// that feature, it is only 1 byte, and the error will not include any information about the path
+/// to the fields that encountered the error while decoding.
 #[derive(Clone, PartialEq, Eq)]
 pub struct DecodeError {
     /// A 'best effort' root cause description.
