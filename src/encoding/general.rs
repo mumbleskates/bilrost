@@ -1,3 +1,4 @@
+use alloc::borrow::Cow;
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -222,8 +223,6 @@ impl Wiretyped<String> for General {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
 }
 
-// TODO(widders): rope string? Cow string? cow string is probably pretty doable. does it matter?
-
 impl ValueEncoder<String> for General {
     fn encode_value<B: BufMut + ?Sized>(value: &String, buf: &mut B) {
         encode_varint(value.len() as u64, buf);
@@ -295,6 +294,41 @@ mod string {
     use crate::encoding::test::check_type_test;
     check_type_test!(General, expedient, String, LengthDelimited);
     check_type_test!(General, distinguished, String, LengthDelimited);
+}
+
+impl EqualDefaultAlwaysEmpty for Cow<'_, str> {}
+
+impl Wiretyped<Cow<'_, str>> for General {
+    const WIRE_TYPE: WireType = WireType::LengthDelimited;
+}
+
+impl ValueEncoder<Cow<'_, str>> for General {
+    fn encode_value<B: BufMut + ?Sized>(value: &Cow<str>, buf: &mut B) {
+        encode_varint(value.len() as u64, buf);
+        buf.put_slice(value.as_bytes());
+    }
+
+    fn value_encoded_len(value: &Cow<str>) -> usize {
+        encoded_len_varint(value.len() as u64) + value.len()
+    }
+
+    fn decode_value<B: Buf + ?Sized>(
+        value: &mut Cow<str>,
+        buf: Capped<B>,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError> {
+        Self::decode_value(value.to_mut(), buf, ctx)
+    }
+}
+
+impl DistinguishedValueEncoder<Cow<'_, str>> for General {
+    fn decode_value_distinguished<B: Buf + ?Sized>(
+        value: &mut Cow<str>,
+        buf: Capped<B>,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError> {
+        Self::decode_value(value, buf, ctx)
+    }
 }
 
 impl EqualDefaultAlwaysEmpty for Bytes {}
