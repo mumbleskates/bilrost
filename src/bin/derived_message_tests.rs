@@ -828,7 +828,47 @@ mod derived_message_tests {
         assert::encodes(Foo(owned_empty), []);
     }
 
-    // TODO(widders): bytes tests
+    // Blob tests
+
+    #[test]
+    fn parsing_blob() {
+        #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+        struct Foo(bilrost::Blob);
+        assert::decodes_distinguished(
+            [(1, OV::string("hello world"))],
+            Foo(b"hello world"[..].into()),
+        );
+    }
+
+    #[test]
+    fn parsing_vec_blob() {
+        #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+        struct Foo(#[bilrost(encoder(vecblob))] Vec<u8>);
+        assert::decodes_distinguished(
+            [(1, OV::string("hello world"))],
+            Foo(b"hello world"[..].into()),
+        );
+    }
+
+    #[test]
+    fn parsing_cow_blob() {
+        #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+        struct Foo<'a>(#[bilrost(encoder(vecblob))] Cow<'a, [u8]>);
+        assert::decodes_distinguished(
+            [(1, OV::string("hello world"))],
+            Foo(b"hello world"[..].into()),
+        );
+    }
+
+    #[test]
+    fn parsing_bytes_blob() {
+        #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+        struct Foo(bytes::Bytes);
+        assert::decodes_distinguished(
+            [(1, OV::string("hello world"))],
+            Foo(b"hello world"[..].into()),
+        );
+    }
 
     // Repeated field tests
 
