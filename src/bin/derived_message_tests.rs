@@ -325,11 +325,11 @@ mod derived_message_tests {
                 .filter_map(|(present, tag)| present.then_some(tag));
             let (((a, b), c), d) = oneofs;
             // Encoding of `true` for each plain field set to true and each oneof field's tag
-            let opaque_message = field_tags
-                .chain([a, b, c, d].into_iter().flatten())
-                .map(|tag| (tag, OV::bool(true)))
-                .collect::<Vec<_>>()
-                .into_opaque_message();
+            let opaque_message = OpaqueMessage::from_iter(
+                field_tags
+                    .chain([a, b, c, d].into_iter().flatten())
+                    .map(|tag| (tag, OV::bool(true))),
+            );
             assert::decodes_distinguished(&opaque_message, Struct::from_opaque(&opaque_message));
         }
     }
