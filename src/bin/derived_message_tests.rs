@@ -1063,9 +1063,6 @@ mod derived_message_tests {
         }
     }
 
-    // TODO(widders): map tests
-    //  * map keys must never recur
-    //  * map keys and set values must be ascending in distinguished decoding
     // TODO(widders): collection tests -- vec, sets
     //  * set values must never recur
     //  * repeated fields must have matching packed-ness in distinguished decoding
