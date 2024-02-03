@@ -16,13 +16,14 @@ mod derived_message_tests {
     use alloc::vec::Vec;
     use core::default::Default;
     use core::fmt::Debug;
+    use std::collections::BTreeMap;
 
     use itertools::{repeat_n, Itertools};
 
     use bilrost::encoding::opaque::{OpaqueMessage, OpaqueValue as OV};
     use bilrost::encoding::{
         encode_varint, DistinguishedEncoder, DistinguishedOneof, DistinguishedValueEncoder,
-        General, HasEmptyState, Oneof, ValueEncoder,
+        Encoder, General, HasEmptyState, Mapping, Oneof, ValueEncoder,
     };
     use bilrost::DecodeErrorKind::{
         ConflictingFields, InvalidValue, NotCanonical, OutOfDomainValue, TagOverflowed, Truncated,
@@ -906,6 +907,160 @@ mod derived_message_tests {
             ],
             UnexpectedlyRepeated,
         );
+    }
+
+    // Map tests
+
+    #[test]
+    fn decoding_maps() {
+        #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+        struct Foo<T>(T);
+
+        let valid_map = [(
+            1,
+            OV::packed([
+                OV::bool(false),
+                OV::string("no"),
+                OV::bool(true),
+                OV::string("yes"),
+            ]),
+        )];
+        let disordered_map = [(
+            1,
+            OV::packed([
+                OV::bool(true),
+                OV::string("yes"),
+                OV::bool(false),
+                OV::string("no"),
+            ]),
+        )];
+        let repeated_map = [(
+            1,
+            OV::packed([
+                OV::bool(false),
+                OV::string("indecipherable"),
+                OV::bool(false),
+                OV::string("could mean anything"),
+            ]),
+        )];
+
+        assert::decodes_distinguished(
+            &valid_map,
+            Foo(BTreeMap::from([
+                (false, "no".to_string()),
+                (true, "yes".to_string()),
+            ])),
+        );
+        assert::decodes_only_expedient(
+            &disordered_map,
+            Foo(BTreeMap::from([
+                (false, "no".to_string()),
+                (true, "yes".to_string()),
+            ])),
+            NotCanonical,
+        );
+        assert::never_decodes::<Foo<BTreeMap<bool, String>>>(&repeated_map, UnexpectedlyRepeated);
+
+        #[cfg(feature = "std")]
+        {
+            for map_value in [&valid_map, &disordered_map] {
+                assert::decodes(
+                    map_value,
+                    Foo(std::collections::HashMap::from([
+                        (false, "no".to_string()),
+                        (true, "yes".to_string()),
+                    ])),
+                );
+            }
+            assert::doesnt_decode::<Foo<std::collections::HashMap<bool, String>>>(
+                &repeated_map,
+                UnexpectedlyRepeated,
+            );
+        }
+        #[cfg(feature = "hashbrown")]
+        {
+            for map_value in [&valid_map, &disordered_map] {
+                assert::decodes(
+                    map_value,
+                    Foo(hashbrown::HashMap::from([
+                        (false, "no".to_string()),
+                        (true, "yes".to_string()),
+                    ])),
+                );
+            }
+            assert::doesnt_decode::<Foo<hashbrown::HashMap<bool, String>>>(
+                &repeated_map,
+                UnexpectedlyRepeated,
+            );
+        }
+    }
+
+    fn truncated_bool_string_map<T>()
+    where
+        T: Debug + Default + HasEmptyState + Mapping<Key = bool, Value = String>,
+        General: Encoder<T>,
+    {
+        #[derive(Debug, PartialEq, Message)]
+        struct Foo<T>(T, String);
+
+        let OV::LengthDelimited(map_value) = OV::packed([
+            OV::bool(false),
+            OV::string("no"),
+            OV::bool(true),
+            OV::string("yes"),
+        ]) else {
+            unreachable!()
+        };
+        assert::doesnt_decode::<Foo<T>>(
+            [
+                (1, OV::blob(&map_value[..map_value.len() - 1])),
+                (2, OV::string("another field after that")),
+            ],
+            Truncated,
+        );
+    }
+
+    fn truncated_string_int_map<T>()
+    where
+        T: Debug + Default + HasEmptyState + Mapping<Key = String, Value = u64>,
+        General: Encoder<T>,
+    {
+        #[derive(Debug, PartialEq, Message)]
+        struct Foo<T>(T, String);
+
+        let OV::LengthDelimited(map_value) = OV::packed([
+            OV::string("zero"),
+            OV::u64(0),
+            OV::string("lots"),
+            OV::u64(999999999999999),
+        ]) else {
+            unreachable!()
+        };
+        assert::doesnt_decode::<Foo<T>>(
+            [
+                (1, OV::blob(&map_value[..map_value.len() - 1])),
+                (2, OV::string("another field after that")),
+            ],
+            Truncated,
+        );
+    }
+
+    #[test]
+    fn truncated_map() {
+        truncated_bool_string_map::<BTreeMap<bool, String>>();
+        truncated_string_int_map::<BTreeMap<String, u64>>();
+        #[cfg(feature = "std")]
+        {
+            use std::collections::HashMap;
+            truncated_bool_string_map::<HashMap<bool, String>>();
+            truncated_string_int_map::<HashMap<String, u64>>();
+        }
+        #[cfg(feature = "hashbrown")]
+        {
+            use hashbrown::HashMap;
+            truncated_bool_string_map::<HashMap<bool, String>>();
+            truncated_string_int_map::<HashMap<String, u64>>();
+        }
     }
 
     // TODO(widders): map tests
