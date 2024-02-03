@@ -812,24 +812,26 @@ mod derived_message_tests {
             Foo("hello".into(), "world".into()),
         );
         let mut invalid_strings = Vec::<Vec<u8>>::from([
-            b"bad byte: \xff can't appear in utf-8".into(),
-            b"non-canonical representation \xc0\x80 of nul byte".into(),
+            b"bad byte: \xff can't appear in utf-8".as_slice().into(),
+            b"non-canonical representation \xc0\x80 of nul byte"
+                .as_slice()
+                .into(),
         ]);
 
         invalid_strings.extend((0xd800u32..=0xdfff).map(|surrogate_codepoint| {
-            let mut invalid_with_surrogate: Vec<u8> = b"string with surrogate: ".into();
+            let mut invalid_with_surrogate: Vec<u8> = b"string with surrogate: ".as_slice().into();
             invalid_with_surrogate.extend(bytes_for_surrogate(surrogate_codepoint));
             invalid_with_surrogate.extend(b" isn't valid");
             invalid_with_surrogate
         }));
 
-        let mut surrogate_pair: Vec<u8> = b"surrogate pair: ".into();
+        let mut surrogate_pair: Vec<u8> = b"surrogate pair: ".as_slice().into();
         surrogate_pair.extend(bytes_for_surrogate(0xd801));
         surrogate_pair.extend(bytes_for_surrogate(0xdc02));
         surrogate_pair.extend(b" is a valid surrogate pair");
         invalid_strings.push(surrogate_pair);
 
-        let mut surrogate_pair: Vec<u8> = b"reversed surrogate pair: ".into();
+        let mut surrogate_pair: Vec<u8> = b"reversed surrogate pair: ".as_slice().into();
         surrogate_pair.extend(bytes_for_surrogate(0xdc02));
         surrogate_pair.extend(bytes_for_surrogate(0xd801));
         surrogate_pair.extend(b" is a backwards surrogate pair");
