@@ -14,7 +14,7 @@ use crate::encoding::{
     delegate_encoding, delegate_value_encoding, encode_varint, encoded_len_varint, Capped,
     DecodeContext, DistinguishedEncoder, DistinguishedFieldEncoder, DistinguishedValueEncoder,
     Encoder, EqualDefaultAlwaysEmpty, FieldEncoder, HasEmptyState, Map, TagMeasurer, TagWriter,
-    ValueEncoder, WireType, Wiretyped,
+    ValueEncoder, VecBlob, WireType, Wiretyped,
 };
 use crate::message::{merge, merge_distinguished, RawDistinguishedMessage, RawMessage};
 use crate::DecodeErrorKind::{InvalidValue, NotCanonical, OutOfDomainValue, UnexpectedlyRepeated};
@@ -297,6 +297,14 @@ impl DistinguishedValueEncoder<Cow<'_, str>> for General {
     }
 }
 
+#[cfg(test)]
+mod cow_string {
+    use super::{Cow, General};
+    use crate::encoding::test::check_type_test;
+    check_type_test!(General, expedient, Cow<str>, LengthDelimited);
+    check_type_test!(General, distinguished, Cow<str>, LengthDelimited);
+}
+
 #[cfg(feature = "bytestring")]
 impl EqualDefaultAlwaysEmpty for bytestring::ByteString {}
 
@@ -338,6 +346,15 @@ impl DistinguishedValueEncoder<bytestring::ByteString> for General {
     ) -> Result<(), DecodeError> {
         Self::decode_value(value, buf, ctx)
     }
+}
+
+#[cfg(feature = "bytestring")]
+#[cfg(test)]
+mod bytestring_string {
+    use super::{General, String};
+    use crate::encoding::test::check_type_test;
+    check_type_test!(General, expedient, from String, into bytestring::ByteString, LengthDelimited);
+    check_type_test!(General, distinguished, from String, into bytestring::ByteString, LengthDelimited);
 }
 
 impl EqualDefaultAlwaysEmpty for Bytes {}
@@ -395,12 +412,12 @@ impl Wiretyped<Blob> for General {
 impl ValueEncoder<Blob> for General {
     #[inline]
     fn encode_value<B: BufMut + ?Sized>(value: &Blob, buf: &mut B) {
-        crate::encoding::VecBlob::encode_value(value, buf)
+        VecBlob::encode_value(&**value, buf)
     }
 
     #[inline]
     fn value_encoded_len(value: &Blob) -> usize {
-        crate::encoding::VecBlob::value_encoded_len(value)
+        VecBlob::value_encoded_len(&**value)
     }
 
     #[inline]
@@ -409,7 +426,7 @@ impl ValueEncoder<Blob> for General {
         buf: Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
-        crate::encoding::VecBlob::decode_value(value, buf, ctx)
+        VecBlob::decode_value(&mut **value, buf, ctx)
     }
 }
 
@@ -420,7 +437,7 @@ impl DistinguishedValueEncoder<Blob> for General {
         buf: Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
-        crate::encoding::VecBlob::decode_value_distinguished(value, buf, ctx)
+        VecBlob::decode_value_distinguished(&mut **value, buf, ctx)
     }
 }
 

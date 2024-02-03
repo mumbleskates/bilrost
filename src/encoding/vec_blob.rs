@@ -1,3 +1,4 @@
+use alloc::borrow::Cow;
 use alloc::vec::Vec;
 
 use bytes::{Buf, BufMut};
@@ -5,7 +6,7 @@ use bytes::{Buf, BufMut};
 use crate::encoding::{
     delegate_encoding, encode_varint, encoded_len_varint, Capped, DecodeContext,
     DistinguishedEncoder, DistinguishedFieldEncoder, DistinguishedValueEncoder, Encoder,
-    FieldEncoder, TagMeasurer, TagWriter, ValueEncoder, WireType, Wiretyped,
+    FieldEncoder, HasEmptyState, TagMeasurer, TagWriter, ValueEncoder, WireType, Wiretyped,
 };
 use crate::DecodeError;
 use crate::DecodeErrorKind::{NotCanonical, UnexpectedlyRepeated};
@@ -16,6 +17,66 @@ use crate::DecodeErrorKind::{NotCanonical, UnexpectedlyRepeated};
 /// this encoder can be used instead if it's desirable to have a value whose type is exactly
 /// `Vec<u8>`.
 pub struct VecBlob;
+
+impl<T> Encoder<T> for VecBlob
+where
+    VecBlob: ValueEncoder<T>,
+    T: HasEmptyState,
+{
+    #[inline]
+    fn encode<B: BufMut + ?Sized>(tag: u32, value: &T, buf: &mut B, tw: &mut TagWriter) {
+        if !value.is_empty() {
+            Self::encode_field(tag, value, buf, tw);
+        }
+    }
+
+    #[inline]
+    fn encoded_len(tag: u32, value: &T, tm: &mut TagMeasurer) -> usize {
+        if !value.is_empty() {
+            Self::field_encoded_len(tag, value, tm)
+        } else {
+            0
+        }
+    }
+
+    #[inline]
+    fn decode<B: Buf + ?Sized>(
+        wire_type: WireType,
+        duplicated: bool,
+        value: &mut T,
+        buf: Capped<B>,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError> {
+        if duplicated {
+            return Err(DecodeError::new(UnexpectedlyRepeated));
+        }
+        Self::decode_field(wire_type, value, buf, ctx)
+    }
+}
+
+impl<T> DistinguishedEncoder<T> for VecBlob
+where
+    VecBlob: DistinguishedValueEncoder<T> + Encoder<T>,
+    T: Eq + HasEmptyState,
+{
+    #[inline]
+    fn decode_distinguished<B: Buf + ?Sized>(
+        wire_type: WireType,
+        duplicated: bool,
+        value: &mut T,
+        buf: Capped<B>,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError> {
+        if duplicated {
+            return Err(DecodeError::new(UnexpectedlyRepeated));
+        }
+        Self::decode_field_distinguished(wire_type, value, buf, ctx)?;
+        if value.is_empty() {
+            return Err(DecodeError::new(NotCanonical));
+        }
+        Ok(())
+    }
+}
 
 impl Wiretyped<Vec<u8>> for VecBlob {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
@@ -54,68 +115,60 @@ impl DistinguishedValueEncoder<Vec<u8>> for VecBlob {
     }
 }
 
-impl Encoder<Vec<u8>> for VecBlob {
-    #[inline]
-    fn encode<B: BufMut + ?Sized>(tag: u32, value: &Vec<u8>, buf: &mut B, tw: &mut TagWriter) {
-        if !value.is_empty() {
-            Self::encode_field(tag, value, buf, tw);
-        }
-    }
-
-    #[inline]
-    fn encoded_len(tag: u32, value: &Vec<u8>, tm: &mut TagMeasurer) -> usize {
-        if !value.is_empty() {
-            Self::field_encoded_len(tag, value, tm)
-        } else {
-            0
-        }
-    }
-
-    #[inline]
-    fn decode<B: Buf + ?Sized>(
-        wire_type: WireType,
-        duplicated: bool,
-        value: &mut Vec<u8>,
-        buf: Capped<B>,
-        ctx: DecodeContext,
-    ) -> Result<(), DecodeError> {
-        if duplicated {
-            return Err(DecodeError::new(UnexpectedlyRepeated));
-        }
-        Self::decode_field(wire_type, value, buf, ctx)
-    }
-}
-
-impl DistinguishedEncoder<Vec<u8>> for VecBlob {
-    #[inline]
-    fn decode_distinguished<B: Buf + ?Sized>(
-        wire_type: WireType,
-        duplicated: bool,
-        value: &mut Vec<u8>,
-        buf: Capped<B>,
-        ctx: DecodeContext,
-    ) -> Result<(), DecodeError> {
-        if duplicated {
-            return Err(DecodeError::new(UnexpectedlyRepeated));
-        }
-        Self::decode_field_distinguished(wire_type, value, buf, ctx)?;
-        if value.is_empty() {
-            return Err(DecodeError::new(NotCanonical));
-        }
-        Ok(())
-    }
-}
-
 delegate_encoding!(delegate from (VecBlob) to (crate::encoding::Unpacked<VecBlob>)
     for type (Vec<Vec<u8>>) including distinguished);
-
-// TODO(widders): Cow<[u8]>
+delegate_encoding!(delegate from (VecBlob) to (crate::encoding::Unpacked<VecBlob>)
+    for type (Vec<Cow<'a, [u8]>>) including distinguished with generics ('a));
 
 #[cfg(test)]
-mod test {
+mod vec_u8 {
+    use super::{Vec, VecBlob};
     use crate::encoding::test::check_type_test;
-    use crate::encoding::VecBlob;
-    use alloc::vec::Vec;
     check_type_test!(VecBlob, expedient, Vec<u8>, LengthDelimited);
     check_type_test!(VecBlob, distinguished, Vec<u8>, LengthDelimited);
+}
+
+impl Wiretyped<Cow<'_, [u8]>> for VecBlob {
+    const WIRE_TYPE: WireType = WireType::LengthDelimited;
+}
+
+impl ValueEncoder<Cow<'_, [u8]>> for VecBlob {
+    #[inline]
+    fn encode_value<B: BufMut + ?Sized>(value: &Cow<[u8]>, buf: &mut B) {
+        encode_varint(value.len() as u64, buf);
+        buf.put_slice(value.as_ref());
+    }
+
+    #[inline]
+    fn value_encoded_len(value: &Cow<[u8]>) -> usize {
+        encoded_len_varint(value.len() as u64) + value.len()
+    }
+
+    #[inline]
+    fn decode_value<B: Buf + ?Sized>(
+        value: &mut Cow<[u8]>,
+        buf: Capped<B>,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError> {
+        Self::decode_value(value.to_mut(), buf, ctx)
+    }
+}
+
+impl DistinguishedValueEncoder<Cow<'_, [u8]>> for VecBlob {
+    #[inline]
+    fn decode_value_distinguished<B: Buf + ?Sized>(
+        value: &mut Cow<[u8]>,
+        buf: Capped<B>,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError> {
+        Self::decode_value_distinguished(value.to_mut(), buf, ctx)
+    }
+}
+
+#[cfg(test)]
+mod cow_bytes {
+    use super::{Cow, VecBlob};
+    use crate::encoding::test::check_type_test;
+    check_type_test!(VecBlob, expedient, Cow<[u8]>, LengthDelimited);
+    check_type_test!(VecBlob, distinguished, Cow<[u8]>, LengthDelimited);
 }

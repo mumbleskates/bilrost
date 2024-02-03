@@ -216,17 +216,14 @@ Bilrost structs can encode fields with a wide variety of types:
 | `fixed`             | `i64`                  | fixed-size 64 bits     |
 | `general`           | `bool`                 | varint                 |
 | `general`           | derived `Enumeration`* | varint                 |
-| `general`           | `String`               | length-delimited       |
-| `general`           | `Blob`**, `Bytes`      | length-delimited       |
-| `vecblob`           | `Vec<u8>`              | length-delimited       |
+| `general`           | `String`**             | length-delimited       |
+| `vecblob`           | `Vec<u8>`**            | length-delimited       |
 | `general`           | derived `Message`      | length-delimited       |
 
 *`Enumeration` types can be directly included if they implement `Default`;
 otherwise they must always be nested.
 
-**`Blob` is a transparent wrapper for `Vec<u8>` that is a drop-in replacement
-in most situations. If nothing but `Vec<u8>` will do, the `vecblob` encoder
-will encode a plain `Vec<u8>` as a bytes value.
+**Alternative types are available! See below.
 
 Any of these types may be included directly in a Bilrost message struct. If that
 field's value is defaulted, no bytes will be emitted when it is encoded.
@@ -236,16 +233,44 @@ several different containers:
 
 <!-- TODO(widders): detail encoders and value-encoders -->
 
-| Encoder       | Value type                            | Encoded representation                                                         | Re-nestable |
-|---------------|---------------------------------------|--------------------------------------------------------------------------------|-------------|
-| any encoder   | `Option<T>`                           | identical; at least some bytes are always encoded if `Some`, nothing if `None` | no          |
-| `unpacked<E>` | `Vec<T>`, `HashSet<T>`, `BTreeSet<T>` | the same as encoder `E`, one field per value                                   | no          |
-| `unpacked`    | *                                     | (the same as `unpacked<general>`)                                              | no          |
-| `packed<E>`   | `Vec<T>`, `HashSet<T>`, `BTreeSet<T>` | length-delimited, successively encoded with `E`                                | yes         |
-| `packed`      | *                                     | (the same as `packed<general>`)                                                | yes         |
-| `map<KE, VE>` | `BTreeMap<K, V>`, `HashMap<K, V>`     | length-delimited, alternately encoded with `KE` and `VE`                       | yes         |
-| `general`     | `Vec`, `HashSet`, `BTreeSet`          | (the same as `unpacked`)                                                       | no          |
-| `general`     | `BTreeMap`, `HashMap`                 | (the same as `map<general, general>`)                                          | yes         |
+| Encoder       | Value type              | Encoded representation                                                         | Re-nestable |
+|---------------|-------------------------|--------------------------------------------------------------------------------|-------------|
+| any encoder   | `Option<T>`             | identical; at least some bytes are always encoded if `Some`, nothing if `None` | no          |
+| `unpacked<E>` | `Vec<T>`, `BTreeSet<T>` | the same as encoder `E`, one field per value                                   | no          |
+| `unpacked`    | *                       | (the same as `unpacked<general>`)                                              | no          |
+| `packed<E>`   | `Vec<T>`, `BTreeSet<T>` | length-delimited, successively encoded with `E`                                | yes         |
+| `packed`      | *                       | (the same as `packed<general>`)                                                | yes         |
+| `map<KE, VE>` | `BTreeMap<K, V>`        | length-delimited, alternately encoded with `KE` and `VE`                       | yes         |
+| `general`     | `Vec<T>`, `BTreeSet<T>` | (the same as `unpacked`)                                                       | no          |
+| `general`     | `BTreeMap`              | (the same as `map<general, general>`)                                          | yes         |
+
+Many alternative types are also available for both scalar values and containers!
+
+| Value type | Alternative              | Feature to enable |
+|------------|--------------------------|-------------------|
+| `Vec<u8>`  | `Blob`*                  | (none)            |
+| `Vec<u8>`  | `Bytes`                  | (none)            |
+| `Vec<u8>`  | `Cow<[u8]>`              | (none)            |
+| `String`   | `Cow<str>`               | (none)            |
+| `String`   | `bytestring::ByteString` | "bytestring"      |
+
+*`bilrost::Blob` is a transparent wrapper for `Vec<u8>` in that is a drop-in
+replacement in most situations. If nothing but `Vec<u8>` will do, the `vecblob`
+encoder will encode a plain `Vec<u8>` as a bytes value.
+
+All listed alternative types are supported by the `general` encoder.
+
+| Container type | Alternative              | Feature to enable |
+|----------------|--------------------------|-------------------|
+| `Vec<T>`       | `Cow<[T]>`               | (none)            |
+| `BTreeMap<T>`  | `HashMap<T>`*            | "std" (default)   |
+| `BTreeSet<T>`  | `HashSet<T>`*            | "std" (default)   |
+| `BTreeMap<T>`  | `hashbrown::HashMap<T>`* | "hashbrown"       |
+| `BTreeSet<T>`  | `hashbrown::HashSet<T>`* | "hashbrown"       |
+
+*Hashtable-based maps and sets are implemented, but are not compatible with
+distinguished encoding or decoding. If distinguished encoding is required, a
+container which stores its values ordered must be used.
 
 #### Compatible Widening
 
@@ -258,7 +283,7 @@ into the same representation.
 |------------------------------------------------------|-------------------------------------|----------------------------------------------------------------| 
 | `bool` --> `u32` --> `u64` with `general` encoding   | `true`/`false` becomes 1/0          | value is out of range of the narrower type                     |
 | `bool` --> `i32` --> `i64` with `general` encoding   | `true`/`false` becomes -1/0         | value is out of range of the narrower type                     |
-| `String` --> `Blob`/`Bytes`                          | string becomes its UTF-8 data       | value contains invalid UTF-8                                   |
+| `String` --> `Vec<u8>`                               | string becomes its UTF-8 data       | value contains invalid UTF-8                                   |
 | `T` --> `Option<T>`                                  | default value of `T` becomes `None` | `Some(default)` is encoded, then decoded in distinguished mode |
 | `Option<T>` --> `Vec<T>` (with `unpacked` encodings) | maybe-contained value is identical  | multiple values are in the `Vec`                               |
 
@@ -272,9 +297,10 @@ also change the bytes of the encoding, but expedient decoding will still work.
 
 `bilrost` can derive an enumeration type from an `enum` with no fields in its
 variants, where each variant has either
- * an explicit discriminant that is a valid `u32` value, or
- * a `#[bilrost = 123]` or `#[bilrost(123)]` attribute that specifies a valid
-   `u32` const expression (here with the example value `123`).
+
+* an explicit discriminant that is a valid `u32` value, or
+* a `#[bilrost = 123]` or `#[bilrost(123)]` attribute that specifies a valid
+  `u32` const expression (here with the example value `123`).
 
 ```rust
 const FOUR: u32 = 4;
