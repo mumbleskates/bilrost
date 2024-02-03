@@ -487,7 +487,8 @@ mod tests {
     use crate::datetime::DateTime;
 
     #[test]
-    fn check_crashing_datetimes() {
+    fn check_overflowing_datetimes() {
+        // These DateTimes cause overflows and crashes in the prost crate.
         assert_eq!(
             Timestamp::from(DateTime {
                 year: i64::from_le_bytes([178, 2, 0, 0, 0, 0, 0, 128]),
