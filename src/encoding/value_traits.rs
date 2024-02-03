@@ -1,4 +1,4 @@
-use alloc::borrow::Cow;
+use alloc::borrow::{Cow, ToOwned};
 use alloc::collections::{btree_map, btree_set, BTreeMap, BTreeSet};
 use alloc::vec::Vec;
 #[cfg(feature = "std")]
