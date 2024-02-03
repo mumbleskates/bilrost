@@ -113,7 +113,7 @@ where
             Ok((new_key, new_val))
         }) {
             let (key, val) = item?;
-            value.insert(key, val).map_err(DecodeError::new)?;
+            value.insert_distinguished(key, val).map_err(DecodeError::new)?;
         }
         Ok(())
     }

@@ -79,7 +79,7 @@ where
             E::decode_value_distinguished(&mut new_val, buf.lend(), ctx.clone())?;
             Ok(new_val)
         }) {
-            value.insert(val?).map_err(DecodeError::new)?;
+            value.insert_distinguished(val?).map_err(DecodeError::new)?;
         }
         Ok(())
     }
