@@ -183,7 +183,7 @@ where
     }
 }
 
-impl<'a, T> HasEmptyState for Cow<'a, [T]>
+impl<T> HasEmptyState for Cow<'_, [T]>
 where
     [T]: ToOwned<Owned = Vec<T>>,
 {
@@ -192,15 +192,15 @@ where
     }
 }
 
-impl<'a, T> Collection for Cow<'a, [T]>
+impl<T> Collection for Cow<'_, [T]>
 where
     [T]: ToOwned<Owned = Vec<T>>,
 {
     type Item = T;
-    type RefIter<'b> = core::slice::Iter<'b, T>
+    type RefIter<'a> = core::slice::Iter<'a, T>
     where
-        T: 'b,
-        Self: 'b;
+        T: 'a,
+        Self: 'a;
     fn len(&self) -> usize {
         <[T]>::len(self)
     }
@@ -215,15 +215,15 @@ where
     }
 }
 
-impl<'a, T> DistinguishedCollection for Cow<'a, [T]>
+impl<T> DistinguishedCollection for Cow<'_, [T]>
 where
     T: Eq,
     [T]: ToOwned<Owned = Vec<T>>,
 {
-    type ReverseIter<'b> = core::iter::Rev<core::slice::Iter<'b, T>>
+    type ReverseIter<'a> = core::iter::Rev<core::slice::Iter<'a, T>>
         where
-            Self::Item: 'b,
-            Self: 'b;
+            Self::Item: 'a,
+            Self: 'a;
 
     #[inline]
     fn reversed(&self) -> Self::ReverseIter<'_> {

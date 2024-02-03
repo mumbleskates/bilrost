@@ -105,8 +105,8 @@ impl<const N: usize> From<[u8; N]> for Blob {
     }
 }
 
-impl<'a> From<Cow<'a, [u8]>> for Blob {
-    fn from(value: Cow<'a, [u8]>) -> Self {
+impl From<Cow<'_, [u8]>> for Blob {
+    fn from(value: Cow<[u8]>) -> Self {
         Self(value.into())
     }
 }
