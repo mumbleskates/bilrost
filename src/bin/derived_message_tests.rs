@@ -993,6 +993,8 @@ mod derived_message_tests {
                 UnexpectedlyRepeated,
             );
         }
+        // dispose to suppress linter complaining about references
+        _ = (valid_map, disordered_map, repeated_map);
     }
 
     fn truncated_bool_string_map<T>()
