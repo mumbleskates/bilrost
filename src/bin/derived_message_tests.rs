@@ -10,6 +10,7 @@ fn main() {
 mod derived_message_tests {
     extern crate alloc;
 
+    use alloc::borrow::Cow;
     use alloc::string::{String, ToString};
     use alloc::vec;
     use alloc::vec::Vec;
@@ -790,7 +791,60 @@ mod derived_message_tests {
         check_fixed_truncation::<i64>(OV::fixed_u64(0x1234deadbeefcafe));
     }
 
-    // TODO(widders): string tests (including InvalidValue)
+    // String tests
+
+    fn bytes_for_surrogate(surrogate_codepoint: u32) -> [u8; 3] {
+        assert!((0xd800..=0xdfff).contains(&surrogate_codepoint));
+        [
+            0b1110_0000 | (0b0000_1111 & (surrogate_codepoint >> 12)) as u8,
+            0b10_000000 | (0b00_111111 & (surrogate_codepoint >> 6)) as u8,
+            0b10_000000 | (0b00_111111 & surrogate_codepoint) as u8,
+        ]
+    }
+
+    #[test]
+    fn parsing_strings() {
+        #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+        struct Foo<'a>(String, Cow<'a, str>);
+
+        assert::decodes_distinguished(
+            [(1, OV::string("hello")), (2, OV::string("world"))],
+            Foo("hello".into(), "world".into()),
+        );
+        let mut invalid_strings = Vec::<Vec<u8>>::from([
+            b"bad byte: \xff can't appear in utf-8".into(),
+            b"non-canonical representation \xc0\x80 of nul byte".into(),
+        ]);
+
+        invalid_strings.extend((0xd800u32..=0xdfff).map(|surrogate_codepoint| {
+            let mut invalid_with_surrogate: Vec<u8> = b"string with surrogate: ".into();
+            invalid_with_surrogate.extend(bytes_for_surrogate(surrogate_codepoint));
+            invalid_with_surrogate.extend(b" isn't valid");
+            invalid_with_surrogate
+        }));
+
+        let mut surrogate_pair: Vec<u8> = b"surrogate pair: ".into();
+        surrogate_pair.extend(bytes_for_surrogate(0xd801));
+        surrogate_pair.extend(bytes_for_surrogate(0xdc02));
+        surrogate_pair.extend(b" is a valid surrogate pair");
+        invalid_strings.push(surrogate_pair);
+
+        let mut surrogate_pair: Vec<u8> = b"reversed surrogate pair: ".into();
+        surrogate_pair.extend(bytes_for_surrogate(0xdc02));
+        surrogate_pair.extend(bytes_for_surrogate(0xd801));
+        surrogate_pair.extend(b" is a backwards surrogate pair");
+        invalid_strings.push(surrogate_pair);
+
+        for invalid_string in invalid_strings {
+            for string_field_tag in [1, 2] {
+                assert::never_decodes::<Foo>(
+                    [(string_field_tag, OV::blob(&*invalid_string))],
+                    InvalidValue,
+                );
+            }
+        }
+    }
+
     // TODO(widders): bytes tests
 
     // Repeated field tests
