@@ -850,6 +850,18 @@ mod derived_message_tests {
         parsing_string_type::<bytestring::ByteString>();
     }
 
+    #[test]
+    fn owned_empty_cow_str_is_still_empty() {
+        let owned_empty = Cow::<str>::Owned(String::with_capacity(32));
+        assert!(owned_empty.is_empty());
+
+        #[derive(Message)]
+        struct Foo<'a>(Cow<'a, str>);
+
+        assert::encodes(Foo(Cow::Borrowed("")), []);
+        assert::encodes(Foo(owned_empty), []);
+    }
+
     // TODO(widders): bytes tests
 
     // Repeated field tests
