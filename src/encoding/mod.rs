@@ -1,5 +1,3 @@
-#![allow(clippy::implicit_hasher, clippy::ptr_arg)]
-
 #[cfg(all(test, not(feature = "std")))]
 use alloc::format;
 use core::cmp::{min, Eq, PartialEq};
