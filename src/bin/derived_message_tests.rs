@@ -200,9 +200,6 @@ mod derived_message_tests {
         }
     }
 
-    // TODO(widders): test coverage for completed features:
-    //  * truncated values and nested messages
-
     // Tests for derived trait bounds
 
     #[test]
@@ -1208,6 +1205,25 @@ mod derived_message_tests {
                 }),
                 also: Some("abc".into()),
             },
+        );
+    }
+
+    #[test]
+    fn truncated_submessage() {
+        #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+        struct Nested(String);
+        #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+        struct Foo(Nested, String);
+
+        let inner = [(1, OV::string("interrupting cow says"))]
+            .into_opaque_message()
+            .encode_to_vec();
+        assert::never_decodes::<Foo>(
+            [
+                (1, OV::blob(&inner[..inner.len() - 1])),
+                (2, OV::string("moo")),
+            ],
+            Truncated,
         );
     }
 
