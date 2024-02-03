@@ -36,6 +36,7 @@ bench = false
 
 [features]
 default = ["derive", "detailed_errors", "std"]
+bytestring = ["dep:bytestring"]
 derive = ["dep:bilrost-derive"]
 detailed_errors = ["dep:thin-vec"]
 extended-diagnostics = ["dep:const_panic"]
@@ -48,6 +49,7 @@ std = []
 bilrost-derive = { version = "0.999.0", path = "bilrost-derive", optional = true }
 btreemultimap = { version = "0.1", optional = true }
 bytes = { version = "1", default-features = false }
+bytestring = { version = "1", optional = true}
 const_panic = { version = "0.2", optional = true }
 hashbrown = { version = ">=0.1.0", optional = true }
 thin-vec = { version = "0.2", optional = true }

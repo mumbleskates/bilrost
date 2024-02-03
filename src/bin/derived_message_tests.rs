@@ -22,7 +22,7 @@ mod derived_message_tests {
     use bilrost::encoding::opaque::{OpaqueMessage, OpaqueValue as OV};
     use bilrost::encoding::{
         encode_varint, DistinguishedEncoder, DistinguishedOneof, DistinguishedValueEncoder,
-        HasEmptyState, Oneof, ValueEncoder,
+        General, HasEmptyState, Oneof, ValueEncoder,
     };
     use bilrost::DecodeErrorKind::{
         ConflictingFields, InvalidValue, NotCanonical, OutOfDomainValue, TagOverflowed, Truncated,
@@ -802,15 +802,15 @@ mod derived_message_tests {
         ]
     }
 
-    #[test]
-    fn parsing_strings() {
+    fn parsing_string_type<'a, T>()
+    where
+        T: 'a + Debug + Default + Eq + From<&'a str> + HasEmptyState,
+        General: DistinguishedEncoder<T>,
+    {
         #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
-        struct Foo<'a>(String, Cow<'a, str>);
+        struct Foo<T>(T);
 
-        assert::decodes_distinguished(
-            [(1, OV::string("hello")), (2, OV::string("world"))],
-            Foo("hello".into(), "world".into()),
-        );
+        assert::decodes_distinguished([(1, OV::string("hello world"))], Foo("hello world".into()));
         let mut invalid_strings = Vec::<Vec<u8>>::from([
             b"bad byte: \xff can't appear in utf-8".as_slice().into(),
             b"non-canonical representation \xc0\x80 of nul byte"
@@ -838,13 +838,16 @@ mod derived_message_tests {
         invalid_strings.push(surrogate_pair);
 
         for invalid_string in invalid_strings {
-            for string_field_tag in [1, 2] {
-                assert::never_decodes::<Foo>(
-                    [(string_field_tag, OV::blob(&*invalid_string))],
-                    InvalidValue,
-                );
-            }
+            assert::never_decodes::<Foo<T>>([(1, OV::blob(&*invalid_string))], InvalidValue);
         }
+    }
+
+    #[test]
+    fn parsing_strings() {
+        parsing_string_type::<String>();
+        parsing_string_type::<Cow<str>>();
+        #[cfg(feature = "bytestring")]
+        parsing_string_type::<bytestring::ByteString>();
     }
 
     // TODO(widders): bytes tests

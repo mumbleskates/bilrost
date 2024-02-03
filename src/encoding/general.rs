@@ -331,6 +331,49 @@ impl DistinguishedValueEncoder<Cow<'_, str>> for General {
     }
 }
 
+#[cfg(feature = "bytestring")]
+impl EqualDefaultAlwaysEmpty for bytestring::ByteString {}
+
+#[cfg(feature = "bytestring")]
+impl Wiretyped<bytestring::ByteString> for General {
+    const WIRE_TYPE: WireType = WireType::LengthDelimited;
+}
+
+#[cfg(feature = "bytestring")]
+impl ValueEncoder<bytestring::ByteString> for General {
+    fn encode_value<B: BufMut + ?Sized>(value: &bytestring::ByteString, buf: &mut B) {
+        encode_varint(value.len() as u64, buf);
+        buf.put_slice(value.as_bytes());
+    }
+
+    fn value_encoded_len(value: &bytestring::ByteString) -> usize {
+        encoded_len_varint(value.len() as u64) + value.len()
+    }
+
+    fn decode_value<B: Buf + ?Sized>(
+        value: &mut bytestring::ByteString,
+        mut buf: Capped<B>,
+        _ctx: DecodeContext,
+    ) -> Result<(), DecodeError> {
+        let mut string_data = buf.take_length_delimited()?;
+        let string_len = string_data.remaining_before_cap();
+        *value = bytestring::ByteString::try_from(string_data.copy_to_bytes(string_len))
+            .map_err(|_| DecodeError::new(InvalidValue))?;
+        Ok(())
+    }
+}
+
+#[cfg(feature = "bytestring")]
+impl DistinguishedValueEncoder<bytestring::ByteString> for General {
+    fn decode_value_distinguished<B: Buf + ?Sized>(
+        value: &mut bytestring::ByteString,
+        buf: Capped<B>,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError> {
+        Self::decode_value(value, buf, ctx)
+    }
+}
+
 impl EqualDefaultAlwaysEmpty for Bytes {}
 
 impl Wiretyped<Bytes> for General {
