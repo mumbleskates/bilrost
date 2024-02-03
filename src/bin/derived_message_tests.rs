@@ -248,7 +248,7 @@ mod derived_message_tests {
 
     #[test]
     fn derived_message_field_ordering() {
-        #[derive(Clone, Debug, PartialEq, Oneof)]
+        #[derive(Clone, Debug, PartialEq, Eq, Oneof, DistinguishedOneof)]
         enum A {
             #[bilrost(1)]
             One(bool),
@@ -258,7 +258,7 @@ mod derived_message_tests {
             Twenty(bool),
         }
 
-        #[derive(Clone, Debug, PartialEq, Oneof)]
+        #[derive(Clone, Debug, PartialEq, Eq, Oneof, DistinguishedOneof)]
         enum B {
             #[bilrost(9)]
             Nine(bool),
@@ -266,7 +266,7 @@ mod derived_message_tests {
             Eleven(bool),
         }
 
-        #[derive(Clone, Debug, PartialEq, Oneof)]
+        #[derive(Clone, Debug, PartialEq, Eq, Oneof, DistinguishedOneof)]
         enum C {
             #[bilrost(13)]
             Thirteen(bool),
@@ -276,7 +276,7 @@ mod derived_message_tests {
             TwentyTwo(bool),
         }
 
-        #[derive(Clone, Debug, PartialEq, Oneof)]
+        #[derive(Clone, Debug, PartialEq, Eq, Oneof, DistinguishedOneof)]
         enum D {
             #[bilrost(18)]
             Eighteen(bool),
@@ -284,12 +284,7 @@ mod derived_message_tests {
             Nineteen(bool),
         }
 
-        use A::*;
-        use B::*;
-        use C::*;
-        use D::*;
-
-        #[derive(Clone, Debug, PartialEq, Message)]
+        #[derive(Clone, Debug, PartialEq, Eq, Message, DistinguishedMessage)]
         struct Struct {
             #[bilrost(0)]
             zero: bool,
@@ -319,51 +314,25 @@ mod derived_message_tests {
             fifty: bool,
         }
 
-        impl TryFrom<Vec<bool>> for Struct {
-            type Error = ();
-
-            fn try_from(value: Vec<bool>) -> Result<Self, ()> {
-                match value[..] {
-                    [zero, four, five, twelve, fourteen, fifteen, seventeen, twentyone, fifty] => {
-                        Ok(Self {
-                            zero,
-                            four,
-                            five,
-                            twelve,
-                            fourteen,
-                            fifteen,
-                            seventeen,
-                            twentyone,
-                            fifty,
-                            ..Default::default()
-                        })
-                    }
-                    _ => Err(()),
-                }
-            }
-        }
-
-        // This must be the same as the number of fields we're putting into the struct...
         let bools = repeat_n([false, true], 9).multi_cartesian_product();
-        let abcd = [None, Some(One(true)), Some(Ten(true)), Some(Twenty(true))]
+        let abcd = [None, Some(1), Some(10), Some(20)]
             .into_iter()
-            .cartesian_product([None, Some(Nine(true)), Some(Eleven(true))])
-            .cartesian_product([
-                None,
-                Some(Thirteen(true)),
-                Some(Sixteen(true)),
-                Some(TwentyTwo(true)),
-            ])
-            .cartesian_product([None, Some(Eighteen(true)), Some(Nineteen(true))]);
+            .cartesian_product([None, Some(9), Some(11)])
+            .cartesian_product([None, Some(13), Some(16), Some(22)])
+            .cartesian_product([None, Some(18), Some(19)]);
         for (bools, oneofs) in bools.cartesian_product(abcd) {
-            let mut out: Struct = bools.try_into().unwrap();
-            (((out.a, out.b), out.c), out.d) = oneofs;
-
-            let encoded_len = out.encoded_len();
-            let encoded = out.encode_to_vec();
-            assert_eq!(encoded.len(), encoded_len);
-            let re = Struct::decode(encoded.as_slice()).unwrap();
-            assert_eq!(out, re);
+            let field_tags = bools
+                .into_iter()
+                .zip([0, 4, 5, 12, 14, 15, 17, 21, 50]) // plain bool tags
+                .filter_map(|(present, tag)| present.then_some(tag));
+            let (((a, b), c), d) = oneofs;
+            // Encoding of `true` for each plain field set to true and each oneof field's tag
+            let opaque_message = field_tags
+                .chain([a, b, c, d].into_iter().flatten())
+                .map(|tag| (tag, OV::bool(true)))
+                .collect::<Vec<_>>()
+                .into_opaque_message();
+            assert::decodes_distinguished(&opaque_message, Struct::from_opaque(&opaque_message));
         }
     }
 
@@ -545,7 +514,7 @@ mod derived_message_tests {
     #[test]
     fn truncated_varint() {
         #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
-        struct Foo<T>(#[bilrost(1_000_000)] T);
+        struct Foo<T>(T);
 
         let buf = [(1, OV::Varint(1_000_000))]
             .into_opaque_message()
