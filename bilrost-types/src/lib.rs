@@ -41,6 +41,8 @@ impl core::ops::Neg for Duration {
     }
 }
 
+// TODO(widders): addition and subtraction with Timestamp & Duration
+
 impl Duration {
     /// Normalizes the duration to a canonical format.
     ///
@@ -87,9 +89,6 @@ impl Duration {
                 self.nanos = -NANOS_MAX;
             }
         }
-        // TODO: should this be checked?
-        // debug_assert!(self.seconds >= -315_576_000_000 && self.seconds <= 315_576_000_000,
-        //               "invalid duration: {:?}", self);
     }
 }
 
