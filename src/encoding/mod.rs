@@ -1172,9 +1172,21 @@ mod test {
     /// Generalized proptest macro. Kind must be either `expedient`, `hashable`, or `distinguished`.
     macro_rules! check_type_test {
         ($encoder:ty, $kind:ident, $ty:ty, $wire_type:ident) => {
-            crate::encoding::test::check_type_test!($encoder, $kind, from $ty, into $ty, $wire_type);
+            crate::encoding::test::check_type_test!($encoder, $kind, from $ty, into $ty,
+            converter(value) { value }, $wire_type);
         };
         ($encoder:ty, $kind:ident, from $from_ty:ty, into $into_ty:ty, $wire_type:ident) => {
+            crate::encoding::test::check_type_test!($encoder, $kind, from $from_ty, into $into_ty,
+                converter(value) { <$into_ty>::from(value) }, $wire_type);
+        };
+        (
+            $encoder:ty,
+            $kind:ident,
+            from $from_ty:ty,
+            into $into_ty:ty,
+            converter($from_value:ident) $convert:expr,
+            $wire_type:ident
+        ) => {
             #[cfg(test)]
             mod $kind {
                 use proptest::prelude::*;
@@ -1186,13 +1198,13 @@ mod test {
 
                 proptest! {
                     #[test]
-                    fn check(value: $from_ty, tag: u32) {
-                        check_type::<$into_ty, $encoder>(<$into_ty>::from(value), tag, $wire_type)?;
+                    fn check($from_value: $from_ty, tag: u32) {
+                        check_type::<$into_ty, $encoder>($convert, tag, $wire_type)?;
                     }
                     #[test]
-                    fn check_optional(value: Option<$from_ty>, tag: u32) {
+                    fn check_optional(opt_value: Option<$from_ty>, tag: u32) {
                         check_type::<Option<$into_ty>, $encoder>(
-                            value.map(<$into_ty>::from),
+                            opt_value.map(|$from_value| $convert),
                             tag,
                             $wire_type,
                         )?;

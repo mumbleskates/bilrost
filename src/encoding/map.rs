@@ -179,8 +179,6 @@ where
     }
 }
 
-// TODO(widders): test hashbrown support
-
 #[cfg(test)]
 mod test {
     mod btree {
@@ -273,6 +271,60 @@ mod test {
                 General,
                 expedient,
                 HashMap<bool, u32>,
+                LengthDelimited
+            );
+        }
+    }
+
+    #[cfg(feature = "hashbrown")]
+    mod hashbrown_hash {
+        mod general {
+            use crate::encoding::test::check_type_test;
+            use crate::encoding::{General, Map};
+            use alloc::collections::BTreeMap;
+            use hashbrown::HashMap;
+            check_type_test!(
+                Map<General, General>,
+                expedient,
+                from BTreeMap<u64, f32>,
+                into HashMap<u64, f32>,
+                converter(value) {
+                    <HashMap<u64, f32> as FromIterator<_>>::from_iter(value.into_iter())
+                },
+                LengthDelimited
+            );
+        }
+
+        mod fixed {
+            use crate::encoding::test::check_type_test;
+            use crate::encoding::{Fixed, Map};
+            use alloc::collections::BTreeMap;
+            use hashbrown::HashMap;
+            check_type_test!(
+                Map<Fixed, Fixed>,
+                expedient,
+                from BTreeMap<u64, f32>,
+                into HashMap<u64, f32>,
+                converter(value) {
+                    <HashMap<u64, f32> as FromIterator<_>>::from_iter(value.into_iter())
+                },
+                LengthDelimited
+            );
+        }
+
+        mod delegated_from_general {
+            use crate::encoding::test::check_type_test;
+            use crate::encoding::General;
+            use alloc::collections::BTreeMap;
+            use hashbrown::HashMap;
+            check_type_test!(
+                General,
+                expedient,
+                from BTreeMap<bool, u32>,
+                into HashMap<bool, u32>,
+                converter(value) {
+                    <HashMap<bool, u32> as FromIterator<_>>::from_iter(value.into_iter())
+                },
                 LengthDelimited
             );
         }
