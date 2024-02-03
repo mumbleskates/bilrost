@@ -30,14 +30,6 @@ const NANOS_MAX: i32 = NANOS_PER_SECOND - 1;
 
 // TODO(widders): Message and into/from impls on time::Duration, time::Instant as optional features
 
-#[cfg(feature = "std")]
-impl std::hash::Hash for Duration {
-    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
-        self.seconds.hash(state);
-        self.nanos.hash(state);
-    }
-}
-
 impl core::ops::Neg for Duration {
     type Output = Self;
 
@@ -306,21 +298,6 @@ impl Timestamp {
         } else {
             Err(TimestampError::InvalidDateTime)
         }
-    }
-}
-
-/// Implements the unstable/naive version of `Eq`: a basic equality check on the internal fields of the `Timestamp`.
-/// This implies that `normalized_ts != non_normalized_ts` even if `normalized_ts == non_normalized_ts.normalized()`.
-#[cfg(feature = "std")]
-impl Eq for Timestamp {}
-
-#[cfg(feature = "std")]
-// Derived logic is correct: comparing the 2 fields for equality
-#[allow(clippy::derived_hash_with_manual_eq)]
-impl std::hash::Hash for Timestamp {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.seconds.hash(state);
-        self.nanos.hash(state);
     }
 }
 

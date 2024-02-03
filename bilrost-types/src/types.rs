@@ -10,6 +10,9 @@ use bilrost::Message;
 /// two Timestamp values is a Duration and it can be added or subtracted
 /// from a Timestamp. Range is approximately +-10,000 years.
 ///
+/// Values of this type are not guaranteed to only exist in their normalized
+/// form.
+///
 /// # Examples
 ///
 /// Example 1: Compute Duration from two Timestamps in pseudo code.
@@ -67,6 +70,7 @@ use bilrost::Message;
 /// encoded in JSON format as "3s", while 3 seconds and 1 nanosecond should
 /// be expressed in JSON format as "3.000000001s", and 3 seconds and 1
 /// microsecond should be expressed in JSON format as "3.000001s".
+#[cfg_attr(feature = "std", derive(Eq, Hash))]
 #[derive(Clone, Debug, PartialEq, PartialOrd, Message)]
 pub struct Duration {
     /// Signed seconds of the span of time. Must be from -315,576,000,000
@@ -97,6 +101,9 @@ pub struct Duration {
 /// The range is from 0001-01-01T00:00:00Z to 9999-12-31T23:59:59.999999999Z. By
 /// restricting to that range, we ensure that we can convert to and from [RFC
 /// 3339](<https://www.ietf.org/rfc/rfc3339.txt>) date strings.
+///
+/// Values of this type are not guaranteed to only exist in their normalized
+/// form.
 ///
 /// # Examples
 ///
@@ -185,6 +192,7 @@ pub struct Duration {
 /// can use the Joda Time's
 /// [`ISODateTimeFormat.dateTime()`](<http://www.joda.org/joda-time/apidocs/org/joda/time/format/ISODateTimeFormat.html#dateTime%2D%2D>)
 /// to obtain a formatter capable of generating timestamps in this format.
+#[cfg_attr(feature = "std", derive(Eq, Hash))]
 #[derive(Clone, Debug, PartialEq, PartialOrd, Message)]
 pub struct Timestamp {
     /// Represents seconds of UTC time since Unix epoch 1970-01-01T00:00:00Z.
