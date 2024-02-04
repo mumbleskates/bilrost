@@ -9,6 +9,7 @@ authors = [
 ]
 license = "Apache-2.0"
 repository = "https://github.com/mumbleskates/bilrost"
+documentation = "https://docs.rs/bilrost"
 readme = "README.md"
 description = "A compact protobuf-like serializer and deserializer for the Rust Language."
 keywords = ["serialization"]
