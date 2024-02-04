@@ -992,10 +992,7 @@ mod derived_message_tests {
                         ])),
                     );
                 }
-                assert::doesnt_decode::<Foo<$ty<bool, String>>>(
-                    repeated_map,
-                    UnexpectedlyRepeated,
-                );
+                assert::doesnt_decode::<Foo<$ty<bool, String>>>(repeated_map, UnexpectedlyRepeated);
             };
         }
         #[cfg(feature = "std")]
@@ -1256,14 +1253,8 @@ mod derived_message_tests {
                         Oof($ty::new(), $ty::from(expected_items.clone())),
                     );
                 }
-                assert::doesnt_decode::<Oof<$ty<u32>>>(
-                    repeated_set_packed,
-                    UnexpectedlyRepeated,
-                );
-                assert::doesnt_decode::<Oof<$ty<u32>>>(
-                    repeated_set_unpacked,
-                    UnexpectedlyRepeated,
-                );
+                assert::doesnt_decode::<Oof<$ty<u32>>>(repeated_set_packed, UnexpectedlyRepeated);
+                assert::doesnt_decode::<Oof<$ty<u32>>>(repeated_set_unpacked, UnexpectedlyRepeated);
             };
         }
         #[cfg(feature = "std")]
