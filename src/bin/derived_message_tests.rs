@@ -1078,6 +1078,117 @@ mod derived_message_tests {
         }
     }
 
+    // Vec tests
+
+    #[test]
+    fn decoding_vecs() {
+        #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+        struct Foo<T>(
+            #[bilrost(encoder(packed))] T,
+            #[bilrost(encoder(unpacked))] T,
+        );
+
+        let values = [
+            (vec![OV::string("foo")], vec!["foo"]),
+            (
+                vec![
+                    OV::string("bar"),
+                    OV::string("baz"),
+                    OV::string("bear"),
+                    OV::string("wabl"),
+                ],
+                vec!["bar", "baz", "bear", "wabl"],
+            ),
+        ];
+        for (ref packed, ref unpacked, expected) in values.map(|(items, expected)| {
+            (
+                // One packed field with all the values
+                [(1, OV::packed(items.iter().cloned()))].into_opaque_message(),
+                // Unpacked fields for each value
+                OpaqueMessage::from_iter(items.iter().map(|item| (2, item.clone()))),
+                expected.into_iter().map(str::to_string).collect::<Vec<_>>(),
+            )
+        }) {
+            assert::decodes_distinguished(packed, Foo(expected.clone(), vec![]));
+            assert::decodes_distinguished(unpacked, Foo(vec![], expected.clone()));
+            assert::decodes_distinguished(
+                packed,
+                Foo(Cow::Borrowed(expected.as_slice()), Cow::default()),
+            );
+            assert::decodes_distinguished(
+                unpacked,
+                Foo(Cow::default(), Cow::Borrowed(expected.as_slice())),
+            );
+            assert::decodes_distinguished(
+                packed,
+                Foo(Cow::Owned(expected.clone()), Cow::default()),
+            );
+            assert::decodes_distinguished(
+                unpacked,
+                Foo(Cow::default(), Cow::Owned(expected.clone())),
+            );
+        }
+    }
+
+    #[test]
+    fn decoding_vecs_with_swapped_packedness() {
+        #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+        struct Oof<T>(
+            #[bilrost(encoder(unpacked))] T, // Fields have swapped packedness from `Foo` above
+            #[bilrost(encoder(packed))] T,
+        );
+
+        let values = [
+            (vec![OV::u32(1)], vec![1u32]),
+            (
+                vec![
+                    OV::u32(1),
+                    OV::u32(1),
+                    OV::u32(2),
+                    OV::u32(3),
+                    OV::u32(5),
+                    OV::u32(8),
+                ],
+                vec![1, 1, 2, 3, 5, 8],
+            ),
+        ];
+
+        // In expedient mode, packed sets will decode unpacked values and vice versa, but this is
+        // only detectable when the values are not length-delimited.
+        for (ref packed, ref unpacked, expected) in values.map(|(items, expected)| {
+            (
+                // One packed field with all the values
+                [(1, OV::packed(items.iter().cloned()))].into_opaque_message(),
+                // Unpacked fields for each value
+                OpaqueMessage::from_iter(items.iter().map(|item| (2, item.clone()))),
+                expected,
+            )
+        }) {
+            assert::decodes_only_expedient(packed, Oof(expected.clone(), vec![]), WrongWireType);
+            assert::decodes_only_expedient(unpacked, Oof(vec![], expected.clone()), WrongWireType);
+            assert::decodes_only_expedient(
+                packed,
+                Oof(Cow::Borrowed(expected.as_slice()), Cow::default()),
+                WrongWireType,
+            );
+            assert::decodes_only_expedient(
+                unpacked,
+                Oof(Cow::default(), Cow::Borrowed(expected.as_slice())),
+                WrongWireType,
+            );
+            assert::decodes_only_expedient(
+                packed,
+                Oof(Cow::Owned(expected.clone()), Cow::default()),
+                WrongWireType,
+            );
+            assert::decodes_only_expedient(
+                unpacked,
+                Oof(Cow::default(), Cow::Owned(expected.clone())),
+                WrongWireType,
+            );
+        }
+    }
+
     // Set tests
 
     #[test]
@@ -1211,7 +1322,7 @@ mod derived_message_tests {
         let expected_items = [1u32, 2, 3];
 
         // In expedient mode, packed sets will decode unpacked values and vice versa, but this is
-        // only detectable when the values are not length-delineated.
+        // only detectable when the values are not length-delimited.
         {
             use alloc::collections::BTreeSet;
             for (unmatching_packed, unmatching_unpacked) in [&valid, &disordered] {
@@ -1269,7 +1380,7 @@ mod derived_message_tests {
         }
     }
 
-    fn truncated_packed_string_set<T>()
+    fn truncated_packed_string<T>()
     where
         T: Debug + Default + HasEmptyState + Collection<Item = String>,
         General: Encoder<T>,
@@ -1291,7 +1402,7 @@ mod derived_message_tests {
         );
     }
 
-    fn truncated_packed_int_set<T>()
+    fn truncated_packed_int<T>()
     where
         T: Debug + Default + HasEmptyState + Collection<Item = u64>,
         General: Encoder<T>,
@@ -1313,29 +1424,34 @@ mod derived_message_tests {
     }
 
     #[test]
-    fn truncated_packed_set() {
+    fn truncated_packed_collection() {
+        {
+            use alloc::vec::Vec;
+            truncated_packed_string::<Vec<String>>();
+            truncated_packed_int::<Vec<u64>>();
+        }
+        {
+            truncated_packed_string::<Cow<[String]>>();
+            truncated_packed_int::<Cow<[u64]>>();
+        }
         {
             use alloc::collections::BTreeSet;
-            truncated_packed_string_set::<BTreeSet<String>>();
-            truncated_packed_int_set::<BTreeSet<u64>>();
+            truncated_packed_string::<BTreeSet<String>>();
+            truncated_packed_int::<BTreeSet<u64>>();
         }
         #[cfg(feature = "std")]
         {
             use std::collections::HashSet;
-            truncated_packed_string_set::<HashSet<String>>();
-            truncated_packed_int_set::<HashSet<u64>>();
+            truncated_packed_string::<HashSet<String>>();
+            truncated_packed_int::<HashSet<u64>>();
         }
         #[cfg(feature = "hashbrown")]
         {
             use hashbrown::HashSet;
-            truncated_packed_string_set::<HashSet<String>>();
-            truncated_packed_int_set::<HashSet<u64>>();
+            truncated_packed_string::<HashSet<String>>();
+            truncated_packed_int::<HashSet<u64>>();
         }
     }
-
-    // TODO(widders): collection tests -- vec
-    //  * set values must never recur
-    //  * repeated fields must have matching packed-ness in distinguished decoding
 
     // Oneof tests
 
