@@ -2,10 +2,8 @@
 
 //! Analogs for protobuf well-known types.
 //!
-//! Note that the documentation for the types defined in this crate are generated from the Protobuf
-//! definitions, so code examples are not in Rust.
-//!
-//! See the [Protobuf reference][1] for more information about well-known types.
+//! See the [Protobuf reference][1] for more information about the use cases and semantics of these
+//! types.
 //!
 //! [1]: https://developers.google.com/protocol-buffers/docs/reference/google.protobuf
 
