@@ -16,14 +16,13 @@ mod derived_message_tests {
     use alloc::vec::Vec;
     use core::default::Default;
     use core::fmt::Debug;
-    use std::collections::BTreeMap;
 
     use itertools::{repeat_n, Itertools};
 
     use bilrost::encoding::opaque::{OpaqueMessage, OpaqueValue as OV};
     use bilrost::encoding::{
-        encode_varint, DistinguishedEncoder, DistinguishedOneof, DistinguishedValueEncoder,
-        Encoder, General, HasEmptyState, Mapping, Oneof, ValueEncoder,
+        encode_varint, Collection, DistinguishedEncoder, DistinguishedOneof,
+        DistinguishedValueEncoder, Encoder, General, HasEmptyState, Mapping, Oneof, ValueEncoder,
     };
     use bilrost::DecodeErrorKind::{
         ConflictingFields, InvalidValue, NotCanonical, OutOfDomainValue, TagOverflowed, Truncated,
@@ -97,6 +96,21 @@ mod derived_message_tests {
             let encoded = from.into_opaque_message().encode_to_vec();
             assert_eq!(
                 M::decode(encoded.as_slice())
+                    .expect_err("unexpectedly decoded without error")
+                    .kind(),
+                err
+            );
+        }
+
+        pub(super) fn doesnt_decode_distinguished<M>(
+            from: impl IntoOpaqueMessage,
+            err: DecodeErrorKind,
+        ) where
+            M: DistinguishedMessage + Debug,
+        {
+            let encoded = from.into_opaque_message().encode_to_vec();
+            assert_eq!(
+                M::decode_distinguished(encoded.as_slice())
                     .expect_err("unexpectedly decoded without error")
                     .kind(),
                 err
@@ -916,7 +930,7 @@ mod derived_message_tests {
         #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
         struct Foo<T>(T);
 
-        let valid_map = [(
+        let valid_map = &[(
             1,
             OV::packed([
                 OV::bool(false),
@@ -925,7 +939,7 @@ mod derived_message_tests {
                 OV::string("yes"),
             ]),
         )];
-        let disordered_map = [(
+        let disordered_map = &[(
             1,
             OV::packed([
                 OV::bool(true),
@@ -934,7 +948,7 @@ mod derived_message_tests {
                 OV::string("no"),
             ]),
         )];
-        let repeated_map = [(
+        let repeated_map = &[(
             1,
             OV::packed([
                 OV::bool(false),
@@ -944,57 +958,56 @@ mod derived_message_tests {
             ]),
         )];
 
-        assert::decodes_distinguished(
-            &valid_map,
-            Foo(BTreeMap::from([
-                (false, "no".to_string()),
-                (true, "yes".to_string()),
-            ])),
-        );
-        assert::decodes_only_expedient(
-            &disordered_map,
-            Foo(BTreeMap::from([
-                (false, "no".to_string()),
-                (true, "yes".to_string()),
-            ])),
-            NotCanonical,
-        );
-        assert::never_decodes::<Foo<BTreeMap<bool, String>>>(&repeated_map, UnexpectedlyRepeated);
-
-        #[cfg(feature = "std")]
         {
-            for map_value in [&valid_map, &disordered_map] {
-                assert::decodes(
-                    map_value,
-                    Foo(std::collections::HashMap::from([
-                        (false, "no".to_string()),
-                        (true, "yes".to_string()),
-                    ])),
-                );
-            }
-            assert::doesnt_decode::<Foo<std::collections::HashMap<bool, String>>>(
-                &repeated_map,
+            use alloc::collections::BTreeMap;
+            assert::decodes_distinguished(
+                valid_map,
+                Foo(BTreeMap::from([
+                    (false, "no".to_string()),
+                    (true, "yes".to_string()),
+                ])),
+            );
+            assert::decodes_only_expedient(
+                disordered_map,
+                Foo(BTreeMap::from([
+                    (false, "no".to_string()),
+                    (true, "yes".to_string()),
+                ])),
+                NotCanonical,
+            );
+            assert::never_decodes::<Foo<BTreeMap<bool, String>>>(
+                repeated_map,
                 UnexpectedlyRepeated,
             );
+        }
+        #[allow(unused_macros)]
+        macro_rules! test_hash {
+            ($ty:ident) => {
+                for map_value in [valid_map, disordered_map] {
+                    assert::decodes(
+                        map_value,
+                        Foo($ty::from([
+                            (false, "no".to_string()),
+                            (true, "yes".to_string()),
+                        ])),
+                    );
+                }
+                assert::doesnt_decode::<Foo<$ty<bool, String>>>(
+                    repeated_map,
+                    UnexpectedlyRepeated,
+                );
+            };
+        }
+        #[cfg(feature = "std")]
+        {
+            use std::collections::HashMap;
+            test_hash!(HashMap);
         }
         #[cfg(feature = "hashbrown")]
         {
-            for map_value in [&valid_map, &disordered_map] {
-                assert::decodes(
-                    map_value,
-                    Foo(hashbrown::HashMap::from([
-                        (false, "no".to_string()),
-                        (true, "yes".to_string()),
-                    ])),
-                );
-            }
-            assert::doesnt_decode::<Foo<hashbrown::HashMap<bool, String>>>(
-                &repeated_map,
-                UnexpectedlyRepeated,
-            );
+            use hashbrown::HashMap;
+            test_hash!(HashMap);
         }
-        // dispose to suppress linter complaining about references
-        _ = (valid_map, disordered_map, repeated_map);
     }
 
     fn truncated_bool_string_map<T>()
@@ -1049,8 +1062,11 @@ mod derived_message_tests {
 
     #[test]
     fn truncated_map() {
-        truncated_bool_string_map::<BTreeMap<bool, String>>();
-        truncated_string_int_map::<BTreeMap<String, u64>>();
+        {
+            use alloc::collections::BTreeMap;
+            truncated_bool_string_map::<BTreeMap<bool, String>>();
+            truncated_string_int_map::<BTreeMap<String, u64>>();
+        }
         #[cfg(feature = "std")]
         {
             use std::collections::HashMap;
@@ -1065,7 +1081,268 @@ mod derived_message_tests {
         }
     }
 
-    // TODO(widders): collection tests -- vec, sets
+    // Set tests
+
+    #[test]
+    fn decoding_sets() {
+        #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+        struct Foo<T>(
+            #[bilrost(encoder(packed))] T,
+            #[bilrost(encoder(unpacked))] T,
+        );
+
+        let valid_set_items = [OV::string("bar"), OV::string("baz"), OV::string("foo")];
+        let disordered_set_items = [OV::string("foo"), OV::string("bar"), OV::string("baz")];
+        let repeated_set_items = [
+            OV::string("a value"),
+            OV::string("repeated"),
+            OV::string("repeated"),
+            OV::string("incorrectly"),
+        ];
+        // Turn each of these lists of items into a packed field and an unpacked field with those
+        // values in the same order.
+        let [valid, disordered, repeated] = [
+            &valid_set_items[..],
+            &disordered_set_items,
+            &repeated_set_items,
+        ]
+        .map(|items| {
+            (
+                // One packed field with all the values
+                [(1, OV::packed(items.iter().cloned()))].into_opaque_message(),
+                // Unpacked fields for each value
+                OpaqueMessage::from_iter(items.iter().map(|item| (2, item.clone()))),
+            )
+        });
+        let (valid_set_packed, valid_set_unpacked) = &valid;
+        let (disordered_set_packed, disordered_set_unpacked) = &disordered;
+        let (repeated_set_packed, repeated_set_unpacked) = &repeated;
+
+        let expected_items = ["foo".to_string(), "bar".to_string(), "baz".to_string()];
+
+        {
+            use alloc::collections::BTreeSet;
+            assert::decodes_distinguished(
+                valid_set_packed,
+                Foo(BTreeSet::from(expected_items.clone()), BTreeSet::new()),
+            );
+            assert::decodes_distinguished(
+                valid_set_unpacked,
+                Foo(BTreeSet::new(), BTreeSet::from(expected_items.clone())),
+            );
+            assert::decodes_only_expedient(
+                disordered_set_packed,
+                Foo(BTreeSet::from(expected_items.clone()), BTreeSet::new()),
+                NotCanonical,
+            );
+            assert::decodes_only_expedient(
+                disordered_set_unpacked,
+                Foo(BTreeSet::new(), BTreeSet::from(expected_items.clone())),
+                NotCanonical,
+            );
+            assert::never_decodes::<Foo<BTreeSet<String>>>(
+                &repeated_set_packed,
+                UnexpectedlyRepeated,
+            );
+            assert::never_decodes::<Foo<BTreeSet<String>>>(
+                &repeated_set_unpacked,
+                UnexpectedlyRepeated,
+            );
+        }
+        #[allow(unused_macros)]
+        macro_rules! test_hash {
+            ($ty:ident) => {
+                for (set_value_packed, set_value_unpacked) in [&valid, &disordered] {
+                    assert::decodes(
+                        set_value_packed,
+                        Foo($ty::from(expected_items.clone()), $ty::new()),
+                    );
+                    assert::decodes(
+                        set_value_unpacked,
+                        Foo($ty::new(), $ty::from(expected_items.clone())),
+                    );
+                }
+                assert::doesnt_decode::<Foo<$ty<String>>>(
+                    repeated_set_packed,
+                    UnexpectedlyRepeated,
+                );
+                assert::doesnt_decode::<Foo<$ty<String>>>(
+                    repeated_set_unpacked,
+                    UnexpectedlyRepeated,
+                );
+            };
+        }
+        #[cfg(feature = "std")]
+        {
+            use std::collections::HashSet;
+            test_hash!(HashSet);
+        }
+        #[cfg(feature = "hashbrown")]
+        {
+            use hashbrown::HashSet;
+            test_hash!(HashSet);
+        }
+    }
+
+    #[test]
+    fn decoding_sets_with_swapped_packedness() {
+        #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+        struct Oof<T>(
+            #[bilrost(encoder(unpacked))] T, // Fields have swapped packedness from `Foo` above
+            #[bilrost(encoder(packed))] T,
+        );
+
+        let valid_set_items = [OV::u32(1), OV::u32(2), OV::u32(3)];
+        let disordered_set_items = [OV::u32(2), OV::u32(3), OV::u32(1)];
+        let repeated_set_items = [OV::u32(1), OV::u32(2), OV::u32(2), OV::u32(3)];
+        // Turn each of these lists of items into a packed field and an unpacked field with those
+        // values in the same order.
+        let [valid, disordered, repeated] = [
+            &valid_set_items[..],
+            &disordered_set_items,
+            &repeated_set_items,
+        ]
+        .map(|items| {
+            (
+                // One packed field with all the values
+                [(1, OV::packed(items.iter().cloned()))].into_opaque_message(),
+                // Unpacked fields for each value
+                OpaqueMessage::from_iter(items.iter().map(|item| (2, item.clone()))),
+            )
+        });
+        let (repeated_set_packed, repeated_set_unpacked) = &repeated;
+        let expected_items = [1u32, 2, 3];
+
+        // In expedient mode, packed sets will decode unpacked values and vice versa, but this is
+        // only detectable when the values are not length-delineated.
+        {
+            use alloc::collections::BTreeSet;
+            for (unmatching_packed, unmatching_unpacked) in [&valid, &disordered] {
+                assert::decodes_only_expedient(
+                    unmatching_packed,
+                    Oof(BTreeSet::from(expected_items), BTreeSet::new()),
+                    WrongWireType,
+                );
+                assert::decodes_only_expedient(
+                    unmatching_unpacked,
+                    Oof(BTreeSet::new(), BTreeSet::from(expected_items)),
+                    WrongWireType,
+                );
+            }
+            assert::doesnt_decode::<Oof<BTreeSet<u32>>>(&repeated_set_packed, UnexpectedlyRepeated);
+            assert::doesnt_decode_distinguished::<Oof<BTreeSet<u32>>>(
+                &repeated_set_packed,
+                WrongWireType,
+            );
+            assert::doesnt_decode::<Oof<BTreeSet<u32>>>(
+                &repeated_set_unpacked,
+                UnexpectedlyRepeated,
+            );
+            assert::doesnt_decode_distinguished::<Oof<BTreeSet<u32>>>(
+                &repeated_set_unpacked,
+                WrongWireType,
+            );
+        }
+        #[allow(unused_macros)]
+        macro_rules! test_hash {
+            ($ty:ident) => {
+                for (set_value_packed, set_value_unpacked) in [&valid, &disordered] {
+                    assert::decodes(
+                        set_value_packed,
+                        Oof($ty::from(expected_items.clone()), $ty::new()),
+                    );
+                    assert::decodes(
+                        set_value_unpacked,
+                        Oof($ty::new(), $ty::from(expected_items.clone())),
+                    );
+                }
+                assert::doesnt_decode::<Oof<$ty<u32>>>(
+                    repeated_set_packed,
+                    UnexpectedlyRepeated,
+                );
+                assert::doesnt_decode::<Oof<$ty<u32>>>(
+                    repeated_set_unpacked,
+                    UnexpectedlyRepeated,
+                );
+            };
+        }
+        #[cfg(feature = "std")]
+        {
+            use std::collections::HashSet;
+            test_hash!(HashSet);
+        }
+        #[cfg(feature = "hashbrown")]
+        {
+            use hashbrown::HashSet;
+            test_hash!(HashSet);
+        }
+    }
+
+    fn truncated_packed_string_set<T>()
+    where
+        T: Debug + Default + HasEmptyState + Collection<Item = String>,
+        General: Encoder<T>,
+    {
+        #[derive(Debug, PartialEq, Message)]
+        struct Foo<T>(#[bilrost(encoder(packed))] T, String);
+
+        let OV::LengthDelimited(set_value) =
+            OV::packed([OV::string("fooble"), OV::string("barbaz")])
+        else {
+            unreachable!()
+        };
+        assert::doesnt_decode::<Foo<T>>(
+            [
+                (1, OV::blob(&set_value[..set_value.len() - 1])),
+                (2, OV::string("another field after that")),
+            ],
+            Truncated,
+        );
+    }
+
+    fn truncated_packed_int_set<T>()
+    where
+        T: Debug + Default + HasEmptyState + Collection<Item = u64>,
+        General: Encoder<T>,
+    {
+        #[derive(Debug, PartialEq, Message)]
+        struct Foo<T>(T, String);
+
+        let OV::LengthDelimited(map_value) = OV::packed([OV::u64(0), OV::u64(999999999999999)])
+        else {
+            unreachable!()
+        };
+        assert::doesnt_decode::<Foo<T>>(
+            [
+                (1, OV::blob(&map_value[..map_value.len() - 1])),
+                (2, OV::string("another field after that")),
+            ],
+            Truncated,
+        );
+    }
+
+    #[test]
+    fn truncated_packed_set() {
+        {
+            use alloc::collections::BTreeSet;
+            truncated_packed_string_set::<BTreeSet<String>>();
+            truncated_packed_int_set::<BTreeSet<u64>>();
+        }
+        #[cfg(feature = "std")]
+        {
+            use std::collections::HashSet;
+            truncated_packed_string_set::<HashSet<String>>();
+            truncated_packed_int_set::<HashSet<u64>>();
+        }
+        #[cfg(feature = "hashbrown")]
+        {
+            use hashbrown::HashSet;
+            truncated_packed_string_set::<HashSet<String>>();
+            truncated_packed_int_set::<HashSet<u64>>();
+        }
+    }
+
+    // TODO(widders): collection tests -- vec
     //  * set values must never recur
     //  * repeated fields must have matching packed-ness in distinguished decoding
 
