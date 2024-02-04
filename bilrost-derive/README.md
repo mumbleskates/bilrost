@@ -14,4 +14,5 @@ Rust types annotated with `bilrost` annotation. For the most part, users of
 
 See [LICENSE](../LICENSE) for details.
 
+Copyright 2023-2024 Kent Ross
 Copyright 2017 Dan Burkert

@@ -19,4 +19,5 @@ is included under its original ([BSD][2]) license.
 
 See [LICENSE](..LICENSE) for details.
 
+Copyright 2023-2024 Kent Ross
 Copyright 2017 Dan Burkert
