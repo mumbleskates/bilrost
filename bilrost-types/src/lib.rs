@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/bilrost-types/0.999.0")]
+#![doc(html_root_url = "https://docs.rs/bilrost-types/0.1000.0")]
 
 //! Analogs for protobuf well-known types.
 //!
