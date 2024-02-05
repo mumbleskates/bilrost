@@ -39,21 +39,26 @@ bench = false
 default = ["derive", "detailed_errors", "std"]
 bytestring = ["dep:bytestring"]
 derive = ["dep:bilrost-derive"]
-detailed_errors = ["dep:thin-vec"]
+detailed_errors = ["thin-vec"]
 extended-diagnostics = ["dep:const_panic"]
 hashbrown = ["dep:hashbrown"]
 no-recursion-limit = []
 opaque = ["dep:btreemultimap"]
+smallvec = ["dep:smallvec"]
 std = []
+thin-vec = ["dep:thin-vec"]
+tinyvec = ["dep:tinyvec"]
 
 [dependencies]
 bilrost-derive = { version = "0.1000.0", path = "bilrost-derive", optional = true }
 btreemultimap = { version = "0.1", optional = true }
 bytes = { version = "1", default-features = false }
-bytestring = { version = "1", optional = true }
+bytestring = { version = ">=1", optional = true }
 const_panic = { version = "0.2", optional = true }
 hashbrown = { version = ">=0.1.0", optional = true }
-thin-vec = { version = "0.2", optional = true }
+smallvec = { version = ">=1", features = ["const_generics"], optional = true }
+thin-vec = { version = ">=0.2", optional = true }
+tinyvec = { version = ">=1", features = ["alloc"], optional = true }
 
 [dev-dependencies]
 criterion = { version = "0.4", default-features = false } # MSRV: can't use 0.5

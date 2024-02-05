@@ -999,8 +999,8 @@ where
 macro_rules! delegate_encoding {
     (
         delegate from ($from_ty:ty) to ($to_ty:ty) for type ($value_ty:ty)
-        $(with generics ($($value_generics:tt)*))?
         $(with where clause ($($where_clause:tt)*))?
+        $(with generics ($($value_generics:tt)*))?
     ) => {
         impl$(<$($value_generics)*>)? $crate::encoding::Encoder<$value_ty> for $from_ty
         where
@@ -1041,13 +1041,13 @@ macro_rules! delegate_encoding {
 
     (
         delegate from ($from_ty:ty) to ($to_ty:ty) for type ($value_ty:ty) including distinguished
-        $(with generics ($($value_generics:tt)*))?
         $(with where clause ($($where_clause:tt)*))?
+        $(with generics ($($value_generics:tt)*))?
     ) => {
         delegate_encoding!(
             delegate from ($from_ty) to ($to_ty) for type ($value_ty)
-            $(with generics ($($value_generics)*))?
             $(with where clause ($($where_clause)*))?
+            $(with generics ($($value_generics)*))?
         );
 
         impl$(<$($value_generics)*>)? $crate::encoding::DistinguishedEncoder<$value_ty>

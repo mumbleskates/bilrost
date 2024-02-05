@@ -22,7 +22,8 @@ mod derived_message_tests {
     use bilrost::encoding::opaque::{OpaqueMessage, OpaqueValue as OV};
     use bilrost::encoding::{
         encode_varint, Collection, DistinguishedEncoder, DistinguishedOneof,
-        DistinguishedValueEncoder, Encoder, General, HasEmptyState, Mapping, Oneof, ValueEncoder,
+        DistinguishedValueEncoder, Encoder, General, HasEmptyState, Mapping, Oneof, Packed,
+        ValueEncoder,
     };
     use bilrost::DecodeErrorKind::{
         ConflictingFields, InvalidValue, NotCanonical, OutOfDomainValue, TagOverflowed, Truncated,
@@ -1127,6 +1128,25 @@ mod derived_message_tests {
                 unpacked,
                 Foo(Cow::default(), Cow::Owned(expected.clone())),
             );
+            #[allow(unused_macros)]
+            macro_rules! test_vec {
+                ($vec_ty:ty) => {
+                    assert::decodes_distinguished(
+                        packed,
+                        Foo(expected.iter().cloned().collect(), <$vec_ty>::new()),
+                    );
+                    assert::decodes_distinguished(
+                        unpacked,
+                        Foo(<$vec_ty>::new(), expected.iter().cloned().collect()),
+                    );
+                }
+            }
+            #[cfg(feature = "smallvec")]
+            test_vec!(smallvec::SmallVec<[String; 2]>);
+            #[cfg(feature = "thin-vec")]
+            test_vec!(thin_vec::ThinVec<String>);
+            #[cfg(feature = "tinyvec")]
+            test_vec!(tinyvec::TinyVec<[String; 2]>);
         }
     }
 
@@ -1186,6 +1206,27 @@ mod derived_message_tests {
                 Oof(Cow::default(), Cow::Owned(expected.clone())),
                 WrongWireType,
             );
+            #[allow(unused_macros)]
+            macro_rules! test_vec {
+                ($vec_ty:ty) => {
+                    assert::decodes_only_expedient(
+                        packed,
+                        Oof(expected.iter().cloned().collect(), <$vec_ty>::new()),
+                        WrongWireType,
+                    );
+                    assert::decodes_only_expedient(
+                        unpacked,
+                        Oof(<$vec_ty>::new(), expected.iter().cloned().collect()),
+                        WrongWireType,
+                    );
+                };
+            }
+            #[cfg(feature = "smallvec")]
+            test_vec!(smallvec::SmallVec<[u32; 2]>);
+            #[cfg(feature = "thin-vec")]
+            test_vec!(thin_vec::ThinVec<u32>);
+            #[cfg(feature = "tinyvec")]
+            test_vec!(tinyvec::TinyVec<[u32; 2]>);
         }
     }
 
@@ -1384,6 +1425,7 @@ mod derived_message_tests {
     where
         T: Debug + Default + HasEmptyState + Collection<Item = String>,
         General: Encoder<T>,
+        Packed: Encoder<T>,
     {
         #[derive(Debug, PartialEq, Message)]
         struct Foo<T>(#[bilrost(encoder(packed))] T, String);
@@ -1433,6 +1475,24 @@ mod derived_message_tests {
         {
             truncated_packed_string::<Cow<[String]>>();
             truncated_packed_int::<Cow<[u64]>>();
+        }
+        #[cfg(feature = "smallvec")]
+        {
+            use smallvec::SmallVec;
+            truncated_packed_string::<SmallVec<[String; 2]>>();
+            truncated_packed_int::<SmallVec<[u64; 2]>>();
+        }
+        #[cfg(feature = "thin-vec")]
+        {
+            use thin_vec::ThinVec;
+            truncated_packed_string::<ThinVec<String>>();
+            truncated_packed_int::<ThinVec<u64>>();
+        }
+        #[cfg(feature = "tinyvec")]
+        {
+            use tinyvec::TinyVec;
+            truncated_packed_string::<TinyVec<[String; 2]>>();
+            truncated_packed_int::<TinyVec<[u64; 2]>>();
         }
         {
             use alloc::collections::BTreeSet;

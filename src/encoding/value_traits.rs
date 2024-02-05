@@ -237,7 +237,167 @@ where
     }
 }
 
-// TODO(widders): via feature: smallvec, tinyvec, thin-vec
+#[cfg(feature = "smallvec")]
+impl<T, A: smallvec::Array<Item = T>> HasEmptyState for smallvec::SmallVec<A> {
+    fn is_empty(&self) -> bool {
+        Self::is_empty(self)
+    }
+}
+
+#[cfg(feature = "smallvec")]
+impl<T, A: smallvec::Array<Item = T>> Collection for smallvec::SmallVec<A> {
+    type Item = T;
+    type RefIter<'a> = core::slice::Iter<'a, T>
+    where
+        T: 'a,
+        Self: 'a;
+
+    #[inline]
+    fn len(&self) -> usize {
+        smallvec::SmallVec::len(self)
+    }
+
+    #[inline]
+    fn iter(&self) -> Self::RefIter<'_> {
+        <[T]>::iter(self)
+    }
+
+    #[inline]
+    fn insert(&mut self, item: T) -> Result<(), DecodeErrorKind> {
+        smallvec::SmallVec::push(self, item);
+        Ok(())
+    }
+}
+
+#[cfg(feature = "smallvec")]
+impl<T, A: smallvec::Array<Item = T>> DistinguishedCollection for smallvec::SmallVec<A>
+where
+    T: Eq,
+{
+    type ReverseIter<'a> = core::iter::Rev<core::slice::Iter<'a, T>>
+        where
+            Self::Item: 'a,
+            Self: 'a;
+
+    #[inline]
+    fn reversed(&self) -> Self::ReverseIter<'_> {
+        <[T]>::iter(self).rev()
+    }
+
+    #[inline]
+    fn insert_distinguished(&mut self, item: Self::Item) -> Result<(), DecodeErrorKind> {
+        smallvec::SmallVec::push(self, item);
+        Ok(())
+    }
+}
+
+#[cfg(feature = "thin-vec")]
+impl<T> HasEmptyState for thin_vec::ThinVec<T> {
+    fn is_empty(&self) -> bool {
+        Self::is_empty(self)
+    }
+}
+
+#[cfg(feature = "thin-vec")]
+impl<T> Collection for thin_vec::ThinVec<T> {
+    type Item = T;
+    type RefIter<'a> = core::slice::Iter<'a, T>
+    where
+        T: 'a,
+        Self: 'a;
+
+    #[inline]
+    fn len(&self) -> usize {
+        thin_vec::ThinVec::len(self)
+    }
+
+    #[inline]
+    fn iter(&self) -> Self::RefIter<'_> {
+        <[T]>::iter(self)
+    }
+
+    #[inline]
+    fn insert(&mut self, item: T) -> Result<(), DecodeErrorKind> {
+        thin_vec::ThinVec::push(self, item);
+        Ok(())
+    }
+}
+
+#[cfg(feature = "thin-vec")]
+impl<T> DistinguishedCollection for thin_vec::ThinVec<T>
+where
+    T: Eq,
+{
+    type ReverseIter<'a> = core::iter::Rev<core::slice::Iter<'a, T>>
+        where
+            Self::Item: 'a,
+            Self: 'a;
+
+    #[inline]
+    fn reversed(&self) -> Self::ReverseIter<'_> {
+        <[T]>::iter(self).rev()
+    }
+
+    #[inline]
+    fn insert_distinguished(&mut self, item: Self::Item) -> Result<(), DecodeErrorKind> {
+        thin_vec::ThinVec::push(self, item);
+        Ok(())
+    }
+}
+
+#[cfg(feature = "tinyvec")]
+impl<T, A: tinyvec::Array<Item = T>> HasEmptyState for tinyvec::TinyVec<A> {
+    fn is_empty(&self) -> bool {
+        Self::is_empty(self)
+    }
+}
+
+#[cfg(feature = "tinyvec")]
+impl<T, A: tinyvec::Array<Item = T>> Collection for tinyvec::TinyVec<A> {
+    type Item = T;
+    type RefIter<'a> = core::slice::Iter<'a, T>
+    where
+        T: 'a,
+        Self: 'a;
+
+    #[inline]
+    fn len(&self) -> usize {
+        tinyvec::TinyVec::len(self)
+    }
+
+    #[inline]
+    fn iter(&self) -> Self::RefIter<'_> {
+        <[T]>::iter(self)
+    }
+
+    #[inline]
+    fn insert(&mut self, item: T) -> Result<(), DecodeErrorKind> {
+        tinyvec::TinyVec::push(self, item);
+        Ok(())
+    }
+}
+
+#[cfg(feature = "tinyvec")]
+impl<T, A: tinyvec::Array<Item = T>> DistinguishedCollection for tinyvec::TinyVec<A>
+where
+    T: Eq,
+{
+    type ReverseIter<'a> = core::iter::Rev<core::slice::Iter<'a, T>>
+        where
+            Self::Item: 'a,
+            Self: 'a;
+
+    #[inline]
+    fn reversed(&self) -> Self::ReverseIter<'_> {
+        <[T]>::iter(self).rev()
+    }
+
+    #[inline]
+    fn insert_distinguished(&mut self, item: Self::Item) -> Result<(), DecodeErrorKind> {
+        tinyvec::TinyVec::push(self, item);
+        Ok(())
+    }
+}
 
 impl<T> HasEmptyState for BTreeSet<T> {
     fn is_empty(&self) -> bool {

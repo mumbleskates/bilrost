@@ -27,8 +27,22 @@ pub struct General;
 delegate_encoding!(delegate from (General) to (Unpacked<General>)
     for type (Vec<T>) including distinguished with generics (T));
 delegate_encoding!(delegate from (General) to (Unpacked<General>)
-    for type (Cow<'a, [T]>) including distinguished with generics ('a, T)
-    with where clause (T: Clone));
+    for type (Cow<'a, [T]>) including distinguished
+    with where clause (T: Clone)
+    with generics ('a, T));
+#[cfg(feature = "smallvec")]
+delegate_encoding!(delegate from (General) to (Unpacked<General>)
+    for type (smallvec::SmallVec<A>) including distinguished
+    with where clause (A: smallvec::Array<Item = T>)
+    with generics (T, A));
+#[cfg(feature = "thin-vec")]
+delegate_encoding!(delegate from (General) to (Unpacked<General>)
+    for type (thin_vec::ThinVec<T>) including distinguished with generics (T));
+#[cfg(feature = "tinyvec")]
+delegate_encoding!(delegate from (General) to (Unpacked<General>)
+    for type (tinyvec::TinyVec<A>) including distinguished
+    with where clause (A: tinyvec::Array<Item = T>)
+    with generics (T, A));
 delegate_encoding!(delegate from (General) to (Unpacked<General>)
     for type (BTreeSet<T>) including distinguished with generics (T));
 delegate_value_encoding!(delegate from (General) to (Map<General, General>)
