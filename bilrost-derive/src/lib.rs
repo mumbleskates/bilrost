@@ -691,9 +691,8 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
             }
         }
 
-        let expr = discriminant
-            .map(|(_, expr)| expr)
-            .xor(variant_attr(&attrs)?)
+        let expr = variant_attr(&attrs)?
+            .or(discriminant.map(|(_, expr)| expr))
             .ok_or_else(|| {
                 anyhow!(
                     "Enumeration variants must have a discriminant or a #[bilrost(..)] \

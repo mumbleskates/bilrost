@@ -1724,6 +1724,7 @@ mod derived_message_tests {
     #[test]
     fn enumeration_value_limits() {
         const TEN: u32 = 10;
+        const ELEVEN_U8: u8 = 11;
 
         #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Enumeration)]
         #[repr(u8)]
@@ -1734,8 +1735,10 @@ mod derived_message_tests {
             #[bilrost(TEN)]
             #[default]
             T,
-            #[bilrost(u32::MAX)]
-            Z,
+            #[bilrost(11)] // ELEVEN_U8 isn't a u32 value, but we can still specify 11 here
+            E = ELEVEN_U8,
+            #[bilrost(u32::MAX)] // Attribute values take precedence within bilrost
+            Z = 255,
         }
         assert_eq!(core::mem::size_of::<Foo>(), 1);
 
@@ -1744,14 +1747,13 @@ mod derived_message_tests {
 
         assert_eq!(u32::from(Foo::A), 0);
         assert_eq!(u32::from(Foo::Z), u32::MAX);
-        assert::encodes(Bar(Foo::A), [(1, OV::u32(0))]);
-        assert::encodes(Bar(Foo::D), [(1, OV::u32(5))]);
-        assert::encodes(Bar(Foo::T), []);
-        assert::encodes(Bar(Foo::Z), [(1, OV::u32(u32::MAX))]);
+        assert_eq!(Foo::try_from(u32::MAX), Ok(Foo::Z));
+        assert_eq!(Foo::Z as u8, 255);
         assert::decodes_distinguished([(1, OV::u32(0))], Bar(Foo::A));
         assert::decodes_distinguished([(1, OV::u32(5))], Bar(Foo::D));
         assert::decodes_distinguished([], Bar(Foo::T));
         assert::decodes_only_expedient([(1, OV::u32(10))], Bar(Foo::T), NotCanonical);
+        assert::decodes_distinguished([(1, OV::u32(11))], Bar(Foo::E));
         assert::decodes_distinguished([(1, OV::u32(u32::MAX))], Bar(Foo::Z));
     }
 
