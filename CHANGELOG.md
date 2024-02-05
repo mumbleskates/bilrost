@@ -1,3 +1,18 @@
+## v0.1001.0-dev
+
+### Breaking changes
+
+* Changed the name of the `detailed-errors` feature to have a hyphen instead of
+  an underscore, consistent with the other feature names.
+
+### New features
+
+* Added features that enable support of `smallvec`, `thin-vec`, and `tinyvec`.
+
+### Fixes
+
+### Cleanups
+
 ## v0.1000.0
 
 This is the first rough release of `bilrost`. It is largely tested and feature
