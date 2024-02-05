@@ -344,9 +344,9 @@ fields in the message, only one of which may be present in a valid message.
 `bilrost` is compatible with `no_std` crates. To enable `no_std` support,
 disable the `std` features in `bilrost` and `bilrost-types`:
 
-```ignore
+```toml
 [dependencies]
-bilrost = { version = "0.12", default-features = false, features = ["derive"] }
+bilrost = { version = "0.1000.0", default-features = false, features = ["derive"] }
 ```
 
 ## Serializing Existing Types
@@ -372,7 +372,7 @@ the tags of all fields in a struct instead, but this is not mandatory.
 
 <!-- TODO(widders): fix this example -->
 
-```rust,ignore
+```rust
 use bilrost;
 use bilrost::{Enumeration, Message};
 
@@ -389,7 +389,7 @@ struct Person {
     #[bilrost(tag = "3")]
     pub age: u32, // tag=3
     pub height: u32, // tag=4
-    // TODO(widders): implement u32 enumeration helpers
+    #[bilrost(enumeration(Gender))]
     pub gender: u32, // tag=5
     // NOTE: Skip to less commonly occurring fields
     #[bilrost(tag(16))]
