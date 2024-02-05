@@ -11,7 +11,8 @@ then
   echo "Usage: $0 <version>"
   exit 1
 fi
+VERSION="$1"
 
-$(dirname $0)/update-version.sh $1
+$(dirname $0)/update-version.sh ${VERSION}
 git commit -a -m "release ${VERSION}"
 git tag -a "v${VERSION}" -m "release ${VERSION}"
