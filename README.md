@@ -255,8 +255,9 @@ Many alternative types are also available for both scalar values and containers!
 | `String`   | `bytestring::ByteString` | `general`          | "bytestring"      |
 
 *`bilrost::Blob` is a transparent wrapper for `Vec<u8>` in that is a drop-in
-replacement in most situations. If nothing but `Vec<u8>` will do, the `vecblob`
-encoder will still encode a plain `Vec<u8>` as its bytes value.
+replacement in most situations and is supported by the default `general` encoder
+for maximum ease of use. If nothing but `Vec<u8>` will do, the `vecblob` encoder
+will still encode a plain `Vec<u8>` as its bytes value.
 
 | Container type | Alternative              | Feature to enable |
 |----------------|--------------------------|-------------------|
@@ -372,7 +373,7 @@ the tags of all fields in a struct instead, but this is not mandatory.
 
 <!-- TODO(widders): fix this example -->
 
-```rust
+```
 use bilrost;
 use bilrost::{Enumeration, Message};
 
