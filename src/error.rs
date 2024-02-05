@@ -61,14 +61,14 @@ impl fmt::Display for DecodeErrorKind {
 /// error details should be considered 'best effort': in general it is not possible to exactly
 /// pinpoint why data is malformed.
 ///
-/// `DecodeError` is 1 word plus 1 byte in size with the "detailed_errors" feature enabled; without
+/// `DecodeError` is 1 word plus 1 byte in size with the "detailed-errors" feature enabled; without
 /// that feature, it is only 1 byte, and the error will not include any information about the path
 /// to the fields that encountered the error while decoding.
 #[derive(Clone, PartialEq, Eq)]
 pub struct DecodeError {
     /// A 'best effort' root cause description.
     kind: DecodeErrorKind,
-    #[cfg(feature = "detailed_errors")]
+    #[cfg(feature = "detailed-errors")]
     /// A stack of (message, field) name pairs, which identify the specific
     /// message type and field where decoding failed. The stack contains an
     /// entry per level of nesting.
@@ -84,7 +84,7 @@ impl DecodeError {
     pub fn new(kind: DecodeErrorKind) -> DecodeError {
         DecodeError {
             kind,
-            #[cfg(feature = "detailed_errors")]
+            #[cfg(feature = "detailed-errors")]
             stack: Default::default(),
         }
     }
@@ -99,7 +99,7 @@ impl DecodeError {
     /// Meant to be used only by `Message` implementations.
     #[doc(hidden)]
     pub fn push(&mut self, message: &'static str, field: &'static str) {
-        #[cfg(feature = "detailed_errors")]
+        #[cfg(feature = "detailed-errors")]
         self.stack.push((message, field));
         _ = (message, field);
     }
@@ -109,7 +109,7 @@ impl fmt::Debug for DecodeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut s = f.debug_struct("DecodeError");
         s.field("description", &self.kind);
-        #[cfg(feature = "detailed_errors")]
+        #[cfg(feature = "detailed-errors")]
         s.field("stack", &self.stack);
         s.finish()
     }
@@ -118,7 +118,7 @@ impl fmt::Debug for DecodeError {
 impl fmt::Display for DecodeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("failed to decode Bilrost message: ")?;
-        #[cfg(feature = "detailed_errors")]
+        #[cfg(feature = "detailed-errors")]
         for (message, field) in self.stack.iter() {
             write!(f, "{}.{}: ", message, field)?;
         }
