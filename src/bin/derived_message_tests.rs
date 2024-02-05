@@ -1139,7 +1139,7 @@ mod derived_message_tests {
                         unpacked,
                         Foo(<$vec_ty>::new(), expected.iter().cloned().collect()),
                     );
-                }
+                };
             }
             #[cfg(feature = "smallvec")]
             test_vec!(smallvec::SmallVec<[String; 2]>);
