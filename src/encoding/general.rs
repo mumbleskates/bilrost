@@ -109,7 +109,7 @@ where
 impl<T> DistinguishedEncoder<T> for General
 where
     General: DistinguishedValueEncoder<T> + Encoder<T>,
-    T: Default + Eq,
+    T: Eq + HasEmptyState,
 {
     #[inline]
     fn decode_distinguished<B: Buf + ?Sized>(
