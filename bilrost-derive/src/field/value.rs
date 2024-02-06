@@ -11,6 +11,10 @@ pub struct Field {
     pub tag: u32,
     pub ty: Type,
     pub encoder: Type,
+    // TODO(widders): consider adding an "adapter" attribute that supports encoding values with the
+    //  adapter applied to a reference; if the adapter is for example some newtype, this would allow
+    //  encoding user A to implement e.g. `Collection` for third party B's container and then encode
+    //  it without requiring anything to be implemented inside `bilrost`.
     pub enumeration_ty: Option<Type>,
     /// If a field is part of a recursion of messages, currently the chain needs to be broken so
     /// that there is not a cyclic dependency of type constraints on the implementation of `Message`
