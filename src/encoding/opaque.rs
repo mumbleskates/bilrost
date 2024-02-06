@@ -25,7 +25,7 @@ impl OpaqueValue {
     }
 
     pub fn i64(value: i64) -> Self {
-        Varint(super::i64_to_unsigned(value))
+        Varint(super::varint::i64_to_unsigned(value))
     }
 
     pub fn u32(value: u32) -> Self {
@@ -33,7 +33,23 @@ impl OpaqueValue {
     }
 
     pub fn i32(value: i32) -> Self {
-        Varint(super::i32_to_unsigned(value) as u64)
+        Varint(super::varint::i64_to_unsigned(value as i64))
+    }
+
+    pub fn u16(value: u16) -> Self {
+        Varint(value.into())
+    }
+
+    pub fn i16(value: i16) -> Self {
+        Varint(super::varint::i64_to_unsigned(value as i64))
+    }
+
+    pub fn u8(value: u8) -> Self {
+        Varint(value.into())
+    }
+
+    pub fn i8(value: i8) -> Self {
+        Varint(super::varint::i64_to_unsigned(value as i64))
     }
 
     pub fn bool(value: bool) -> Self {

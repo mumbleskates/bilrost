@@ -23,6 +23,7 @@ pub mod opaque;
 mod packed;
 mod unpacked;
 mod value_traits;
+mod varint;
 mod vec_blob;
 
 pub use value_traits::{
@@ -32,7 +33,8 @@ pub use value_traits::{
 
 /// Fixed-size encoder. Encodes integers in fixed-size format.
 pub use fixed::Fixed;
-/// General encoder. Encodes numbers as varints and repeated types un-packed.
+/// General encoder. Encodes strings and byte blobs, numbers as varints, floats as fixed size,
+/// repeated types unpacked, maps with its own encoding for keys and values, and message types.
 pub use general::General;
 /// Encoder for mapping types. Encodes alternating keys and values in packed format.
 pub use map::Map;
@@ -40,6 +42,8 @@ pub use map::Map;
 pub use packed::Packed;
 /// Unpacked encoder. Encodes repeated types in unpacked format, writing repeated fields.
 pub use unpacked::Unpacked;
+/// Varint encoder. Encodes integer types as varints.
+pub use varint::Varint;
 /// Encoder that decodes bytes data directly into `Vec<u8>`, rather than requiring it to be wrapped
 /// in `Blob`.
 pub use vec_blob::VecBlob;
@@ -190,29 +194,6 @@ fn decode_varint_slow<B: Buf + ?Sized>(buf: &mut B) -> Result<u64, DecodeError> 
     // There is probably a reason why using u64::checked_add here seems to cause decoding even
     // smaller varints to bench faster, while using it in the fast-path in decode_varint_slice
     // causes a 5x pessimization. Probably best not to worry about it too much.
-}
-
-/// Zig-zag encoding: These functions implement storing signed in unsigned integers by encoding the
-/// sign bit in the least significant bit.
-
-#[inline]
-fn i32_to_unsigned(value: i32) -> u32 {
-    ((value << 1) ^ (value >> 31)) as u32
-}
-
-#[inline]
-fn u32_to_signed(value: u32) -> i32 {
-    ((value >> 1) as i32) ^ (-((value & 1) as i32))
-}
-
-#[inline]
-fn i64_to_unsigned(value: i64) -> u64 {
-    ((value << 1) ^ (value >> 63)) as u64
-}
-
-#[inline]
-fn u64_to_signed(value: u64) -> i64 {
-    ((value >> 1) as i64) ^ (-((value & 1) as i64))
 }
 
 /// Additional information passed to every decode/merge function.
@@ -1171,11 +1152,11 @@ mod test {
 
     /// Generalized proptest macro. Kind must be either `expedient`, `hashable`, or `distinguished`.
     macro_rules! check_type_test {
-        ($encoder:ty, $kind:ident, $ty:ty, $wire_type:ident) => {
+        ($encoder:ty, $kind:ident, $ty:ty, $wire_type:expr) => {
             crate::encoding::test::check_type_test!($encoder, $kind, from $ty, into $ty,
             converter(value) { value }, $wire_type);
         };
-        ($encoder:ty, $kind:ident, from $from_ty:ty, into $into_ty:ty, $wire_type:ident) => {
+        ($encoder:ty, $kind:ident, from $from_ty:ty, into $into_ty:ty, $wire_type:expr) => {
             crate::encoding::test::check_type_test!($encoder, $kind, from $from_ty, into $into_ty,
                 converter(value) { <$into_ty>::from(value) }, $wire_type);
         };
@@ -1185,14 +1166,15 @@ mod test {
             from $from_ty:ty,
             into $into_ty:ty,
             converter($from_value:ident) $convert:expr,
-            $wire_type:ident
+            $wire_type:expr
         ) => {
             #[cfg(test)]
             mod $kind {
                 use proptest::prelude::*;
 
                 use crate::encoding::test::$kind::check_type;
-                use crate::encoding::WireType::*;
+                #[allow(unused_imports)]
+                use crate::encoding::WireType;
                 #[allow(unused_imports)]
                 use super::*;
 

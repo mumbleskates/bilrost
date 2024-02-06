@@ -124,8 +124,8 @@ delegate_encoding!(delegate from (VecBlob) to (crate::encoding::Unpacked<VecBlob
 mod vec_u8 {
     use super::{Vec, VecBlob};
     use crate::encoding::test::check_type_test;
-    check_type_test!(VecBlob, expedient, Vec<u8>, LengthDelimited);
-    check_type_test!(VecBlob, distinguished, Vec<u8>, LengthDelimited);
+    check_type_test!(VecBlob, expedient, Vec<u8>, WireType::LengthDelimited);
+    check_type_test!(VecBlob, distinguished, Vec<u8>, WireType::LengthDelimited);
 }
 
 impl Wiretyped<Cow<'_, [u8]>> for VecBlob {
@@ -169,6 +169,6 @@ impl DistinguishedValueEncoder<Cow<'_, [u8]>> for VecBlob {
 mod cow_bytes {
     use super::{Cow, VecBlob};
     use crate::encoding::test::check_type_test;
-    check_type_test!(VecBlob, expedient, Cow<[u8]>, LengthDelimited);
-    check_type_test!(VecBlob, distinguished, Cow<[u8]>, LengthDelimited);
+    check_type_test!(VecBlob, expedient, Cow<[u8]>, WireType::LengthDelimited);
+    check_type_test!(VecBlob, distinguished, Cow<[u8]>, WireType::LengthDelimited);
 }

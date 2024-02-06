@@ -62,6 +62,7 @@ fn encoder_alias_header() -> TokenStream {
             Map as map,
             Packed as packed,
             Unpacked as unpacked,
+            Varint as varint,
             VecBlob as vecblob,
         };
     }

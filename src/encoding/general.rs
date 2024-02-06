@@ -17,7 +17,7 @@ use crate::encoding::{
     Unpacked, ValueEncoder, VecBlob, WireType, Wiretyped,
 };
 use crate::message::{merge, merge_distinguished, RawDistinguishedMessage, RawMessage};
-use crate::DecodeErrorKind::{InvalidValue, NotCanonical, OutOfDomainValue, UnexpectedlyRepeated};
+use crate::DecodeErrorKind::{InvalidValue, NotCanonical, UnexpectedlyRepeated};
 use crate::{Blob, DecodeError};
 
 pub struct General;
@@ -123,111 +123,32 @@ where
             return Err(DecodeError::new(UnexpectedlyRepeated));
         }
         Self::decode_field_distinguished(wire_type, value, buf, ctx)?;
-        if *value == T::default() {
+        if value.is_empty() {
             return Err(DecodeError::new(NotCanonical));
         }
         Ok(())
     }
 }
 
-/// Macro which emits implementations for variable width numeric encoding.
-macro_rules! varint {
-    (
-        $name:ident,
-        $ty:ty,
-        to_uint64($to_uint64_value:ident) $to_uint64:expr,
-        from_uint64($from_uint64_value:ident) $from_uint64:expr
-    ) => {
-        impl EqualDefaultAlwaysEmpty for $ty {}
-
-        impl Wiretyped<$ty> for General {
-            const WIRE_TYPE: WireType = WireType::Varint;
-        }
-
-        impl ValueEncoder<$ty> for General {
-            #[inline]
-            fn encode_value<B: BufMut + ?Sized>($to_uint64_value: &$ty, buf: &mut B) {
-                encode_varint($to_uint64, buf);
-            }
-
-            #[inline]
-            fn value_encoded_len($to_uint64_value: &$ty) -> usize {
-                encoded_len_varint($to_uint64)
-            }
-
-            #[inline]
-            fn decode_value<B: Buf + ?Sized>(
-                __value: &mut $ty,
-                mut buf: Capped<B>,
-                _ctx: DecodeContext,
-            ) -> Result<(), DecodeError> {
-                let $from_uint64_value = buf.decode_varint()?;
-                *__value = $from_uint64;
-                Ok(())
-            }
-        }
-
-        impl DistinguishedValueEncoder<$ty> for General {
-            #[inline]
-            fn decode_value_distinguished<B: Buf + ?Sized>(
-                value: &mut $ty,
-                buf: Capped<B>,
-                ctx: DecodeContext,
-            ) -> Result<(), DecodeError> {
-                Self::decode_value(value, buf, ctx)
-            }
-        }
-
-        #[cfg(test)]
-        mod $name {
-            use crate::encoding::General;
-            crate::encoding::test::check_type_test!(General, expedient, $ty, Varint);
-            crate::encoding::test::check_type_test!(General, distinguished, $ty, Varint);
-        }
-    };
-}
-
-varint!(varint_bool, bool,
-to_uint64(value) {
-    u64::from(*value)
-},
-from_uint64(value) {
-    match value {
-        0 => false,
-        1 => true,
-        _ => return Err(DecodeError::new(OutOfDomainValue))
-    }
-});
-varint!(varint_u32, u32,
-to_uint64(value) {
-    *value as u64
-},
-from_uint64(value) {
-    u32::try_from(value).map_err(|_| DecodeError::new(OutOfDomainValue))?
-});
-varint!(varint_u64, u64,
-to_uint64(value) {
-    *value
-},
-from_uint64(value) {
-    value
-});
-varint!(varint_i32, i32,
-to_uint64(value) {
-    super::i32_to_unsigned(*value) as u64
-},
-from_uint64(value) {
-    let value = u32::try_from(value)
-        .map_err(|_| DecodeError::new(OutOfDomainValue))?;
-    super::u32_to_signed(value)
-});
-varint!(varint_i64, i64,
-to_uint64(value) {
-    super::i64_to_unsigned(*value)
-},
-from_uint64(value) {
-    super::u64_to_signed(value)
-});
+// General encodes bool and integers as varints.
+delegate_value_encoding!(delegate from (General) to (crate::encoding::Varint)
+    for type (bool) including distinguished);
+delegate_value_encoding!(delegate from (General) to (crate::encoding::Varint)
+    for type (u8) including distinguished);
+delegate_value_encoding!(delegate from (General) to (crate::encoding::Varint)
+    for type (i8) including distinguished);
+delegate_value_encoding!(delegate from (General) to (crate::encoding::Varint)
+    for type (u16) including distinguished);
+delegate_value_encoding!(delegate from (General) to (crate::encoding::Varint)
+    for type (i16) including distinguished);
+delegate_value_encoding!(delegate from (General) to (crate::encoding::Varint)
+    for type (u32) including distinguished);
+delegate_value_encoding!(delegate from (General) to (crate::encoding::Varint)
+    for type (i32) including distinguished);
+delegate_value_encoding!(delegate from (General) to (crate::encoding::Varint)
+    for type (u64) including distinguished);
+delegate_value_encoding!(delegate from (General) to (crate::encoding::Varint)
+    for type (i64) including distinguished);
 
 // General also encodes floating point values.
 delegate_value_encoding!(delegate from (General) to (crate::encoding::Fixed) for type (f32));
@@ -275,8 +196,8 @@ impl DistinguishedValueEncoder<String> for General {
 mod string {
     use super::{General, String};
     use crate::encoding::test::check_type_test;
-    check_type_test!(General, expedient, String, LengthDelimited);
-    check_type_test!(General, distinguished, String, LengthDelimited);
+    check_type_test!(General, expedient, String, WireType::LengthDelimited);
+    check_type_test!(General, distinguished, String, WireType::LengthDelimited);
 }
 
 impl EqualDefaultAlwaysEmpty for Cow<'_, str> {}
@@ -318,8 +239,8 @@ impl DistinguishedValueEncoder<Cow<'_, str>> for General {
 mod cow_string {
     use super::{Cow, General};
     use crate::encoding::test::check_type_test;
-    check_type_test!(General, expedient, Cow<str>, LengthDelimited);
-    check_type_test!(General, distinguished, Cow<str>, LengthDelimited);
+    check_type_test!(General, expedient, Cow<str>, WireType::LengthDelimited);
+    check_type_test!(General, distinguished, Cow<str>, WireType::LengthDelimited);
 }
 
 #[cfg(feature = "bytestring")]
@@ -370,9 +291,9 @@ impl DistinguishedValueEncoder<bytestring::ByteString> for General {
 mod bytestring_string {
     use super::{General, String};
     use crate::encoding::test::check_type_test;
-    check_type_test!(General, expedient, from String, into bytestring::ByteString, LengthDelimited);
+    check_type_test!(General, expedient, from String, into bytestring::ByteString, WireType::LengthDelimited);
     check_type_test!(General, distinguished, from String, into bytestring::ByteString,
-        LengthDelimited);
+        WireType::LengthDelimited);
 }
 
 impl EqualDefaultAlwaysEmpty for Bytes {}
@@ -417,8 +338,8 @@ impl DistinguishedValueEncoder<Bytes> for General {
 mod bytes_blob {
     use super::{Bytes, General, Vec};
     use crate::encoding::test::check_type_test;
-    check_type_test!(General, expedient, from Vec<u8>, into Bytes, LengthDelimited);
-    check_type_test!(General, distinguished, from Vec<u8>, into Bytes, LengthDelimited);
+    check_type_test!(General, expedient, from Vec<u8>, into Bytes, WireType::LengthDelimited);
+    check_type_test!(General, distinguished, from Vec<u8>, into Bytes, WireType::LengthDelimited);
 }
 
 impl EqualDefaultAlwaysEmpty for Blob {}
@@ -463,8 +384,8 @@ impl DistinguishedValueEncoder<Blob> for General {
 mod blob {
     use super::{Blob, General};
     use crate::encoding::test::check_type_test;
-    check_type_test!(General, expedient, Blob, LengthDelimited);
-    check_type_test!(General, distinguished, Blob, LengthDelimited);
+    check_type_test!(General, expedient, Blob, WireType::LengthDelimited);
+    check_type_test!(General, distinguished, Blob, WireType::LengthDelimited);
 }
 
 // TODO(widders): consider... bytes with limited size? like ArrayVec. too big probably means

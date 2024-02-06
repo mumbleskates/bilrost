@@ -190,13 +190,13 @@ mod test {
                 Map<General, General>,
                 expedient,
                 BTreeMap<u64, f32>,
-                LengthDelimited
+                WireType::LengthDelimited
             );
             check_type_test!(
                 Map<General, General>,
                 distinguished,
                 BTreeMap<u32, i32>,
-                LengthDelimited
+                WireType::LengthDelimited
             );
         }
 
@@ -208,13 +208,13 @@ mod test {
                 Map<Fixed, Fixed>,
                 expedient,
                 BTreeMap<u64, f32>,
-                LengthDelimited
+                WireType::LengthDelimited
             );
             check_type_test!(
                 Map<Fixed, Fixed>,
                 distinguished,
                 BTreeMap<u32, i32>,
-                LengthDelimited
+                WireType::LengthDelimited
             );
         }
 
@@ -226,13 +226,13 @@ mod test {
                 General,
                 expedient,
                 BTreeMap<bool, f32>,
-                LengthDelimited
+                WireType::LengthDelimited
             );
             check_type_test!(
                 General,
                 distinguished,
                 BTreeMap<bool, u32>,
-                LengthDelimited
+                WireType::LengthDelimited
             );
         }
     }
@@ -247,7 +247,7 @@ mod test {
                 Map<General, General>,
                 expedient,
                 HashMap<u64, f32>,
-                LengthDelimited
+                WireType::LengthDelimited
             );
         }
 
@@ -259,7 +259,7 @@ mod test {
                 Map<Fixed, Fixed>,
                 expedient,
                 HashMap<u64, f32>,
-                LengthDelimited
+                WireType::LengthDelimited
             );
         }
 
@@ -271,7 +271,7 @@ mod test {
                 General,
                 expedient,
                 HashMap<bool, u32>,
-                LengthDelimited
+                WireType::LengthDelimited
             );
         }
     }
@@ -291,7 +291,7 @@ mod test {
                 converter(value) {
                     <HashMap<u64, f32> as FromIterator<_>>::from_iter(value.into_iter())
                 },
-                LengthDelimited
+                WireType::LengthDelimited
             );
         }
 
@@ -308,7 +308,7 @@ mod test {
                 converter(value) {
                     <HashMap<u64, f32> as FromIterator<_>>::from_iter(value.into_iter())
                 },
-                LengthDelimited
+                WireType::LengthDelimited
             );
         }
 
@@ -325,7 +325,7 @@ mod test {
                 converter(value) {
                     <HashMap<bool, u32> as FromIterator<_>>::from_iter(value.into_iter())
                 },
-                LengthDelimited
+                WireType::LengthDelimited
             );
         }
     }
