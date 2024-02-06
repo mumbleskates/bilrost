@@ -103,6 +103,20 @@ TODO: fill out this outline for a better introduction
         * maps in protobuf were a pain and seem like a bodge
         * theoretically it's possible to widen that schema into a repeated
           nested message with more fields, but this is almost never done
+* comparisons to `prost`
+    * does not generate implementations and structs from schemas, but rather
+      makes deriving traits by hand ergonomic
+    * `bilrost` uses trait-dispatched encoding instead of rigid types, which
+      allows it to have far better type support
+    * binary encoding is quite different, but just as capable (or more). for
+      better or worse this is not a protobuf library.
+        * a protobuf library, or fork of prost, could be created that uses the
+          trait-based dispatch to be much easier to use
+    * bilrost inherently supports deterministic & canonical outputs as a banner
+      feature
+    * message traits are now usefully object-safe, and all the encoder traits
+      can function with `&dyn Buf` and so on
+    * (look over more unsolved complaints in the prost issues)
 
 ### Comparisons to protobuf
 
