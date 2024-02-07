@@ -171,7 +171,7 @@ macro_rules! fixed_width_float {
 
             #[inline]
             fn encoded_len(tag: u32, value: &$ty, tm: &mut TagMeasurer) -> usize {
-                if value.to_bits() != 0 {
+                if !value.is_empty() {
                     Self::field_encoded_len(tag, value, tm)
                 } else {
                     0
