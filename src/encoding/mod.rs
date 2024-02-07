@@ -667,6 +667,11 @@ where
     ) -> Result<(), DecodeError>;
 }
 
+// TODO(widders): traits for values of each wire type to consolidate encoding impls? like a varint
+//  value trait, trait(s) for 32b and 64b fixed size, and a trait for length-delimited values. this
+//  could cut down on extra impl code for enumerations and other duplicated logic like encoded_len
+//  for length-delimited and varint types
+
 /// Affiliated helper trait for ValueEncoder that provides obligate implementations for handling
 /// field keys and wire types.
 pub trait FieldEncoder<T> {
