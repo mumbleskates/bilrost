@@ -1,4 +1,5 @@
 use alloc::vec::Vec;
+use core::ops::{Deref, DerefMut};
 
 use btreemultimap::BTreeMultiMap;
 use bytes::{Buf, BufMut};
@@ -17,6 +18,7 @@ pub enum OpaqueValue {
     ThirtyTwoBit([u8; 4]),
     SixtyFourBit([u8; 8]),
 }
+
 use OpaqueValue::*;
 
 impl OpaqueValue {
@@ -179,7 +181,85 @@ impl OpaqueValue {
 ///
 /// At present this is still an unstable API, mostly used for internals and testing. Trait
 /// implementations and APIs of `OpaqueMessage` and `OpaqueValue` are subject to change.
-pub type OpaqueMessage = BTreeMultiMap<u32, OpaqueValue>;
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct OpaqueMessage(BTreeMultiMap<u32, OpaqueValue>);
+
+impl OpaqueMessage {
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
+impl Deref for OpaqueMessage {
+    type Target = BTreeMultiMap<u32, OpaqueValue>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for OpaqueMessage {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+pub struct OpaqueIterator {
+    iter: <BTreeMultiMap<u32, OpaqueValue> as IntoIterator>::IntoIter,
+    current: Option<(u32, <Vec<OpaqueValue> as IntoIterator>::IntoIter)>,
+}
+
+impl Iterator for OpaqueIterator {
+    type Item = (u32, OpaqueValue);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let (tag, value_iter) = match self.current.as_mut() {
+            None => self.current.insert(
+                self.iter
+                    .next()
+                    .map(|(tag, values)| (tag, values.into_iter()))?,
+            ),
+            Some(x) => x,
+        };
+        match value_iter.next() {
+            None => {
+                let (new_tag, new_values) = self.current.insert(
+                    self.iter
+                        .next()
+                        .map(|(tag, values)| (tag, values.into_iter()))?,
+                );
+                Some((*new_tag, new_values.next()?))
+            }
+            Some(value) => Some((*tag, value)),
+        }
+    }
+}
+
+impl IntoIterator for OpaqueMessage {
+    type Item = <OpaqueIterator as Iterator>::Item;
+    type IntoIter = OpaqueIterator;
+    fn into_iter(self) -> Self::IntoIter {
+        OpaqueIterator {
+            iter: self.0.into_iter(),
+            current: None,
+        }
+    }
+}
+
+impl<'a> IntoIterator for &'a OpaqueMessage {
+    type Item = <&'a BTreeMultiMap<u32, OpaqueValue> as IntoIterator>::Item;
+    type IntoIter = <&'a BTreeMultiMap<u32, OpaqueValue> as IntoIterator>::IntoIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+impl FromIterator<(u32, OpaqueValue)> for OpaqueMessage {
+    fn from_iter<T: IntoIterator<Item = (u32, OpaqueValue)>>(iter: T) -> Self {
+        Self(iter.into_iter().collect())
+    }
+}
 
 impl RawMessage for OpaqueMessage {
     const __ASSERTIONS: () = ();
