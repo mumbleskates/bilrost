@@ -368,6 +368,9 @@ enum Foo {
     Three,
     #[bilrost(FOUR)]
     Four,
+    // When both discriminant and attribute exist, bilrost uses the attribute.
+    #[bilrost(5)]
+    Five = 8,
 }
 ```
 
