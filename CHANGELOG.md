@@ -9,8 +9,18 @@
 ### New features
 
 * Added features that enable support of `smallvec`, `thin-vec`, and `tinyvec`.
+* Added support for `u16` and `i16` with the `general` encoder, and added a
+  new `varint` encoder that supports all the varint types in addition to `u8`
+  and `i8`. `general` will not support one-byte integers, because this makes it
+  too easy to accidentally spell a completely unintended encoding of `Vec<u8>`;
+  encodings for collections of bytes like this will remain explicit.
 
 ### Fixes
+
+* Require the `serde_json/float_roundtrip` feature for
+  the `bilrost-types/serde_json` compatibility. If that feature is desired to be
+  disabled, the `serde_json` feature in `bilrost-types` currently only provides
+  from/into anyway and those can be written elsewhere.
 
 ### Cleanups
 
