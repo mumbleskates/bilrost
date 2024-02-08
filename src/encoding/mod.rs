@@ -519,6 +519,11 @@ impl<'a, B: 'a + Buf + ?Sized> Capped<'a, B> {
     pub fn over_cap(&self) -> bool {
         self.buf.remaining() < self.extra_bytes_remaining
     }
+
+    #[inline]
+    pub fn has_remaining(&self) -> bool {
+        self.buf.remaining() > self.extra_bytes_remaining
+    }
 }
 
 pub struct CappedConsumer<'a, B: Buf + ?Sized, F> {
