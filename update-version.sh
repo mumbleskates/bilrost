@@ -12,13 +12,19 @@ fi
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 VERSION="$1"
-MINOR="$( echo ${VERSION} | cut -d\. -f1-2 )"
+
+# Remove the patch number from the cargo lines in the readme only if it's a plain semver
+if [[ "${VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  MINOR="$( echo ${VERSION} | cut -d\. -f1-2 )"
+else
+  MINOR="${VERSION}"
+fi
 
 VERSION_MATCHER="([a-z0-9\\.-]+)"
 BILROST_CRATE_MATCHER="(bilrost|bilrost-[a-z]+)"
 
 # Update the README.md.
-sed -i -E "s/${BILROST_CRATE_MATCHER} = \"${VERSION_MATCHER}\"/\1 = \"${MINOR}\"/" "${DIR}/README.md"
+sed -i -E "s/version = \"${VERSION_MATCHER}\"/version = \"${MINOR}\"/" "${DIR}/README.md"
 
 # Update html_root_url attributes.
 sed -i -E "s~html_root_url = \"https://docs\.rs/${BILROST_CRATE_MATCHER}/${VERSION_MATCHER}\"~html_root_url = \"https://docs.rs/\1/${VERSION}\"~" \

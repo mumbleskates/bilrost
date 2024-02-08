@@ -400,7 +400,7 @@ disable the `std` features in `bilrost` and `bilrost-types`:
 
 ```toml
 [dependencies]
-bilrost = { version = "0.1000.0", default-features = false, features = ["derive"] }
+bilrost = { version = "0.1001.0-dev", default-features = false, features = ["derive"] }
 ```
 
 ## Serializing Existing Types
