@@ -236,23 +236,18 @@ encoded values. Most of the time, this is what is desired.
 
 Bilrost structs can encode fields with a wide variety of types:
 
-| Encoder             | Value type             | Encoded representation |
-|---------------------|------------------------|------------------------|
-| `general` & `fixed` | `f32`                  | fixed-size 32 bits     |
-| `general` & `fixed` | `f64`                  | fixed-size 64 bits     |
-| `general`           | `u32`                  | varint                 |
-| `fixed`             | `u32`                  | fixed-size 32 bits     |
-| `general`           | `u64`                  | varint                 |
-| `fixed`             | `u64`                  | fixed-size 64 bits     |
-| `general`           | `i32`                  | varint                 |
-| `fixed`             | `i32`                  | fixed-size 32 bits     |
-| `general`           | `i64`                  | varint                 |
-| `fixed`             | `i64`                  | fixed-size 64 bits     |
-| `general`           | `bool`                 | varint                 |
-| `general`           | derived `Enumeration`* | varint                 |
-| `general`           | `String`**             | length-delimited       |
-| `plainbytes`        | `Vec<u8>`**            | length-delimited       |
-| `general`           | derived `Message`      | length-delimited       |
+| Encoder              | Value type             | Encoded representation |
+|----------------------|------------------------|------------------------|
+| `general` & `fixed`  | `f32`, `u32`, `i32`    | fixed-size 32 bits     |
+| `general` & `fixed`  | `f64`, `u64`, `i64`    | fixed-size 64 bits     |
+| `general` & `varint` | `u64`, `u32`, `u16`    | varint                 |
+| `general` & `varint` | `i64`, `i32`, `i16`    | varint                 |
+| `general` & `varint` | `bool`                 | varint                 |
+| `general`            | derived `Enumeration`* | varint                 |
+| `general`            | `String`**             | length-delimited       |
+| `general`            | derived `Message`      | length-delimited       |
+| `varint`             | `u8`, `i8`             | varint                 |
+| `plainbytes`         | `Vec<u8>`**            | length-delimited       |
 
 *`Enumeration` types can be directly included if they implement `Default`;
 otherwise they must always be nested.
