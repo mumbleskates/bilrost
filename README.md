@@ -231,7 +231,7 @@ Bilrost structs can encode fields with a wide variety of types:
 | `general`           | `bool`                 | varint                 |
 | `general`           | derived `Enumeration`* | varint                 |
 | `general`           | `String`**             | length-delimited       |
-| `vecblob`           | `Vec<u8>`**            | length-delimited       |
+| `plainbytes`        | `Vec<u8>`**            | length-delimited       |
 | `general`           | derived `Message`      | length-delimited       |
 
 *`Enumeration` types can be directly included if they implement `Default`;
@@ -263,15 +263,15 @@ Many alternative types are also available for both scalar values and containers!
 | Value type | Alternative              | Supporting encoder | Feature to enable |
 |------------|--------------------------|--------------------|-------------------|
 | `Vec<u8>`  | `Blob`*                  | `general`          | (none)            |
-| `Vec<u8>`  | `Cow<[u8]>`              | `vecblob`          | (none)            |
+| `Vec<u8>`  | `Cow<[u8]>`              | `plainbytes`       | (none)            |
 | `Vec<u8>`  | `Bytes`                  | `general`          | (none)            |
 | `String`   | `Cow<str>`               | `general`          | (none)            |
 | `String`   | `bytestring::ByteString` | `general`          | "bytestring"      |
 
 *`bilrost::Blob` is a transparent wrapper for `Vec<u8>` in that is a drop-in
 replacement in most situations and is supported by the default `general` encoder
-for maximum ease of use. If nothing but `Vec<u8>` will do, the `vecblob` encoder
-will still encode a plain `Vec<u8>` as its bytes value.
+for maximum ease of use. If nothing but `Vec<u8>` will do, the `plainbytes`
+encoder will still encode a plain `Vec<u8>` as its bytes value.
 
 | Container type | Alternative              | Feature to enable |
 |----------------|--------------------------|-------------------|

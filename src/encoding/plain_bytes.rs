@@ -11,16 +11,16 @@ use crate::encoding::{
 use crate::DecodeError;
 use crate::DecodeErrorKind::{NotCanonical, UnexpectedlyRepeated};
 
-/// `VecBlob` implements encoding for blob values directly into `Vec<u8>`, and provides the base
+/// `PlainBytes` implements encoding for blob values directly into `Vec<u8>`, and provides the base
 /// implementation for that functionality. `Vec<u8>` cannot generically dispatch to `General`'s
 /// encoding, since `General` already generically implements encoding for other kinds of `Vec`, but
 /// this encoder can be used instead if it's desirable to have a value whose type is exactly
 /// `Vec<u8>`.
-pub struct VecBlob;
+pub struct PlainBytes;
 
-impl<T> Encoder<T> for VecBlob
+impl<T> Encoder<T> for PlainBytes
 where
-    VecBlob: ValueEncoder<T>,
+    PlainBytes: ValueEncoder<T>,
     T: HasEmptyState,
 {
     #[inline]
@@ -54,9 +54,9 @@ where
     }
 }
 
-impl<T> DistinguishedEncoder<T> for VecBlob
+impl<T> DistinguishedEncoder<T> for PlainBytes
 where
-    VecBlob: DistinguishedValueEncoder<T> + Encoder<T>,
+    PlainBytes: DistinguishedValueEncoder<T> + Encoder<T>,
     T: Eq + HasEmptyState,
 {
     #[inline]
@@ -78,11 +78,11 @@ where
     }
 }
 
-impl Wiretyped<Vec<u8>> for VecBlob {
+impl Wiretyped<Vec<u8>> for PlainBytes {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
 }
 
-impl ValueEncoder<Vec<u8>> for VecBlob {
+impl ValueEncoder<Vec<u8>> for PlainBytes {
     fn encode_value<B: BufMut + ?Sized>(value: &Vec<u8>, buf: &mut B) {
         encode_varint(value.len() as u64, buf);
         buf.put_slice(value.as_slice());
@@ -105,7 +105,7 @@ impl ValueEncoder<Vec<u8>> for VecBlob {
     }
 }
 
-impl DistinguishedValueEncoder<Vec<u8>> for VecBlob {
+impl DistinguishedValueEncoder<Vec<u8>> for PlainBytes {
     fn decode_value_distinguished<B: Buf + ?Sized>(
         value: &mut Vec<u8>,
         buf: Capped<B>,
@@ -115,24 +115,29 @@ impl DistinguishedValueEncoder<Vec<u8>> for VecBlob {
     }
 }
 
-delegate_encoding!(delegate from (VecBlob) to (crate::encoding::Unpacked<VecBlob>)
+delegate_encoding!(delegate from (PlainBytes) to (crate::encoding::Unpacked<PlainBytes>)
     for type (Vec<Vec<u8>>) including distinguished);
-delegate_encoding!(delegate from (VecBlob) to (crate::encoding::Unpacked<VecBlob>)
+delegate_encoding!(delegate from (PlainBytes) to (crate::encoding::Unpacked<PlainBytes>)
     for type (Vec<Cow<'a, [u8]>>) including distinguished with generics ('a));
 
 #[cfg(test)]
 mod vec_u8 {
-    use super::{Vec, VecBlob};
+    use super::{PlainBytes, Vec};
     use crate::encoding::test::check_type_test;
-    check_type_test!(VecBlob, expedient, Vec<u8>, WireType::LengthDelimited);
-    check_type_test!(VecBlob, distinguished, Vec<u8>, WireType::LengthDelimited);
+    check_type_test!(PlainBytes, expedient, Vec<u8>, WireType::LengthDelimited);
+    check_type_test!(
+        PlainBytes,
+        distinguished,
+        Vec<u8>,
+        WireType::LengthDelimited
+    );
 }
 
-impl Wiretyped<Cow<'_, [u8]>> for VecBlob {
+impl Wiretyped<Cow<'_, [u8]>> for PlainBytes {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
 }
 
-impl ValueEncoder<Cow<'_, [u8]>> for VecBlob {
+impl ValueEncoder<Cow<'_, [u8]>> for PlainBytes {
     #[inline]
     fn encode_value<B: BufMut + ?Sized>(value: &Cow<[u8]>, buf: &mut B) {
         encode_varint(value.len() as u64, buf);
@@ -154,7 +159,7 @@ impl ValueEncoder<Cow<'_, [u8]>> for VecBlob {
     }
 }
 
-impl DistinguishedValueEncoder<Cow<'_, [u8]>> for VecBlob {
+impl DistinguishedValueEncoder<Cow<'_, [u8]>> for PlainBytes {
     #[inline]
     fn decode_value_distinguished<B: Buf + ?Sized>(
         value: &mut Cow<[u8]>,
@@ -167,8 +172,13 @@ impl DistinguishedValueEncoder<Cow<'_, [u8]>> for VecBlob {
 
 #[cfg(test)]
 mod cow_bytes {
-    use super::{Cow, VecBlob};
+    use super::{Cow, PlainBytes};
     use crate::encoding::test::check_type_test;
-    check_type_test!(VecBlob, expedient, Cow<[u8]>, WireType::LengthDelimited);
-    check_type_test!(VecBlob, distinguished, Cow<[u8]>, WireType::LengthDelimited);
+    check_type_test!(PlainBytes, expedient, Cow<[u8]>, WireType::LengthDelimited);
+    check_type_test!(
+        PlainBytes,
+        distinguished,
+        Cow<[u8]>,
+        WireType::LengthDelimited
+    );
 }

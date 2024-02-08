@@ -61,9 +61,9 @@ fn encoder_alias_header() -> TokenStream {
             General as general,
             Map as map,
             Packed as packed,
+            PlainBytes as plainbytes,
             Unpacked as unpacked,
             Varint as varint,
-            VecBlob as vecblob,
         };
     }
 }

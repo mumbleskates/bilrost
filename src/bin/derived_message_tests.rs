@@ -859,7 +859,7 @@ mod derived_message_tests {
     #[test]
     fn parsing_vec_blob() {
         #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
-        struct Foo(#[bilrost(encoder(vecblob))] Vec<u8>);
+        struct Foo(#[bilrost(encoder(plainbytes))] Vec<u8>);
         assert::decodes_distinguished(
             [(1, OV::string("hello world"))],
             Foo(b"hello world"[..].into()),
@@ -869,7 +869,7 @@ mod derived_message_tests {
     #[test]
     fn parsing_cow_blob() {
         #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
-        struct Foo<'a>(#[bilrost(encoder(vecblob))] Cow<'a, [u8]>);
+        struct Foo<'a>(#[bilrost(encoder(plainbytes))] Cow<'a, [u8]>);
         assert::decodes_distinguished(
             [(1, OV::string("hello world"))],
             Foo(b"hello world"[..].into()),

@@ -15,7 +15,7 @@ use crate::DecodeErrorKind::UnknownField;
 /// Newtype wrapper to act as a simple "bytes data" type in Bilrost. It transparently wraps a
 /// `Vec<u8>` and is fully supported by the `General` encoder.
 ///
-/// To use `Vec<u8>` directly, use the `VecBlob` encoder.
+/// To use `Vec<u8>` directly, use the `PlainBytes` encoder.
 #[derive(Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Debug, Default)]
 #[repr(transparent)]
 pub struct Blob(Vec<u8>);

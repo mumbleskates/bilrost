@@ -13,8 +13,8 @@ use bytes::{Buf, BufMut, Bytes};
 use crate::encoding::{
     delegate_encoding, delegate_value_encoding, encode_varint, encoded_len_varint, Capped,
     DecodeContext, DistinguishedEncoder, DistinguishedFieldEncoder, DistinguishedValueEncoder,
-    Encoder, EqualDefaultAlwaysEmpty, FieldEncoder, HasEmptyState, Map, TagMeasurer, TagWriter,
-    Unpacked, ValueEncoder, VecBlob, WireType, Wiretyped,
+    Encoder, EqualDefaultAlwaysEmpty, FieldEncoder, HasEmptyState, Map, PlainBytes, TagMeasurer,
+    TagWriter, Unpacked, ValueEncoder, WireType, Wiretyped,
 };
 use crate::message::{merge, merge_distinguished, RawDistinguishedMessage, RawMessage};
 use crate::DecodeErrorKind::{InvalidValue, NotCanonical, UnexpectedlyRepeated};
@@ -351,12 +351,12 @@ impl Wiretyped<Blob> for General {
 impl ValueEncoder<Blob> for General {
     #[inline]
     fn encode_value<B: BufMut + ?Sized>(value: &Blob, buf: &mut B) {
-        VecBlob::encode_value(&**value, buf)
+        PlainBytes::encode_value(&**value, buf)
     }
 
     #[inline]
     fn value_encoded_len(value: &Blob) -> usize {
-        VecBlob::value_encoded_len(&**value)
+        PlainBytes::value_encoded_len(&**value)
     }
 
     #[inline]
@@ -365,7 +365,7 @@ impl ValueEncoder<Blob> for General {
         buf: Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
-        VecBlob::decode_value(&mut **value, buf, ctx)
+        PlainBytes::decode_value(&mut **value, buf, ctx)
     }
 }
 
@@ -376,7 +376,7 @@ impl DistinguishedValueEncoder<Blob> for General {
         buf: Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
-        VecBlob::decode_value_distinguished(&mut **value, buf, ctx)
+        PlainBytes::decode_value_distinguished(&mut **value, buf, ctx)
     }
 }
 

@@ -21,10 +21,10 @@ mod map;
 #[cfg(feature = "opaque")]
 pub mod opaque;
 mod packed;
+mod plain_bytes;
 mod unpacked;
 mod value_traits;
 mod varint;
-mod vec_blob;
 
 pub use value_traits::{
     Collection, DistinguishedCollection, DistinguishedMapping, EqualDefaultAlwaysEmpty,
@@ -40,13 +40,13 @@ pub use general::General;
 pub use map::Map;
 /// Packed encoder. Encodes repeated types in packed format.
 pub use packed::Packed;
+/// Encoder that decodes bytes data directly into `Vec<u8>`, rather than requiring it to be wrapped
+/// in `Blob`.
+pub use plain_bytes::PlainBytes;
 /// Unpacked encoder. Encodes repeated types in unpacked format, writing repeated fields.
 pub use unpacked::Unpacked;
 /// Varint encoder. Encodes integer types as varints.
 pub use varint::Varint;
-/// Encoder that decodes bytes data directly into `Vec<u8>`, rather than requiring it to be wrapped
-/// in `Blob`.
-pub use vec_blob::VecBlob;
 
 /// Encodes an integer value into LEB128-bijective variable length format, and writes it to the
 /// buffer. The buffer must have enough remaining space (maximum 9 bytes).
@@ -687,6 +687,7 @@ pub trait FieldEncoder<T> {
         ctx: DecodeContext,
     ) -> Result<(), DecodeError>;
 }
+
 impl<T, E> FieldEncoder<T> for E
 where
     E: ValueEncoder<T>,
@@ -723,6 +724,7 @@ pub trait DistinguishedFieldEncoder<T> {
         ctx: DecodeContext,
     ) -> Result<(), DecodeError>;
 }
+
 impl<T, E> DistinguishedFieldEncoder<T> for E
 where
     E: DistinguishedValueEncoder<T>,
@@ -950,6 +952,7 @@ pub trait EnumerationHelper<FieldType> {
     fn help_set(enum_val: Self::Input) -> FieldType;
     fn help_get(field_val: FieldType) -> Self::Output;
 }
+
 impl<T> EnumerationHelper<u32> for T
 where
     T: Into<u32> + TryFrom<u32, Error = DecodeError>,
@@ -965,6 +968,7 @@ where
         T::try_from(field_val)
     }
 }
+
 impl<T> EnumerationHelper<Option<u32>> for T
 where
     T: Into<u32> + TryFrom<u32, Error = DecodeError>,
@@ -1385,7 +1389,7 @@ mod test {
                 false,
                 &mut T::default(),
                 capped,
-                DecodeContext::default()
+                DecodeContext::default(),
             )
             .expect_err("decoding a plain field with an encoded defaulted value should fail")
             .kind(),
@@ -1408,7 +1412,7 @@ mod test {
         present_and_defaulted_errs::<bool, General>();
         present_and_defaulted_errs::<String, General>();
         present_and_defaulted_errs::<Blob, General>();
-        present_and_defaulted_errs::<Vec<u8>, VecBlob>();
+        present_and_defaulted_errs::<Vec<u8>, PlainBytes>();
 
         present_and_defaulted_errs::<Vec<u32>, Packed<General>>();
         present_and_defaulted_errs::<Vec<u64>, Packed<General>>();
@@ -1421,7 +1425,7 @@ mod test {
         present_and_defaulted_errs::<Vec<bool>, Packed<General>>();
         present_and_defaulted_errs::<Vec<String>, Packed<General>>();
         present_and_defaulted_errs::<Vec<Blob>, Packed<General>>();
-        present_and_defaulted_errs::<Vec<Vec<u8>>, Packed<VecBlob>>();
+        present_and_defaulted_errs::<Vec<Vec<u8>>, Packed<PlainBytes>>();
 
         present_and_defaulted_errs::<BTreeSet<u32>, Packed<General>>();
         present_and_defaulted_errs::<BTreeSet<u64>, Packed<General>>();
@@ -1434,7 +1438,7 @@ mod test {
         present_and_defaulted_errs::<BTreeSet<bool>, Packed<General>>();
         present_and_defaulted_errs::<BTreeSet<String>, Packed<General>>();
         present_and_defaulted_errs::<BTreeSet<Blob>, Packed<General>>();
-        present_and_defaulted_errs::<BTreeSet<Vec<u8>>, Packed<VecBlob>>();
+        present_and_defaulted_errs::<BTreeSet<Vec<u8>>, Packed<PlainBytes>>();
 
         present_and_defaulted_errs::<BTreeMap<u32, u32>, Map<General, General>>();
         present_and_defaulted_errs::<BTreeMap<u64, u64>, Map<General, General>>();
@@ -1447,7 +1451,7 @@ mod test {
         present_and_defaulted_errs::<BTreeMap<bool, bool>, Map<General, General>>();
         present_and_defaulted_errs::<BTreeMap<String, String>, Map<General, General>>();
         present_and_defaulted_errs::<BTreeMap<Blob, Blob>, Map<General, General>>();
-        present_and_defaulted_errs::<BTreeMap<Vec<u8>, Vec<u8>>, Map<VecBlob, VecBlob>>();
+        present_and_defaulted_errs::<BTreeMap<Vec<u8>, Vec<u8>>, Map<PlainBytes, PlainBytes>>();
 
         present_and_defaulted_errs::<Vec<BTreeMap<u32, u32>>, Packed<Map<General, General>>>();
         present_and_defaulted_errs::<Vec<BTreeMap<u64, u64>>, Packed<Map<General, General>>>();
@@ -1461,8 +1465,10 @@ mod test {
         present_and_defaulted_errs::<Vec<BTreeMap<String, String>>, Packed<Map<General, General>>>(
         );
         present_and_defaulted_errs::<Vec<BTreeMap<Blob, Blob>>, Packed<Map<General, General>>>();
-        present_and_defaulted_errs::<Vec<BTreeMap<Vec<u8>, Vec<u8>>>, Packed<Map<VecBlob, VecBlob>>>(
-        );
+        present_and_defaulted_errs::<
+            Vec<BTreeMap<Vec<u8>, Vec<u8>>>,
+            Packed<Map<PlainBytes, PlainBytes>>,
+        >();
     }
 
     #[test]
@@ -1807,7 +1813,7 @@ mod test {
                 false,
                 &mut out,
                 Capped::new(&mut [0u8; 0].as_slice()),
-                DecodeContext::default()
+                DecodeContext::default(),
             ),
             Err(DecodeError::new(WrongWireType))
         );
@@ -1826,7 +1832,7 @@ mod test {
                 false,
                 &mut out,
                 Capped::new(&mut [0u8; 0].as_slice()),
-                DecodeContext::default()
+                DecodeContext::default(),
             ),
             Err(DecodeError::new(WrongWireType))
         );
@@ -1877,7 +1883,7 @@ mod test {
         ] {
             check_rejects_wrong_wire_type_distinguished::<String, General>(wire_type);
             check_rejects_wrong_wire_type_distinguished::<Blob, General>(wire_type);
-            check_rejects_wrong_wire_type_distinguished::<Vec<u8>, VecBlob>(wire_type);
+            check_rejects_wrong_wire_type_distinguished::<Vec<u8>, PlainBytes>(wire_type);
         }
     }
 

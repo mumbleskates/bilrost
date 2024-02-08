@@ -4,6 +4,7 @@
 
 * Changed the name of the `detailed-errors` feature to have a hyphen instead of
   an underscore, consistent with the other feature names.
+* Renamed the `vecblob` encoder to `plainbytes`.
 
 ### New features
 
