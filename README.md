@@ -5,7 +5,7 @@ structured data. The encoding is binary, and unsuitable for reading directly by
 humans; however, it does have other other useful properties and advantages. This
 crate, `bilrost`, is its first implementation and its first instantiation.
 Bilrost (as a specification) strives to provide a superset of the capabilities
-of protocol buffers while reducing the surface area for mistakes and
+of protocol buffers while reducing some of the surface area for mistakes and
 surprises; `bilrost` (the implementing library) strives to provide access to all
 of those capabilities with maximum convenience.
 
@@ -14,16 +14,17 @@ and shares many of its traits. It is in some ways simpler and less rigid in its
 specification, and is designed to improve on some of protobuf's deficiencies. In
 doing so it breaks wire-compatibility with protobuf.
 
-`bilrost` (this implementing library) is implemented for the
-[Rust Language][rs]. It is a direct fork of [`prost`][p], and shares many of its
-performance characteristics. (It is not the fastest encoding library out there,
-but it is still pretty fast.) Like `prost`, bilrost can enable writing simple,
-idiomatic Rust code with `derive` macros that serialize and deserializes structs
-from binary data. Unlike `prost`, `bilrost` is free from most of the constraints
-of the protobuf ecosystem and can make it convenient to derive these encoding
-implementations for a wider variety of existing types: rather than relying on
-producing generated code from a protobuf `.proto` schema file, `bilrost` is
-designed to be used by hand.
+`bilrost` is implemented for the [Rust Language][rs]. It is a direct fork of
+[`prost`][p], and shares many of its performance characteristics. (It is not the
+fastest possible encoding library, but it is still pretty fast and comes with
+unique advantages.) Like `prost` bilrost can enable writing simple, idiomatic
+Rust code with `derive` macros that serialize and deserialize structs from
+binary data. Unlike `prost`, `bilrost` is free from most of the constraints of
+the protobuf ecosystem and required semantics of protobuf message types.
+Bilrost (the specification) and this library are free to allow much more
+compatibility with existing types and their normal semantics. Rather than
+relying on producing generated code from a protobuf `.proto` schema definition,
+`bilrost` is designed to be easily used by hand.
 
 🌈
 
