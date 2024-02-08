@@ -35,12 +35,17 @@ designed to be used by hand.
 
 TODO: fill out this outline for a better introduction
 
+## Conceptual overview
+
 * the overall concepts
     * tagged fields
     * forwards and backwards compatibility as message types are extended
     * distinguished encoding
     * some semantics depend upon the types themselves, like defaults and
       maybe ordering
+
+## Design philosophy
+
 * the philosophy
     * data has meaning based on where you find it
     * encodings with explicit schemas can be easier to guess the meaning of
@@ -52,16 +57,25 @@ TODO: fill out this outline for a better introduction
     * as an encoding, bilrost works to make invalid states unrepresentable
       when practical where it doesn't greatly increase complexity
     * bilrost is designed to aid, but not require, distinguished encoding
+
+## Using the library
+
 * using the library
     * how to derive
         * field annotations
     * types that work with `bilrost`
     * encoders
     * custom encoders
+
+## What Bilrost and the library won't do
+
 * the (current lack of) ecosystem compared to protobuf
     * no reflection yet
     * no DSL for specifying schemas yet
     * no support across other languages yet
+
+## Encoding specification
+
 * encoding specification
     * messages as strings of bytes that encode zero or more fields
     * varint encoding
@@ -84,6 +98,9 @@ TODO: fill out this outline for a better introduction
           default value
         * unknown fields must err
         * maps' keys and sets' items must be ordered
+
+## Differences from Protobuf encoding & semantics
+
 * major changes in relation to protobuf and the history there
     * bijective varints
         * what leb128 varints gave protobuf
@@ -122,6 +139,9 @@ TODO: fill out this outline for a better introduction
         * maps in protobuf were a pain and seem like a bodge
         * theoretically it's possible to widen that schema into a repeated
           nested message with more fields, but this is almost never done
+
+## `bilrost` vs. `prost`
+
 * comparisons to `prost`
     * does not generate implementations and structs from schemas, but rather
       makes deriving traits by hand ergonomic
@@ -136,6 +156,10 @@ TODO: fill out this outline for a better introduction
     * message traits are now usefully object-safe, and all the encoder traits
       can function with `&dyn Buf` and so on
     * (look over more unsolved complaints in the prost issues)
+
+---
+
+---
 
 ### Comparisons to protobuf
 
