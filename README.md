@@ -1,18 +1,37 @@
 # *BILROST!*
 
-<!-- TODO(widders): normalize capitalization of "bilrost" -->
+Bilrost is a binary encoding format designed for storing and transmitting
+structured data. The encoding is binary, and unsuitable for reading directly by
+humans; however, it does have other other useful properties and advantages. This
+crate, `bilrost`, is its first implementation and its first instantiation.
+Bilrost (as a specification) strives to provide a superset of the capabilities
+of protocol buffers while reducing the surface area for mistakes and
+surprises; `bilrost` (the implementing library) strives to provide access to all
+of those capabilities with maximum convenience.
 
-Bilrost is a
-[Protocol Buffers](https://developers.google.com/protocol-buffers/)-alike
-encoding for the [Rust Language](https://www.rust-lang.org/). It is a direct
-fork of [`prost`](https://github.com/tokio-rs/prost). Like `prost`, bilrost can
-enable writing simple, idiomatic Rust code with `derive` macros that serializes
-and deserializes structs as portable and durable binary data, using an encoding
-scheme similar to that of protocol buffers but slightly different and mutually
-incompatible. Bilrost (as a specification) strives to provide a superset of the
-capabilities of protocol buffers while reducing the surface area for mistakes
-and surprises; `bilrost` (the Rust Language implementation library) strives to
-provide access to all of those capabilities with maximum convenience.
+Bilrost at the encoding level is based upon [Protocol Buffers][pb] (protobuf)
+and shares many of its traits. It is in some ways simpler and less rigid in its
+specification, and is designed to improve on some of protobuf's deficiencies. In
+doing so it breaks wire-compatibility with protobuf.
+
+`bilrost` (this implementing library) is implemented for the
+[Rust Language][rs]. It is a direct fork of [`prost`][p], and shares many of its
+performance characteristics. (It is not the fastest encoding library out there,
+but it is still pretty fast.) Like `prost`, bilrost can enable writing simple,
+idiomatic Rust code with `derive` macros that serialize and deserializes structs
+from binary data. Unlike `prost`, `bilrost` is free from most of the constraints
+of the protobuf ecosystem and can make it convenient to derive these encoding
+implementations for a wider variety of existing types: rather than relying on
+producing generated code from a protobuf `.proto` schema file, `bilrost` is
+designed to be used by hand.
+
+🌈
+
+[pb]: https://developers.google.com/protocol-buffers/
+
+[rs]: https://www.rust-lang.org/
+
+[p]: https://github.com/tokio-rs/prost
 
 TODO: fill out this outline for a better introduction
 
@@ -120,8 +139,7 @@ TODO: fill out this outline for a better introduction
 
 ### Comparisons to protobuf
 
-* All varints (including tag fields and lengths) use
-  [bijective numeration](https://en.wikipedia.org/wiki/Bijective_numeration),
+* All varints (including tag fields and lengths) use [bijective numeration][bn],
   which cannot be length-extended with trailing zeros the way protobuf varints
   can (and are slightly more compact, especially at the 64bit limit where they
   take up 9 bytes instead of 10). Varint encodings which would represent a value
@@ -152,6 +170,8 @@ TODO: fill out this outline for a better introduction
   backwards compatible when known fields' values would be altered or truncated
   to fit: decoding a bilrost message that has multiple occurrences of a non-
   repeated field in it is also an error.
+
+[bn]: https://en.wikipedia.org/wiki/Bijective_numeration
 
 ### Strengths, Aims, and Advantages
 
@@ -431,12 +451,13 @@ pub enum Gender {
 Because I can make one that does what I want.
 
 Protobuf, for all its power and grace, is burdened with decades of legacy in
-both stored data and usage in practice
-that [prevent it from changing](https://www.hyrumslaw.com/). Bizarre corner case
-behaviors in practice that were originally implemented out of expediency have
-deeply ramified themselves into the official specification of the encoding (such
-as how repeated presence of nested messages in a non-repeated field merges them
-together, etc.).
+both stored data and usage in practice that [prevent it from changing][hy].
+Bizarre corner case behaviors in practice that were originally implemented out
+of expediency have deeply ramified themselves into the official specification of
+the encoding (such as how repeated presence of nested messages in a non-repeated
+field merges them together, etc.).
+
+[hy]: https://www.hyrumslaw.com/
 
 With a careful approach to a newer standard, we can solve many of these problems
 and make a very similar encoding that is far more robust against shenanigans and
@@ -453,7 +474,7 @@ personal purposes, this is true. Perhaps the same will be even true for you as
 well.
 
 2. **Could the bilrost encoding be implemented as a serializer for
-   [Serde](https://serde.rs/)?**
+   [Serde][se]?**
 
 Probably not, though `serde` experts are free to weigh in. There are multiple
 complications with trying to serialize bilrost messages with Serde:
@@ -474,6 +495,8 @@ complications with trying to serialize bilrost messages with Serde:
 
 Despite all this, it is possible to place `serde` derive tags onto the generated
 types, so the same structure can support both `bilrost` and `Serde`.
+
+[se]: https://serde.rs/
 
 ## Why *Bilrost?*
 
