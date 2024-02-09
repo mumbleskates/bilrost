@@ -28,7 +28,7 @@
 ### Cleanups
 
 * Deduplicated implementations of `Encoder` and `DistinguishedEncoder` that
-  blanketed all implementation's of those encoders' value-encodable types.
+  blanket all implementations for which those encoders support value-encoding.
 
 ## v0.1000.0
 
