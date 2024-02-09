@@ -1,5 +1,6 @@
 use alloc::borrow::Cow;
 use alloc::vec::Vec;
+use core::ops::Deref;
 
 use bytes::{Buf, BufMut};
 
@@ -9,7 +10,7 @@ use crate::encoding::{
     FieldEncoder, HasEmptyState, TagMeasurer, TagWriter, ValueEncoder, WireType, Wiretyped,
 };
 use crate::DecodeError;
-use crate::DecodeErrorKind::{NotCanonical, UnexpectedlyRepeated};
+use crate::DecodeErrorKind::{InvalidValue, NotCanonical, UnexpectedlyRepeated};
 
 /// `PlainBytes` implements encoding for blob values directly into `Vec<u8>`, and provides the base
 /// implementation for that functionality. `Vec<u8>` cannot generically dispatch to `General`'s
@@ -182,3 +183,57 @@ mod cow_bytes {
         WireType::LengthDelimited
     );
 }
+
+impl<const N: usize> Wiretyped<[u8; N]> for PlainBytes {
+    const WIRE_TYPE: WireType = WireType::LengthDelimited;
+}
+
+impl<const N: usize> HasEmptyState for [u8; N] {
+    fn is_empty(&self) -> bool {
+        self.iter().all(|&byte| byte == 0)
+    }
+}
+
+impl<const N: usize> ValueEncoder<[u8; N]> for PlainBytes {
+    fn encode_value<B: BufMut + ?Sized>(value: &[u8; N], mut buf: &mut B) {
+        encode_varint(N as u64, buf);
+        (&mut buf).put(value.as_slice())
+    }
+
+    fn value_encoded_len(_value: &[u8; N]) -> usize {
+        encoded_len_varint(N as u64) + N
+    }
+
+    fn many_values_encoded_len<I>(values: I) -> usize
+    where
+        I: ExactSizeIterator,
+        I::Item: Deref<Target = [u8; N]>,
+    {
+        values.len() * (encoded_len_varint(N as u64) + N)
+    }
+
+    fn decode_value<B: Buf + ?Sized>(
+        value: &mut [u8; N],
+        mut buf: Capped<B>,
+        _ctx: DecodeContext,
+    ) -> Result<(), DecodeError> {
+        let mut delimited = buf.take_length_delimited()?;
+        if delimited.remaining_before_cap() != N {
+            return Err(DecodeError::new(InvalidValue));
+        }
+        delimited.copy_to_slice(value.as_mut_slice());
+        Ok(())
+    }
+}
+
+impl<const N: usize> DistinguishedValueEncoder<[u8; N]> for PlainBytes {
+    fn decode_value_distinguished<B: Buf + ?Sized>(
+        value: &mut [u8; N],
+        buf: Capped<B>,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError> {
+        Self::decode_value(value, buf, ctx) // Distinguished value decoding is the same
+    }
+}
+
+// TODO(widders): ArrayVec

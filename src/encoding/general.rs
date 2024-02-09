@@ -388,9 +388,6 @@ mod blob {
     check_type_test!(General, distinguished, Blob, WireType::LengthDelimited);
 }
 
-// TODO(widders): consider... bytes with limited size? like ArrayVec. too big probably means
-//  returning an InvalidValue error.
-
 impl<T> Wiretyped<T> for General
 where
     T: RawMessage,
