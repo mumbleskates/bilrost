@@ -6,12 +6,11 @@ use bytes::{Buf, BufMut};
 
 use crate::encoding::{
     delegate_encoding, encode_varint, encoded_len_varint, encoder_where_value_encoder, Capped,
-    DecodeContext, DistinguishedEncoder, DistinguishedFieldEncoder, DistinguishedValueEncoder,
-    Encoder, FieldEncoder, HasEmptyState, TagMeasurer, TagWriter, ValueEncoder, WireType,
-    Wiretyped,
+    DecodeContext, DistinguishedEncoder, DistinguishedValueEncoder, Encoder, HasEmptyState,
+    TagMeasurer, TagWriter, ValueEncoder, WireType, Wiretyped,
 };
 use crate::DecodeError;
-use crate::DecodeErrorKind::{InvalidValue, NotCanonical, UnexpectedlyRepeated};
+use crate::DecodeErrorKind::InvalidValue;
 
 /// `PlainBytes` implements encoding for blob values directly into `Vec<u8>`, and provides the base
 /// implementation for that functionality. `Vec<u8>` cannot generically dispatch to `General`'s

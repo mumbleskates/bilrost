@@ -5,11 +5,10 @@ use bytes::{Buf, BufMut};
 use crate::encoding::value_traits::HasEmptyState;
 use crate::encoding::{
     delegate_encoding, encoder_where_value_encoder, Capped, DecodeContext, DistinguishedEncoder,
-    DistinguishedFieldEncoder, DistinguishedValueEncoder, Encoder, FieldEncoder, TagMeasurer,
-    TagWriter, ValueEncoder, WireType, Wiretyped,
+    DistinguishedValueEncoder, Encoder, TagMeasurer, TagWriter, ValueEncoder, WireType, Wiretyped,
 };
 use crate::DecodeError;
-use crate::DecodeErrorKind::{NotCanonical, Truncated, UnexpectedlyRepeated};
+use crate::DecodeErrorKind::Truncated;
 
 pub struct Fixed;
 

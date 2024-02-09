@@ -1151,24 +1151,29 @@ macro_rules! delegate_value_encoding {
 pub(crate) use delegate_value_encoding;
 
 macro_rules! encoder_where_value_encoder {
-    ($encoder:ty) => {
+    (
+        $encoder:ty
+        $(, with where clause ($($where_clause:tt)*))?
+        $(, with generics ($($generics:tt)*))?
+    ) => {
         /// Encodes plain values only when they are non-default.
-        impl<T> Encoder<T> for $encoder
+        impl<T $(, $($generics)*)?> Encoder<T> for $encoder
         where
             $encoder: ValueEncoder<T>,
-            T: HasEmptyState,
+            T: crate::encoding::value_traits::HasEmptyState,
+            $($($where_clause)*)?
         {
             #[inline]
             fn encode<B: BufMut + ?Sized>(tag: u32, value: &T, buf: &mut B, tw: &mut TagWriter) {
-                if !value.is_empty() {
-                    Self::encode_field(tag, value, buf, tw);
+                if !crate::encoding::value_traits::HasEmptyState::is_empty(value) {
+                    <Self as crate::encoding::FieldEncoder<T>>::encode_field(tag, value, buf, tw);
                 }
             }
 
             #[inline]
             fn encoded_len(tag: u32, value: &T, tm: &mut TagMeasurer) -> usize {
-                if !value.is_empty() {
-                    Self::field_encoded_len(tag, value, tm)
+                if !crate::encoding::value_traits::HasEmptyState::is_empty(value) {
+                    <Self as crate::encoding::FieldEncoder<T>>::field_encoded_len(tag, value, tm)
                 } else {
                     0
                 }
@@ -1181,20 +1186,23 @@ macro_rules! encoder_where_value_encoder {
                 value: &mut T,
                 buf: Capped<B>,
                 ctx: DecodeContext,
-            ) -> Result<(), DecodeError> {
+            ) -> Result<(), crate::DecodeError> {
                 if duplicated {
-                    return Err(DecodeError::new(UnexpectedlyRepeated));
+                    return Err(
+                        crate::DecodeError::new(crate::DecodeErrorKind::UnexpectedlyRepeated)
+                    );
                 }
-                Self::decode_field(wire_type, value, buf, ctx)
+                <Self as crate::encoding::FieldEncoder<T>>::decode_field(wire_type, value, buf, ctx)
             }
         }
 
         /// Distinguished encoding for plain values forbids encoding defaulted values. This includes
         /// directly-nested message types, which are not emitted when all their fields are default.
-        impl<T> DistinguishedEncoder<T> for $encoder
+        impl<T $(, $($generics)*)?> DistinguishedEncoder<T> for $encoder
         where
             $encoder: DistinguishedValueEncoder<T> + Encoder<T>,
-            T: Eq + HasEmptyState,
+            T: Eq + crate::encoding::value_traits::HasEmptyState,
+            $($($where_clause)*)?
         {
             #[inline]
             fn decode_distinguished<B: Buf + ?Sized>(
@@ -1203,13 +1211,20 @@ macro_rules! encoder_where_value_encoder {
                 value: &mut T,
                 buf: Capped<B>,
                 ctx: DecodeContext,
-            ) -> Result<(), DecodeError> {
+            ) -> Result<(), crate::DecodeError> {
                 if duplicated {
-                    return Err(DecodeError::new(UnexpectedlyRepeated));
+                    return Err(
+                        crate::DecodeError::new(crate::DecodeErrorKind::UnexpectedlyRepeated)
+                    );
                 }
-                Self::decode_field_distinguished(wire_type, value, buf, ctx)?;
-                if value.is_empty() {
-                    return Err(DecodeError::new(NotCanonical));
+                <Self as crate::encoding::DistinguishedFieldEncoder<T>>::decode_field_distinguished(
+                    wire_type,
+                    value,
+                    buf,
+                    ctx,
+                )?;
+                if crate::encoding::value_traits::HasEmptyState::is_empty(value) {
+                    return Err(crate::DecodeError::new(crate::DecodeErrorKind::NotCanonical));
                 }
                 Ok(())
             }

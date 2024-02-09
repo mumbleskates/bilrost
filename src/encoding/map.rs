@@ -2,14 +2,16 @@ use bytes::{Buf, BufMut};
 
 use crate::encoding::value_traits::{DistinguishedMapping, Mapping};
 use crate::encoding::{
-    check_wire_type, encode_varint, encoded_len_varint, Capped, DecodeContext,
-    DistinguishedEncoder, DistinguishedValueEncoder, Encoder, FieldEncoder, NewForOverwrite,
-    TagMeasurer, TagWriter, ValueEncoder, WireType, Wiretyped,
+    encode_varint, encoded_len_varint, encoder_where_value_encoder, Capped, DecodeContext,
+    DistinguishedEncoder, DistinguishedValueEncoder, Encoder, NewForOverwrite, TagMeasurer,
+    TagWriter, ValueEncoder, WireType, Wiretyped,
 };
 use crate::DecodeError;
-use crate::DecodeErrorKind::{NotCanonical, Truncated, UnexpectedlyRepeated};
+use crate::DecodeErrorKind::Truncated;
 
 pub struct Map<KE, VE>(KE, VE);
+
+encoder_where_value_encoder!(Map<KE, VE>, with where clause (T: Mapping), with generics (KE, VE));
 
 /// Maps are always length delimited.
 impl<T, KE, VE> Wiretyped<T> for Map<KE, VE> {
@@ -116,64 +118,6 @@ where
             value
                 .insert_distinguished(key, val)
                 .map_err(DecodeError::new)?;
-        }
-        Ok(())
-    }
-}
-
-impl<M, KE, VE> Encoder<M> for Map<KE, VE>
-where
-    M: Mapping,
-    Self: ValueEncoder<M>,
-{
-    fn encode<B: BufMut + ?Sized>(tag: u32, value: &M, buf: &mut B, tw: &mut TagWriter) {
-        if !value.is_empty() {
-            Self::encode_field(tag, value, buf, tw);
-        }
-    }
-
-    fn encoded_len(tag: u32, value: &M, tm: &mut TagMeasurer) -> usize {
-        if !value.is_empty() {
-            Self::field_encoded_len(tag, value, tm)
-        } else {
-            0
-        }
-    }
-
-    fn decode<B: Buf + ?Sized>(
-        wire_type: WireType,
-        duplicated: bool,
-        value: &mut M,
-        buf: Capped<B>,
-        ctx: DecodeContext,
-    ) -> Result<(), DecodeError> {
-        check_wire_type(WireType::LengthDelimited, wire_type)?;
-        if duplicated {
-            return Err(DecodeError::new(UnexpectedlyRepeated));
-        }
-        Self::decode_value(value, buf, ctx)
-    }
-}
-
-impl<M, KE, VE> DistinguishedEncoder<M> for Map<KE, VE>
-where
-    M: DistinguishedMapping + Eq,
-    Self: DistinguishedValueEncoder<M> + Encoder<M>,
-{
-    fn decode_distinguished<B: Buf + ?Sized>(
-        wire_type: WireType,
-        duplicated: bool,
-        value: &mut M,
-        buf: Capped<B>,
-        ctx: DecodeContext,
-    ) -> Result<(), DecodeError> {
-        check_wire_type(WireType::LengthDelimited, wire_type)?;
-        if duplicated {
-            return Err(DecodeError::new(UnexpectedlyRepeated));
-        }
-        Self::decode_value_distinguished(value, buf, ctx)?;
-        if value.is_empty() {
-            return Err(DecodeError::new(NotCanonical));
         }
         Ok(())
     }

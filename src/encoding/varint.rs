@@ -1,11 +1,10 @@
 use crate::encoding::{
     encode_varint, encoded_len_varint, encoder_where_value_encoder, Buf, BufMut, Capped,
-    DecodeContext, DistinguishedEncoder, DistinguishedFieldEncoder, DistinguishedValueEncoder,
-    Encoder, EqualDefaultAlwaysEmpty, FieldEncoder, HasEmptyState, TagMeasurer, TagWriter,
-    ValueEncoder, WireType, Wiretyped,
+    DecodeContext, DistinguishedEncoder, DistinguishedValueEncoder, Encoder,
+    EqualDefaultAlwaysEmpty, TagMeasurer, TagWriter, ValueEncoder, WireType, Wiretyped,
 };
 use crate::DecodeError;
-use crate::DecodeErrorKind::{NotCanonical, OutOfDomainValue, UnexpectedlyRepeated};
+use crate::DecodeErrorKind::OutOfDomainValue;
 
 pub struct Varint;
 

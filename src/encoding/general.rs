@@ -13,12 +13,11 @@ use bytes::{Buf, BufMut, Bytes};
 use crate::encoding::{
     delegate_encoding, delegate_value_encoding, encode_varint, encoded_len_varint,
     encoder_where_value_encoder, Capped, DecodeContext, DistinguishedEncoder,
-    DistinguishedFieldEncoder, DistinguishedValueEncoder, Encoder, EqualDefaultAlwaysEmpty,
-    FieldEncoder, HasEmptyState, Map, PlainBytes, TagMeasurer, TagWriter, Unpacked, ValueEncoder,
-    WireType, Wiretyped,
+    DistinguishedValueEncoder, Encoder, EqualDefaultAlwaysEmpty, Map, PlainBytes, TagMeasurer,
+    TagWriter, Unpacked, ValueEncoder, WireType, Wiretyped,
 };
 use crate::message::{merge, merge_distinguished, RawDistinguishedMessage, RawMessage};
-use crate::DecodeErrorKind::{InvalidValue, NotCanonical, UnexpectedlyRepeated};
+use crate::DecodeErrorKind::InvalidValue;
 use crate::{Blob, DecodeError};
 
 pub struct General;
