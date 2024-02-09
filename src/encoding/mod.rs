@@ -1150,6 +1150,9 @@ macro_rules! delegate_value_encoding {
 }
 pub(crate) use delegate_value_encoding;
 
+/// Most kinds of encoder want to act as field encoders for bare values in any situation where they
+/// also implement value encoding. Only a couple encoders want to do anything fancy, like accepting
+/// alternate wire-types in expedient mode.
 macro_rules! encoder_where_value_encoder {
     (
         $encoder:ty
