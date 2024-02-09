@@ -12,10 +12,10 @@ use crate::DecodeErrorKind::Truncated;
 
 pub struct Fixed;
 
+encoder_where_value_encoder!(Fixed);
+
 delegate_encoding!(delegate from (Fixed) to (crate::encoding::Unpacked<Fixed>) for type (Vec<T>)
     including distinguished with generics (T));
-
-encoder_where_value_encoder!(Fixed);
 
 /// Macros which emit implementations for fixed width numeric encoding.
 macro_rules! fixed_width_common {
