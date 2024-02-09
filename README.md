@@ -263,23 +263,28 @@ encoded values. Most of the time, this is what is desired.
 
 Bilrost structs can encode fields with a wide variety of types:
 
-| Encoder              | Value type             | Encoded representation |
-|----------------------|------------------------|------------------------|
-| `general` & `fixed`  | `f32`, `u32`, `i32`    | fixed-size 32 bits     |
-| `general` & `fixed`  | `f64`, `u64`, `i64`    | fixed-size 64 bits     |
-| `general` & `varint` | `u64`, `u32`, `u16`    | varint                 |
-| `general` & `varint` | `i64`, `i32`, `i16`    | varint                 |
-| `general` & `varint` | `bool`                 | varint                 |
-| `general`            | derived `Enumeration`* | varint                 |
-| `general`            | `String`**             | length-delimited       |
-| `general`            | derived `Message`      | length-delimited       |
-| `varint`             | `u8`, `i8`             | varint                 |
-| `plainbytes`         | `Vec<u8>`**            | length-delimited       |
+| Encoder              | Value type             | Encoded representation | Distinguished |
+|----------------------|------------------------|------------------------|---------------|
+| `general` & `fixed`  | `f32`                  | fixed-size 32 bits     | no            |
+| `general` & `fixed`  | `u32`, `i32`           | fixed-size 32 bits     | yes           |
+| `general` & `fixed`  | `f64`                  | fixed-size 64 bits     | no            |
+| `general` & `fixed`  | `u64`, `i64`           | fixed-size 64 bits     | yes           |
+| `general` & `varint` | `u64`, `u32`, `u16`    | varint                 | yes           |
+| `general` & `varint` | `i64`, `i32`, `i16`    | varint                 | yes           |
+| `general` & `varint` | `bool`                 | varint                 | yes           |
+| `general`            | derived `Enumeration`* | varint                 | yes           |
+| `general`            | `String`**             | length-delimited       | yes           |
+| `general`            | impl `Message`***      | length-delimited       | maybe         |
+| `varint`             | `u8`, `i8`             | varint                 | yes           |
+| `plainbytes`         | `Vec<u8>`**            | length-delimited       | yes           |
 
 *`Enumeration` types can be directly included if they implement `Default`;
 otherwise they must always be nested.
 
 **Alternative types are available! See below.
+
+***`Message` types inside `Box` still impl `Message`, with a covering impl;
+message types can nest recursively this way.
 
 Any of these types may be included directly in a Bilrost message struct. If that
 field's value is defaulted, no bytes will be emitted when it is encoded.
@@ -289,43 +294,64 @@ several different containers:
 
 <!-- TODO(widders): detail encoders and value-encoders -->
 
-| Encoder       | Value type              | Encoded representation                                                         | Re-nestable |
-|---------------|-------------------------|--------------------------------------------------------------------------------|-------------|
-| any encoder   | `Option<T>`             | identical; at least some bytes are always encoded if `Some`, nothing if `None` | no          |
-| `unpacked<E>` | `Vec<T>`, `BTreeSet<T>` | the same as encoder `E`, one field per value                                   | no          |
-| `unpacked`    | *                       | (the same as `unpacked<general>`)                                              | no          |
-| `packed<E>`   | `Vec<T>`, `BTreeSet<T>` | length-delimited, successively encoded with `E`                                | yes         |
-| `packed`      | *                       | (the same as `packed<general>`)                                                | yes         |
-| `map<KE, VE>` | `BTreeMap<K, V>`        | length-delimited, alternately encoded with `KE` and `VE`                       | yes         |
-| `general`     | `Vec<T>`, `BTreeSet<T>` | (the same as `unpacked`)                                                       | no          |
-| `general`     | `BTreeMap`              | (the same as `map<general, general>`)                                          | yes         |
+| Encoder       | Value type              | Encoded representation                                                         | Re-nestable | Distinguished      |
+|---------------|-------------------------|--------------------------------------------------------------------------------|-------------|--------------------|
+| any encoder   | `Option<T>`             | identical; at least some bytes are always encoded if `Some`, nothing if `None` | no          | when `T` is        |
+| `unpacked<E>` | `Vec<T>`, `BTreeSet<T>` | the same as encoder `E`, one field per value                                   | no          | when `T` is        |
+| `unpacked`    | *                       | (the same as `unpacked<general>`)                                              | no          | *                  |
+| `packed<E>`   | `Vec<T>`, `BTreeSet<T>` | length-delimited, successively encoded with `E`                                | yes         | when `T` is        |
+| `packed`      | *                       | (the same as `packed<general>`)                                                | yes         | *                  |
+| `map<KE, VE>` | `BTreeMap<K, V>`        | length-delimited, alternately encoded with `KE` and `VE`                       | yes         | when `K` & `V` are |
+| `general`     | `Vec<T>`, `BTreeSet<T>` | (the same as `unpacked`)                                                       | no          | *                  |
+| `general`     | `BTreeMap`              | (the same as `map<general, general>`)                                          | yes         | *                  |
 
 Many alternative types are also available for both scalar values and containers!
 
-| Value type | Alternative              | Supporting encoder | Feature to enable |
-|------------|--------------------------|--------------------|-------------------|
-| `Vec<u8>`  | `Blob`*                  | `general`          | (none)            |
-| `Vec<u8>`  | `Cow<[u8]>`              | `plainbytes`       | (none)            |
-| `Vec<u8>`  | `Bytes`                  | `general`          | (none)            |
-| `String`   | `Cow<str>`               | `general`          | (none)            |
-| `String`   | `bytestring::ByteString` | `general`          | "bytestring"      |
+| Value type   | Alternative               | Supporting encoder | Distinguished | Feature to enable |
+|--------------|---------------------------|--------------------|---------------|-------------------|
+| `Vec<u8>`    | `Blob`***                 | `general`          | yes           | (none)            |
+| `Vec<u8>`    | `Cow<[u8]>`               | `plainbytes`       | yes           | (none)            |
+| `Vec<u8>`    | `bytes::Bytes`*           | `general`          | yes           | (none)            |
+| `Vec<u8>`    | `[u8; N]`**               | `plainbytes`       | yes           | (none)            |
+| `u32`, `u64` | `[u8; 4]`, `[u8; 8]`**    | `fixed`            | yes           | (none)            |
+| `String`     | `Cow<str>`                | `general`          | yes           | (none)            |
+| `String`     | `bytestring::ByteString`* | `general`          | yes           | "bytestring"      |
 
-*`bilrost::Blob` is a transparent wrapper for `Vec<u8>` in that is a drop-in
+*When decoding from a `bytes::Bytes` object, both `bytes::Bytes` and
+`bytes::ByteString` have a zero-copy optimization and will reference the decoded
+buffer rather than copying. (This would also work for any other input type that
+has a zero-copy `bytes::Buf::copy_to_bytes()` optimization.)
+
+**Plain byte arrays, as you might expect, only accept one exact length of data;
+other lengths are considered invalid values.
+
+***`bilrost::Blob` is a transparent wrapper for `Vec<u8>` in that is a drop-in
 replacement in most situations and is supported by the default `general` encoder
 for maximum ease of use. If nothing but `Vec<u8>` will do, the `plainbytes`
 encoder will still encode a plain `Vec<u8>` as its bytes value.
 
-| Container type | Alternative              | Feature to enable |
-|----------------|--------------------------|-------------------|
-| `Vec<T>`       | `Cow<[T]>`               | (none)            |
-| `BTreeMap<T>`  | `HashMap<T>`*            | "std" (default)   |
-| `BTreeSet<T>`  | `HashSet<T>`*            | "std" (default)   |
-| `BTreeMap<T>`  | `hashbrown::HashMap<T>`* | "hashbrown"       |
-| `BTreeSet<T>`  | `hashbrown::HashSet<T>`* | "hashbrown"       |
+| Container type | Alternative               | Distinguished | Feature to enable |
+|----------------|---------------------------|---------------|-------------------|
+| `Vec<T>`       | `Cow<[T]>`                | when `T` is   | (none)            |
+| `Vec<T>`       | `smallvec::SmallVec<[T]>` | when `T` is   | "smallvec"        |
+| `Vec<T>`       | `thin_vec::ThinVec<[T]>`  | when `T` is   | "thin_vec"        |
+| `Vec<T>`       | `tinyvec::TinyVec<[T]>`   | when `T` is   | "tinyvec"         |
+| `BTreeMap<T>`  | `HashMap<T>`*             | no            | "std" (default)   |
+| `BTreeSet<T>`  | `HashSet<T>`*             | no            | "std" (default)   |
+| `BTreeMap<T>`  | `hashbrown::HashMap<T>`*  | no            | "hashbrown"       |
+| `BTreeSet<T>`  | `hashbrown::HashSet<T>`*  | no            | "hashbrown"       |
 
 *Hash-table-based maps and sets are implemented, but are not compatible with
 distinguished encoding or decoding. If distinguished encoding is required, a
 container which stores its values in sorted order must be used.
+
+While it's possible to nest and recursively nest `Message` types with `Box`,
+`Vec`, etc., `bilrost` does not do any kind of runtime check to avoid infinite
+recursion in the event of a cycle. The chosen supported types and containers
+should not be able to become *infinite* as implemented, but if the situation
+were induced to happen anyway it would not end well. (Note that creative usage
+of `Cow<[T]>` can create messages that encode absurdly large, but the borrow
+checker keeps them from becoming infinite mathematically if not practically.)
 
 #### Compatible Widening
 
