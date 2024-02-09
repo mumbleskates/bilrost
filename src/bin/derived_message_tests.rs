@@ -16,6 +16,7 @@ mod derived_message_tests {
     use alloc::vec::Vec;
     use core::default::Default;
     use core::fmt::Debug;
+    use core::iter;
 
     use itertools::{repeat_n, Itertools};
 
@@ -66,6 +67,15 @@ mod derived_message_tests {
     impl IntoOpaqueMessage for OpaqueMessage {
         fn into_opaque_message(self) -> OpaqueMessage {
             self
+        }
+    }
+
+    impl<I, F> IntoOpaqueMessage for iter::Map<I, F>
+    where
+        Self: Iterator<Item = (u32, OV)>,
+    {
+        fn into_opaque_message(self) -> OpaqueMessage {
+            self.collect()
         }
     }
 
@@ -474,40 +484,34 @@ mod derived_message_tests {
     #[test]
     fn parsing_varints() {
         #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
-        struct Foo(u32, i32, u64, i64);
-        // TODO(widders): u16, i16, u8, i8
+        struct Foo(bool, u8, i8, u16, i16, u32, i32, u64, i64);
 
         assert::decodes_distinguished([], Foo::default());
         assert::decodes_distinguished(
-            [
-                (1, OV::Varint(1)),
-                (2, OV::Varint(1)),
-                (3, OV::Varint(1)),
-                (4, OV::Varint(1)),
-            ],
-            Foo(1, -1, 1, -1),
+            (1..=9).map(|tag| (tag, OV::Varint(1))),
+            Foo(true, 1, -1, 1, -1, 1, -1, 1, -1),
         );
-        for fixed_value in [
+        for field in (1..=9).cartesian_product([
             // Currently it is not supported to parse fixed-width values into varint fields.
-            [(1, OV::fixed_u32(1))],
-            [(2, OV::fixed_u32(1))],
-            [(3, OV::fixed_u32(1))],
-            [(4, OV::fixed_u32(1))],
-            [(1, OV::fixed_u64(1))],
-            [(2, OV::fixed_u64(1))],
-            [(3, OV::fixed_u64(1))],
-            [(4, OV::fixed_u64(1))],
+            OV::fixed_u32(1),
+            OV::fixed_u64(1),
             // Length-delimited values don't represent integers either.
-            [(1, OV::string("1"))],
-            [(2, OV::string("1"))],
-            [(3, OV::string("1"))],
-            [(4, OV::string("1"))],
-        ] {
-            assert::never_decodes::<Foo>(fixed_value, WrongWireType);
+            OV::string("1"),
+        ]) {
+            assert::never_decodes::<Foo>([field], WrongWireType);
         }
-        for out_of_range in [u32::MAX as u64 + 1, 1_000_000_000_000, u64::MAX] {
-            assert::never_decodes::<Foo>([(1, OV::u64(out_of_range))], OutOfDomainValue);
-            assert::never_decodes::<Foo>([(2, OV::u64(out_of_range))], OutOfDomainValue);
+        for (tag, out_of_range) in [
+            (1, 2),
+            (2, 256),
+            (3, 256),
+            (4, 65536),
+            (5, 65536),
+            (6, 1 << 32),
+            (7, 1 << 32),
+        ] {
+            assert::never_decodes::<Foo>([(tag, OV::u64(out_of_range))], OutOfDomainValue);
+            let should_fit = [(tag, OV::u64(out_of_range - 1))];
+            assert::decodes_distinguished(&should_fit, Foo::from_opaque(&should_fit));
         }
     }
 
