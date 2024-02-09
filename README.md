@@ -43,7 +43,10 @@ TODO: fill out this outline for a better introduction
     * forwards and backwards compatibility as message types are extended
     * distinguished encoding
       * floating point values
-      * negative zero and why `ordered_float::NotNan` is not supported
+      * negative zero and why `ordered_float::NotNan` is not supported, nor
+       `decorum`
+      * https://github.com/protocolbuffers/protobuf/issues/7062 this has even 
+        been a pain point in protobuf. we are not making this mistake again
     * some semantics depend upon the types themselves, like defaults and
       maybe ordering
 
