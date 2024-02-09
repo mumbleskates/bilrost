@@ -5,9 +5,10 @@ use core::ops::Deref;
 use bytes::{Buf, BufMut};
 
 use crate::encoding::{
-    delegate_encoding, encode_varint, encoded_len_varint, Capped, DecodeContext,
-    DistinguishedEncoder, DistinguishedFieldEncoder, DistinguishedValueEncoder, Encoder,
-    FieldEncoder, HasEmptyState, TagMeasurer, TagWriter, ValueEncoder, WireType, Wiretyped,
+    delegate_encoding, encode_varint, encoded_len_varint, encoder_where_value_encoder, Capped,
+    DecodeContext, DistinguishedEncoder, DistinguishedFieldEncoder, DistinguishedValueEncoder,
+    Encoder, FieldEncoder, HasEmptyState, TagMeasurer, TagWriter, ValueEncoder, WireType,
+    Wiretyped,
 };
 use crate::DecodeError;
 use crate::DecodeErrorKind::{InvalidValue, NotCanonical, UnexpectedlyRepeated};
@@ -19,65 +20,7 @@ use crate::DecodeErrorKind::{InvalidValue, NotCanonical, UnexpectedlyRepeated};
 /// `Vec<u8>`.
 pub struct PlainBytes;
 
-impl<T> Encoder<T> for PlainBytes
-where
-    PlainBytes: ValueEncoder<T>,
-    T: HasEmptyState,
-{
-    #[inline]
-    fn encode<B: BufMut + ?Sized>(tag: u32, value: &T, buf: &mut B, tw: &mut TagWriter) {
-        if !value.is_empty() {
-            Self::encode_field(tag, value, buf, tw);
-        }
-    }
-
-    #[inline]
-    fn encoded_len(tag: u32, value: &T, tm: &mut TagMeasurer) -> usize {
-        if !value.is_empty() {
-            Self::field_encoded_len(tag, value, tm)
-        } else {
-            0
-        }
-    }
-
-    #[inline]
-    fn decode<B: Buf + ?Sized>(
-        wire_type: WireType,
-        duplicated: bool,
-        value: &mut T,
-        buf: Capped<B>,
-        ctx: DecodeContext,
-    ) -> Result<(), DecodeError> {
-        if duplicated {
-            return Err(DecodeError::new(UnexpectedlyRepeated));
-        }
-        Self::decode_field(wire_type, value, buf, ctx)
-    }
-}
-
-impl<T> DistinguishedEncoder<T> for PlainBytes
-where
-    PlainBytes: DistinguishedValueEncoder<T> + Encoder<T>,
-    T: Eq + HasEmptyState,
-{
-    #[inline]
-    fn decode_distinguished<B: Buf + ?Sized>(
-        wire_type: WireType,
-        duplicated: bool,
-        value: &mut T,
-        buf: Capped<B>,
-        ctx: DecodeContext,
-    ) -> Result<(), DecodeError> {
-        if duplicated {
-            return Err(DecodeError::new(UnexpectedlyRepeated));
-        }
-        Self::decode_field_distinguished(wire_type, value, buf, ctx)?;
-        if value.is_empty() {
-            return Err(DecodeError::new(NotCanonical));
-        }
-        Ok(())
-    }
-}
+encoder_where_value_encoder!(PlainBytes);
 
 impl Wiretyped<Vec<u8>> for PlainBytes {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
@@ -251,6 +194,7 @@ mod u8_array {
             WireType::LengthDelimited
         );
     }
+
     mod length_1 {
         use super::super::PlainBytes;
         use crate::encoding::test::check_type_test;
@@ -262,6 +206,7 @@ mod u8_array {
             WireType::LengthDelimited
         );
     }
+
     mod length_8 {
         use super::super::PlainBytes;
         use crate::encoding::test::check_type_test;
@@ -273,6 +218,7 @@ mod u8_array {
             WireType::LengthDelimited
         );
     }
+
     mod length_13 {
         use super::super::PlainBytes;
         use crate::encoding::test::check_type_test;

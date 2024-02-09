@@ -1,79 +1,18 @@
 use crate::encoding::{
-    encode_varint, encoded_len_varint, Buf, BufMut, Capped, DecodeContext, DistinguishedEncoder,
-    DistinguishedFieldEncoder, DistinguishedValueEncoder, Encoder, EqualDefaultAlwaysEmpty,
-    FieldEncoder, HasEmptyState, TagMeasurer, TagWriter, ValueEncoder, WireType, Wiretyped,
+    encode_varint, encoded_len_varint, encoder_where_value_encoder, Buf, BufMut, Capped,
+    DecodeContext, DistinguishedEncoder, DistinguishedFieldEncoder, DistinguishedValueEncoder,
+    Encoder, EqualDefaultAlwaysEmpty, FieldEncoder, HasEmptyState, TagMeasurer, TagWriter,
+    ValueEncoder, WireType, Wiretyped,
 };
 use crate::DecodeError;
 use crate::DecodeErrorKind::{NotCanonical, OutOfDomainValue, UnexpectedlyRepeated};
 
 pub struct Varint;
 
-/// General encodes plain values only when they are non-default.
-impl<T> Encoder<T> for Varint
-where
-    Varint: ValueEncoder<T>,
-    T: HasEmptyState,
-{
-    #[inline]
-    fn encode<B: BufMut + ?Sized>(tag: u32, value: &T, buf: &mut B, tw: &mut TagWriter) {
-        if !value.is_empty() {
-            Self::encode_field(tag, value, buf, tw);
-        }
-    }
-
-    #[inline]
-    fn encoded_len(tag: u32, value: &T, tm: &mut TagMeasurer) -> usize {
-        if !value.is_empty() {
-            Self::field_encoded_len(tag, value, tm)
-        } else {
-            0
-        }
-    }
-
-    #[inline]
-    fn decode<B: Buf + ?Sized>(
-        wire_type: WireType,
-        duplicated: bool,
-        value: &mut T,
-        buf: Capped<B>,
-        ctx: DecodeContext,
-    ) -> Result<(), DecodeError> {
-        if duplicated {
-            return Err(DecodeError::new(UnexpectedlyRepeated));
-        }
-        Self::decode_field(wire_type, value, buf, ctx)
-    }
-}
-
-/// General's distinguished encoding for plain values forbids encoding defaulted values. This
-/// includes directly-nested message types, which are not emitted when all their fields are default.
-impl<T> DistinguishedEncoder<T> for Varint
-where
-    Varint: DistinguishedValueEncoder<T> + Encoder<T>,
-    T: Eq + HasEmptyState,
-{
-    #[inline]
-    fn decode_distinguished<B: Buf + ?Sized>(
-        wire_type: WireType,
-        duplicated: bool,
-        value: &mut T,
-        buf: Capped<B>,
-        ctx: DecodeContext,
-    ) -> Result<(), DecodeError> {
-        if duplicated {
-            return Err(DecodeError::new(UnexpectedlyRepeated));
-        }
-        Self::decode_field_distinguished(wire_type, value, buf, ctx)?;
-        if value.is_empty() {
-            return Err(DecodeError::new(NotCanonical));
-        }
-        Ok(())
-    }
-}
+encoder_where_value_encoder!(Varint);
 
 /// Zig-zag encoding: These functions implement storing signed in unsigned integers by encoding the
 /// sign bit in the least significant bit.
-
 #[inline]
 fn i8_to_unsigned(value: i8) -> u8 {
     ((value << 1) ^ (value >> 7)) as u8

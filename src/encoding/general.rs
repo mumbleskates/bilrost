@@ -11,16 +11,19 @@ use std::collections::{HashMap, HashSet};
 use bytes::{Buf, BufMut, Bytes};
 
 use crate::encoding::{
-    delegate_encoding, delegate_value_encoding, encode_varint, encoded_len_varint, Capped,
-    DecodeContext, DistinguishedEncoder, DistinguishedFieldEncoder, DistinguishedValueEncoder,
-    Encoder, EqualDefaultAlwaysEmpty, FieldEncoder, HasEmptyState, Map, PlainBytes, TagMeasurer,
-    TagWriter, Unpacked, ValueEncoder, WireType, Wiretyped,
+    delegate_encoding, delegate_value_encoding, encode_varint, encoded_len_varint,
+    encoder_where_value_encoder, Capped, DecodeContext, DistinguishedEncoder,
+    DistinguishedFieldEncoder, DistinguishedValueEncoder, Encoder, EqualDefaultAlwaysEmpty,
+    FieldEncoder, HasEmptyState, Map, PlainBytes, TagMeasurer, TagWriter, Unpacked, ValueEncoder,
+    WireType, Wiretyped,
 };
 use crate::message::{merge, merge_distinguished, RawDistinguishedMessage, RawMessage};
 use crate::DecodeErrorKind::{InvalidValue, NotCanonical, UnexpectedlyRepeated};
 use crate::{Blob, DecodeError};
 
 pub struct General;
+
+encoder_where_value_encoder!(General);
 
 // General implements unpacked encodings by default, but only for select collection types. Other
 // implementers of the `Collection` trait must use Unpacked or Packed.
@@ -66,69 +69,6 @@ delegate_value_encoding!(delegate from (General) to (Map<General, General>)
     for type (hashbrown::HashMap<K, V>)
     with where clause (K: Eq + Hash)
     with generics (K, V));
-
-/// General encodes plain values only when they are non-default.
-impl<T> Encoder<T> for General
-where
-    General: ValueEncoder<T>,
-    T: HasEmptyState,
-{
-    #[inline]
-    fn encode<B: BufMut + ?Sized>(tag: u32, value: &T, buf: &mut B, tw: &mut TagWriter) {
-        if !value.is_empty() {
-            Self::encode_field(tag, value, buf, tw);
-        }
-    }
-
-    #[inline]
-    fn encoded_len(tag: u32, value: &T, tm: &mut TagMeasurer) -> usize {
-        if !value.is_empty() {
-            Self::field_encoded_len(tag, value, tm)
-        } else {
-            0
-        }
-    }
-
-    #[inline]
-    fn decode<B: Buf + ?Sized>(
-        wire_type: WireType,
-        duplicated: bool,
-        value: &mut T,
-        buf: Capped<B>,
-        ctx: DecodeContext,
-    ) -> Result<(), DecodeError> {
-        if duplicated {
-            return Err(DecodeError::new(UnexpectedlyRepeated));
-        }
-        Self::decode_field(wire_type, value, buf, ctx)
-    }
-}
-
-/// General's distinguished encoding for plain values forbids encoding defaulted values. This
-/// includes directly-nested message types, which are not emitted when all their fields are default.
-impl<T> DistinguishedEncoder<T> for General
-where
-    General: DistinguishedValueEncoder<T> + Encoder<T>,
-    T: Eq + HasEmptyState,
-{
-    #[inline]
-    fn decode_distinguished<B: Buf + ?Sized>(
-        wire_type: WireType,
-        duplicated: bool,
-        value: &mut T,
-        buf: Capped<B>,
-        ctx: DecodeContext,
-    ) -> Result<(), DecodeError> {
-        if duplicated {
-            return Err(DecodeError::new(UnexpectedlyRepeated));
-        }
-        Self::decode_field_distinguished(wire_type, value, buf, ctx)?;
-        if value.is_empty() {
-            return Err(DecodeError::new(NotCanonical));
-        }
-        Ok(())
-    }
-}
 
 // General encodes bool and integers as varints.
 delegate_value_encoding!(delegate from (General) to (crate::encoding::Varint)

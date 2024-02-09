@@ -4,9 +4,9 @@ use bytes::{Buf, BufMut};
 
 use crate::encoding::value_traits::HasEmptyState;
 use crate::encoding::{
-    delegate_encoding, Capped, DecodeContext, DistinguishedEncoder, DistinguishedFieldEncoder,
-    DistinguishedValueEncoder, Encoder, FieldEncoder, TagMeasurer, TagWriter, ValueEncoder,
-    WireType, Wiretyped,
+    delegate_encoding, encoder_where_value_encoder, Capped, DecodeContext, DistinguishedEncoder,
+    DistinguishedFieldEncoder, DistinguishedValueEncoder, Encoder, FieldEncoder, TagMeasurer,
+    TagWriter, ValueEncoder, WireType, Wiretyped,
 };
 use crate::DecodeError;
 use crate::DecodeErrorKind::{NotCanonical, Truncated, UnexpectedlyRepeated};
@@ -15,6 +15,8 @@ pub struct Fixed;
 
 delegate_encoding!(delegate from (Fixed) to (crate::encoding::Unpacked<Fixed>) for type (Vec<T>)
     including distinguished with generics (T));
+
+encoder_where_value_encoder!(Fixed);
 
 /// Macros which emit implementations for fixed width numeric encoding.
 macro_rules! fixed_width_common {
@@ -76,58 +78,6 @@ macro_rules! fixed_width_int {
             }
         }
 
-        impl Encoder<$ty> for Fixed {
-            #[inline]
-            fn encode<B: BufMut + ?Sized>(tag: u32, value: &$ty, buf: &mut B, tw: &mut TagWriter) {
-                if *value != 0 {
-                    Self::encode_field(tag, value, buf, tw);
-                }
-            }
-
-            #[inline]
-            fn encoded_len(tag: u32, value: &$ty, tm: &mut TagMeasurer) -> usize {
-                if *value != 0 {
-                    Self::field_encoded_len(tag, value, tm)
-                } else {
-                    0
-                }
-            }
-
-            #[inline]
-            fn decode<B: Buf + ?Sized>(
-                wire_type: WireType,
-                duplicated: bool,
-                value: &mut $ty,
-                buf: Capped<B>,
-                ctx: DecodeContext,
-            ) -> Result<(), DecodeError> {
-                if duplicated {
-                    return Err(DecodeError::new(UnexpectedlyRepeated));
-                }
-                Self::decode_field(wire_type, value, buf, ctx)
-            }
-        }
-
-        impl DistinguishedEncoder<$ty> for Fixed {
-            #[inline]
-            fn decode_distinguished<B: Buf + ?Sized>(
-                wire_type: WireType,
-                duplicated: bool,
-                value: &mut $ty,
-                buf: Capped<B>,
-                ctx: DecodeContext,
-            ) -> Result<(), DecodeError> {
-                if duplicated {
-                    return Err(DecodeError::new(UnexpectedlyRepeated));
-                }
-                Self::decode_field_distinguished(wire_type, value, buf, ctx)?;
-                if *value == 0 {
-                    return Err(DecodeError::new(NotCanonical));
-                }
-                Ok(())
-            }
-        }
-
         #[cfg(test)]
         mod $test_name {
             use crate::encoding::Fixed;
@@ -158,38 +108,6 @@ macro_rules! fixed_width_float {
             fn is_empty(&self) -> bool {
                 // Preserve -0.0. This is actually the original motivation for `HasEmptyState`.
                 self.to_bits() == 0
-            }
-        }
-
-        impl Encoder<$ty> for Fixed {
-            #[inline]
-            fn encode<B: BufMut + ?Sized>(tag: u32, value: &$ty, buf: &mut B, tw: &mut TagWriter) {
-                if !value.is_empty() {
-                    Self::encode_field(tag, value, buf, tw);
-                }
-            }
-
-            #[inline]
-            fn encoded_len(tag: u32, value: &$ty, tm: &mut TagMeasurer) -> usize {
-                if !value.is_empty() {
-                    Self::field_encoded_len(tag, value, tm)
-                } else {
-                    0
-                }
-            }
-
-            #[inline]
-            fn decode<B: Buf + ?Sized>(
-                wire_type: WireType,
-                duplicated: bool,
-                value: &mut $ty,
-                buf: Capped<B>,
-                ctx: DecodeContext,
-            ) -> Result<(), DecodeError> {
-                if duplicated {
-                    return Err(DecodeError::new(UnexpectedlyRepeated));
-                }
-                Self::decode_field(wire_type, value, buf, ctx)
             }
         }
 

@@ -1150,6 +1150,74 @@ macro_rules! delegate_value_encoding {
 }
 pub(crate) use delegate_value_encoding;
 
+macro_rules! encoder_where_value_encoder {
+    ($encoder:ty) => {
+        /// Encodes plain values only when they are non-default.
+        impl<T> Encoder<T> for $encoder
+        where
+            $encoder: ValueEncoder<T>,
+            T: HasEmptyState,
+        {
+            #[inline]
+            fn encode<B: BufMut + ?Sized>(tag: u32, value: &T, buf: &mut B, tw: &mut TagWriter) {
+                if !value.is_empty() {
+                    Self::encode_field(tag, value, buf, tw);
+                }
+            }
+
+            #[inline]
+            fn encoded_len(tag: u32, value: &T, tm: &mut TagMeasurer) -> usize {
+                if !value.is_empty() {
+                    Self::field_encoded_len(tag, value, tm)
+                } else {
+                    0
+                }
+            }
+
+            #[inline]
+            fn decode<B: Buf + ?Sized>(
+                wire_type: WireType,
+                duplicated: bool,
+                value: &mut T,
+                buf: Capped<B>,
+                ctx: DecodeContext,
+            ) -> Result<(), DecodeError> {
+                if duplicated {
+                    return Err(DecodeError::new(UnexpectedlyRepeated));
+                }
+                Self::decode_field(wire_type, value, buf, ctx)
+            }
+        }
+
+        /// Distinguished encoding for plain values forbids encoding defaulted values. This includes
+        /// directly-nested message types, which are not emitted when all their fields are default.
+        impl<T> DistinguishedEncoder<T> for $encoder
+        where
+            $encoder: DistinguishedValueEncoder<T> + Encoder<T>,
+            T: Eq + HasEmptyState,
+        {
+            #[inline]
+            fn decode_distinguished<B: Buf + ?Sized>(
+                wire_type: WireType,
+                duplicated: bool,
+                value: &mut T,
+                buf: Capped<B>,
+                ctx: DecodeContext,
+            ) -> Result<(), DecodeError> {
+                if duplicated {
+                    return Err(DecodeError::new(UnexpectedlyRepeated));
+                }
+                Self::decode_field_distinguished(wire_type, value, buf, ctx)?;
+                if value.is_empty() {
+                    return Err(DecodeError::new(NotCanonical));
+                }
+                Ok(())
+            }
+        }
+    };
+}
+pub(crate) use encoder_where_value_encoder;
+
 #[cfg(test)]
 mod test {
     use alloc::collections::{BTreeMap, BTreeSet};

@@ -27,6 +27,7 @@ pub trait NewForOverwrite {
     /// Produces a new Self value to be overwritten.
     fn new_for_overwrite() -> Self;
 }
+
 impl<T> NewForOverwrite for T
 where
     T: Default,
@@ -53,6 +54,7 @@ pub trait HasEmptyState {
 
 /// Marker trait indicating that the `Default` value for a type is always considered empty.
 pub trait EqualDefaultAlwaysEmpty {}
+
 impl<T> HasEmptyState for T
 where
     T: EqualDefaultAlwaysEmpty + Default + PartialEq,
@@ -142,9 +144,9 @@ impl<T> HasEmptyState for Vec<T> {
 impl<T> Collection for Vec<T> {
     type Item = T;
     type RefIter<'a> = core::slice::Iter<'a, T>
-    where
-        T: 'a,
-        Self: 'a;
+        where
+            T: 'a,
+            Self: 'a;
 
     #[inline]
     fn len(&self) -> usize {
@@ -199,9 +201,9 @@ where
 {
     type Item = T;
     type RefIter<'a> = core::slice::Iter<'a, T>
-    where
-        T: 'a,
-        Self: 'a;
+        where
+            T: 'a,
+            Self: 'a;
     fn len(&self) -> usize {
         <[T]>::len(self)
     }
@@ -248,9 +250,9 @@ impl<T, A: smallvec::Array<Item = T>> HasEmptyState for smallvec::SmallVec<A> {
 impl<T, A: smallvec::Array<Item = T>> Collection for smallvec::SmallVec<A> {
     type Item = T;
     type RefIter<'a> = core::slice::Iter<'a, T>
-    where
-        T: 'a,
-        Self: 'a;
+        where
+            T: 'a,
+            Self: 'a;
 
     #[inline]
     fn len(&self) -> usize {
@@ -302,9 +304,9 @@ impl<T> HasEmptyState for thin_vec::ThinVec<T> {
 impl<T> Collection for thin_vec::ThinVec<T> {
     type Item = T;
     type RefIter<'a> = core::slice::Iter<'a, T>
-    where
-        T: 'a,
-        Self: 'a;
+        where
+            T: 'a,
+            Self: 'a;
 
     #[inline]
     fn len(&self) -> usize {
@@ -356,9 +358,9 @@ impl<T, A: tinyvec::Array<Item = T>> HasEmptyState for tinyvec::TinyVec<A> {
 impl<T, A: tinyvec::Array<Item = T>> Collection for tinyvec::TinyVec<A> {
     type Item = T;
     type RefIter<'a> = core::slice::Iter<'a, T>
-    where
-        T: 'a,
-        Self: 'a;
+        where
+            T: 'a,
+            Self: 'a;
 
     #[inline]
     fn len(&self) -> usize {
@@ -412,9 +414,9 @@ where
 {
     type Item = T;
     type RefIter<'a> = btree_set::Iter<'a, T>
-    where
-        Self::Item: 'a,
-        Self: 'a;
+        where
+            Self::Item: 'a,
+            Self: 'a;
 
     #[inline]
     fn len(&self) -> usize {
@@ -441,9 +443,9 @@ where
     T: Ord,
 {
     type ReverseIter<'a> = core::iter::Rev<btree_set::Iter<'a, T>>
-    where
-        Self::Item: 'a,
-        Self: 'a;
+        where
+            Self::Item: 'a,
+            Self: 'a;
 
     #[inline]
     fn reversed(&self) -> Self::ReverseIter<'_> {
@@ -479,9 +481,9 @@ where
 {
     type Item = T;
     type RefIter<'a> = hash_set::Iter<'a, T>
-    where
-        Self::Item: 'a,
-        Self: 'a;
+        where
+            Self::Item: 'a,
+            Self: 'a;
 
     #[inline]
     fn len(&self) -> usize {
@@ -517,9 +519,9 @@ where
 {
     type Item = T;
     type RefIter<'a> = hashbrown::hash_set::Iter<'a, T>
-    where
-        Self::Item: 'a,
-        Self: 'a;
+        where
+            Self::Item: 'a,
+            Self: 'a;
 
     #[inline]
     fn len(&self) -> usize {
@@ -554,10 +556,10 @@ where
     type Key = K;
     type Value = V;
     type RefIter<'a> = btree_map::Iter<'a, K, V>
-    where
-        K: 'a,
-        V: 'a,
-        Self: 'a;
+        where
+            K: 'a,
+            V: 'a,
+            Self: 'a;
 
     #[inline]
     fn len(&self) -> usize {
@@ -586,10 +588,10 @@ where
     K: Ord,
 {
     type ReverseIter<'a> = core::iter::Rev<btree_map::Iter<'a, K, V>>
-    where
-        K: 'a,
-        V: 'a,
-        Self: 'a;
+        where
+            K: 'a,
+            V: 'a,
+            Self: 'a;
 
     #[inline]
     fn reversed(&self) -> Self::ReverseIter<'_> {
@@ -629,10 +631,10 @@ where
     type Key = K;
     type Value = V;
     type RefIter<'a> = hash_map::Iter<'a, K, V>
-    where
-        K: 'a,
-        V: 'a,
-        Self: 'a;
+        where
+            K: 'a,
+            V: 'a,
+            Self: 'a;
 
     #[inline]
     fn len(&self) -> usize {
@@ -671,10 +673,10 @@ where
     type Key = K;
     type Value = V;
     type RefIter<'a> = hashbrown::hash_map::Iter<'a, K, V>
-    where
-        K: 'a,
-        V: 'a,
-        Self: 'a;
+        where
+            K: 'a,
+            V: 'a,
+            Self: 'a;
 
     #[inline]
     fn len(&self) -> usize {
