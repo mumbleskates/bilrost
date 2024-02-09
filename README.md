@@ -207,6 +207,8 @@ encoding requires `Eq` and its semantics of each field, oneof, and message type.
     * no reflection yet
     * no DSL for specifying schemas yet
     * no support across other languages yet
+    * no text format (use `Debug`)
+    * no RPC integrations (yet!)
 
 ## Encoding specification
 
