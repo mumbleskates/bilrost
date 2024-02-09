@@ -886,6 +886,8 @@ mod derived_message_tests {
         );
     }
 
+    // TODO(widders): [u8; N]
+
     // Repeated field tests
 
     #[test]

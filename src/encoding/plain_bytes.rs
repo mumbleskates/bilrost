@@ -237,3 +237,51 @@ impl<const N: usize> DistinguishedValueEncoder<[u8; N]> for PlainBytes {
 }
 
 // TODO(widders): ArrayVec
+
+#[cfg(test)]
+mod u8_array {
+    mod length_0 {
+        use super::super::PlainBytes;
+        use crate::encoding::test::check_type_test;
+        check_type_test!(PlainBytes, expedient, [u8; 0], WireType::LengthDelimited);
+        check_type_test!(
+            PlainBytes,
+            distinguished,
+            [u8; 0],
+            WireType::LengthDelimited
+        );
+    }
+    mod length_1 {
+        use super::super::PlainBytes;
+        use crate::encoding::test::check_type_test;
+        check_type_test!(PlainBytes, expedient, [u8; 1], WireType::LengthDelimited);
+        check_type_test!(
+            PlainBytes,
+            distinguished,
+            [u8; 1],
+            WireType::LengthDelimited
+        );
+    }
+    mod length_8 {
+        use super::super::PlainBytes;
+        use crate::encoding::test::check_type_test;
+        check_type_test!(PlainBytes, expedient, [u8; 8], WireType::LengthDelimited);
+        check_type_test!(
+            PlainBytes,
+            distinguished,
+            [u8; 8],
+            WireType::LengthDelimited
+        );
+    }
+    mod length_13 {
+        use super::super::PlainBytes;
+        use crate::encoding::test::check_type_test;
+        check_type_test!(PlainBytes, expedient, [u8; 13], WireType::LengthDelimited);
+        check_type_test!(
+            PlainBytes,
+            distinguished,
+            [u8; 13],
+            WireType::LengthDelimited
+        );
+    }
+}
