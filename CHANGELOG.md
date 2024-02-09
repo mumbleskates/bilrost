@@ -14,6 +14,9 @@
   and `i8`. `general` will not support one-byte integers, because this makes it
   too easy to accidentally spell a completely unintended encoding of `Vec<u8>`;
   encodings for collections of bytes like this will remain explicit.
+* Added support for `[u8; N]` with the `plainbytes` encoder, which only accepts
+  values of the correct length.
+* Added support for `[u8; 4]` and `[u8; 8]` with the `fixed` encoder.
 
 ### Fixes
 
@@ -23,6 +26,9 @@
   from/into anyway and those can be written elsewhere.
 
 ### Cleanups
+
+* Deduplicated implementations of `Encoder` and `DistinguishedEncoder` that
+  blanketed all implementation's of those encoders' value-encodable types.
 
 ## v0.1000.0
 
