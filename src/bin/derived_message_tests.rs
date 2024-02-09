@@ -475,6 +475,7 @@ mod derived_message_tests {
     fn parsing_varints() {
         #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
         struct Foo(u32, i32, u64, i64);
+        // TODO(widders): u16, i16, u8, i8
 
         assert::decodes_distinguished([], Foo::default());
         assert::decodes_distinguished(
