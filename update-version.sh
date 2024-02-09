@@ -24,7 +24,7 @@ VERSION_MATCHER="([a-z0-9\\.-]+)"
 BILROST_CRATE_MATCHER="(bilrost|bilrost-[a-z]+)"
 
 # Update the README.md.
-sed -i -E "s/version = \"${VERSION_MATCHER}\"/version = \"${MINOR}\"/" "${DIR}/README.md"
+sed -i -E "s/(version|bilrost) = \"${VERSION_MATCHER}\"/\1 = \"${MINOR}\"/" "${DIR}/README.md"
 
 # Update html_root_url attributes.
 sed -i -E "s~html_root_url = \"https://docs\.rs/${BILROST_CRATE_MATCHER}/${VERSION_MATCHER}\"~html_root_url = \"https://docs.rs/\1/${VERSION}\"~" \

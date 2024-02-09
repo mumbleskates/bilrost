@@ -42,6 +42,8 @@ TODO: fill out this outline for a better introduction
     * tagged fields
     * forwards and backwards compatibility as message types are extended
     * distinguished encoding
+      * floating point values
+      * negative zero and why `ordered_float::NotNan` is not supported
     * some semantics depend upon the types themselves, like defaults and
       maybe ordering
 
@@ -63,12 +65,138 @@ TODO: fill out this outline for a better introduction
 
 ## Using the library
 
-* using the library
-    * how to derive
-        * field annotations
-    * types that work with `bilrost`
-    * encoders
-    * custom encoders
+[Changelog](./CHANGELOG.md)
+
+### Getting started
+
+To use `bilrost`, first add it as a dependency in `Cargo.toml`, either with
+`cargo add bilrost` or manually:
+
+```toml
+bilrost = "0.1001.0-dev"
+```
+
+The `bilrost` crate has several features:
+
+* "std" (default): provides support for `HashMap` and `HashSet`.
+* "derive" (default): includes the `bilrost-derive` crate and re-exports its
+  derive macros. It's unlikely this should ever be disabled if you are
+  using `bilrost` normally.
+* "detailed-errors" (default): the decode error type returned by messages will
+  have more information on the path to the exact field in the decoded data that
+  encountered an error. With this disabled errors are more opaque, but may be
+  smaller and faster.
+* "no-recursion-limit": removes the recursion limit designed to keep data from
+  nesting too deeply.
+* "extended-diagnostics": with a small added dependency, attempts to provide
+  better compile-time diagnostics when derives and derived implementations don't
+  work. Somewhat experimental.
+* "opaque": enables `bilrost::encoding::opaque::{OpaqueMessage, OpaqueValue}`
+  which can decode, represent, and reencode *any* potentially valid `bilrost`
+  data.
+* "bytestring": provides first-party support for `bytestring::Bytestring`
+* "hashbrown": provides first-party support for `hashbrown::{HashMap, HashSet}`
+* "smallvec": provides first-party support for `smallvec::SmallVec`
+* "thin-vec": provides first-party support for `thin-vec::ThinVec`
+* "tinyvec": provides first-party support for `tinyvec::TinyVec`
+
+### `no_std` support
+
+With the "std" feature disabled, `bilrost` has full `no_std` support.
+`no_std`-compatible hash-maps are still available if desired by enabling the
+"hashbrown" feature.
+
+### Derive macros
+
+You can then import and use its traits and derive macros. The main three are:
+
+* `Message`: This is the basic working unit. Derive this for structs to enable
+  encoding and decoding them to and from binary data.
+* `Enumeration`: This is a derive only, not a trait, which implements support
+  for encoding an enum type with `bilrost`. The enum must have no fields, and
+  each of its variants will correspond to a different `u32` value that will
+  represent it in the encoding.
+* `Oneof`: This is a trait and derive macro for enumerations representing
+  mutually exclusive fields within a message struct. Each variant must have one
+  field, and each variant must have a unique field tag assigned to it, *both*
+  within the oneof and within the message of which it is a part. Types
+  with `Oneof` derived do not have `bilrost` APIs useful to library users except
+  when they are included in a `Message` struct.
+
+#### Example derive macro applications
+
+If not otherwise specified, fields are tagged sequentially in the order they
+are specified in the struct, starting with `1`.
+
+You may skip tags which have been reserved, or where there are gaps between
+sequentially occurring tag values by specifying the tag number to skip to with
+the `tag` attribute on the first field after the gap. The following fields will
+be tagged sequentially starting from the next number.
+
+When defining message types for interoperation, or when fields are likely to
+be added, removed, or shuffled, it may be good practice to explicitly specify
+the tags of all fields in a struct instead, but this is not mandatory.
+
+<!-- TODO(widders): fix this example -->
+
+```
+use bilrost;
+use bilrost::{Enumeration, Message};
+
+#[derive(Clone, PartialEq, Message)]
+struct Person {
+    #[bilrost(tag = 1)]
+    pub id: String, // tag=1
+    // NOTE: Old "name" field has been removed
+    // pub name: String, // tag=2 (Removed)
+    #[bilrost(6)]
+    pub given_name: String, // tag=6
+    pub family_name: String, // tag=7
+    pub formatted_name: String, // tag=8
+    #[bilrost(tag = "3")]
+    pub age: u32, // tag=3
+    pub height: u32, // tag=4
+    #[bilrost(enumeration(Gender))]
+    pub gender: u32, // tag=5
+    // NOTE: Skip to less commonly occurring fields
+    #[bilrost(tag(16))]
+    pub name_prefix: String, // tag=16  (eg. mr/mrs/ms)
+    pub name_suffix: String, // tag=17  (eg. jr/esq)
+    pub maiden_name: String, // tag=18
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Enumeration)]
+#[non_exhaustive]
+pub enum Gender {
+    #[default]
+    Unknown = 0,
+    Female = 1,
+    Male = 2,
+    Nonbinary = 3,
+}
+```
+
+#### Oneof Fields
+
+Oneof fields are enums with their own derive macro, which represent multiple
+fields in the message, only one of which may be present in a valid message.
+
+* example usage
+* with & without empty variant
+
+#### Encoders and other attributes
+
+* different encoders and what they do
+* "enumeration" helpers
+* "recurses"
+
+### Distinguished derive macros
+
+There are two derivable companion traits, `DistinguishedMessage`
+and `DistinguishedOneof`, that implement the extended traits for distinguished
+decoding when possible. Both messages and oneofs must contain only fields that
+support distinguished decoding in order to support it themselves. Distinguished
+encoding requires `Eq` and its semantics of each field, oneof, and message type.
 
 ## What Bilrost and the library won't do
 
@@ -418,13 +546,6 @@ would change the meaning of every encoding in which that field is default.
 
 <!-- TODO(widders): document enumeration helpers -->
 
-#### Oneof Fields
-
-Oneof fields are enums with their own derive macro, which represent multiple
-fields in the message, only one of which may be present in a valid message.
-
-<!-- TODO(widders): impl and doc -->
-
 ## Using `bilrost` in a `no_std` Crate
 
 `bilrost` is compatible with `no_std` crates. To enable `no_std` support,
@@ -433,66 +554,6 @@ disable the `std` features in `bilrost` and `bilrost-types`:
 ```toml
 [dependencies]
 bilrost = { version = "0.1001.0-dev", default-features = false, features = ["derive"] }
-```
-
-## Serializing Existing Types
-
-`bilrost` uses a custom derive macro to handle encoding and decoding types,
-which means that if your existing Rust type is compatible with `bilrost`
-encoders, you can serialize and deserialize it by adding the appropriate derive
-and field annotations.
-
-### Tag Inference for Existing Types
-
-If not otherwise specified, fields are tagged sequentially in the order they
-are specified in the struct, starting with `1`.
-
-You may skip tags which have been reserved, or where there are gaps between
-sequentially occurring tag values by specifying the tag number to skip to with
-the `tag` attribute on the first field after the gap. The following fields will
-be tagged sequentially starting from the next number.
-
-When defining message types for interoperation, or when fields are likely to
-be added, removed, or shuffled, it may be good practice to explicitly specify
-the tags of all fields in a struct instead, but this is not mandatory.
-
-<!-- TODO(widders): fix this example -->
-
-```
-use bilrost;
-use bilrost::{Enumeration, Message};
-
-#[derive(Clone, PartialEq, Message)]
-struct Person {
-    #[bilrost(tag = 1)]
-    pub id: String, // tag=1
-    // NOTE: Old "name" field has been removed
-    // pub name: String, // tag=2 (Removed)
-    #[bilrost(6)]
-    pub given_name: String, // tag=6
-    pub family_name: String, // tag=7
-    pub formatted_name: String, // tag=8
-    #[bilrost(tag = "3")]
-    pub age: u32, // tag=3
-    pub height: u32, // tag=4
-    #[bilrost(enumeration(Gender))]
-    pub gender: u32, // tag=5
-    // NOTE: Skip to less commonly occurring fields
-    #[bilrost(tag(16))]
-    pub name_prefix: String, // tag=16  (eg. mr/mrs/ms)
-    pub name_suffix: String, // tag=17  (eg. jr/esq)
-    pub maiden_name: String, // tag=18
-}
-
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Enumeration)]
-#[non_exhaustive]
-pub enum Gender {
-    #[default]
-    Unknown = 0,
-    Female = 1,
-    Male = 2,
-    Nonbinary = 3,
-}
 ```
 
 ## FAQ
