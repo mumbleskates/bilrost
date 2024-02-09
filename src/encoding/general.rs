@@ -73,10 +73,6 @@ delegate_value_encoding!(delegate from (General) to (Map<General, General>)
 delegate_value_encoding!(delegate from (General) to (crate::encoding::Varint)
     for type (bool) including distinguished);
 delegate_value_encoding!(delegate from (General) to (crate::encoding::Varint)
-    for type (u8) including distinguished);
-delegate_value_encoding!(delegate from (General) to (crate::encoding::Varint)
-    for type (i8) including distinguished);
-delegate_value_encoding!(delegate from (General) to (crate::encoding::Varint)
     for type (u16) including distinguished);
 delegate_value_encoding!(delegate from (General) to (crate::encoding::Varint)
     for type (i16) including distinguished);
