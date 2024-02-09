@@ -128,9 +128,72 @@ macro_rules! fixed_width_float {
     };
 }
 
+macro_rules! fixed_width_array {
+    ($test_name:ident, $N:literal, $wire_type:ident) => {
+        impl Wiretyped<[u8; $N]> for Fixed {
+            const WIRE_TYPE: WireType = WireType::$wire_type;
+        }
+
+        impl ValueEncoder<[u8; $N]> for Fixed {
+            #[inline]
+            fn encode_value<B: BufMut + ?Sized>(value: &[u8; $N], mut buf: &mut B) {
+                (&mut buf).put(value.as_slice());
+            }
+
+            #[inline]
+            fn value_encoded_len(_value: &[u8; $N]) -> usize {
+                $N
+            }
+
+            #[inline]
+            fn decode_value<B: Buf + ?Sized>(
+                value: &mut [u8; $N],
+                mut buf: Capped<B>,
+                _ctx: DecodeContext,
+            ) -> Result<(), DecodeError> {
+                if buf.remaining() < $N {
+                    return Err(DecodeError::new(Truncated));
+                }
+                buf.copy_to_slice(value.as_mut_slice());
+                Ok(())
+            }
+        }
+
+        impl DistinguishedValueEncoder<[u8; $N]> for Fixed {
+            #[inline]
+            fn decode_value_distinguished<B: Buf + ?Sized>(
+                value: &mut [u8; $N],
+                buf: Capped<B>,
+                ctx: DecodeContext,
+            ) -> Result<(), DecodeError> {
+                Fixed::decode_value(value, buf, ctx)
+            }
+        }
+
+        #[cfg(test)]
+        mod $test_name {
+            use crate::encoding::Fixed;
+            crate::encoding::test::check_type_test!(
+                Fixed,
+                expedient,
+                [u8; $N],
+                WireType::$wire_type
+            );
+            crate::encoding::test::check_type_test!(
+                Fixed,
+                distinguished,
+                [u8; $N],
+                WireType::$wire_type
+            );
+        }
+    };
+}
+
 fixed_width_float!(f32, f32, ThirtyTwoBit, put_f32_le, get_f32_le);
 fixed_width_float!(f64, f64, SixtyFourBit, put_f64_le, get_f64_le);
 fixed_width_int!(fixed_u32, u32, ThirtyTwoBit, put_u32_le, get_u32_le);
 fixed_width_int!(fixed_u64, u64, SixtyFourBit, put_u64_le, get_u64_le);
 fixed_width_int!(fixed_i32, i32, ThirtyTwoBit, put_i32_le, get_i32_le);
 fixed_width_int!(fixed_i64, i64, SixtyFourBit, put_i64_le, get_i64_le);
+fixed_width_array!(u8_4, 4, ThirtyTwoBit);
+fixed_width_array!(u8_8, 8, SixtyFourBit);
