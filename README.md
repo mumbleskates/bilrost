@@ -10,9 +10,9 @@ surprises; `bilrost` (the implementing library) strives to provide access to all
 of those capabilities with maximum convenience.
 
 Bilrost at the encoding level is based upon [Protocol Buffers][pb] (protobuf)
-and shares many of its traits. It is in some ways simpler and less rigid in its
-specification, and is designed to improve on some of protobuf's deficiencies. In
-doing so it breaks wire-compatibility with protobuf.
+and shares many of its traits, but is incompatible. It is in some ways simpler
+and less rigid in its specification, and is designed to improve on some of
+protobuf's deficiencies. In doing so it breaks wire-compatibility with protobuf.
 
 `bilrost` is implemented for the [Rust Language][rs]. It is a direct fork of
 [`prost`][p], and shares many of its performance characteristics. (It is not the
@@ -44,6 +44,8 @@ TODO: fill out this outline for a better introduction
     * distinguished encoding
     * some semantics depend upon the types themselves, like defaults and
       maybe ordering
+
+### Examples
 
 ## Design philosophy
 
