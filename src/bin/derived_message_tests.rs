@@ -484,7 +484,17 @@ mod derived_message_tests {
     #[test]
     fn parsing_varints() {
         #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
-        struct Foo(bool, u8, i8, u16, i16, u32, i32, u64, i64);
+        struct Foo(
+            bool,
+            #[bilrost(encoder(varint))] u8,
+            #[bilrost(encoder(varint))] i8,
+            u16,
+            i16,
+            u32,
+            i32,
+            u64,
+            i64,
+        );
 
         assert::decodes_distinguished([], Foo::default());
         assert::decodes_distinguished(
@@ -891,7 +901,37 @@ mod derived_message_tests {
         );
     }
 
-    // TODO(widders): [u8; N]
+    #[test]
+    fn parsing_byte_arrays() {
+        #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+        struct Foo<const N: usize>(#[bilrost(encoder(plainbytes))] [u8; N]);
+
+        assert::decodes_distinguished([], Foo([]));
+        assert::decodes_only_expedient([(1, OV::blob([]))], Foo([]), NotCanonical);
+        assert::never_decodes::<Foo<0>>([(1, OV::blob([1]))], InvalidValue);
+
+        assert::decodes_distinguished([(1, OV::blob([1, 2, 3, 4]))], Foo([1, 2, 3, 4]));
+        assert::decodes_only_expedient([(1, OV::blob([0; 4]))], Foo([0; 4]), NotCanonical);
+        assert::never_decodes::<Foo<4>>([(1, OV::blob([1; 3]))], InvalidValue);
+        assert::never_decodes::<Foo<4>>([(1, OV::blob([1; 5]))], InvalidValue);
+        assert::never_decodes::<Foo<4>>([(1, OV::fixed_u32(1))], WrongWireType);
+
+        assert::decodes_distinguished([(1, OV::blob([13; 13]))], Foo([13; 13]));
+        assert::decodes_only_expedient([(1, OV::blob([0; 13]))], Foo([0; 13]), NotCanonical);
+
+        // Fixed-size wire types are implemented for appropriately sized u8 arrays
+        #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+        struct Bar<const N: usize>(#[bilrost(encoder(fixed))] [u8; N]);
+
+        static_assertions::assert_not_impl_any!(Bar<0>: Message, DistinguishedMessage);
+        static_assertions::assert_not_impl_any!(Bar<2>: Message, DistinguishedMessage);
+        static_assertions::assert_not_impl_any!(Bar<16>: Message, DistinguishedMessage);
+        assert::decodes_distinguished([(1, OV::fixed_u32(0x04030201))], Bar([1, 2, 3, 4]));
+        assert::decodes_only_expedient([(1, OV::fixed_u32(0))], Bar([0; 4]), NotCanonical);
+        assert::decodes_distinguished([(1, OV::SixtyFourBit([8; 8]))], Bar([8; 8]));
+        assert::decodes_only_expedient([(1, OV::SixtyFourBit([0; 8]))], Bar([0; 8]), NotCanonical);
+        assert::never_decodes::<Bar<8>>([(1, OV::blob([8; 8]))], WrongWireType);
+    }
 
     // Repeated field tests
 
