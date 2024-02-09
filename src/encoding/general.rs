@@ -13,8 +13,8 @@ use bytes::{Buf, BufMut, Bytes};
 use crate::encoding::{
     delegate_encoding, delegate_value_encoding, encode_varint, encoded_len_varint,
     encoder_where_value_encoder, Capped, DecodeContext, DistinguishedEncoder,
-    DistinguishedValueEncoder, Encoder, EqualDefaultAlwaysEmpty, Map, PlainBytes, TagMeasurer,
-    TagWriter, Unpacked, ValueEncoder, WireType, Wiretyped,
+    DistinguishedValueEncoder, Encoder, EqualDefaultAlwaysEmpty, Fixed, Map, PlainBytes,
+    TagMeasurer, TagWriter, Unpacked, ValueEncoder, Varint, WireType, Wiretyped,
 };
 use crate::message::{merge, merge_distinguished, RawDistinguishedMessage, RawMessage};
 use crate::DecodeErrorKind::InvalidValue;
@@ -70,24 +70,24 @@ delegate_value_encoding!(delegate from (General) to (Map<General, General>)
     with generics (K, V));
 
 // General encodes bool and integers as varints.
-delegate_value_encoding!(delegate from (General) to (crate::encoding::Varint)
+delegate_value_encoding!(delegate from (General) to (Varint)
     for type (bool) including distinguished);
-delegate_value_encoding!(delegate from (General) to (crate::encoding::Varint)
+delegate_value_encoding!(delegate from (General) to (Varint)
     for type (u16) including distinguished);
-delegate_value_encoding!(delegate from (General) to (crate::encoding::Varint)
+delegate_value_encoding!(delegate from (General) to (Varint)
     for type (i16) including distinguished);
-delegate_value_encoding!(delegate from (General) to (crate::encoding::Varint)
+delegate_value_encoding!(delegate from (General) to (Varint)
     for type (u32) including distinguished);
-delegate_value_encoding!(delegate from (General) to (crate::encoding::Varint)
+delegate_value_encoding!(delegate from (General) to (Varint)
     for type (i32) including distinguished);
-delegate_value_encoding!(delegate from (General) to (crate::encoding::Varint)
+delegate_value_encoding!(delegate from (General) to (Varint)
     for type (u64) including distinguished);
-delegate_value_encoding!(delegate from (General) to (crate::encoding::Varint)
+delegate_value_encoding!(delegate from (General) to (Varint)
     for type (i64) including distinguished);
 
 // General also encodes floating point values.
-delegate_value_encoding!(delegate from (General) to (crate::encoding::Fixed) for type (f32));
-delegate_value_encoding!(delegate from (General) to (crate::encoding::Fixed) for type (f64));
+delegate_value_encoding!(delegate from (General) to (Fixed) for type (f32));
+delegate_value_encoding!(delegate from (General) to (Fixed) for type (f64));
 
 impl EqualDefaultAlwaysEmpty for String {}
 
