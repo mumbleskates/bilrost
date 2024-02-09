@@ -749,6 +749,8 @@ where
 
 /// Different value encoders may dispatch encoding their plain values slightly differently, but
 /// values wrapped in Option are always encoded the same.
+// TODO(widders): this would need to be broken up if a value type that may be encoded with different
+//  wire-types is implemented.
 impl<T, E> Encoder<Option<T>> for E
 where
     E: ValueEncoder<T>,
