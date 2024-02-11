@@ -36,6 +36,8 @@ test:
 test-msrv:
   image: rust:1.65
   stage: test
+  before_script:
+    - ./downgrade-for-msrv.sh
   script:
     - cargo test --workspace --all-targets --all-features
     - cargo test --workspace --doc
