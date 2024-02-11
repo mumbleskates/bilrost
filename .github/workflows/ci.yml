@@ -50,7 +50,8 @@ jobs:
       - name: Verify with Kani
         uses: model-checking/kani-github-action@v1
         with:
-          # enable-propproof: true
+          enable-propproof: true
+          kani-version: "0.45.0"
           args: |
             --tests -p bilrost-types --default-unwind 3 \
             --harness "tests::check_timestamp_roundtrip_via_system_time" \
