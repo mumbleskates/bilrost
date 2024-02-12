@@ -212,28 +212,97 @@ encoding requires `Eq` and its semantics of each field, oneof, and message type.
 
 ## Encoding specification
 
-* encoding specification
-    * messages as strings of bytes that encode zero or more fields
-    * varint encoding
-    * fixed-width encodings must be little-endian
-    * field keys and wire types
-    * complex types
-        * unpacked encodings for vecs and sets
-        * packed encodings for vecs and sets
-        * map encodings
-    * disallowed decoding constraints
-        * unexpectedly repeated fields must err
-        * out-of-domain values must err
-        * text strings with invalid utf-8 must err
-        * sets with duplicated items must err
-        * maps with duplicated keys must err
-        * oneofs with conflicting fields must err
-    * additional decoding constraints for distinguished
-        * fields must implement `Eq`
-        * fields must never be present in the decoded data when they have the
-          default value
-        * unknown fields must err
-        * maps' keys and sets' items must be ordered
+Philosophically, there are two "sides" to the encoding scheme: the opaque data
+that comprises it, and conventions for how that data is interpreted.
+
+### Opaque format
+
+Values in bilrost are encoded opaquely as strings of bytes or as non-negative
+integers not greater than the maximum value representable in an unsigned 64 bit
+integer (2^64-1).
+
+#### Messages
+
+The basic functional unit of encoded Bilrost data is a message. An encoded
+message is some string of zero or more bytes with a specific length.
+
+#### Fields
+
+Encoded messages are comprised of zero or more encoded fields.
+
+Each field is encoded as two parts: first its key, and then its value. The
+field's key is always encoded as a varint. The interpretation of the encoded
+value of that varint is in two parts: the value divided by 4 is the *tag-delta*,
+and the remainder of that division determines the value's *wire-type*. The
+tag-delta encodes the non-negative difference between the tag of the
+previously-encoded field (or zero, if it is the first field) and the field the
+key is part of. Wire-types map to the remainder, and determine the form and
+representation of the field value as follows:
+
+**0: varint** - the value is an opaque number, encoded as a single varint.
+
+**1: length-delimited** - the value is a string of bytes; its length in bytes is
+encoded first as a single varint, then immediately followed by exactly that many
+bytes comprising the value itself.
+
+**2: fixed-length 32 bits** - the value is a string of exactly 4 bytes, encoded
+with no additional prelude.
+
+**3: fixed-length 64 bits** - the value is a string of exaclty 8 bytes, encoded
+with no additional prelude.
+
+Note that because field keys encode only the *delta* from the previous tag, it
+is not possible to encode fields in anything but sorted order according to their
+tags. Unsorted fields are *unrepresentable*.
+
+If a field key's tag-delta indicates a tag that is greater than would fit in an
+unsigned 32 bit integer (2^32-1), the encoded message is not valid and **must**
+be rejected.
+
+#### Varints (LEB128-bijective encoding)
+
+Varints are a variable-length encoding of a non-negative integer, not greater
+than the maximum value representable by an unsigned 64 bit integer (2^64-1).
+Encoded varints are between one and nine bytes, with lesser numeric values
+having shorter representations in the encoding. At the same time, each number in
+this range has exactly one possible encoded representation.
+
+* straightforward description
+    * sum of byte values, shifted up 7 bits for each byte that preceded
+    * any byte that does not have its MSB set or is the ninth byte must be the
+      last
+    * any encoding that would represent a value out of the u64 range is invalid
+      and **must** be rejected
+* algorithm to encode
+* algorithm to decode
+* bijective description
+    * (actually describe the bijective encoding)
+    * extends to any length
+    * more than 64 bits isn't useful because values larger than that are more
+      compact when length-delimited
+    * any 64 bit value that would have required 10 bytes would have a zero final
+      byte, so we can simply omit it
+
+### Standard interpretation
+
+* fixed-width encodings must be little-endian, text must be utf-8
+* complex types
+    * unpacked encodings for vecs and sets
+    * packed encodings for vecs and sets
+    * map encodings
+* disallowed decoding constraints
+    * unexpectedly repeated fields must err
+    * out-of-domain values must err
+    * text strings with invalid utf-8 must err
+    * sets with duplicated items must err
+    * maps with duplicated keys must err
+    * oneofs with conflicting fields must err
+* additional decoding constraints for distinguished
+    * fields must implement `Eq`
+    * fields must never be present in the decoded data when they have the
+      default value
+    * unknown fields must err
+    * maps' keys and sets' items must be ordered
 
 ## Differences from Protobuf encoding & semantics
 
