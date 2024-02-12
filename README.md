@@ -17,7 +17,7 @@ protobuf's deficiencies. In doing so it breaks wire-compatibility with protobuf.
 `bilrost` is implemented for the [Rust Language][rs]. It is a direct fork of
 [`prost`][p], and shares many of its performance characteristics. (It is not the
 fastest possible encoding library, but it is still pretty fast and comes with
-unique advantages.) Like `prost` bilrost can enable writing simple, idiomatic
+unique advantages.) Like `prost`, `bilrost` can enable writing simple, idiomatic
 Rust code with `derive` macros that serialize and deserialize structs from
 binary data. Unlike `prost`, `bilrost` is free from most of the constraints of
 the protobuf ecosystem and required semantics of protobuf message types.
@@ -42,11 +42,11 @@ TODO: fill out this outline for a better introduction
     * tagged fields
     * forwards and backwards compatibility as message types are extended
     * distinguished encoding
-      * floating point values
-      * negative zero and why `ordered_float::NotNan` is not supported, nor
-       `decorum`
-      * https://github.com/protocolbuffers/protobuf/issues/7062 this has even 
-        been a pain point in protobuf. we are not making this mistake again
+        * floating point values
+        * negative zero and why `ordered_float::NotNan` is not supported, nor
+          `decorum`
+        * https://github.com/protocolbuffers/protobuf/issues/7062 this has even
+          been a pain point in protobuf. we are not making this mistake again
     * some semantics depend upon the types themselves, like defaults and
       maybe ordering
 
@@ -62,9 +62,9 @@ TODO: fill out this outline for a better introduction
       legible to you, with implicit schemas and room for extending
     * the data you get back when decoding should not transform any of the field
       values except by omitting extensions (no int coercion)
-    * as an encoding, bilrost works to make invalid states unrepresentable
+    * as an encoding, Bilrost works to make invalid states unrepresentable
       when practical where it doesn't greatly increase complexity
-    * bilrost is designed to aid, but not require, distinguished encoding
+    * Bilrost is designed to aid, but not require, distinguished encoding
 
 ## Using the library
 
@@ -287,7 +287,7 @@ encoding requires `Eq` and its semantics of each field, oneof, and message type.
       better or worse this is not a protobuf library.
         * a protobuf library, or fork of prost, could be created that uses the
           trait-based dispatch to be much easier to use
-    * bilrost inherently supports deterministic & canonical outputs as a banner
+    * Bilrost inherently supports deterministic & canonical outputs as a banner
       feature
     * message traits are now usefully object-safe, and all the encoder traits
       can function with `&dyn Buf` and so on
@@ -328,14 +328,14 @@ encoding requires `Eq` and its semantics of each field, oneof, and message type.
   representation and keep backwards compatibility. Likewise, fields can be
   "widened" from optional to repeated, but the encoded values are never
   backwards compatible when known fields' values would be altered or truncated
-  to fit: decoding a bilrost message that has multiple occurrences of a non-
+  to fit: decoding a Bilrost message that has multiple occurrences of a non-
   repeated field in it is also an error.
 
 [bn]: https://en.wikipedia.org/wiki/Bijective_numeration
 
 ### Strengths, Aims, and Advantages
 
-Strengths of bilrost's encoding include those of protocol buffers:
+Strengths of Bilrost's encoding include those of protocol buffers:
 
 * the encoded messages are very durable, with greatly extensible forward
   compatibility
@@ -350,14 +350,14 @@ Strengths of bilrost's encoding include those of protocol buffers:
 
 ...as well as more:
 
-* bilrost supports distinguished encoding for types where it makes sense, and is
+* Bilrost supports distinguished encoding for types where it makes sense, and is
   designed from a protocol level to make invalid values unrepresentable where
   possible
-* bilrost is more compact than protobuf without incurring significant overhead.
-  nuances of representation in protobuf that bilrost cannot represent or has no
+* Bilrost is more compact than protobuf without incurring significant overhead.
+  nuances of representation in protobuf that Bilrost cannot represent or has no
   analog for are either permanently deprecated, or all conforming decoders are
   required to discard the difference anyway.
-* bilrost aims to be as ergonomic as is practical in plain rust, with basic
+* `bilrost` aims to be as ergonomic as is practical in plain rust, with basic
   annotations and derive macros. It's possible for such a library to be quite
   nice to use!
 
@@ -394,7 +394,7 @@ encoded values. Most of the time, this is what is desired.
 
 #### Field types
 
-Bilrost structs can encode fields with a wide variety of types:
+`bilrost` structs can encode fields with a wide variety of types:
 
 | Encoder              | Value type             | Encoded representation | Distinguished |
 |----------------------|------------------------|------------------------|---------------|
@@ -419,8 +419,8 @@ otherwise they must always be nested.
 ***`Message` types inside `Box` still impl `Message`, with a covering impl;
 message types can nest recursively this way.
 
-Any of these types may be included directly in a Bilrost message struct. If that
-field's value is defaulted, no bytes will be emitted when it is encoded.
+Any of these types may be included directly in a `bilrost` message struct. If
+that field's value is defaulted, no bytes will be emitted when it is encoded.
 
 In addition to including them directly, these types can also be nested within
 several different containers:
@@ -545,7 +545,7 @@ strongly recommended, but not mandatory, that the default variant be one that
 has a discriminant value of zero (`0`). If a different discriminant value is
 used, it may not be possible to change an enum type in a field to a `u32` to
 support decoding unknown enumeration values. This is because the default value
-of each field in a bilrost struct always encodes and decodes from no data, and
+of each field in a Bilrost struct always encodes and decodes from no data, and
 changing the type to one where the default value represents a different number
 would change the meaning of every encoding in which that field is default.
 
@@ -590,11 +590,11 @@ tl;dr: I had the conceit that I could make the protobuf encoding better. For my
 personal purposes, this is true. Perhaps the same will be even true for you as
 well.
 
-2. **Could the bilrost encoding be implemented as a serializer for
+2. **Could the Bilrost encoding be implemented as a serializer for
    [Serde][se]?**
 
 Probably not, though `serde` experts are free to weigh in. There are multiple
-complications with trying to serialize bilrost messages with Serde:
+complications with trying to serialize Bilrost messages with Serde:
 
 - Bilrost fields bear a numbered tag, and currently there appears to be no
   mechanism suitable for this in `serde`.
