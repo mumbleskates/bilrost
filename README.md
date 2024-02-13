@@ -267,13 +267,6 @@ Encoded varints are between one and nine bytes, with lesser numeric values
 having shorter representations in the encoding. At the same time, each number in
 this range has exactly one possible encoded representation.
 
-* straightforward description
-    * sum of byte values, shifted up 7 bits for each byte that preceded
-    * any byte that does not have its MSB set or is the ninth byte must be the
-      last
-    * any encoding that would represent a value out of the u64 range is invalid
-      and **must** be rejected
-
 The bytes that comprise an encoded varint have their most significant bit set
 whenever they are not the final byte, as a continuation bit. In varints that are
 nine bytes in length, the ninth and final byte may or may not have its most
@@ -284,6 +277,25 @@ byte.
 The value of the encoded varint is the sum of each byte's unsigned integer
 value, multiplied by 128 (shifted left by 7 bits) for each byte that preceded
 it.
+
+##### Example values
+
+Following are examples of encoded varints
+
+| Value                  | Bytes (decimal)                                 |
+|------------------------|-------------------------------------------------|
+| 0                      | `[0]`                                           |
+| 1                      | `[1]`                                           |
+| 101                    | `[101]`                                         |
+| 202                    | `[202, 0]`                                      |
+| 1001                   | `[233, 6]`                                      |
+| 1000001                | `[193, 131, 60]`                                |
+| 1234567890             | `[150, 180, 252, 207, 3]`                       |
+| 987654321123456789     | `[149, 237, 196, 218, 243, 202, 181, 217, 12]`  |
+| 12345678900987654321   | `[177, 224, 156, 226, 204, 176, 169, 169, 170]` |
+| (maximum `u64`: 2^64-1 | `[255, 254, 254, 254, 254, 254, 254, 254, 254]` |
+
+##### Varint algorithm
 
 ```python
 def encode_varint(n: int) -> bytes:
@@ -303,8 +315,8 @@ def decode_varint_from_byte_iterator(it: Iterator[int]) -> int:
     num_bytes_read = 0
     for byte_value in it:
         assert 0 <= byte_value < 256
+        n += byte_value * (128**num_bytes_read)
         num_bytes_read += 1
-        n += byte_value * (128**num_preceding_bytes)
         if byte_value < 128 or num_bytes_read == 9:
             # Varints encoding values greater than 64 bits MUST be rejected
             if n >= 2**64:
