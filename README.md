@@ -1,3 +1,8 @@
+[![continuous integration](https://github.com/mumbleskates/bilrost/actions/workflows/ci.yml/badge.svg)](https://github.com/mumbleskates/bilrost/actions/workflows/ci.yml)
+[![Documentation](https://docs.rs/bilrost/badge.svg)](https://docs.rs/bilrost/)
+[![Crate](https://img.shields.io/crates/v/bilrost.svg)](https://crates.io/crates/bilrost)
+[![Dependency Status](https://deps.rs/repo/github/mumbleskates/bilrost/status.svg)](https://deps.rs/repo/github/mumbleskates/bilrost)
+
 # *BILROST!*
 
 Bilrost is a binary encoding format designed for storing and transmitting
