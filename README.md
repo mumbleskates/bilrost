@@ -36,6 +36,8 @@ relying on producing generated code from a protobuf `.proto` schema definition,
 
 # Contents
 
+TODO: reorder the whole document to reconcile with the TOC
+
 ### [Quick start](#getting-started)
 
 #### [`no_std` support](#using-bilrost-in-a-no_std-crate)
@@ -44,9 +46,13 @@ relying on producing generated code from a protobuf `.proto` schema definition,
 
 ### [Differences from Protobuf](#differences-from-protobuf)
 
+#### [Distinguished representation of data](#distinguished-encoding)
+
+### [Compared to other encodings, distinguished and not](#comparisons-to-other-encodings)
+
 ### [Why use Bilrost?](#strengths-aims-and-advantages)
 
-### [Why *not* use Bilrost?](#bilrost-is-not)
+### [Why *not* use Bilrost?](#what-bilrost-and-the-library-wont-do)
 
 ### [How does it work?](#conceptual-overview)
 
@@ -58,19 +64,17 @@ TODO: fill out this outline for a better introduction
 
 ## Conceptual overview
 
-* the overall concepts
-    * tagged fields
-    * forwards and backwards compatibility as message types are extended
-    * distinguished encoding
-        * floating point values
-        * negative zero and why `ordered_float::NotNan` is not supported, nor
-          `decorum`
-        * https://github.com/protocolbuffers/protobuf/issues/7062 this has even
-          been a pain point in protobuf. we are not making this mistake again
-    * some semantics depend upon the types themselves, like defaults and
-      maybe ordering
+* tagged fields
+* forwards and backwards compatibility as message types are extended
+* some semantics depend upon the types themselves, like defaults and maybe
+  ordering
 
-### Examples
+### Distinguished encoding
+
+* floating point values
+* negative zero and why `ordered_float::NotNan` is not supported, nor `decorum`
+* https://github.com/protocolbuffers/protobuf/issues/7062 this has even been a
+  pain point in protobuf. we are not making this mistake again
 
 ## Design philosophy
 
@@ -221,6 +225,16 @@ decoding when possible. Both messages and oneofs must contain only fields that
 support distinguished decoding in order to support it themselves. Distinguished
 encoding requires `Eq` and its semantics of each field, oneof, and message type.
 
+## Using `bilrost` in a `no_std` Crate
+
+`bilrost` is compatible with `no_std` crates. To enable `no_std` support,
+disable the `std` features in `bilrost` and `bilrost-types`:
+
+```toml
+[dependencies]
+bilrost = { version = "0.1001.0-dev", default-features = false, features = ["derive"] }
+```
+
 ## What Bilrost and the library won't do
 
 * the (current lack of) ecosystem compared to protobuf
@@ -229,6 +243,11 @@ encoding requires `Eq` and its semantics of each field, oneof, and message type.
     * no support across other languages yet
     * no text format (use `Debug`)
     * no RPC integrations (yet!)
+
+Bilrost does *not* have a robust reflection ecosystem. It does not (yet) have an
+intermediate schema language like protobuf does, nor implementations for very
+many languages, nor RPC framework support, nor an independent validation
+framework. These things are possible, they just don't exist yet.
 
 ## Encoding specification
 
@@ -417,6 +436,23 @@ def decode_varint_from_byte_iterator(it: Iterator[int]) -> int:
     * unknown fields must err
     * maps' keys and sets' items must be ordered
 
+## `bilrost` vs. `prost`
+
+* comparisons to `prost`
+    * does not generate implementations and structs from schemas, but rather
+      makes deriving traits by hand ergonomic
+    * `bilrost` uses trait-dispatched encoding instead of rigid types, which
+      allows it to have far better type support
+    * binary encoding is quite different, but just as capable (or more). for
+      better or worse this is not a protobuf library.
+        * a protobuf library, or fork of prost, could be created that uses the
+          trait-based dispatch to be much easier to use
+    * Bilrost inherently supports deterministic & canonical outputs as a banner
+      feature
+    * message traits are now usefully object-safe, and all the encoder traits
+      can function with `&dyn Buf` and so on
+    * (look over more unsolved complaints in the prost issues)
+
 ## Differences from Protobuf
 
 * major changes in relation to protobuf and the history there
@@ -458,29 +494,6 @@ def decode_varint_from_byte_iterator(it: Iterator[int]) -> int:
         * theoretically it's possible to widen that schema into a repeated
           nested message with more fields, but this is almost never done
 
-## `bilrost` vs. `prost`
-
-* comparisons to `prost`
-    * does not generate implementations and structs from schemas, but rather
-      makes deriving traits by hand ergonomic
-    * `bilrost` uses trait-dispatched encoding instead of rigid types, which
-      allows it to have far better type support
-    * binary encoding is quite different, but just as capable (or more). for
-      better or worse this is not a protobuf library.
-        * a protobuf library, or fork of prost, could be created that uses the
-          trait-based dispatch to be much easier to use
-    * Bilrost inherently supports deterministic & canonical outputs as a banner
-      feature
-    * message traits are now usefully object-safe, and all the encoder traits
-      can function with `&dyn Buf` and so on
-    * (look over more unsolved complaints in the prost issues)
-
----
-
----
-
-### Comparisons to protobuf
-
 * All varints (including tag fields and lengths) use [bijective numeration][bn],
   which cannot be length-extended with trailing zeros the way protobuf varints
   can (and are slightly more compact, especially at the 64bit limit where they
@@ -513,7 +526,10 @@ def decode_varint_from_byte_iterator(it: Iterator[int]) -> int:
   to fit: decoding a Bilrost message that has multiple occurrences of a non-
   repeated field in it is also an error.
 
-[bn]: https://en.wikipedia.org/wiki/Bijective_numeration
+## Comparisons to other encodings
+
+TODO: compare here (big table: schemaful, schemaless, distinguished) with
+features, traits, and why to prefer bilrost or the other one
 
 ### Strengths, Aims, and Advantages
 
@@ -545,19 +561,6 @@ Strengths of Bilrost's encoding include those of protocol buffers:
 
 (*The main area of potential incompatibility is with the representation of
 signaling vs. quiet NaN floating point values; see `f64::to_bits()`.)
-
-#### Bilrost is *not...*
-
-Bilrost does *not* have a robust reflection ecosystem. It does not (yet) have an
-intermediate schema language like protobuf does, nor implementations for very
-many languages, nor RPC framework support, nor an independent validation
-framework. These things are possible, they just don't exist yet.
-
-### Values and Encodings
-
-Bilrost's basic unit of encoding is the message. Bilrost messages may have zero
-or more fields, which each bear a corresponding numeric tag and are assigned an
-encoder which determines how it is read and written from raw bytes.
 
 #### Expedient vs. Distinguished Encoding
 
@@ -764,16 +767,6 @@ changing the type to one where the default value represents a different number
 would change the meaning of every encoding in which that field is default.
 
 <!-- TODO(widders): document enumeration helpers -->
-
-## Using `bilrost` in a `no_std` Crate
-
-`bilrost` is compatible with `no_std` crates. To enable `no_std` support,
-disable the `std` features in `bilrost` and `bilrost-types`:
-
-```toml
-[dependencies]
-bilrost = { version = "0.1001.0-dev", default-features = false, features = ["derive"] }
-```
 
 ## FAQ
 
