@@ -34,6 +34,26 @@ relying on producing generated code from a protobuf `.proto` schema definition,
 
 [p]: https://github.com/tokio-rs/prost
 
+# Contents
+
+### [Quick start](#getting-started)
+
+#### [`no_std` support](#using-bilrost-in-a-no_std-crate)
+
+### [Differences from `prost`](#bilrost-vs-prost)
+
+### [Differences from Protobuf](#differences-from-protobuf)
+
+### [Why use Bilrost?](#strengths-aims-and-advantages)
+
+### [Why *not* use Bilrost?](#bilrost-is-not)
+
+### [How does it work?](#conceptual-overview)
+
+#### [Ok but really how does it work?](#encoding-specification)
+
+### [License & copyright](#license)
+
 TODO: fill out this outline for a better introduction
 
 ## Conceptual overview
@@ -397,7 +417,7 @@ def decode_varint_from_byte_iterator(it: Iterator[int]) -> int:
     * unknown fields must err
     * maps' keys and sets' items must be ordered
 
-## Differences from Protobuf encoding & semantics
+## Differences from Protobuf
 
 * major changes in relation to protobuf and the history there
     * bijective varints
@@ -637,20 +657,35 @@ encoder will still encode a plain `Vec<u8>` as its bytes value.
 | `BTreeSet<T>`  | [`hashbrown::HashSet<T>`][hbset]*     | no            | "hashbrown"       |
 
 [str]: https://doc.rust-lang.org/std/string/struct.String.html
+
 [vec]: https://doc.rust-lang.org/std/vec/struct.Vec.html
+
 [opt]: https://doc.rust-lang.org/std/option/enum.Option.html
+
 [btset]: https://doc.rust-lang.org/std/collections/struct.BTreeSet.html
+
 [btmap]: https://doc.rust-lang.org/std/collections/btree_map/struct.BTreeMap.html
+
 [cow]: https://doc.rust-lang.org/std/borrow/enum.Cow.html
+
 [bytes]: https://docs.rs/bytes/latest/bytes/struct.Bytes.html
+
 [arr]: https://doc.rust-lang.org/std/primitive.array.html
+
 [bstr]: https://docs.rs/bytestring/latest/bytestring/struct.ByteString.html
+
 [smallvec]: https://docs.rs/smallvec/latest/smallvec/struct.SmallVec.html
+
 [thinvec]: https://docs.rs/thin-vec/latest/thin_vec/struct.ThinVec.html
+
 [tinyvec]: https://docs.rs/tinyvec/latest/tinyvec/enum.TinyVec.html
+
 [hashmap]: https://doc.rust-lang.org/std/collections/struct.HashMap.html
+
 [hashset]: https://doc.rust-lang.org/std/collections/struct.HashSet.html
+
 [hbmap]: https://docs.rs/hashbrown/latest/hashbrown/struct.HashMap.html
+
 [hbset]: https://docs.rs/hashbrown/latest/hashbrown/struct.HashSet.html
 
 *Hash-table-based maps and sets are implemented, but are not compatible with
@@ -794,7 +829,7 @@ types, so the same structure can support both `bilrost` and `Serde`.
 
 [se]: https://serde.rs/
 
-## Why *Bilrost?*
+## Why "Bilrost?"
 
 Protocol Buffers, originating at Google, took on the portmanteau "protobuf". In
 turn, Protobuf for Rust became "prost".
@@ -810,5 +845,5 @@ quite nice, so here we are.
 
 See [LICENSE](./LICENSE) & [NOTICE](./NOTICE) for details.
 
-Copyright 2023-2024 Kent Ross
+Copyright 2023-2024 Kent Ross  
 Copyright 2022 Dan Burkert & Tokio Contributors
