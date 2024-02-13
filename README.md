@@ -278,6 +278,41 @@ The value of the encoded varint is the sum of each byte's unsigned integer
 value, multiplied by 128 (shifted left by 7 bits) for each byte that preceded
 it.
 
+##### Mathematics
+
+Bilrost's varint representation is a base 128 [bijective numeration][bn] scheme
+with a continuation bit. In such a numbering scheme, each possible values in a
+given scheme is greater than each possible value with fewer digits.
+
+[bn]: https://en.wikipedia.org/wiki/Bijective_numeration
+
+Typical bijective numerations have no zero digit, but represent zero with the
+empty string. This doesn't work for us because we must always encode at least
+one byte to avoid ambiguity. Consider instead:
+
+* A base 128 bijective numeration
+* which represents the digits valued 1 through 128 with the byte values 0
+  through 127,
+* is encoded least significant digit first with a continuation bit in the most
+  significant bit of each byte,
+* and encodes the represented value plus one...
+
+...this is *almost exactly* the Bilrost varint encoding. The sole exception is
+that, starting at the value 9295997013522923648 (hexadecimal
+0x8102_0408_1020_4080, encoded as
+`[128, 128, 128, 128, 128, 128, 128, 128, 128, 0]`) and the maximum
+18446744073709551615 (hexadecimal 0xffff_ffff_ffff_ffff, encoded as
+`[255, 254, 254, 254, 254, 254, 254, 254, 254, 0]`), there is always a tenth
+byte and it is always zero.
+
+For practical applications it's not necessary to be able to encode byte lengths
+outside the 64 bit range, it is rare to need to encode values outside the range,
+and if it were desirable to encode integer-like values larger than this (for
+example, 128-bit UUIDs) it is more efficient to represent them in
+length-delimited values, which take 1 extra byte to represent their size. For
+these reasons, in the Bilrost varint encoding we do not encode this trailing
+zero byte.
+
 ##### Example values
 
 Following are examples of encoded varints
@@ -287,8 +322,15 @@ Following are examples of encoded varints
 | 0                      | `[0]`                                           |
 | 1                      | `[1]`                                           |
 | 101                    | `[101]`                                         |
-| 202                    | `[202, 0]`                                      |
+| 127                    | `[127]`                                         |
+| 128                    | `[128, 0]`                                      |
+| 255                    | `[255, 0]`                                      |
+| 256                    | `[128, 1]`                                      |
 | 1001                   | `[233, 6]`                                      |
+| 16511                  | `[255, 127]`                                    |
+| 16512                  | `[128, 128, 0]`                                 |
+| 32895                  | `[255, 255, 0]`                                 |
+| 32896                  | `[128, 128, 1]`                                 |
 | 1000001                | `[193, 131, 60]`                                |
 | 1234567890             | `[150, 180, 252, 207, 3]`                       |
 | 987654321123456789     | `[149, 237, 196, 218, 243, 202, 181, 217, 12]`  |
