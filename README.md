@@ -317,25 +317,25 @@ zero byte.
 
 Following are examples of encoded varints
 
-| Value                  | Bytes (decimal)                                 |
-|------------------------|-------------------------------------------------|
-| 0                      | `[0]`                                           |
-| 1                      | `[1]`                                           |
-| 101                    | `[101]`                                         |
-| 127                    | `[127]`                                         |
-| 128                    | `[128, 0]`                                      |
-| 255                    | `[255, 0]`                                      |
-| 256                    | `[128, 1]`                                      |
-| 1001                   | `[233, 6]`                                      |
-| 16511                  | `[255, 127]`                                    |
-| 16512                  | `[128, 128, 0]`                                 |
-| 32895                  | `[255, 255, 0]`                                 |
-| 32896                  | `[128, 128, 1]`                                 |
-| 1000001                | `[193, 131, 60]`                                |
-| 1234567890             | `[150, 180, 252, 207, 3]`                       |
-| 987654321123456789     | `[149, 237, 196, 218, 243, 202, 181, 217, 12]`  |
-| 12345678900987654321   | `[177, 224, 156, 226, 204, 176, 169, 169, 170]` |
-| (maximum `u64`: 2^64-1 | `[255, 254, 254, 254, 254, 254, 254, 254, 254]` |
+| Value                   | Bytes (decimal)                                 |
+|-------------------------|-------------------------------------------------|
+| 0                       | `[0]`                                           |
+| 1                       | `[1]`                                           |
+| 101                     | `[101]`                                         |
+| 127                     | `[127]`                                         |
+| 128                     | `[128, 0]`                                      |
+| 255                     | `[255, 0]`                                      |
+| 256                     | `[128, 1]`                                      |
+| 1001                    | `[233, 6]`                                      |
+| 16511                   | `[255, 127]`                                    |
+| 16512                   | `[128, 128, 0]`                                 |
+| 32895                   | `[255, 255, 0]`                                 |
+| 32896                   | `[128, 128, 1]`                                 |
+| 1000001                 | `[193, 131, 60]`                                |
+| 1234567890              | `[150, 180, 252, 207, 3]`                       |
+| 987654321123456789      | `[149, 237, 196, 218, 243, 202, 181, 217, 12]`  |
+| 12345678900987654321    | `[177, 224, 156, 226, 204, 176, 169, 169, 170]` |
+| (maximum `u64`: 2^64-1) | `[255, 254, 254, 254, 254, 254, 254, 254, 254]` |
 
 ##### Varint algorithm
 
@@ -568,10 +568,10 @@ encoded values. Most of the time, this is what is desired.
 | `general` & `varint` | `i64`, `i32`, `i16`    | varint                 | yes           |
 | `general` & `varint` | `bool`                 | varint                 | yes           |
 | `general`            | derived `Enumeration`* | varint                 | yes           |
-| `general`            | `String`**             | length-delimited       | yes           |
+| `general`            | [`String`][str]**      | length-delimited       | yes           |
 | `general`            | impl `Message`***      | length-delimited       | maybe         |
 | `varint`             | `u8`, `i8`             | varint                 | yes           |
-| `plainbytes`         | `Vec<u8>`**            | length-delimited       | yes           |
+| `plainbytes`         | [`Vec<u8>`][vec]**     | length-delimited       | yes           |
 
 *`Enumeration` types can be directly included if they implement `Default`;
 otherwise they must always be nested.
@@ -589,28 +589,28 @@ several different containers:
 
 <!-- TODO(widders): detail encoders and value-encoders -->
 
-| Encoder       | Value type              | Encoded representation                                                         | Re-nestable | Distinguished      |
-|---------------|-------------------------|--------------------------------------------------------------------------------|-------------|--------------------|
-| any encoder   | `Option<T>`             | identical; at least some bytes are always encoded if `Some`, nothing if `None` | no          | when `T` is        |
-| `unpacked<E>` | `Vec<T>`, `BTreeSet<T>` | the same as encoder `E`, one field per value                                   | no          | when `T` is        |
-| `unpacked`    | *                       | (the same as `unpacked<general>`)                                              | no          | *                  |
-| `packed<E>`   | `Vec<T>`, `BTreeSet<T>` | length-delimited, successively encoded with `E`                                | yes         | when `T` is        |
-| `packed`      | *                       | (the same as `packed<general>`)                                                | yes         | *                  |
-| `map<KE, VE>` | `BTreeMap<K, V>`        | length-delimited, alternately encoded with `KE` and `VE`                       | yes         | when `K` & `V` are |
-| `general`     | `Vec<T>`, `BTreeSet<T>` | (the same as `unpacked`)                                                       | no          | *                  |
-| `general`     | `BTreeMap`              | (the same as `map<general, general>`)                                          | yes         | *                  |
+| Encoder       | Value type                              | Encoded representation                                                         | Re-nestable | Distinguished      |
+|---------------|-----------------------------------------|--------------------------------------------------------------------------------|-------------|--------------------|
+| any encoder   | [`Option<T>`][opt]                      | identical; at least some bytes are always encoded if `Some`, nothing if `None` | no          | when `T` is        |
+| `unpacked<E>` | [`Vec<T>`][vec], [`BTreeSet<T>`][btset] | the same as encoder `E`, one field per value                                   | no          | when `T` is        |
+| `unpacked`    | *                                       | (the same as `unpacked<general>`)                                              | no          | *                  |
+| `packed<E>`   | `Vec<T>`, `BTreeSet<T>`                 | length-delimited, successively encoded with `E`                                | yes         | when `T` is        |
+| `packed`      | *                                       | (the same as `packed<general>`)                                                | yes         | *                  |
+| `map<KE, VE>` | [`BTreeMap<K, V>`][btmap]               | length-delimited, alternately encoded with `KE` and `VE`                       | yes         | when `K` & `V` are |
+| `general`     | `Vec<T>`, `BTreeSet<T>`                 | (the same as `unpacked`)                                                       | no          | *                  |
+| `general`     | `BTreeMap`                              | (the same as `map<general, general>`)                                          | yes         | *                  |
 
 Many alternative types are also available for both scalar values and containers!
 
-| Value type   | Alternative               | Supporting encoder | Distinguished | Feature to enable |
-|--------------|---------------------------|--------------------|---------------|-------------------|
-| `Vec<u8>`    | `Blob`***                 | `general`          | yes           | (none)            |
-| `Vec<u8>`    | `Cow<[u8]>`               | `plainbytes`       | yes           | (none)            |
-| `Vec<u8>`    | `bytes::Bytes`*           | `general`          | yes           | (none)            |
-| `Vec<u8>`    | `[u8; N]`**               | `plainbytes`       | yes           | (none)            |
-| `u32`, `u64` | `[u8; 4]`, `[u8; 8]`**    | `fixed`            | yes           | (none)            |
-| `String`     | `Cow<str>`                | `general`          | yes           | (none)            |
-| `String`     | `bytestring::ByteString`* | `general`          | yes           | "bytestring"      |
+| Value type   | Alternative                       | Supporting encoder | Distinguished | Feature to enable |
+|--------------|-----------------------------------|--------------------|---------------|-------------------|
+| `Vec<u8>`    | `Blob`***                         | `general`          | yes           | (none)            |
+| `Vec<u8>`    | [`Cow<[u8]>`][cow]                | `plainbytes`       | yes           | (none)            |
+| `Vec<u8>`    | [`bytes::Bytes`][bytes]*          | `general`          | yes           | (none)            |
+| `Vec<u8>`    | [`[u8; N]`][arr]**                | `plainbytes`       | yes           | (none)            |
+| `u32`, `u64` | `[u8; 4]`, `[u8; 8]`**            | `fixed`            | yes           | (none)            |
+| `String`     | [`Cow<str>`][cow]                 | `general`          | yes           | (none)            |
+| `String`     | [`bytestring::ByteString`][bstr]* | `general`          | yes           | "bytestring"      |
 
 *When decoding from a `bytes::Bytes` object, both `bytes::Bytes` and
 `bytes::ByteString` have a zero-copy optimization and will reference the decoded
@@ -625,16 +625,33 @@ replacement in most situations and is supported by the default `general` encoder
 for maximum ease of use. If nothing but `Vec<u8>` will do, the `plainbytes`
 encoder will still encode a plain `Vec<u8>` as its bytes value.
 
-| Container type | Alternative               | Distinguished | Feature to enable |
-|----------------|---------------------------|---------------|-------------------|
-| `Vec<T>`       | `Cow<[T]>`                | when `T` is   | (none)            |
-| `Vec<T>`       | `smallvec::SmallVec<[T]>` | when `T` is   | "smallvec"        |
-| `Vec<T>`       | `thin_vec::ThinVec<[T]>`  | when `T` is   | "thin_vec"        |
-| `Vec<T>`       | `tinyvec::TinyVec<[T]>`   | when `T` is   | "tinyvec"         |
-| `BTreeMap<T>`  | `HashMap<T>`*             | no            | "std" (default)   |
-| `BTreeSet<T>`  | `HashSet<T>`*             | no            | "std" (default)   |
-| `BTreeMap<T>`  | `hashbrown::HashMap<T>`*  | no            | "hashbrown"       |
-| `BTreeSet<T>`  | `hashbrown::HashSet<T>`*  | no            | "hashbrown"       |
+| Container type | Alternative                           | Distinguished | Feature to enable |
+|----------------|---------------------------------------|---------------|-------------------|
+| `Vec<T>`       | [`Cow<[T]>`][cow]                     | when `T` is   | (none)            |
+| `Vec<T>`       | [`smallvec::SmallVec<[T]>`][smallvec] | when `T` is   | "smallvec"        |
+| `Vec<T>`       | [`thin_vec::ThinVec<[T]>`][thinvec]   | when `T` is   | "thin_vec"        |
+| `Vec<T>`       | [`tinyvec::TinyVec<[T]>`][tinyvec]    | when `T` is   | "tinyvec"         |
+| `BTreeMap<T>`  | [`HashMap<T>`][hashmap]*              | no            | "std" (default)   |
+| `BTreeSet<T>`  | [`HashSet<T>`][hashset]*              | no            | "std" (default)   |
+| `BTreeMap<T>`  | [`hashbrown::HashMap<T>`][hbmap]*     | no            | "hashbrown"       |
+| `BTreeSet<T>`  | [`hashbrown::HashSet<T>`][hbset]*     | no            | "hashbrown"       |
+
+[str]: https://doc.rust-lang.org/std/string/struct.String.html
+[vec]: https://doc.rust-lang.org/std/vec/struct.Vec.html
+[opt]: https://doc.rust-lang.org/std/option/enum.Option.html
+[btset]: https://doc.rust-lang.org/std/collections/struct.BTreeSet.html
+[btmap]: https://doc.rust-lang.org/std/collections/btree_map/struct.BTreeMap.html
+[cow]: https://doc.rust-lang.org/std/borrow/enum.Cow.html
+[bytes]: https://docs.rs/bytes/latest/bytes/struct.Bytes.html
+[arr]: https://doc.rust-lang.org/std/primitive.array.html
+[bstr]: https://docs.rs/bytestring/latest/bytestring/struct.ByteString.html
+[smallvec]: https://docs.rs/smallvec/latest/smallvec/struct.SmallVec.html
+[thinvec]: https://docs.rs/thin-vec/latest/thin_vec/struct.ThinVec.html
+[tinyvec]: https://docs.rs/tinyvec/latest/tinyvec/enum.TinyVec.html
+[hashmap]: https://doc.rust-lang.org/std/collections/struct.HashMap.html
+[hashset]: https://doc.rust-lang.org/std/collections/struct.HashSet.html
+[hbmap]: https://docs.rs/hashbrown/latest/hashbrown/struct.HashMap.html
+[hbset]: https://docs.rs/hashbrown/latest/hashbrown/struct.HashSet.html
 
 *Hash-table-based maps and sets are implemented, but are not compatible with
 distinguished encoding or decoding. If distinguished encoding is required, a
