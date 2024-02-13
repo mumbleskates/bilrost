@@ -298,17 +298,20 @@ def encode_varint(n: int) -> bytes:
     return bytes(bytes_to_encode)
 
 
-def decode_varint_from_byte_iterator(i: Iterator[int]) -> int:
+def decode_varint_from_byte_iterator(it: Iterator[int]) -> int:
     n = 0
-    for num_preceding_bytes, byte_value in enumerate(i):
+    num_bytes_read = 0
+    for byte_value in it:
         assert 0 <= byte_value < 256
+        num_bytes_read += 1
         n += byte_value * (128**num_preceding_bytes)
-        if byte_value < 128 or num_preceding_bytes == 8:
-            break
-    # Varints encoding values greater than 64 bits MUST be rejected
-    if n >= 2**64:
-        raise ValueError("invalid varint")
-    return n
+        if byte_value < 128 or num_bytes_read == 9:
+            # Varints encoding values greater than 64 bits MUST be rejected
+            if n >= 2**64:
+                raise ValueError("invalid varint")
+            return n
+    # Reached end of data before the end of the varint
+    raise ValueError("varint truncated")
 ```
 
 * bijective description
