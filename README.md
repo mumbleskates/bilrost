@@ -273,8 +273,44 @@ this range has exactly one possible encoded representation.
       last
     * any encoding that would represent a value out of the u64 range is invalid
       and **must** be rejected
-* algorithm to encode
-* algorithm to decode
+
+The bytes that comprise an encoded varint have their most significant bit set
+whenever they are not the final byte, as a continuation bit. In varints that are
+nine bytes in length, the ninth and final byte may or may not have its most
+significant bit set. The first byte that does *not* have its most significant
+bit set (or the ninth if each byte's most significant bit is set) is the final
+byte.
+
+The value of the encoded varint is the sum of each byte's unsigned integer
+value, multiplied by 128 (shifted left by 7 bits) for each byte that preceded
+it.
+
+```python
+def encode_varint(n: int) -> bytes:
+    assert 0 <= n < 2**64
+    bytes_to_encode = []
+    # Encode up to 8 preceding bytes
+    while n >= 128 and len(bytes_to_encode) < 8:
+        bytes_to_encode.append(128 + (n % 128))
+        n = (n // 128) - 1
+    # Always encode at least one byte
+    bytes_to_encode.append(n)
+    return bytes(bytes_to_encode)
+
+
+def decode_varint_from_byte_iterator(i: Iterator[int]) -> int:
+    n = 0
+    for num_preceding_bytes, byte_value in enumerate(i):
+        assert 0 <= byte_value < 256
+        n += byte_value * (128**num_preceding_bytes)
+        if byte_value < 128 or num_preceding_bytes == 8:
+            break
+    # Varints encoding values greater than 64 bits MUST be rejected
+    if n >= 2**64:
+        raise ValueError("invalid varint")
+    return n
+```
+
 * bijective description
     * (actually describe the bijective encoding)
     * extends to any length
