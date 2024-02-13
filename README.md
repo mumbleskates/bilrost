@@ -43,29 +43,18 @@ relying on producing generated code from a protobuf `.proto` schema definition,
 
 TODO: reorder the whole document to reconcile with the TOC
 
-### [Quick start](#getting-started)
-
-#### [`no_std` support](#using-bilrost-in-a-no_std-crate)
-
-### [Differences from `prost`](#bilrost-vs-prost)
-
-### [Differences from Protobuf](#differences-from-protobuf)
-
-#### [Distinguished representation of data](#distinguished-encoding)
-
-### [Compared to other encodings, distinguished and not](#comparisons-to-other-encodings)
-
-### [Why use Bilrost?](#strengths-aims-and-advantages)
-
-### [Why *not* use Bilrost?](#what-bilrost-and-the-library-wont-do)
-
-### [How does it work?](#conceptual-overview)
-
-#### [Ok but really how does it work?](#encoding-specification)
-
-### [License & copyright](#license)
-
-TODO: fill out this outline for a better introduction
+- [Quick start](#getting-started)
+    - [`no_std` support](#using-bilrost-in-a-no_std-crate)
+    - [Changelog](./CHANGELOG.md)
+- [Differences from `prost`](#bilrost-vs-prost)
+-  [Differences from Protobuf](#differences-from-protobuf)
+    - [Distinguished representation of data](#distinguished-encoding)
+-  [Compared to other encodings, distinguished and not](#comparisons-to-other-encodings)
+-  [Why use Bilrost?](#strengths-aims-and-advantages)
+-  [Why *not* use Bilrost?](#what-bilrost-and-the-library-wont-do)
+-  [How does it work?](#conceptual-overview)
+    - [How *exactly* does it work?](#encoding-specification)
+-  [License & copyright](#license)
 
 ## Conceptual overview
 
@@ -78,7 +67,7 @@ TODO: fill out this outline for a better introduction
 
 * floating point values
 * negative zero and why `ordered_float::NotNan` is not supported, nor `decorum`
-* https://github.com/protocolbuffers/protobuf/issues/7062 this has even been a
+* <https://github.com/protocolbuffers/protobuf/issues/7062> this has even been a
   pain point in protobuf. we are not making this mistake again
 
 ## Design philosophy
@@ -359,7 +348,7 @@ zero byte.
 
 ##### Example values
 
-Following are examples of encoded varints
+<details><summary>Some examples of encoded varints</summary>
 
 | Value                   | Bytes (decimal)                                 |
 |-------------------------|-------------------------------------------------|
@@ -380,6 +369,8 @@ Following are examples of encoded varints
 | 987654321123456789      | `[149, 237, 196, 218, 243, 202, 181, 217, 12]`  |
 | 12345678900987654321    | `[177, 224, 156, 226, 204, 176, 169, 169, 170]` |
 | (maximum `u64`: 2^64-1) | `[255, 254, 254, 254, 254, 254, 254, 254, 254]` |
+
+</details>
 
 ##### Varint algorithm
 
@@ -715,13 +706,14 @@ Old message data will always decode to an equivalent/corresponding value, and
 those corresponding values will of course re-encode from the new widened struct
 into the same representation.
 
-| Change                                               | Corresponding values                | Backwards compatibility breaks when...                         |
-|------------------------------------------------------|-------------------------------------|----------------------------------------------------------------| 
-| `bool` --> `u32` --> `u64` with `general` encoding   | `true`/`false` becomes 1/0          | value is out of range of the narrower type                     |
-| `bool` --> `i32` --> `i64` with `general` encoding   | `true`/`false` becomes -1/0         | value is out of range of the narrower type                     |
-| `String` --> `Vec<u8>`                               | string becomes its UTF-8 data       | value contains invalid UTF-8                                   |
-| `T` --> `Option<T>`                                  | default value of `T` becomes `None` | `Some(default)` is encoded, then decoded in distinguished mode |
-| `Option<T>` --> `Vec<T>` (with `unpacked` encodings) | maybe-contained value is identical  | multiple values are in the `Vec`                               |
+| Change                                                                                | Corresponding values                | Backwards compatibility breaks when...                         |
+|---------------------------------------------------------------------------------------|-------------------------------------|----------------------------------------------------------------| 
+| `bool` --> `u8` --> `u16` --> `u32` --> `u64`, all with `general` or `varint` encoder | `true`/`false` becomes 1/0          | value is out of range of the narrower type                     |
+| `bool` --> `i8` --> `i16` --> `i32` --> `i64`, all with `general` or `varint` encoder | `true`/`false` becomes -1/0         | value is out of range of the narrower type                     |
+| `String` --> `Vec<u8>`                                                                | string becomes its UTF-8 data       | value contains invalid UTF-8                                   |
+| `[u8; N]` with `general` encoder --> `Vec<u8>`                                        | no change                           | data is a different length than the array                      |
+| `T` --> `Option<T>`                                                                   | default value of `T` becomes `None` | `Some(default)` is encoded, then decoded in distinguished mode |
+| `Option<T>` --> `Vec<T>` (with `unpacked` encoding)                                   | maybe-contained value is identical  | multiple values are in the `Vec`                               |
 
 `Vec<T>` can also be changed between `unpacked` and `packed` encoding, as long
 as `T` does not have a length-delimited representation. This will break

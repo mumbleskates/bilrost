@@ -12,19 +12,20 @@ use crate::DecodeErrorKind::{NotCanonical, UnexpectedlyRepeated};
 
 /// Trait for cheaply producing a new value that will always be overwritten, rather than a value
 /// that really serves as a zero-valued default. This is implemented for types that can be present
-/// optionally (in Option or Vec, for instance) but don't have a Default value, such as
+/// optionally (in `Option` or `Vec`, for instance) but don't have a `Default` value, such as
 /// enumerations.
 ///
 /// API design note:
 /// Philosophically it would be preferable to make decoding values produce owned values rather than
-/// writing them into a &mut T, but this is currently not possible as reading in values may happen
-/// multiple times for the same destination field (such as Vec<T>, or more challengingly Oneofs).
+/// writing them into a `&mut T`, but this is currently not possible as reading in values may happen
+/// multiple times for the same destination field (such as `Vec<T>`, or more challengingly
+/// `Oneof`s).
 // TODO(widders): if we change unpacked repeated to greedily decode every available field with the
 //  same tag instead of waiting for them to be provided, we gain two major things: we can return
 //  decoded types by value instead of always needing to write them into a &mut, and we can do a
 //  better job of complaining when we decode repeated fields with mixed packedness.
 pub trait NewForOverwrite {
-    /// Produces a new Self value to be overwritten.
+    /// Produces a new `Self` value to be overwritten.
     fn new_for_overwrite() -> Self;
 }
 
