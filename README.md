@@ -346,7 +346,7 @@ length-delimited values, which take 1 extra byte to represent their size. For
 these reasons, in the Bilrost varint encoding we do not encode this trailing
 zero byte.
 
-##### Example values
+##### Example varint values and algorithms
 
 <details><summary>Some examples of encoded varints</summary>
 
@@ -372,7 +372,7 @@ zero byte.
 
 </details>
 
-##### Varint algorithm
+<details><summary>Varint algorithm</summary>
 
 ```python
 def encode_varint(n: int) -> bytes:
@@ -403,13 +403,7 @@ def decode_varint_from_byte_iterator(it: Iterator[int]) -> int:
     raise ValueError("varint truncated")
 ```
 
-* bijective description
-    * (actually describe the bijective encoding)
-    * extends to any length
-    * more than 64 bits isn't useful because values larger than that are more
-      compact when length-delimited
-    * any 64 bit value that would have required 10 bytes would have a zero final
-      byte, so we can simply omit it
+</details>
 
 ### Standard interpretation
 
