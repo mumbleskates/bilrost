@@ -8,7 +8,7 @@ use crate::encoding::{
     DistinguishedValueEncoder, Encoder, TagMeasurer, TagWriter, ValueEncoder, WireType, Wiretyped,
 };
 use crate::DecodeError;
-use crate::DecodeErrorKind::Truncated;
+use crate::DecodeErrorKind::{NotCanonical, Truncated};
 
 pub struct Fixed;
 
@@ -71,9 +71,15 @@ macro_rules! fixed_width_int {
             fn decode_value_distinguished<B: Buf + ?Sized>(
                 value: &mut $ty,
                 buf: Capped<B>,
+                allow_empty: bool,
                 ctx: DecodeContext,
             ) -> Result<(), DecodeError> {
-                Fixed::decode_value(value, buf, ctx)
+                Fixed::decode_value(value, buf, ctx)?;
+                if !allow_empty && value.is_empty() {
+                    return Err(DecodeError::new(NotCanonical));
+                } else {
+                    Ok(())
+                }
             }
         }
 
@@ -164,9 +170,15 @@ macro_rules! fixed_width_array {
             fn decode_value_distinguished<B: Buf + ?Sized>(
                 value: &mut [u8; $N],
                 buf: Capped<B>,
+                allow_empty: bool,
                 ctx: DecodeContext,
             ) -> Result<(), DecodeError> {
-                Fixed::decode_value(value, buf, ctx)
+                Fixed::decode_value(value, buf, ctx)?;
+                if !allow_empty && value.is_empty() {
+                    return Err(DecodeError::new(NotCanonical));
+                } else {
+                    Ok(())
+                }
             }
         }
 

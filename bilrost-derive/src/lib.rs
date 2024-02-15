@@ -74,13 +74,16 @@ enum SortGroupPart {
     // A oneof field that needs to be sorted based on its current value's tag
     Oneof((TokenStream, Field)),
 }
+
 use SortGroupPart::*;
+
 enum FieldChunk {
     // A field that does not need to be sorted
     AlwaysOrdered((TokenStream, Field)),
     // A set of fields that must be sorted before emitting
     SortGroup(Vec<SortGroupPart>),
 }
+
 use crate::field::set_option;
 use FieldChunk::*;
 
@@ -752,6 +755,18 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
         }
     };
 
+    let check_empty = if has_default {
+        quote! {
+            if !allow_empty && ::bilrost::encoding::HasEmptyState::is_empty(value) {
+                return Err(::bilrost::DecodeError::new(
+                    ::bilrost::DecodeErrorKind::NotCanonical
+                ));
+            }
+        }
+    } else {
+        quote!()
+    };
+
     let expanded = quote! {
         impl #impl_generics #ident #ty_generics #where_clause {
             #[doc=#is_valid_doc]
@@ -826,9 +841,12 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
             fn decode_value_distinguished<B: ::bilrost::bytes::Buf + ?Sized>(
                 value: &mut #ident,
                 buf: ::bilrost::encoding::Capped<B>,
+                allow_empty: bool,
                 ctx: ::bilrost::encoding::DecodeContext,
             ) -> Result<(), ::bilrost::DecodeError> {
-                <Self as ::bilrost::encoding::ValueEncoder<#ident>>::decode_value(value, buf, ctx)
+                <Self as ::bilrost::encoding::ValueEncoder<#ident>>::decode_value(value, buf, ctx)?;
+                #check_empty
+                Ok(())
             }
         }
 

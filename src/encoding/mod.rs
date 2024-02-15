@@ -668,6 +668,7 @@ where
     fn decode_value_distinguished<B: Buf + ?Sized>(
         value: &mut T,
         buf: Capped<B>,
+        allow_empty: bool,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError>;
 }
@@ -726,6 +727,7 @@ pub trait DistinguishedFieldEncoder<T> {
         wire_type: WireType,
         value: &mut T,
         buf: Capped<B>,
+        allow_empty: bool,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError>;
 }
@@ -740,10 +742,11 @@ where
         wire_type: WireType,
         value: &mut T,
         buf: Capped<B>,
+        allow_empty: bool,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         check_wire_type(Self::WIRE_TYPE, wire_type)?;
-        Self::decode_value_distinguished(value, buf, ctx)
+        Self::decode_value_distinguished(value, buf, allow_empty, ctx)
     }
 }
 
@@ -814,6 +817,7 @@ where
             wire_type,
             value.get_or_insert_with(T::new_for_overwrite),
             buf,
+            true,
             ctx,
         )
     }
@@ -1143,9 +1147,10 @@ macro_rules! delegate_value_encoding {
             fn decode_value_distinguished<B: Buf + ?Sized>(
                 value: &mut $value_ty,
                 buf: $crate::encoding::Capped<B>,
+                allow_empty: bool,
                 ctx: $crate::encoding::DecodeContext,
             ) -> Result<(), $crate::DecodeError> {
-                <$to_ty>::decode_value_distinguished(value, buf, ctx)
+                <$to_ty>::decode_value_distinguished(value, buf, allow_empty, ctx)
             }
         }
     };
@@ -1226,11 +1231,9 @@ macro_rules! encoder_where_value_encoder {
                     wire_type,
                     value,
                     buf,
+                    false,
                     ctx,
                 )?;
-                if crate::encoding::value_traits::HasEmptyState::is_empty(value) {
-                    return Err(crate::DecodeError::new(crate::DecodeErrorKind::NotCanonical));
-                }
                 Ok(())
             }
         }
@@ -1585,6 +1588,7 @@ mod test {
         let res = <Packed<Fixed>>::decode_value_distinguished(
             &mut parsed,
             Capped::new(&mut buf.as_slice()),
+            true,
             DecodeContext::default(),
         );
         assert_eq!(
@@ -1615,6 +1619,7 @@ mod test {
         let res = <Packed<Fixed>>::decode_value_distinguished(
             &mut parsed,
             Capped::new(&mut buf.as_slice()),
+            true,
             DecodeContext::default(),
         );
         assert_eq!(
@@ -1648,6 +1653,7 @@ mod test {
         let res = <Map<Fixed, Fixed>>::decode_value_distinguished(
             &mut parsed,
             Capped::new(&mut buf.as_slice()),
+            true,
             DecodeContext::default(),
         );
         assert_eq!(

@@ -7,7 +7,7 @@ use crate::encoding::{
     TagWriter, ValueEncoder, WireType, Wiretyped,
 };
 use crate::DecodeError;
-use crate::DecodeErrorKind::Truncated;
+use crate::DecodeErrorKind::{NotCanonical, Truncated};
 
 pub struct Map<KE, VE>(KE, VE);
 
@@ -99,9 +99,13 @@ where
     fn decode_value_distinguished<B: Buf + ?Sized>(
         value: &mut M,
         mut buf: Capped<B>,
+        allow_empty: bool,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         let capped = buf.take_length_delimited()?;
+        if !allow_empty && !capped.has_remaining() {
+            return Err(DecodeError::new(NotCanonical));
+        }
         if combined_fixed_size(KE::WIRE_TYPE, VE::WIRE_TYPE).map_or(false, |fixed_size| {
             capped.remaining_before_cap() % fixed_size != 0
         }) {
@@ -110,8 +114,8 @@ where
         for item in capped.consume(|buf| {
             let mut new_key = K::new_for_overwrite();
             let mut new_val = V::new_for_overwrite();
-            KE::decode_value_distinguished(&mut new_key, buf.lend(), ctx.clone())?;
-            VE::decode_value_distinguished(&mut new_val, buf.lend(), ctx.clone())?;
+            KE::decode_value_distinguished(&mut new_key, buf.lend(), true, ctx.clone())?;
+            VE::decode_value_distinguished(&mut new_val, buf.lend(), true, ctx.clone())?;
             Ok((new_key, new_val))
         }) {
             let (key, val) = item?;

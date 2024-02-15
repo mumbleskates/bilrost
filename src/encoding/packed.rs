@@ -66,9 +66,13 @@ where
     fn decode_value_distinguished<B: Buf + ?Sized>(
         value: &mut C,
         mut buf: Capped<B>,
+        allow_empty: bool,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         let capped = buf.take_length_delimited()?;
+        if !capped.has_remaining() && !allow_empty {
+            return Err(DecodeError::new(NotCanonical));
+        }
         if E::WIRE_TYPE.fixed_size().map_or(false, |fixed_size| {
             capped.remaining_before_cap() % fixed_size != 0
         }) {
@@ -76,7 +80,7 @@ where
         }
         for val in capped.consume(|buf| {
             let mut new_val = T::new_for_overwrite();
-            E::decode_value_distinguished(&mut new_val, buf.lend(), ctx.clone())?;
+            E::decode_value_distinguished(&mut new_val, buf.lend(), true, ctx.clone())?;
             Ok(new_val)
         }) {
             value.insert_distinguished(val?).map_err(DecodeError::new)?;
@@ -150,7 +154,7 @@ where
         if duplicated {
             return Err(DecodeError::new(UnexpectedlyRepeated));
         }
-        Self::decode_field_distinguished(wire_type, value, buf, ctx)?;
+        Self::decode_field_distinguished(wire_type, value, buf, false, ctx)?;
         if value.is_empty() {
             return Err(DecodeError::new(NotCanonical));
         }

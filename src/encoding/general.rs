@@ -17,7 +17,7 @@ use crate::encoding::{
     TagMeasurer, TagWriter, Unpacked, ValueEncoder, Varint, WireType, Wiretyped,
 };
 use crate::message::{merge, merge_distinguished, RawDistinguishedMessage, RawMessage};
-use crate::DecodeErrorKind::InvalidValue;
+use crate::DecodeErrorKind::{InvalidValue, NotCanonical};
 use crate::{Blob, DecodeError};
 
 pub struct General;
@@ -120,10 +120,18 @@ impl ValueEncoder<String> for General {
 impl DistinguishedValueEncoder<String> for General {
     fn decode_value_distinguished<B: Buf + ?Sized>(
         value: &mut String,
-        buf: Capped<B>,
-        ctx: DecodeContext,
+        mut buf: Capped<B>,
+        allow_empty: bool,
+        _ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
-        Self::decode_value(value, buf, ctx)
+        let buf = buf.take_length_delimited()?;
+        if !allow_empty && !buf.has_remaining() {
+            return Err(DecodeError::new(NotCanonical));
+        }
+        let mut string_data = Vec::<u8>::new();
+        string_data.put(buf.take_all());
+        *value = String::from_utf8(string_data).map_err(|_| DecodeError::new(InvalidValue))?;
+        Ok(())
     }
 }
 
@@ -164,9 +172,10 @@ impl DistinguishedValueEncoder<Cow<'_, str>> for General {
     fn decode_value_distinguished<B: Buf + ?Sized>(
         value: &mut Cow<str>,
         buf: Capped<B>,
+        allow_empty: bool,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
-        Self::decode_value(value, buf, ctx)
+        Self::decode_value_distinguished(value.to_mut(), buf, allow_empty, ctx)
     }
 }
 
@@ -214,10 +223,18 @@ impl ValueEncoder<bytestring::ByteString> for General {
 impl DistinguishedValueEncoder<bytestring::ByteString> for General {
     fn decode_value_distinguished<B: Buf + ?Sized>(
         value: &mut bytestring::ByteString,
-        buf: Capped<B>,
-        ctx: DecodeContext,
+        mut buf: Capped<B>,
+        allow_empty: bool,
+        _ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
-        Self::decode_value(value, buf, ctx)
+        let mut string_data = buf.take_length_delimited()?;
+        let string_len = string_data.remaining_before_cap();
+        if !allow_empty && string_len == 0 {
+            return Err(DecodeError::new(NotCanonical));
+        }
+        *value = bytestring::ByteString::try_from(string_data.copy_to_bytes(string_len))
+            .map_err(|_| DecodeError::new(InvalidValue))?;
+        Ok(())
     }
 }
 
@@ -262,10 +279,17 @@ impl ValueEncoder<Bytes> for General {
 impl DistinguishedValueEncoder<Bytes> for General {
     fn decode_value_distinguished<B: Buf + ?Sized>(
         value: &mut Bytes,
-        buf: Capped<B>,
-        ctx: DecodeContext,
+        mut buf: Capped<B>,
+        allow_empty: bool,
+        _ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
-        Self::decode_value(value, buf, ctx)
+        let mut buf = buf.take_length_delimited()?;
+        if !allow_empty && !buf.has_remaining() {
+            return Err(DecodeError::new(NotCanonical));
+        }
+        let len = buf.remaining_before_cap();
+        *value = buf.copy_to_bytes(len);
+        Ok(())
     }
 }
 
@@ -309,9 +333,10 @@ impl DistinguishedValueEncoder<Blob> for General {
     fn decode_value_distinguished<B: Buf + ?Sized>(
         value: &mut Blob,
         buf: Capped<B>,
+        allow_empty: bool,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
-        PlainBytes::decode_value_distinguished(&mut **value, buf, ctx)
+        PlainBytes::decode_value_distinguished(&mut **value, buf, allow_empty, ctx)
     }
 }
 
@@ -361,9 +386,14 @@ where
     fn decode_value_distinguished<B: Buf + ?Sized>(
         value: &mut T,
         mut buf: Capped<B>,
+        allow_empty: bool,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         ctx.limit_reached()?;
-        merge_distinguished(value, buf.take_length_delimited()?, ctx.enter_recursion())
+        let buf = buf.take_length_delimited()?;
+        if !allow_empty && !buf.has_remaining() {
+            return Err(DecodeError::new(NotCanonical));
+        }
+        merge_distinguished(value, buf, ctx.enter_recursion())
     }
 }

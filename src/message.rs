@@ -230,6 +230,7 @@ pub trait MessageDyn {
     fn replace_from_length_delimited(&mut self, buf: &mut dyn Buf) -> Result<(), DecodeError>;
     fn replace_from_capped(&mut self, buf: Capped<dyn Buf>) -> Result<(), DecodeError>;
 }
+
 impl<T> MessageDyn for T
 where
     T: RawMessage,
@@ -286,6 +287,7 @@ pub trait DistinguishedMessageDyn {
         buf: Capped<dyn Buf>,
     ) -> Result<(), DecodeError>;
 }
+
 impl<T> DistinguishedMessageDyn for T
 where
     T: RawDistinguishedMessage,

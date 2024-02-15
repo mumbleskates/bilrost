@@ -10,7 +10,7 @@ use crate::encoding::{
     TagMeasurer, TagWriter, ValueEncoder, WireType, Wiretyped,
 };
 use crate::DecodeError;
-use crate::DecodeErrorKind::InvalidValue;
+use crate::DecodeErrorKind::{InvalidValue, NotCanonical};
 
 /// `PlainBytes` implements encoding for blob values directly into `Vec<u8>`, and provides the base
 /// implementation for that functionality. `Vec<u8>` cannot generically dispatch to `General`'s
@@ -51,10 +51,18 @@ impl ValueEncoder<Vec<u8>> for PlainBytes {
 impl DistinguishedValueEncoder<Vec<u8>> for PlainBytes {
     fn decode_value_distinguished<B: Buf + ?Sized>(
         value: &mut Vec<u8>,
-        buf: Capped<B>,
-        ctx: DecodeContext,
+        mut buf: Capped<B>,
+        allow_empty: bool,
+        _ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
-        Self::decode_value(value, buf, ctx)
+        let buf = buf.take_length_delimited()?;
+        if !allow_empty && !buf.has_remaining() {
+            return Err(DecodeError::new(NotCanonical));
+        }
+        value.clear();
+        value.reserve(buf.remaining_before_cap());
+        value.put(buf.take_all());
+        Ok(())
     }
 }
 
@@ -107,9 +115,10 @@ impl DistinguishedValueEncoder<Cow<'_, [u8]>> for PlainBytes {
     fn decode_value_distinguished<B: Buf + ?Sized>(
         value: &mut Cow<[u8]>,
         buf: Capped<B>,
+        allow_empty: bool,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
-        Self::decode_value_distinguished(value.to_mut(), buf, ctx)
+        Self::decode_value_distinguished(value.to_mut(), buf, allow_empty, ctx)
     }
 }
 
@@ -172,9 +181,15 @@ impl<const N: usize> DistinguishedValueEncoder<[u8; N]> for PlainBytes {
     fn decode_value_distinguished<B: Buf + ?Sized>(
         value: &mut [u8; N],
         buf: Capped<B>,
+        allow_empty: bool,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
-        Self::decode_value(value, buf, ctx) // Distinguished value decoding is the same
+        Self::decode_value(value, buf, ctx)?; // Distinguished value decoding is the same
+        if !allow_empty && value.is_empty() {
+            return Err(DecodeError::new(NotCanonical));
+        } else {
+            Ok(())
+        }
     }
 }
 

@@ -75,7 +75,7 @@ where
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         let mut new_val = T::new_for_overwrite();
-        E::decode_field_distinguished(wire_type, &mut new_val, buf, ctx)?;
+        E::decode_field_distinguished(wire_type, &mut new_val, buf, true, ctx)?;
         value
             .insert_distinguished(new_val)
             .map_err(DecodeError::new)?;

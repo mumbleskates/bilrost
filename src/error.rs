@@ -33,6 +33,7 @@ pub enum DecodeErrorKind {
     /// Something else.
     Other,
 }
+
 use DecodeErrorKind::*;
 
 impl fmt::Display for DecodeErrorKind {

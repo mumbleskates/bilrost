@@ -172,6 +172,7 @@ impl Field {
                     wire_type,
                     #ident,
                     buf,
+                    true,
                     ctx,
                 )
             )
