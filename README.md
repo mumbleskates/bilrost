@@ -47,14 +47,14 @@ TODO: reorder the whole document to reconcile with the TOC
     - [`no_std` support](#using-bilrost-in-a-no_std-crate)
     - [Changelog](./CHANGELOG.md)
 - [Differences from `prost`](#bilrost-vs-prost)
--  [Differences from Protobuf](#differences-from-protobuf)
+- [Differences from Protobuf](#differences-from-protobuf)
     - [Distinguished representation of data](#distinguished-encoding)
--  [Compared to other encodings, distinguished and not](#comparisons-to-other-encodings)
--  [Why use Bilrost?](#strengths-aims-and-advantages)
--  [Why *not* use Bilrost?](#what-bilrost-and-the-library-wont-do)
--  [How does it work?](#conceptual-overview)
+- [Compared to other encodings, distinguished and not](#comparisons-to-other-encodings)
+- [Why use Bilrost?](#strengths-aims-and-advantages)
+- [Why *not* use Bilrost?](#what-bilrost-and-the-library-wont-do)
+- [How does it work?](#conceptual-overview)
     - [How *exactly* does it work?](#encoding-specification)
--  [License & copyright](#license)
+- [License & copyright](#license)
 
 ## Conceptual overview
 
@@ -374,6 +374,9 @@ zero byte.
 
 <details><summary>Varint algorithm</summary>
 
+The following is python example code, written for clarity rather than
+performance:
+
 ```python
 def encode_varint(n: int) -> bytes:
     assert 0 <= n < 2**64
@@ -387,7 +390,7 @@ def encode_varint(n: int) -> bytes:
     return bytes(bytes_to_encode)
 
 
-def decode_varint_from_byte_iterator(it: Iterator[int]) -> int:
+def decode_varint_from_byte_iterator(it: Iterable[int]) -> int:
     n = 0
     num_bytes_read = 0
     for byte_value in it:
