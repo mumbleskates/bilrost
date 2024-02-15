@@ -44,6 +44,7 @@ relying on producing generated code from a protobuf `.proto` schema definition,
 TODO: reorder the whole document to reconcile with the TOC
 
 - [Quick start](#getting-started)
+    - [Using the derive macros](#example-derive-macro-applications)
     - [`no_std` support](#using-bilrost-in-a-no_std-crate)
     - [Changelog](./CHANGELOG.md)
 - [Differences from `prost`](#bilrost-vs-prost)
@@ -97,7 +98,7 @@ To use `bilrost`, first add it as a dependency in `Cargo.toml`, either with
 bilrost = "0.1001.0-dev"
 ```
 
-The `bilrost` crate has several features:
+The `bilrost` crate has several optional features:
 
 * "std" (default): provides support for `HashMap` and `HashSet`.
 * "derive" (default): includes the `bilrost-derive` crate and re-exports its
@@ -803,7 +804,7 @@ complications with trying to serialize Bilrost messages with Serde:
   or `fixed`, which may alter their encoding. Purely trait-based dispatch will
   work poorly for this, especially when the values become nested within other
   data structures like maps and `Vec` and encoders may begin to look
-  like `map<general, packed<fixed>>`.
+  like `map<plainbytes, packed<fixed>>`.
 - Bilrost messages must encode their fields in tag order, which may (in the case
   of `oneof` fields) vary depending on their value, and it's not clear how or if
   this could be solved in `serde`.
