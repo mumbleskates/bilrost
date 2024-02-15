@@ -172,7 +172,7 @@ impl Field {
                     wire_type,
                     #ident,
                     buf,
-                    true,
+                    true, // Allow empty values: oneof field values are nested
                     ctx,
                 )
             )

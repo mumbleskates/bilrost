@@ -1233,8 +1233,7 @@ macro_rules! encoder_where_value_encoder {
                     buf,
                     false, // decoding a bare value, empty values are unacceptable
                     ctx,
-                )?;
-                Ok(())
+                )
             }
         }
     };
