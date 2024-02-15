@@ -171,8 +171,6 @@ in code that cares very much about distinguished representations.
 
 ## Using the library
 
-[Changelog](./CHANGELOG.md)
-
 ### Getting started
 
 To use `bilrost`, first add it as a dependency in `Cargo.toml`, either with
@@ -314,6 +312,14 @@ and `DistinguishedOneof`, that implement the extended traits for distinguished
 decoding when possible. Both messages and oneofs must contain only fields that
 support distinguished decoding in order to support it themselves. Distinguished
 encoding requires `Eq` and its semantics of each field, oneof, and message type.
+
+### Encoding and decoding messages
+
+TODO: this
+
+#### Using `dyn` with object-safe message traits
+
+TODO: this
 
 ### Supported message field types
 
