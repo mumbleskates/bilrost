@@ -88,52 +88,72 @@ will produce an error when decoded in this mode. If a message is successfully
 decoded from a byte string in distinguished mode, is not modified, and is then
 re-encoded, it will emit the exact same byte string.
 
+The best proxy of this expectation of an [equivalence relation][equiv] in Rust
+is the [`Eq`][eq] trait, which denotes that there is an equivalence relation
+between all values of any type that implements it. Therefore, this trait is
+required of all field and message types in order to implement distinguished
+encoding in `bilrost`.
+
+[equiv]: https://en.wikipedia.org/wiki/Equivalence_relation
+
+[eq]: https://doc.rust-lang.org/std/cmp/trait.Eq.html
+
 Normal ("expedient") decoding may accept other byte strings as valid
 encodings of a given value, such as encodings that contain unknown fields or
 non-canonically encoded values*. Most of the time, this is what is desired.
 
-*"Non-canonical" values, in Bilrost, principally include fields that are 
-represented in the encoding even though their value is default.
+*"Non-canonical" value encodings in Bilrost principally include fields that are
+represented in the encoding even though their value is default. For message
+types, such as nested messages, it also encompasses the message representation
+containing fields with unknown tags.
 
 To support this "exactly 1:1" expectation for distinguished messages, certain
 types are forbidden and not implemented in disinguished mode, even though they
 theoretically could be. This primarily includes floating point numbers, which
-have incompatible equality semantics: "NaN" values are never equal to
-each other or themselves, and the values +0.0 and -0.0 are considered to be
-equal to each other even though they are distinct.
+have incompatible equality semantics. In the Bilrost encoding, floating point
+numbers are represented in their standard [IEEE 754][ieee754] binary format
+standard to most computers today. This comes with particular rules for equality
+semantics that are generally uniform across all languages, and which don't form
+an equivalence relation. "NaN" values are never equal to each other or to
+themselves.
 
-The best proxy this expectation in Rust is the [`Eq`][eq] trait, which denotes
-that there is an [equivalence relation][equiv] between all values of a type that
-implements it. Therefore, this trait is required of all field and message types
-in order to implement distinguished encoding in `bilrost`.
-
-[eq]: https://doc.rust-lang.org/std/cmp/trait.Eq.html
-
-[equiv]: https://en.wikipedia.org/wiki/Equivalence_relation
+[ieee754]: https://en.wikipedia.org/wiki/IEEE_754
 
 #### Floating point values and distinguished encoding
 
-Equivalence relations are also not quite sufficient to describe the properties
-of a distinguished type in Bilrost; not only must the values be *considered* to
-be equivalent, they must also *encode* to the same bytes. `bilrost` takes care
-to preserve even the distinction between +0.0 and -0.0 mentioned above, which
-[has been a problem][protonegzero] for other encodings in the past: even if it
-is not always required, when you encode a value in `bilrost`, when you decode
-that value again you are guaranteed to get those exact same bits back.
+Equivalence relations are also not quite sufficient to describe the desired
+properties of a distinguished type in Bilrost, either; not only must the values
+*themselves* be considered equivalent, they must also *encode* to the same
+bytes. When encoding and decoding floating point values, `bilrost` takes care to
+preserve even the distinction between +0.0 and -0.0, which are considered to be
+equal to each other in IEEE 754; this [has been a problem][protonegzero] for
+other encodings in the past. Even if it is not always necessary, when a value is
+encoded in `bilrost`, decoding that value again is guaranteed to produce the
+same value with the exact same bits.
 
 [protonegzero]: https://github.com/protocolbuffers/protobuf/issues/7062
 
-For this reason it is not a good idea to implement distinguished encoding for
-third-party wrappers for Rust's floating point types that implement [`Eq`][eq]
-and [`Ord`][ord] such as [`ordered_float`][ordered_float] and
+For this reason it is not yet considered a good idea to implement distinguished
+encoding for third-party wrappers for Rust's floating point types that implement
+[`Eq`][eq] and [`Ord`][ord] such as [`ordered_float`][ordered_float] and
 [`decorum`][decorum] because they still consider some sets of values that have
-*different bits* to be equal.
+*different bits* to be equal. Any future implementation of such a type would
+have to take special care to unify the encoded representation of any equivalence
+classes in these types *and standardize this in a portable way*, which also
+de facto induces some data loss when round tripping. It is not guaranteed this
+will ever be considered worthwhile or implemented.
 
 [ord]: https://doc.rust-lang.org/std/cmp/trait.Ord.html
 
 [ordered_float]: https://docs.rs/ordered-float/latest/ordered_float/
 
 [decorum]: https://docs.rs/decorum/latest/decorum/
+
+**If it is desirable to have a distinguished encoding for the bit-wise
+representations of a floating point value**, it should first be cast to its bits
+as an unsigned integer and encoded that way. This reduces the surface area for
+mistakes, and makes it clearer that floating point numbers need special handling
+in code that cares very much about distinguished representations.
 
 ## Design philosophy
 
@@ -426,7 +446,7 @@ from an `enum` with no fields in its variants, where each variant has either
 
 1. an explicit discriminant that is a valid `u32` value, or
 2. a `#[bilrost = 123]` or `#[bilrost(123)]` attribute that specifies a valid
-  `u32` const expression (here with the example value `123`).
+   `u32` const expression (here with the example value `123`).
 
 ```rust
 #[derive(Clone, PartialEq, Eq, bilrost::Enumeration)]
@@ -502,22 +522,13 @@ work.
 
 ## What Bilrost and the library won't do
 
-TODO: expand
-
-* the (current lack of) ecosystem compared to protobuf
-    * no reflection yet
-    * no DSL for specifying schemas yet
-    * no support across other languages yet
-    * no text format (use `Debug`)
-    * no RPC integrations (yet!)
-
 Bilrost does *not* have a robust reflection ecosystem. It does not (yet) have an
 intermediate schema language like protobuf does, nor implementations for very
 many languages, nor RPC framework support, nor an independent validation
 framework. These things are possible, they just don't exist yet.
 
-This library also does not have support for encoding/decoding its message types 
-to and from JSON or other readable text formats. However, because it supports 
+This library also does not have support for encoding/decoding its message types
+to and from JSON or other readable text formats. However, because it supports
 deriving Bilrost encoding implementations from existing structs, it is possible
 (and recommended) to use other, preexisting tools to do this. `Debug` can also
 be derived for a `bilrost` message type, as can other encodings that similarly
@@ -532,7 +543,9 @@ that comprises it, and conventions for how that data is interpreted.
 
 Values in bilrost are encoded opaquely as strings of bytes or as non-negative
 integers not greater than the maximum value representable in an unsigned 64 bit
-integer (2^64-1).
+integer (2^64-1). The only four scalar types supported by the encoding format
+itself are these integers, byte strings of any (64-bit representable) length,
+and byte strings with lengths of exactly 4 or exactly 8.
 
 #### Messages
 
@@ -690,6 +703,9 @@ def decode_varint_from_byte_iterator(it: Iterable[int]) -> int:
 
 ### Standard interpretation
 
+To make the encoding useful, these opaque values have standard interpretations
+for many common data types.
+
 * fixed-width encodings must be little-endian, text must be utf-8
 * complex types
     * unpacked encodings for vecs and sets
@@ -703,7 +719,8 @@ def decode_varint_from_byte_iterator(it: Iterable[int]) -> int:
     * maps with duplicated keys must err
     * oneofs with conflicting fields must err
 * additional decoding constraints for distinguished
-    * fields must implement `Eq`
+    * fields' types must have an equivalence relation via their encoded
+      representations
     * fields must never be present in the decoded data when they have the
       default value
     * unknown fields must err
@@ -808,24 +825,27 @@ TODO: enumerate key differences
 TODO: compare here (big table: schemaful, schemaless, distinguished) with
 features, traits, and why to prefer bilrost or the other one
 
+uses schema:
+
 * protobuf
 * capnp
 * flatbuffers
 
-no-extension:
-* rkyv
+schemaful but extensions break compatibility:
 
-schemaless:
+* rkyv
+* borsh
+* bincode
+
+schemaless (key names are encoded in the data):
+
+* asn.1 / X.690
 * JSON
 * bson
-* cbor
 * msgpack
-* asn.1 / X.690
-
-?:
+* cbor
+* ion
 * XML
-* noproto
-* veriform
 
 ## Strengths, Aims, and Advantages
 
