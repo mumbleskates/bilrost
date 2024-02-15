@@ -17,6 +17,10 @@
 * Added support for `[u8; N]` with the `plainbytes` encoder, which only accepts
   values of the correct length.
 * Added support for `[u8; 4]` and `[u8; 8]` with the `fixed` encoder.
+* Changed value-decoding to pass down whether or not an empty value is allowed,
+  allowing implementations to err sooner and cheaper by detecting that the
+  encoded data is that which represents a default, rather than always checking
+  the value for emptiness after the fact.
 
 ### Fixes
 
@@ -29,6 +33,7 @@
 
 * Deduplicated implementations of `Encoder` and `DistinguishedEncoder` that
   blanket all implementations for which those encoders support value-encoding.
+* Great strides in expanding and cleaning up the documentation.
 
 ## v0.1000.0
 
