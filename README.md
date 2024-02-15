@@ -49,8 +49,10 @@ TODO: reorder the whole document to reconcile with the TOC
     - [Changelog](./CHANGELOG.md) ([on github][ghchangelog])
 - [Differences from `prost`](#bilrost-vs-prost)
 - [Differences from Protobuf](#differences-from-protobuf)
-    - [Distinguished representation of data](#distinguished-encoding)
-- [Compared to other encodings, distinguished and not](#comparisons-to-other-encodings)
+    - [Distinguished representation of data](#distinguished-decoding) and [how
+      this is achieved](#distinguished-representation-on-the-wire-in-bilrost)
+- [Compared to other encodings, distinguished and not](
+  #comparisons-to-other-encodings)
 - [Why use Bilrost?](#strengths-aims-and-advantages)
 - [Why *not* use Bilrost?](#what-bilrost-and-the-library-wont-do)
 - [How does it work?](#conceptual-overview)
@@ -61,17 +63,77 @@ TODO: reorder the whole document to reconcile with the TOC
 
 ## Conceptual overview
 
+TODO: expand
+
 * tagged fields
 * forwards and backwards compatibility as message types are extended
 * some semantics depend upon the types themselves, like defaults and maybe
   ordering
 
-### Distinguished encoding
+### Distinguished decoding
 
-* floating point values
-* negative zero and why `ordered_float::NotNan` is not supported, nor `decorum`
-* <https://github.com/protocolbuffers/protobuf/issues/7062> this has even been a
-  pain point in protobuf. we are not making this mistake again
+It is possible to derive an extended trait, `DistinguishedMessage`, which
+provides a distinguished decoding mode. Decoding in distinguished mode comes
+with an additional guarantee that the resulting message value will re-encode to
+the exact same sequence of bytes, and that *every* different sequence of bytes
+will either decode to a different value or fail to decode. Any message type that
+*can* implement distinguished encoding *will* always encode in its distinguished
+form; there is not an alternate encoding mode that is "more canonical".
+
+Formally, when a message type implements `DistinguishedMessage`, values of
+the message type are *bijective* to a subset of all byte strings. Each different
+possible byte string decodes in distinguished mode to a message value that is
+distinct from the message values decoded from every other such byte string, or
+will produce an error when decoded in this mode. If a message is successfully
+decoded from a byte string in distinguished mode, is not modified, and is then
+re-encoded, it will emit the exact same byte string.
+
+Normal ("expedient") decoding may accept other byte strings as valid
+encodings of a given value, such as encodings that contain unknown fields or
+non-canonically encoded values*. Most of the time, this is what is desired.
+
+*"Non-canonical" values, in Bilrost, principally include fields that are 
+represented in the encoding even though their value is default.
+
+To support this "exactly 1:1" expectation for distinguished messages, certain
+types are forbidden and not implemented in disinguished mode, even though they
+theoretically could be. This primarily includes floating point numbers, which
+have incompatible equality semantics: "NaN" values are never equal to
+each other or themselves, and the values +0.0 and -0.0 are considered to be
+equal to each other even though they are distinct.
+
+The best proxy this expectation in Rust is the [`Eq`][eq] trait, which denotes
+that there is an [equivalence relation][equiv] between all values of a type that
+implements it. Therefore, this trait is required of all field and message types
+in order to implement distinguished encoding in `bilrost`.
+
+[eq]: https://doc.rust-lang.org/std/cmp/trait.Eq.html
+
+[equiv]: https://en.wikipedia.org/wiki/Equivalence_relation
+
+#### Floating point values and distinguished encoding
+
+Equivalence relations are also not quite sufficient to describe the properties
+of a distinguished type in Bilrost; not only must the values be *considered* to
+be equivalent, they must also *encode* to the same bytes. `bilrost` takes care
+to preserve even the distinction between +0.0 and -0.0 mentioned above, which
+[has been a problem][protonegzero] for other encodings in the past: even if it
+is not always required, when you encode a value in `bilrost`, when you decode
+that value again you are guaranteed to get those exact same bits back.
+
+[protonegzero]: https://github.com/protocolbuffers/protobuf/issues/7062
+
+For this reason it is not a good idea to implement distinguished encoding for
+third-party wrappers for Rust's floating point types that implement [`Eq`][eq]
+and [`Ord`][ord] such as [`ordered_float`][ordered_float] and
+[`decorum`][decorum] because they still consider some sets of values that have
+*different bits* to be equal.
+
+[ord]: https://doc.rust-lang.org/std/cmp/trait.Ord.html
+
+[ordered_float]: https://docs.rs/ordered-float/latest/ordered_float/
+
+[decorum]: https://docs.rs/decorum/latest/decorum/
 
 ## Design philosophy
 
@@ -169,7 +231,7 @@ When defining message types for interoperation, or when fields are likely to
 be added, removed, or shuffled, it may be good practice to explicitly specify
 the tags of all fields in a struct instead, but this is not mandatory.
 
-<!-- TODO(widders): fix this example -->
+TODO: clean up this example
 
 ```
 use bilrost::{Enumeration, Message};
@@ -737,12 +799,35 @@ def decode_varint_from_byte_iterator(it: Iterable[int]) -> int:
   to fit: decoding a Bilrost message that has multiple occurrences of a non-
   repeated field in it is also an error.
 
+### Distinguished representation on the wire in Bilrost
+
+TODO: enumerate key differences
+
 ## Comparisons to other encodings
 
 TODO: compare here (big table: schemaful, schemaless, distinguished) with
 features, traits, and why to prefer bilrost or the other one
 
-### Strengths, Aims, and Advantages
+* protobuf
+* capnp
+* flatbuffers
+
+no-extension:
+* rkyv
+
+schemaless:
+* JSON
+* bson
+* cbor
+* msgpack
+* asn.1 / X.690
+
+?:
+* XML
+* noproto
+* veriform
+
+## Strengths, Aims, and Advantages
 
 Strengths of Bilrost's encoding include those of protocol buffers:
 
@@ -772,21 +857,6 @@ Strengths of Bilrost's encoding include those of protocol buffers:
 
 (*The main area of potential incompatibility is with the representation of
 signaling vs. quiet NaN floating point values; see `f64::to_bits()`.)
-
-#### Expedient vs. Distinguished Encoding
-
-It is possible to derive an extended trait, `DistinguishedMessage`, which
-provides a distinguished decoding mode. Decoding in distinguished mode comes
-with an additional guarantee that the resulting message value will re-encode to
-the exact same sequence of bytes, and that *every* different sequence of bytes
-will either decode to a different value or fail to decode. Formally, values of
-the message type are *bijective* to a subset of all byte strings, and all other
-byte strings are considered invalid and will err when decoded (in distinguished
-mode).
-
-Normal ("expedient") decoding may accept other byte strings as valid
-encodings, such as encodings that contain unknown fields or non-canonically
-encoded values. Most of the time, this is what is desired.
 
 ## FAQ
 
