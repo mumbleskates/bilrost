@@ -26,10 +26,10 @@ unique advantages.) Like `prost`, `bilrost` can enable writing simple, idiomatic
 Rust code with `derive` macros that serialize and deserialize structs from
 binary data. Unlike `prost`, `bilrost` is free from most of the constraints of
 the protobuf ecosystem and required semantics of protobuf message types.
-Bilrost (the specification) and this library are free to allow much more
-compatibility with existing types and their normal semantics. Rather than
-relying on producing generated code from a protobuf `.proto` schema definition,
-`bilrost` is designed to be easily used by hand.
+Bilrost (the specification) and this library allow much wider compatibility with
+existing struct types and their normal semantics. Rather than relying on
+producing generated code from a protobuf `.proto` schema definition, `bilrost`
+is designed to be easily used by hand.
 
 🌈
 
