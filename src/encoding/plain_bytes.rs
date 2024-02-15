@@ -51,18 +51,16 @@ impl ValueEncoder<Vec<u8>> for PlainBytes {
 impl DistinguishedValueEncoder<Vec<u8>> for PlainBytes {
     fn decode_value_distinguished<B: Buf + ?Sized>(
         value: &mut Vec<u8>,
-        mut buf: Capped<B>,
+        buf: Capped<B>,
         allow_empty: bool,
-        _ctx: DecodeContext,
+        ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
-        let buf = buf.take_length_delimited()?;
-        if !allow_empty && !buf.has_remaining() {
-            return Err(DecodeError::new(NotCanonical));
+        Self::decode_value(value, buf, ctx)?;
+        if !allow_empty && value.is_empty() {
+            Err(DecodeError::new(NotCanonical))
+        } else {
+            Ok(())
         }
-        value.clear();
-        value.reserve(buf.remaining_before_cap());
-        value.put(buf.take_all());
-        Ok(())
     }
 }
 
@@ -184,9 +182,9 @@ impl<const N: usize> DistinguishedValueEncoder<[u8; N]> for PlainBytes {
         allow_empty: bool,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
-        Self::decode_value(value, buf, ctx)?; // Distinguished value decoding is the same
+        Self::decode_value(value, buf, ctx)?;
         if !allow_empty && value.is_empty() {
-            return Err(DecodeError::new(NotCanonical));
+            Err(DecodeError::new(NotCanonical))
         } else {
             Ok(())
         }

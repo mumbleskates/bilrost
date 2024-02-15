@@ -817,7 +817,7 @@ where
             wire_type,
             value.get_or_insert_with(T::new_for_overwrite),
             buf,
-            true,
+            true, // Decoding an option, empty values are meaningful
             ctx,
         )
     }
@@ -1231,7 +1231,7 @@ macro_rules! encoder_where_value_encoder {
                     wire_type,
                     value,
                     buf,
-                    false,
+                    false, // decoding a bare value, empty values are unacceptable
                     ctx,
                 )?;
                 Ok(())

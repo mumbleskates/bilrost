@@ -120,18 +120,16 @@ impl ValueEncoder<String> for General {
 impl DistinguishedValueEncoder<String> for General {
     fn decode_value_distinguished<B: Buf + ?Sized>(
         value: &mut String,
-        mut buf: Capped<B>,
+        buf: Capped<B>,
         allow_empty: bool,
-        _ctx: DecodeContext,
+        ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
-        let buf = buf.take_length_delimited()?;
-        if !allow_empty && !buf.has_remaining() {
-            return Err(DecodeError::new(NotCanonical));
+        Self::decode_value(value, buf, ctx)?;
+        if !allow_empty && value.is_empty() {
+            Err(DecodeError::new(NotCanonical))
+        } else {
+            Ok(())
         }
-        let mut string_data = Vec::<u8>::new();
-        string_data.put(buf.take_all());
-        *value = String::from_utf8(string_data).map_err(|_| DecodeError::new(InvalidValue))?;
-        Ok(())
     }
 }
 
@@ -223,18 +221,16 @@ impl ValueEncoder<bytestring::ByteString> for General {
 impl DistinguishedValueEncoder<bytestring::ByteString> for General {
     fn decode_value_distinguished<B: Buf + ?Sized>(
         value: &mut bytestring::ByteString,
-        mut buf: Capped<B>,
+        buf: Capped<B>,
         allow_empty: bool,
-        _ctx: DecodeContext,
+        ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
-        let mut string_data = buf.take_length_delimited()?;
-        let string_len = string_data.remaining_before_cap();
-        if !allow_empty && string_len == 0 {
-            return Err(DecodeError::new(NotCanonical));
+        Self::decode_value(value, buf, ctx)?;
+        if !allow_empty && value.is_empty() {
+            Err(DecodeError::new(NotCanonical))
+        } else {
+            Ok(())
         }
-        *value = bytestring::ByteString::try_from(string_data.copy_to_bytes(string_len))
-            .map_err(|_| DecodeError::new(InvalidValue))?;
-        Ok(())
     }
 }
 
@@ -279,17 +275,16 @@ impl ValueEncoder<Bytes> for General {
 impl DistinguishedValueEncoder<Bytes> for General {
     fn decode_value_distinguished<B: Buf + ?Sized>(
         value: &mut Bytes,
-        mut buf: Capped<B>,
+        buf: Capped<B>,
         allow_empty: bool,
-        _ctx: DecodeContext,
+        ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
-        let mut buf = buf.take_length_delimited()?;
-        if !allow_empty && !buf.has_remaining() {
-            return Err(DecodeError::new(NotCanonical));
+        Self::decode_value(value, buf, ctx)?;
+        if !allow_empty && value.is_empty() {
+            Err(DecodeError::new(NotCanonical))
+        } else {
+            Ok(())
         }
-        let len = buf.remaining_before_cap();
-        *value = buf.copy_to_bytes(len);
-        Ok(())
     }
 }
 
@@ -391,6 +386,9 @@ where
     ) -> Result<(), DecodeError> {
         ctx.limit_reached()?;
         let buf = buf.take_length_delimited()?;
+        // Empty message types always encode and decode from zero bytes. It is far cheaper to check
+        // here than to check after the value has been decoded and checking the message's
+        // `is_empty()`.
         if !allow_empty && !buf.has_remaining() {
             return Err(DecodeError::new(NotCanonical));
         }

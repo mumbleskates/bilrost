@@ -80,6 +80,7 @@ where
         }
         for val in capped.consume(|buf| {
             let mut new_val = T::new_for_overwrite();
+            // Pass allow_empty=true: nested values may be empty
             E::decode_value_distinguished(&mut new_val, buf.lend(), true, ctx.clone())?;
             Ok(new_val)
         }) {
@@ -154,10 +155,7 @@ where
         if duplicated {
             return Err(DecodeError::new(UnexpectedlyRepeated));
         }
-        Self::decode_field_distinguished(wire_type, value, buf, false, ctx)?;
-        if value.is_empty() {
-            return Err(DecodeError::new(NotCanonical));
-        }
-        Ok(())
+        // Set allow_empty=false: empty collections are not canonical
+        Self::decode_field_distinguished(wire_type, value, buf, false, ctx)
     }
 }
