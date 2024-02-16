@@ -63,22 +63,67 @@ TODO: reorder the whole document to reconcile with the TOC
 
 ## Conceptual overview
 
-TODO: expand
+Bilrost is an encoding scheme for converting in-memory data structs into plain
+byte strings and vice versa. It's generally suitable for both network transport
+and data retained over the long-term. Its encoded data is not human-readable,
+but it is encoded quite simply. It supports integral and floating point numbers,
+strings and byte strings, nested messages, and recursively nested messages. All
+of the above are supported as optional values, repeated values, sets of unique
+values, and key/value mappings where sensible. With appropriate choices of
+encoders (which determine the representation), most of these constructs can be
+nested almost arbitrarily.
 
-* tagged fields
-* forwards and backwards compatibility as message types are extended
-* some semantics depend upon the types themselves, like defaults and maybe
-  ordering
+Encoded Bilrost data does not include the names of its fields; they are instead
+assigned numbers agreed upon in advance by the message schema that specifies it.
+This can make the data much more compact than "schemaless" encodings like JSON,
+CBOR, etc., without sacrificing its extensibility: new fields can be added, and
+old fields removed, without necessarily breaking backwards compatibility with
+older versions of the encoding program. In the typical "expedient" decoding
+mode, any field not in the message schema is ignored when decoding, so if fields
+are added or removed over time the fields that remain in common will still be
+mutually intelligible between the two versions of the schema. In this way,
+Bilrost is very similar to [Protobuf][pb]. See also:
+[Design philosophy](#design-philosophy), [Comparisons to other encodings](
+#comparisons-to-other-encodings).
+
+Bilrost also has the ability to encode and decode data that is guaranteed to be
+canonically represented; see the [next section](#distinguished-decoding).
+
+Bilrost specifies most of what is required to make these message schemas
+portable not just across architectures and programs, but to other programming
+languages as well. There are some minor caveats:
+
+1. The default, "empty" value of a message field's type has an effect on the
+   meaning of encoded data. At present, this only affects "enumerations", which
+   map a set of names to representative numeric values. It is
+   ***strongly recommended,*** but not *required,* that any enumeration with a
+   default value have its default represented by numeric zero.
+
+   Enumeration types which do not have a zero-valued default and are included
+   directly in a message, the field will implicitly take on this non-zero value
+   by default when it is not present in the encoded data, and nothing will be
+   emitted to the encoding when the field has that value. This is true of *all*
+   types that Bilrost may encode, but each of those types is typically
+   explicitly represented by all-zero values or "no data".
+2. The second caveat is that the *sort order* of values in Bilrost may matter.
+   In distinguished encoding mode, canonical data must always be represented
+   with *sets* and *maps* having their items in sorted order. When the item type
+   of a set (or the key type of a map) is not a simple type with an
+   already-standardized sorting order (such as an integer or string), the
+   canonical order of the items depends on that type's implementation, and care
+   must be taken to standardize that order in addition to the schema of the
+   message's fields when defining distinguished types.
 
 ### Distinguished decoding
 
-It is possible to derive an extended trait, `DistinguishedMessage`, which
-provides a distinguished decoding mode. Decoding in distinguished mode comes
-with an additional guarantee that the resulting message value will re-encode to
-the exact same sequence of bytes, and that *every* different sequence of bytes
-will either decode to a different value or fail to decode. Any message type that
-*can* implement distinguished encoding *will* always encode in its distinguished
-form; there is not an alternate encoding mode that is "more canonical".
+It is possible in `bilrost` to derive an extended trait, `DistinguishedMessage`,
+which provides a distinguished decoding mode. Decoding in distinguished mode
+comes with an additional guarantee that the resulting message value will
+re-encode to the exact same sequence of bytes, and that *every* different
+sequence of bytes will either decode to a different value or fail to decode. Any
+message type that *can* implement distinguished encoding *will* always encode in
+its distinguished form; there is not an alternate encoding mode that is "more
+canonical".
 
 Formally, when a message type implements `DistinguishedMessage`, values of
 the message type are *bijective* to a subset of all byte strings. Each different
@@ -304,6 +349,7 @@ TODO: expand
 * different encoders and what they do
 * "enumeration" helpers
 * "recurses"
+* "has_default"
 
 ### Distinguished derive macros
 
@@ -359,9 +405,9 @@ several different containers:
 | any encoder   | [`Option<T>`][opt]                      | identical; at least some bytes are always encoded if `Some`, nothing if `None` | no          | when `T` is        |
 | `unpacked<E>` | [`Vec<T>`][vec], [`BTreeSet<T>`][btset] | the same as encoder `E`, one field per value                                   | no          | when `T` is        |
 | `unpacked`    | *                                       | (the same as `unpacked<general>`)                                              | no          | *                  |
-| `packed<E>`   | `Vec<T>`, `BTreeSet<T>`                 | length-delimited, successively encoded with `E`                                | yes         | when `T` is        |
+| `packed<E>`   | `Vec<T>`, `BTreeSet<T>`                 | always length-delimited, successively encoded with `E`                         | yes         | when `T` is        |
 | `packed`      | *                                       | (the same as `packed<general>`)                                                | yes         | *                  |
-| `map<KE, VE>` | [`BTreeMap<K, V>`][btmap]               | length-delimited, alternately encoded with `KE` and `VE`                       | yes         | when `K` & `V` are |
+| `map<KE, VE>` | [`BTreeMap<K, V>`][btmap]               | always length-delimited, alternately encoded with `KE` and `VE`                | yes         | when `K` & `V` are |
 | `general`     | `Vec<T>`, `BTreeSet<T>`                 | (the same as `unpacked`)                                                       | no          | *                  |
 | `general`     | `BTreeMap`                              | (the same as `map<general, general>`)                                          | yes         | *                  |
 
