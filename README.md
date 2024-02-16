@@ -419,7 +419,7 @@ Many alternative types are also available for both scalar values and containers!
 | `Vec<u8>`    | [`Cow<[u8]>`][cow]                | `plainbytes`       | yes           | (none)            |
 | `Vec<u8>`    | [`bytes::Bytes`][bytes]*          | `general`          | yes           | (none)            |
 | `Vec<u8>`    | [`[u8; N]`][arr]**                | `plainbytes`       | yes           | (none)            |
-| `u32`, `u64` | `[u8; 4]`, `[u8; 8]`**            | `fixed`            | yes           | (none)            |
+| `u32`, `u64` | `[u8; 4]`, `[u8; 8]`              | `fixed`            | yes           | (none)            |
 | `String`     | [`Cow<str>`][cow]                 | `general`          | yes           | (none)            |
 | `String`     | [`bytestring::ByteString`][bstr]* | `general`          | yes           | "bytestring"      |
 
