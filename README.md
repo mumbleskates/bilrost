@@ -39,7 +39,7 @@ is designed to be easily used by hand.
 
 [p]: https://github.com/tokio-rs/prost
 
-# Contents
+## Contents
 
 TODO: reorder the whole document to reconcile with the TOC
 
