@@ -106,6 +106,11 @@ fn preprocess_message(input: &DeriveInput) -> Result<PreprocessedMessage, Error>
         Data::Union(..) => bail!("Message can not be derived for a union"),
     };
 
+    // TODO(widders): make it possible to ignore fields. this should preclude distinguished encoding
+    //  and probably means not auto-implementing `Default` when there are ignored fields, but still
+    //  requiring it; when parsing, the type would be constructed with all non-ignored fields'
+    //  default values overlaying the struct's `Default`.
+
     let fields: Vec<syn::Field> = match variant_data {
         DataStruct {
             fields: Fields::Named(FieldsNamed { named: fields, .. }),
