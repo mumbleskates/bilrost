@@ -664,7 +664,7 @@ mod derived_message_tests {
                 f32::from_bits(0xffff_4321),
                 f64::from_bits(0x7fff_dead_beef_cafe),
             ),
-            nans.clone(),
+            &nans,
         );
         let decoded = Foo::from_opaque(&nans);
         assert_eq!(
