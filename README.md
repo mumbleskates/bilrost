@@ -225,6 +225,62 @@ To use `bilrost`, first add it as a dependency in `Cargo.toml`, either with
 bilrost = "0.1001.0-dev"
 ```
 
+Then, derive `bilrost::Message` for your struct type:
+
+```rust,
+use bilrost::Message;
+
+#[derive(Debug, PartialEq, Message)]
+struct BucketFile {
+    name: String,
+    shared: bool,
+    storage_key: String,
+}
+
+let foo_file = BucketFile {
+    name: "foo.txt".to_string(),
+    shared: true,
+    storage_key: "public/foo.txt".to_string(),
+};
+
+// Encoding data is simple.
+let encoded = foo_file.encode_to_vec();
+// The encoded data is compact, but not very human-readable.
+assert_eq!(encoded, b"\x05\x07foo.txt\x04\x01\x05\x0epublic/foo.txt");
+
+// Decoding data is likewise simple!
+let decoded = BucketFile::decode(encoded.as_slice()).unwrap();
+assert_eq!(foo_file, decoded);
+```
+
+Later, more fields can be added to that same struct and it will still decode the
+same data.
+
+```rust,
+# use bilrost::Message;
+#[derive(Debug, PartialEq, Message)]
+struct BucketFile {
+    #[bilrost(1)]
+    name: String,
+    #[bilrost(5)]
+    mime_type: Option<String>,
+    #[bilrost(6)]
+    size: Option<u64>,
+    #[bilrost(2)]
+    shared: bool,
+    #[bilrost(3)]
+    storage_key: String,
+    #[bilrost(4)]
+    bucket_name: String,
+}
+
+let new_file =
+    BucketFile::decode(b"\x05\x07foo.txt\x04\x01\x05\x0epublic/foo.txt")
+        .unwrap();
+```
+
+#### Crate features
+
 The `bilrost` crate has several optional features:
 
 * "std" (default): provides support for `HashMap` and `HashSet`.
@@ -249,7 +305,7 @@ The `bilrost` crate has several optional features:
 * "thin-vec": provides first-party support for `thin-vec::ThinVec`
 * "tinyvec": provides first-party support for `tinyvec::TinyVec`
 
-### `no_std` support
+#### `no_std` support
 
 With the "std" feature disabled, `bilrost` has full `no_std` support.
 `no_std`-compatible hash-maps are still available if desired by enabling the
@@ -296,7 +352,7 @@ the tags of all fields in a struct instead, but this is not mandatory.
 
 TODO: clean up this example
 
-```
+```rust,
 use bilrost::{Enumeration, Message};
 
 #[derive(Clone, PartialEq, Message)]
@@ -307,11 +363,11 @@ struct Person {
     // pub name: String, // tag=2 (Removed)
     #[bilrost(6)]
     pub given_name: String, // tag=6
-    pub family_name: String, // tag=7
+    pub family_name: String,    // tag=7
     pub formatted_name: String, // tag=8
     #[bilrost(tag = "3")]
     pub age: u32, // tag=3
-    pub height: u32, // tag=4
+    pub height: u32,            // tag=4
     #[bilrost(enumeration(Gender))]
     pub gender: u32, // tag=5
     // NOTE: Skip to less commonly occurring fields
@@ -556,7 +612,7 @@ those corresponding values will re-encode from the new widened struct into the
 same representation.
 
 | Change                                                                                | Corresponding values                | Backwards compatibility breaks when...                         |
-|---------------------------------------------------------------------------------------|-------------------------------------|----------------------------------------------------------------| 
+|---------------------------------------------------------------------------------------|-------------------------------------|----------------------------------------------------------------|
 | `bool` --> `u8` --> `u16` --> `u32` --> `u64`, all with `general` or `varint` encoder | `true`/`false` becomes 1/0          | value is out of range of the narrower type                     |
 | `bool` --> `i8` --> `i16` --> `i32` --> `i64`, all with `general` or `varint` encoder | `true`/`false` becomes -1/0         | value is out of range of the narrower type                     |
 | `String` --> `Vec<u8>`                                                                | string becomes its UTF-8 data       | value contains invalid UTF-8                                   |
