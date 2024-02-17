@@ -274,9 +274,19 @@ struct BucketFile {
     bucket_name: String,
 }
 
-let new_file =
-    BucketFile::decode(b"\x05\x07foo.txt\x04\x01\x05\x0epublic/foo.txt")
-        .unwrap();
+let new_file = BucketFile::decode(
+    &b"\x05\x07foo.txt\x04\x01\x05\x0epublic/foo.txt"[..],
+)
+.unwrap();
+assert_eq!(
+    new_file,
+    BucketFile {
+        name: "foo.txt".to_string(),
+        shared: true,
+        storage_key: "public/foo.txt".to_string(),
+        ..Default::default() // `Message` comes with a `Default` impl
+    }
+);
 ```
 
 #### Crate features
@@ -325,6 +335,10 @@ You can then import and use its traits and derive macros. The main three are:
 
 * `Message`: This is the basic working unit. Derive this for structs to enable
   encoding and decoding them to and from binary data.
+
+  This derive currently includes an implementation of `Default` that is the same
+  as the automatically derived `Default`: each field takes on the value of its
+  own default. TODO: make this untrue
 * `Enumeration`: This is a derive only, not a trait, which implements support
   for encoding an enum type with `bilrost`. The enum must have no fields, and
   each of its variants will correspond to a different `u32` value that will
