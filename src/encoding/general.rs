@@ -4,10 +4,10 @@ use alloc::string::String;
 use alloc::vec::Vec;
 #[cfg(feature = "std")]
 use core::hash::Hash;
+use core::mem;
 use core::str;
 #[cfg(feature = "std")]
 use std::collections::{HashMap, HashSet};
-use std::mem;
 
 use bytes::{Buf, BufMut, Bytes};
 

@@ -22,7 +22,7 @@ pub struct Blob(Vec<u8>);
 
 impl Blob {
     pub fn new() -> Self {
-        Self::from_vec(vec![])
+        Self::from_vec(Vec::new())
     }
 
     pub fn from_vec(vec: Vec<u8>) -> Self {
