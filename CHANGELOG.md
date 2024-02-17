@@ -15,6 +15,9 @@
     * All of the above duties are taken on by the `HasEmptyState` trait, as does
       the base implementation for `NewForOverwrite`.
 * Following on that, renamed the `HasEmptyState` trait to `EmptyState`.
+* Usability fixes for `Blob`: `new(Vec<u8>)` has been changed to create an empty
+  `Blob`, and the functionality for wrapping a vec has been renamed to
+  `from_vec(..)`.
 
 ### New features
 
