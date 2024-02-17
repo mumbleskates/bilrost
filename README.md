@@ -82,7 +82,7 @@ older versions of the encoding program. In the typical "expedient" decoding
 mode, any field not in the message schema is ignored when decoding, so if fields
 are added or removed over time the fields that remain in common will still be
 mutually intelligible between the two versions of the schema. In this way,
-Bilrost is very similar to [Protobuf][pb]. See also:
+Bilrost is very similar to [protobuf][pb]. See also:
 [Design philosophy](#design-philosophy), [Comparisons to other encodings](
 #comparisons-to-other-encodings).
 
@@ -1013,7 +1013,7 @@ edge cases with little overhead (if fields are unordered, detecting that they
 have repeated requires overhead, but if they *must* be ordered it is trivial).
 Along with this, with only a little more work, we also achieve inherent
 canonicalization for our distinguished message types. Accomplishing the same
-thing in Protobuf is an onerous task, and one I have almost never seen correctly
+thing in protobuf is an onerous task, and one I have almost never seen correctly
 described in the wild. Quite a few people have, as the saying goes, tried and
 died.
 
