@@ -1,8 +1,7 @@
 use crate::encoding::{
-    encode_varint, encoded_len_varint, encoder_where_value_encoder, Buf, BufMut, Capped,
-    DecodeContext, DistinguishedEncoder, DistinguishedValueEncoder, Encoder,
-    EqualDefaultAlwaysEmpty, HasEmptyState, TagMeasurer, TagWriter, ValueEncoder, WireType,
-    Wiretyped,
+    encode_varint, encoded_len_varint, encoder_where_value_encoder, has_empty_state_via_default,
+    Buf, BufMut, Capped, DecodeContext, DistinguishedEncoder, DistinguishedValueEncoder, Encoder,
+    HasEmptyState, TagMeasurer, TagWriter, ValueEncoder, WireType, Wiretyped,
 };
 use crate::DecodeError;
 use crate::DecodeErrorKind::{NotCanonical, OutOfDomainValue};
@@ -61,7 +60,7 @@ macro_rules! varint {
         to_uint64($to_uint64_value:ident) $to_uint64:expr,
         from_uint64($from_uint64_value:ident) $from_uint64:expr
     ) => {
-        impl EqualDefaultAlwaysEmpty for $ty {}
+        has_empty_state_via_default!($ty);
 
         impl Wiretyped<$ty> for Varint {
             const WIRE_TYPE: WireType = WireType::Varint;

@@ -7,7 +7,7 @@ use core::ops::{Deref, DerefMut};
 
 use bytes::{Buf, BufMut};
 
-use crate::encoding::{skip_field, Capped, DecodeContext, WireType};
+use crate::encoding::{skip_field, Capped, DecodeContext, HasEmptyState, WireType};
 use crate::message::{RawDistinguishedMessage, RawMessage};
 use crate::DecodeError;
 use crate::DecodeErrorKind::UnknownField;
@@ -21,12 +21,30 @@ use crate::DecodeErrorKind::UnknownField;
 pub struct Blob(Vec<u8>);
 
 impl Blob {
-    pub fn new(vec: Vec<u8>) -> Self {
+    pub fn new() -> Self {
+        Self::from_vec(vec![])
+    }
+
+    pub fn from_vec(vec: Vec<u8>) -> Self {
         Self(vec)
     }
 
     pub fn into_inner(self) -> Vec<u8> {
         self.0
+    }
+}
+
+impl HasEmptyState for Blob {
+    fn empty() -> Self {
+        Self::new()
+    }
+
+    fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    fn clear(&mut self) {
+        self.0.clear()
     }
 }
 
@@ -70,7 +88,7 @@ impl BorrowMut<Vec<u8>> for Blob {
 
 impl From<Vec<u8>> for Blob {
     fn from(value: Vec<u8>) -> Self {
-        Blob::new(value)
+        Blob::from_vec(value)
     }
 }
 
@@ -129,13 +147,21 @@ impl proptest::arbitrary::Arbitrary for Blob {
     fn arbitrary_with(top: Self::Parameters) -> Self::Strategy {
         proptest::strategy::Strategy::prop_map(
             proptest::arbitrary::any_with::<Vec<u8>>(top),
-            Blob::new,
+            Blob::from_vec,
         )
     }
     type Strategy = proptest::strategy::Map<
         <Vec<u8> as proptest::arbitrary::Arbitrary>::Strategy,
         fn(Vec<u8>) -> Self,
     >;
+}
+
+impl HasEmptyState for () {
+    fn empty() -> Self {}
+
+    fn is_empty(&self) -> bool {
+        true
+    }
 }
 
 impl RawMessage for () {

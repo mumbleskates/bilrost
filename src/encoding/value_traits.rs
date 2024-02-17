@@ -31,48 +31,46 @@ pub trait NewForOverwrite {
 
 impl<T> NewForOverwrite for T
 where
-    T: Default,
+    T: HasEmptyState,
 {
     #[inline]
     fn new_for_overwrite() -> Self {
-        Self::default()
+        Self::empty()
     }
 }
 
-/// Trait for types that have a state that is considered "empty". Such a state be a *subset* of the
-/// values that are considered equal to the type's `Default` value, hence the need for a separate
-/// trait.
+/// Trait for types that have a state that is considered "empty".
 ///
 /// This type must be implemented for every type encodable as a directly included field in a bilrost
-/// message, and must be equal to the type's `Default` value. Since this is almost always exactly
-/// the same as "equal to default," the empty convenience trait `EqualDefaultAlwaysEmpty` can be
-/// implemented on a type to cause it to consider its `Default` value to be always empty.
-///
-/// This specifically enables preservation of negative zero floating point values in all encoders.
-pub trait HasEmptyState {
+/// message.
+pub trait HasEmptyState: Sized {
+    /// Produces the empty state for this type.
+    fn empty() -> Self;
+
+    /// Returns true iff this instance is in the empty state.
     fn is_empty(&self) -> bool;
-}
 
-/// Marker trait indicating that the `Default` value for a type is always considered empty.
-pub trait EqualDefaultAlwaysEmpty {}
-
-impl<T> HasEmptyState for T
-where
-    T: EqualDefaultAlwaysEmpty + Default + PartialEq,
-{
-    fn is_empty(&self) -> bool {
-        *self == Self::default()
+    /// Sets this instance to the empty state.
+    // TODO(widders): test this for every type
+    fn clear(&mut self) {
+        *self = Self::empty();
     }
 }
 
 impl<T> HasEmptyState for Option<T> {
+    #[inline]
+    fn empty() -> Self {
+        None
+    }
+
+    #[inline]
     fn is_empty(&self) -> bool {
         Self::is_none(self)
     }
 }
 
 /// Trait for containers that store multiple items such as `Vec`, `BTreeSet`, and `HashSet`
-pub trait Collection: Default {
+pub trait Collection: HasEmptyState {
     type Item;
     type RefIter<'a>: ExactSizeIterator<Item = &'a Self::Item>
     where
@@ -80,10 +78,6 @@ pub trait Collection: Default {
         Self: 'a;
 
     fn len(&self) -> usize;
-    #[inline]
-    fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
     fn iter(&self) -> Self::RefIter<'_>;
     fn insert(&mut self, item: Self::Item) -> Result<(), DecodeErrorKind>;
 }
@@ -101,7 +95,7 @@ pub trait DistinguishedCollection: Collection + Eq {
 }
 
 /// Trait for associative containers, such as `BTreeMap` and `HashMap`.
-pub trait Mapping: Default {
+pub trait Mapping: HasEmptyState {
     type Key;
     type Value;
     type RefIter<'a>: ExactSizeIterator<Item = (&'a Self::Key, &'a Self::Value)>
@@ -137,8 +131,19 @@ pub trait DistinguishedMapping: Mapping {
 }
 
 impl<T> HasEmptyState for Vec<T> {
+    #[inline]
+    fn empty() -> Self {
+        Self::new()
+    }
+
+    #[inline]
     fn is_empty(&self) -> bool {
         Self::is_empty(self)
+    }
+
+    #[inline]
+    fn clear(&mut self) {
+        Self::clear(self)
     }
 }
 
@@ -191,8 +196,26 @@ impl<T> HasEmptyState for Cow<'_, [T]>
 where
     T: Clone,
 {
+    #[inline]
+    fn empty() -> Self {
+        Self::default()
+    }
+
+    #[inline]
     fn is_empty(&self) -> bool {
         <[T]>::is_empty(self)
+    }
+
+    #[inline]
+    fn clear(&mut self) {
+        match self {
+            Cow::Borrowed(_) => {
+                *self = Cow::default();
+            }
+            Cow::Owned(owned) => {
+                owned.clear();
+            }
+        }
     }
 }
 
@@ -242,8 +265,19 @@ where
 
 #[cfg(feature = "smallvec")]
 impl<T, A: smallvec::Array<Item = T>> HasEmptyState for smallvec::SmallVec<A> {
+    #[inline]
+    fn empty() -> Self {
+        Self::new()
+    }
+
+    #[inline]
     fn is_empty(&self) -> bool {
         Self::is_empty(self)
+    }
+
+    #[inline]
+    fn clear(&mut self) {
+        Self::clear(self)
     }
 }
 
@@ -296,8 +330,19 @@ where
 
 #[cfg(feature = "thin-vec")]
 impl<T> HasEmptyState for thin_vec::ThinVec<T> {
+    #[inline]
+    fn empty() -> Self {
+        Self::new()
+    }
+
+    #[inline]
     fn is_empty(&self) -> bool {
         Self::is_empty(self)
+    }
+
+    #[inline]
+    fn clear(&mut self) {
+        Self::clear(self)
     }
 }
 
@@ -350,8 +395,19 @@ where
 
 #[cfg(feature = "tinyvec")]
 impl<T, A: tinyvec::Array<Item = T>> HasEmptyState for tinyvec::TinyVec<A> {
+    #[inline]
+    fn empty() -> Self {
+        Self::new()
+    }
+
+    #[inline]
     fn is_empty(&self) -> bool {
         Self::is_empty(self)
+    }
+
+    #[inline]
+    fn clear(&mut self) {
+        Self::clear(self)
     }
 }
 
@@ -403,14 +459,24 @@ where
 }
 
 impl<T> HasEmptyState for BTreeSet<T> {
+    #[inline]
+    fn empty() -> Self {
+        Self::new()
+    }
+
+    #[inline]
     fn is_empty(&self) -> bool {
         Self::is_empty(self)
+    }
+
+    #[inline]
+    fn clear(&mut self) {
+        Self::clear(self)
     }
 }
 
 impl<T> Collection for BTreeSet<T>
 where
-    Self: Default,
     T: Ord,
 {
     type Item = T;
@@ -440,7 +506,6 @@ where
 
 impl<T> DistinguishedCollection for BTreeSet<T>
 where
-    Self: Eq,
     T: Ord,
 {
     type ReverseIter<'a> = core::iter::Rev<btree_set::Iter<'a, T>>
@@ -469,15 +534,25 @@ where
 
 #[cfg(feature = "std")]
 impl<T> HasEmptyState for HashSet<T> {
+    #[inline]
+    fn empty() -> Self {
+        Self::new()
+    }
+
+    #[inline]
     fn is_empty(&self) -> bool {
         Self::is_empty(self)
+    }
+
+    #[inline]
+    fn clear(&mut self) {
+        Self::clear(self)
     }
 }
 
 #[cfg(feature = "std")]
 impl<T> Collection for HashSet<T>
 where
-    Self: Default,
     T: Eq + Hash,
 {
     type Item = T;
@@ -507,15 +582,25 @@ where
 
 #[cfg(feature = "hashbrown")]
 impl<T> HasEmptyState for hashbrown::HashSet<T> {
+    #[inline]
+    fn empty() -> Self {
+        Self::new()
+    }
+
+    #[inline]
     fn is_empty(&self) -> bool {
         Self::is_empty(self)
+    }
+
+    #[inline]
+    fn clear(&mut self) {
+        Self::clear(self)
     }
 }
 
 #[cfg(feature = "hashbrown")]
 impl<T> Collection for hashbrown::HashSet<T>
 where
-    Self: Default,
     T: Eq + Hash,
 {
     type Item = T;
@@ -544,14 +629,24 @@ where
 }
 
 impl<K, V> HasEmptyState for BTreeMap<K, V> {
+    #[inline]
+    fn empty() -> Self {
+        Self::new()
+    }
+
+    #[inline]
     fn is_empty(&self) -> bool {
         Self::is_empty(self)
+    }
+
+    #[inline]
+    fn clear(&mut self) {
+        Self::clear(self)
     }
 }
 
 impl<K, V> Mapping for BTreeMap<K, V>
 where
-    Self: Default,
     K: Ord,
 {
     type Key = K;
@@ -618,15 +713,25 @@ where
 
 #[cfg(feature = "std")]
 impl<K, V> HasEmptyState for HashMap<K, V> {
+    #[inline]
+    fn empty() -> Self {
+        Self::new()
+    }
+
+    #[inline]
     fn is_empty(&self) -> bool {
         Self::is_empty(self)
+    }
+
+    #[inline]
+    fn clear(&mut self) {
+        Self::clear(self)
     }
 }
 
 #[cfg(feature = "std")]
 impl<K, V> Mapping for HashMap<K, V>
 where
-    Self: Default,
     K: Eq + Hash,
 {
     type Key = K;
@@ -660,15 +765,25 @@ where
 
 #[cfg(feature = "hashbrown")]
 impl<K, V> HasEmptyState for hashbrown::HashMap<K, V> {
+    #[inline]
+    fn empty() -> Self {
+        Self::new()
+    }
+
+    #[inline]
     fn is_empty(&self) -> bool {
         Self::is_empty(self)
+    }
+
+    #[inline]
+    fn clear(&mut self) {
+        Self::clear(self)
     }
 }
 
 #[cfg(feature = "hashbrown")]
 impl<K, V> Mapping for hashbrown::HashMap<K, V>
 where
-    Self: Default,
     K: Eq + Hash,
 {
     type Key = K;

@@ -496,7 +496,7 @@ mod derived_message_tests {
             i64,
         );
 
-        assert::decodes_distinguished([], Foo::default());
+        assert::decodes_distinguished([], Foo::empty());
         assert::decodes_distinguished(
             (1..=9).map(|tag| (tag, OV::Varint(1))),
             Foo(true, 1, -1, 1, -1, 1, -1, 1, -1),
@@ -594,7 +594,7 @@ mod derived_message_tests {
             #[bilrost(encoder(fixed))] i64,
         );
 
-        assert::decodes_distinguished([], Foo::default());
+        assert::decodes_distinguished([], Foo::empty());
         assert::decodes_distinguished(
             [
                 (1, OV::fixed_u32(1)),
@@ -741,7 +741,7 @@ mod derived_message_tests {
 
         fn check_fixed_truncation<T>(val: OV)
         where
-            T: Debug + Default + Eq + HasEmptyState,
+            T: Debug + Eq + HasEmptyState,
             bilrost::encoding::Fixed:
                 DistinguishedEncoder<T> + ValueEncoder<T> + DistinguishedValueEncoder<T>,
         {
@@ -801,7 +801,7 @@ mod derived_message_tests {
 
     fn parsing_string_type<'a, T>()
     where
-        T: 'a + Debug + Default + Eq + From<&'a str> + HasEmptyState,
+        T: 'a + Debug + Eq + From<&'a str> + HasEmptyState,
         General: DistinguishedEncoder<T>,
     {
         #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
@@ -1057,7 +1057,7 @@ mod derived_message_tests {
 
     fn truncated_bool_string_map<T>()
     where
-        T: Debug + Default + HasEmptyState + Mapping<Key = bool, Value = String>,
+        T: Debug + HasEmptyState + Mapping<Key = bool, Value = String>,
         General: Encoder<T>,
     {
         #[derive(Debug, PartialEq, Message)]
@@ -1082,7 +1082,7 @@ mod derived_message_tests {
 
     fn truncated_string_int_map<T>()
     where
-        T: Debug + Default + HasEmptyState + Mapping<Key = String, Value = u64>,
+        T: Debug + HasEmptyState + Mapping<Key = String, Value = u64>,
         General: Encoder<T>,
     {
         #[derive(Debug, PartialEq, Message)]
@@ -1470,7 +1470,7 @@ mod derived_message_tests {
 
     fn truncated_packed_string<T>()
     where
-        T: Debug + Default + HasEmptyState + Collection<Item = String>,
+        T: Debug + HasEmptyState + Collection<Item = String>,
         General: Encoder<T>,
         Packed: Encoder<T>,
     {
@@ -1493,7 +1493,7 @@ mod derived_message_tests {
 
     fn truncated_packed_int<T>()
     where
-        T: Debug + Default + HasEmptyState + Collection<Item = u64>,
+        T: Debug + HasEmptyState + Collection<Item = u64>,
         General: Encoder<T>,
     {
         #[derive(Debug, PartialEq, Message)]
@@ -1674,33 +1674,33 @@ mod derived_message_tests {
 
     #[test]
     fn enumeration_decoding() {
-        #[derive(Clone, Debug, PartialEq, Eq, Enumeration)]
-        enum NoDefault {
+        #[derive(Clone, Debug, Default, PartialEq, Eq, Enumeration)]
+        enum DefaultButNoZero {
+            #[default]
             Five = 5,
             Ten = 10,
             Fifteen = 15,
         }
-        use NoDefault::*;
+        use DefaultButNoZero::*;
 
-        #[derive(Clone, Debug, Default, PartialEq, Eq, Enumeration)]
-        enum HasDefault {
-            #[default]
+        #[derive(Clone, Debug, PartialEq, Eq, Enumeration)]
+        enum HasZero {
+            Zero = 0,
             Big = 1000,
             Bigger = 1_000_000,
-            Biggest = 1_000_000_000,
         }
-        use HasDefault::*;
+        use HasZero::*;
 
         #[derive(Clone, Debug, PartialEq, Eq, Message, DistinguishedMessage)]
-        struct Foo(Option<NoDefault>, HasDefault);
+        struct Foo(Option<DefaultButNoZero>, HasZero);
 
-        assert::decodes_distinguished([], Foo(None, Big));
-        assert::decodes_distinguished([(1, OV::u32(5))], Foo(Some(Five), Big));
-        assert::decodes_distinguished([(1, OV::u32(10))], Foo(Some(Ten), Big));
-        assert::decodes_distinguished([(1, OV::u32(15))], Foo(Some(Fifteen), Big));
-        assert::decodes_only_expedient([(2, OV::u32(1000))], Foo(None, Big), NotCanonical);
+        assert::decodes_distinguished([], Foo(None, Zero));
+        assert::decodes_distinguished([(1, OV::u32(5))], Foo(Some(Five), Zero));
+        assert::decodes_distinguished([(1, OV::u32(10))], Foo(Some(Ten), Zero));
+        assert::decodes_distinguished([(1, OV::u32(15))], Foo(Some(Fifteen), Zero));
+        assert::decodes_only_expedient([(2, OV::u32(0))], Foo(None, Zero), NotCanonical);
+        assert::decodes_distinguished([(2, OV::u32(1_000))], Foo(None, Big));
         assert::decodes_distinguished([(2, OV::u32(1_000_000))], Foo(None, Bigger));
-        assert::decodes_distinguished([(2, OV::u32(1_000_000_000))], Foo(None, Biggest));
     }
 
     #[test]
@@ -1746,7 +1746,7 @@ mod derived_message_tests {
             OutOfDomainValue,
         );
 
-        let val = HelpedStruct::default();
+        let val = HelpedStruct::empty();
         assert_eq!(val.optional(), None);
 
         // Demonstrate that the same errors happen when we decode to a struct with strict
@@ -1796,10 +1796,10 @@ mod derived_message_tests {
         assert_eq!(u32::from(Foo::Z), u32::MAX);
         assert_eq!(Foo::try_from(u32::MAX), Ok(Foo::Z));
         assert_eq!(Foo::Z as u8, 255);
-        assert::decodes_distinguished([(1, OV::u32(0))], Bar(Foo::A));
+        assert::decodes_distinguished([], Bar(Foo::A));
+        assert::decodes_only_expedient([(1, OV::u32(0))], Bar(Foo::A), NotCanonical);
         assert::decodes_distinguished([(1, OV::u32(5))], Bar(Foo::D));
-        assert::decodes_distinguished([], Bar(Foo::T));
-        assert::decodes_only_expedient([(1, OV::u32(10))], Bar(Foo::T), NotCanonical);
+        assert::decodes_distinguished([(1, OV::u32(10))], Bar(Foo::T));
         assert::decodes_distinguished([(1, OV::u32(11))], Bar(Foo::E));
         assert::decodes_distinguished([(1, OV::u32(u32::MAX))], Bar(Foo::Z));
     }
@@ -1827,13 +1827,13 @@ mod derived_message_tests {
         }
 
         // With a directly included inner message field, it should encode only when its value is
-        // defaulted.
+        // empty.
 
-        // When the inner message is default, it doesn't encode.
+        // When the inner message is empty, it doesn't encode.
         assert::decodes_distinguished(
             [(2, OV::string("abc"))],
             OuterDirect {
-                inner: Default::default(),
+                inner: HasEmptyState::empty(),
                 also: "abc".into(),
             },
         );
@@ -1845,22 +1845,22 @@ mod derived_message_tests {
             },
         );
 
-        // When the inner message is present in the encoding but defaulted, it's only canonical when
+        // When the inner message is present in the encoding but empty, it's only canonical when
         // the field is optioned.
         assert::decodes_only_expedient(
             [(1, OV::message(&[].into_opaque_message()))],
-            OuterDirect::default(),
+            OuterDirect::empty(),
             NotCanonical,
         );
         assert::decodes_distinguished(
             [(1, OV::message(&[].into_opaque_message()))],
             OuterOptional {
-                inner: Some(Default::default()),
+                inner: Some(HasEmptyState::empty()),
                 also: None,
             },
         );
 
-        // The inner message is included when it is not fully defaulted
+        // The inner message is included when it is not fully empty
         assert::decodes_distinguished(
             [
                 (
@@ -1953,7 +1953,7 @@ mod derived_message_tests {
                 zero: "hello".into(),
                 four: Some(Nested(555)),
                 oneof: Three(Nested(301)),
-                ..Default::default()
+                ..HasEmptyState::empty()
             },
         );
         assert::decodes_only_expedient(
@@ -1967,7 +1967,7 @@ mod derived_message_tests {
                 zero: "hello".into(),
                 four: Some(Nested(555)),
                 oneof: Three(Nested(301)),
-                ..Default::default()
+                ..HasEmptyState::empty()
             },
             UnknownField,
         );
@@ -1990,7 +1990,7 @@ mod derived_message_tests {
                 zero: "hello".into(),
                 four: Some(Nested(555)),
                 oneof: Three(Nested(301)),
-                ..Default::default()
+                ..HasEmptyState::empty()
             },
             UnknownField,
         );
@@ -2013,7 +2013,7 @@ mod derived_message_tests {
                 zero: "hello".into(),
                 four: Some(Nested(555)),
                 oneof: Three(Nested(301)),
-                ..Default::default()
+                ..HasEmptyState::empty()
             },
             UnknownField,
         );

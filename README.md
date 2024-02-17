@@ -91,28 +91,16 @@ canonically represented; see the [next section](#distinguished-decoding).
 
 Bilrost specifies most of what is required to make these message schemas
 portable not just across architectures and programs, but to other programming
-languages as well. There are some minor caveats:
+languages as well. There is currently one minor caveat: The *sort order* of
+values in Bilrost may matter.
 
-1. The default, "empty" value of a message field's type has an effect on the
-   meaning of encoded data. At present, this only affects "enumerations", which
-   map a set of names to representative numeric values. It is
-   ***strongly recommended,*** but not *required,* that any enumeration with a
-   default value have its default represented by numeric zero.
-
-   Enumeration types which do not have a zero-valued default and are included
-   directly in a message, the field will implicitly take on this non-zero value
-   by default when it is not present in the encoded data, and nothing will be
-   emitted to the encoding when the field has that value. This is true of *all*
-   types that Bilrost may encode, but each of those types is typically
-   explicitly represented by all-zero values or "no data".
-2. The second caveat is that the *sort order* of values in Bilrost may matter.
-   In distinguished encoding mode, canonical data must always be represented
-   with *sets* and *maps* having their items in sorted order. When the item type
-   of a set (or the key type of a map) is not a simple type with an
-   already-standardized sorting order (such as an integer or string), the
-   canonical order of the items depends on that type's implementation, and care
-   must be taken to standardize that order in addition to the schema of the
-   message's fields when defining distinguished types.
+In distinguished encoding mode, canonical data must always be represented with
+*sets* and *maps* having their items in sorted order. When the item type of a
+set (or the key type of a map) is not a simple type with an already-standardized
+sorting order (such as an integer or string), the canonical order of the items
+depends on that type's implementation, and care must be taken to standardize
+that order in addition to the schema of the message's fields when defining
+distinguished types.
 
 ### Distinguished decoding
 
@@ -148,9 +136,9 @@ encodings of a given value, such as encodings that contain unknown fields or
 non-canonically encoded values*. Most of the time, this is what is desired.
 
 *"Non-canonical" value encodings in Bilrost principally include fields that are
-represented in the encoding even though their value is default. For message
-types, such as nested messages, it also encompasses the message representation
-containing fields with unknown tags.
+represented in the encoding even though their value is considered empty. For
+message types, such as nested messages, it also encompasses the message
+representation containing fields with unknown tags.
 
 To support this "exactly 1:1" expectation for distinguished messages, certain
 types are forbidden and not implemented in disinguished mode, even though they
@@ -258,7 +246,7 @@ same data.
 
 ```rust,
 # use bilrost::Message;
-#[derive(Debug, PartialEq, Message)]
+#[derive(Debug, Default, PartialEq, Message)]
 struct BucketFile {
     #[bilrost(1)]
     name: String,
@@ -284,7 +272,7 @@ assert_eq!(
         name: "foo.txt".to_string(),
         shared: true,
         storage_key: "public/foo.txt".to_string(),
-        ..Default::default() // `Message` comes with a `Default` impl
+        ..Default::default()
     }
 );
 ```
@@ -335,10 +323,6 @@ You can then import and use its traits and derive macros. The main three are:
 
 * `Message`: This is the basic working unit. Derive this for structs to enable
   encoding and decoding them to and from binary data.
-
-  This derive currently includes an implementation of `Default` that is the same
-  as the automatically derived `Default`: each field takes on the value of its
-  own default. TODO: make this untrue
 * `Enumeration`: This is a derive only, not a trait, which implements support
   for encoding an enum type with `bilrost`. The enum must have no fields, and
   each of its variants will correspond to a different `u32` value that will
@@ -419,7 +403,6 @@ TODO: expand
 * different encoders and what they do
 * "enumeration" helpers
 * "recurses"
-* "has_default"
 
 ### Distinguished derive macros
 
@@ -456,8 +439,10 @@ TODO: this
 | `varint`             | `u8`, `i8`             | varint                 | yes           |
 | `plainbytes`         | [`Vec<u8>`][vec]**     | length-delimited       | yes           |
 
-*`Enumeration` types can be directly included if they implement `Default`;
-otherwise they must always be nested.
+*`Enumeration` types can be directly included if they have a value that has a
+Bilrost representation of zero (represented as exactly the expression `0` either
+via a `#[bilrost(0)]` attribute or, absent an attribute, via a normal
+discriminant value). Otherwise, enumeration types must always be nested.
 
 **Alternative types are available! See below.
 
@@ -465,7 +450,7 @@ otherwise they must always be nested.
 message types can nest recursively this way.
 
 Any of these types may be included directly in a `bilrost` message struct. If
-that field's value is defaulted, no bytes will be emitted when it is encoded.
+that field's value is empty, no bytes will be emitted when it is encoded.
 
 In addition to including them directly, these types can also be nested within
 several different containers:
@@ -602,15 +587,6 @@ All enumeration types are encoded and decoded by conversion to and from the Rust
 In addition to deriving trait impls with `Enumeration`, the following additional
 traits are also mandatory: `Clone` and `Eq` (and thus `PartialEq` as well).
 
-Enumeration types are not required to implement `Default`, but they may. It is
-strongly recommended, but not mandatory, that the default variant be one that
-has a discriminant value of zero (`0`). If a different discriminant value is
-used, it may not be possible to change an enum type in a field to a `u32` to
-support decoding unknown enumeration values. This is because the default value
-of each field in a Bilrost struct always encodes and decodes from no data, and
-changing the type to one where the default value represents a different number
-would change the meaning of every encoding in which that field is default.
-
 #### Compatible Widening
 
 While many types have different representations and interpretations in the
@@ -638,9 +614,8 @@ same representation.
 can also be changed between `unpacked` and `packed` encoding, as long as the
 inner value type `T` does not have a length-delimited representation. This will
 break compatibility with distinguished decoding in both directions whenever the
-field is present and not default (non-optional and empty or None) because it
-will also change the encoded representation, but expedient decoding will still
-work.
+field is present and not empty (non-optional and empty or None) because it will
+also change the encoded representation, but expedient decoding will still work.
 
 ## What Bilrost and the library won't do
 
@@ -843,8 +818,8 @@ for many common data types.
 * additional decoding constraints for distinguished
     * fields' types must have an equivalence relation via their encoded
       representations
-    * fields must never be present in the decoded data when they have the
-      default value
+    * fields must never be present in the decoded data when they have an empty
+      value
     * unknown fields must err
     * maps' keys and sets' items must be ordered
 

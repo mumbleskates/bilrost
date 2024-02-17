@@ -138,6 +138,12 @@ impl<const N: usize> Wiretyped<[u8; N]> for PlainBytes {
 }
 
 impl<const N: usize> HasEmptyState for [u8; N] {
+    #[inline]
+    fn empty() -> Self {
+        [0; N]
+    }
+
+    #[inline]
     fn is_empty(&self) -> bool {
         self.iter().all(|&byte| byte == 0)
     }

@@ -110,6 +110,11 @@ macro_rules! fixed_width_float {
 
         impl HasEmptyState for $ty {
             #[inline]
+            fn empty() -> Self {
+                0.0
+            }
+
+            #[inline]
             fn is_empty(&self) -> bool {
                 // Preserve -0.0. This is actually the original motivation for `HasEmptyState`.
                 self.to_bits() == 0

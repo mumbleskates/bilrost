@@ -9,7 +9,7 @@ use std::ops::Deref;
 use anyhow::{anyhow, bail, Error};
 use itertools::Itertools;
 use proc_macro2::{Span, TokenStream};
-use quote::quote;
+use quote::{quote, ToTokens};
 use syn::{
     parse2, parse_str, Attribute, Data, DataEnum, DataStruct, DeriveInput, Expr, Fields,
     FieldsNamed, FieldsUnnamed, Ident, ImplGenerics, Index, Meta, MetaList, MetaNameValue,
@@ -107,9 +107,7 @@ fn preprocess_message(input: &DeriveInput) -> Result<PreprocessedMessage, Error>
     };
 
     // TODO(widders): make it possible to ignore fields. this should preclude distinguished encoding
-    //  and probably means not auto-implementing `Default` when there are ignored fields, but still
-    //  requiring it; when parsing, the type would be constructed with all non-ignored fields'
-    //  default values overlaying the struct's `Default`.
+    //  and require an externally implemented `Default` to overlay empty fields onto
 
     let fields: Vec<syn::Field> = match variant_data {
         DataStruct {
@@ -551,18 +549,20 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
             }
         }
 
-        impl #impl_generics ::core::default::Default for #ident #ty_generics #where_clause {
-            fn default() -> Self {
-                Self {
-                    #(#field_idents: ::core::default::Default::default(),)*
-                }
-            }
-        }
-
         impl #impl_generics ::bilrost::encoding::HasEmptyState
         for #ident #ty_generics #where_clause {
+            fn empty() -> Self {
+                Self {
+                    #(#field_idents: ::bilrost::encoding::HasEmptyState::empty(),)*
+                }
+            }
+
             fn is_empty(&self) -> bool {
                 true #(&& ::bilrost::encoding::HasEmptyState::is_empty(&self.#field_idents))*
+            }
+
+            fn clear(&mut self) {
+                #(::bilrost::encoding::HasEmptyState::clear(&mut self.#field_idents);)*
             }
         }
     };
@@ -684,7 +684,7 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
 
     // Map the variants into 'fields'.
     let mut variants: Vec<(Ident, Expr)> = Vec::new();
-    let mut has_default = false;
+    let mut zero_variant_ident = None;
     for Variant {
         attrs,
         ident,
@@ -694,7 +694,7 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
     } in punctuated_variants
     {
         match fields {
-            Fields::Unit => (),
+            Fields::Unit => {}
             Fields::Named(_) | Fields::Unnamed(_) => {
                 bail!("Enumeration variants may not have fields")
             }
@@ -708,25 +708,11 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
                     attribute with a constant value"
                 )
             })?;
+        if is_zero_discriminant(&expr) {
+            zero_variant_ident = Some(ident.clone());
+        }
         variants.push((ident, expr));
-
-        // Detect whether `Default` is being derived by looking for the #[default] attribute. This
-        // isn't foolproof, but it's good enough for most cases and 1) if we falsely detect that
-        // `Default` was implemented `NewForOverwrite` can be implemented manually if needed; if we
-        // fail to detect that `Default` was implemented we can suppress generating the automatic
-        // `NewForOverwrite` with the `bilrost(has_default)` attribute described below; and 3) the
-        // `NewForOverwrite` trait is slated to be factored out anyway.
-        has_default |= attrs
-            .iter()
-            .any(|attr| matches!(&attr.meta, Meta::Path(path) if path.is_ident("default")));
     }
-
-    // If `std::Default` is implemented for the type in a way we can't auto-detect, we make it
-    // possible to prevent implementing the automatic `NewForOverwrite` by including a
-    // `bilrost(has_default)` attribute on the type.
-    has_default |= bilrost_attrs(input.attrs)?
-        .into_iter()
-        .any(|attr| matches!(attr, Meta::Path(path) if path.is_ident("has_default")));
 
     if variants.is_empty() {
         bail!("Enumeration must have at least one variant");
@@ -744,10 +730,22 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
 
     let is_valid_doc = format!("Returns `true` if `value` is a variant of `{}`.", ident);
 
-    // When the type already has a `Default` implementation, we suppress generating a (conflicting)
-    // implementation of `NewForOverwrite`.
-    let new_for_overwrite = if has_default {
-        quote!()
+    // When the type has a zero-valued variant, we implement `HasEmptyState`. When it doesn't, we
+    // need an alternate way to create a value to be overwritten, so we impl `NewForOverwrite`
+    // directly.
+    let creation_impl = if let Some(zero) = &zero_variant_ident {
+        quote! {
+            impl #impl_generics ::bilrost::encoding::HasEmptyState
+            for #ident #ty_generics #where_clause {
+                fn empty() -> Self {
+                    Self::#zero
+                }
+
+                fn is_empty(&self) -> bool {
+                    matches!(self, Self::#zero)
+                }
+            }
+        }
     } else {
         let (first_variant, _) = variants.first().unwrap();
         quote! {
@@ -760,7 +758,7 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
         }
     };
 
-    let check_empty = if has_default {
+    let check_empty = if zero_variant_ident.is_some() {
         quote! {
             if !allow_empty && ::bilrost::encoding::HasEmptyState::is_empty(value) {
                 return Err(::bilrost::DecodeError::new(
@@ -806,7 +804,7 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
             }
         }
 
-        #new_for_overwrite
+        #creation_impl
 
         impl #impl_generics ::bilrost::encoding::Wiretyped<#ident #ty_generics>
         for ::bilrost::encoding::General #where_clause {
@@ -854,9 +852,6 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
                 Ok(())
             }
         }
-
-        impl #impl_generics ::bilrost::encoding::EqualDefaultAlwaysEmpty
-        for #ident #ty_generics #where_clause {}
     };
 
     Ok(expanded)
@@ -865,6 +860,12 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
 #[proc_macro_derive(Enumeration, attributes(bilrost))]
 pub fn enumeration(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     try_enumeration(input.into()).unwrap().into()
+}
+
+/// Detects whether the given expression, denoting the discriminant of an enumeration variant, is
+/// definitely zero.
+fn is_zero_discriminant(expr: &Expr) -> bool {
+    expr.to_token_stream().to_string() == "0"
 }
 
 /// Get the numeric variant value for an enumeration from attrs.
@@ -907,8 +908,8 @@ fn preprocess_oneof(input: &DeriveInput) -> Result<PreprocessedOneof, Error> {
 
     // Oneof enums have either zero or one unit variant. If there is no such variant, the Oneof
     // trait is implemented on `Option<T>`, and `None` stands in for no fields being set. If there
-    // is such a variant, it becomes the default for the type and stands in for no fields being set,
-    // as the "empty" variant.
+    // is such a variant, it becomes the empty state for the type and stands in for no fields being
+    // set.
     let mut empty_variant: Option<Ident> = None;
     let mut fields: Vec<(Ident, Field)> = Vec::new();
     // Map the variants into 'fields'.
@@ -1105,14 +1106,13 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
                     }
                 }
 
-                impl #impl_generics ::core::default::Default for #ident #ty_generics #where_clause {
-                    fn default() -> Self {
-                        #ident::#empty_ident
-                    }
-                }
-
                 impl #impl_generics ::bilrost::encoding::HasEmptyState
                 for #ident #ty_generics #where_clause {
+                    #[inline]
+                    fn empty() -> Self {
+                        #ident::#empty_ident
+                    }
+
                     #[inline]
                     fn is_empty(&self) -> bool {
                         matches!(self, #ident::#empty_ident)

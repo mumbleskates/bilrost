@@ -225,7 +225,6 @@ impl Field {
         } else {
             vec![
                 quote!(#encoder: ::bilrost::encoding::Encoder<#ty>),
-                quote!(#ty: ::core::default::Default),
                 quote!(#ty: ::bilrost::encoding::HasEmptyState),
             ]
         }
@@ -247,7 +246,6 @@ impl Field {
         } else {
             vec![
                 quote!(#encoder: ::bilrost::encoding::DistinguishedEncoder<#ty>),
-                quote!(#ty: ::core::default::Default),
                 quote!(#ty: ::bilrost::encoding::HasEmptyState),
             ]
         }

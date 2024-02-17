@@ -4,7 +4,7 @@ use alloc::vec::Vec;
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 
 use crate::encoding::{
-    encode_varint, encoded_len_varint, Capped, DecodeContext, TagReader, WireType,
+    encode_varint, encoded_len_varint, Capped, DecodeContext, HasEmptyState, TagReader, WireType,
 };
 use crate::{DecodeError, EncodeError};
 
@@ -52,7 +52,7 @@ pub(crate) fn merge_distinguished<T: RawDistinguishedMessage, B: Buf + ?Sized>(
 /// Messages are expected to have a `Default` implementation that is exactly the same as each
 /// field's respective `Default` value; that is, functionally identical to a derived `Default`. This
 /// is automatically satisfied by the derive macro.
-pub trait Message: Default {
+pub trait Message {
     /// Returns the encoded length of the message without a length delimiter.
     fn encoded_len(&self) -> usize;
 
@@ -81,13 +81,19 @@ pub trait Message: Default {
     /// Decodes an instance of the message from a buffer.
     ///
     /// The entire buffer will be consumed.
-    fn decode<B: Buf>(buf: B) -> Result<Self, DecodeError>;
+    fn decode<B: Buf>(buf: B) -> Result<Self, DecodeError>
+    where
+        Self: Sized;
 
     /// Decodes a length-delimited instance of the message from the buffer.
-    fn decode_length_delimited<B: Buf>(buf: B) -> Result<Self, DecodeError>;
+    fn decode_length_delimited<B: Buf>(buf: B) -> Result<Self, DecodeError>
+    where
+        Self: Sized;
 
     /// Decodes an instance from the given `Capped` buffer, consuming it to its cap.
-    fn decode_capped<B: Buf + ?Sized>(buf: Capped<B>) -> Result<Self, DecodeError>;
+    fn decode_capped<B: Buf + ?Sized>(buf: Capped<B>) -> Result<Self, DecodeError>
+    where
+        Self: Sized;
 
     // TODO(widders): encode and decode with unknown fields in an unknown-fields companion struct
 }
@@ -102,14 +108,20 @@ pub trait DistinguishedMessage: Message + Eq {
     /// Decodes an instance of the message from a buffer in distinguished mode.
     ///
     /// The entire buffer will be consumed.
-    fn decode_distinguished<B: Buf>(buf: B) -> Result<Self, DecodeError>;
+    fn decode_distinguished<B: Buf>(buf: B) -> Result<Self, DecodeError>
+    where
+        Self: Sized;
 
     /// Decodes a length-delimited instance of the message from the buffer in distinguished mode.
-    fn decode_distinguished_length_delimited<B: Buf>(buf: B) -> Result<Self, DecodeError>;
+    fn decode_distinguished_length_delimited<B: Buf>(buf: B) -> Result<Self, DecodeError>
+    where
+        Self: Sized;
 
     /// Decodes an instance from the given `Capped` buffer in distinguished mode, consuming it to
     /// its cap.
-    fn decode_distinguished_capped<B: Buf + ?Sized>(buf: Capped<B>) -> Result<Self, DecodeError>;
+    fn decode_distinguished_capped<B: Buf + ?Sized>(buf: Capped<B>) -> Result<Self, DecodeError>
+    where
+        Self: Sized;
 }
 
 /// `Message` is implemented as a usability layer on top of the basic functionality afforded by
@@ -192,7 +204,7 @@ where
     }
 
     fn decode_capped<B: Buf + ?Sized>(buf: Capped<B>) -> Result<Self, DecodeError> {
-        let mut message = Self::default();
+        let mut message = Self::empty();
         merge(&mut message, buf, DecodeContext::default())?;
         Ok(message)
     }
@@ -211,7 +223,7 @@ where
     }
 
     fn decode_distinguished_capped<B: Buf + ?Sized>(buf: Capped<B>) -> Result<Self, DecodeError> {
-        let mut message = Self::default();
+        let mut message = Self::empty();
         merge_distinguished(&mut message, buf, DecodeContext::default())?;
         Ok(message)
     }
@@ -317,7 +329,7 @@ where
 
 /// Trait to be implemented by messages, which have knowledge of their fields' tags and encoding.
 /// The methods of this trait are meant to only be used by the `Message` implementation.
-pub trait RawMessage: Default {
+pub trait RawMessage: HasEmptyState {
     const __ASSERTIONS: ();
 
     /// Encodes the message to a buffer.
@@ -339,13 +351,6 @@ pub trait RawMessage: Default {
     ) -> Result<(), DecodeError>
     where
         Self: Sized;
-
-    /// Clears the message, resetting all fields to their default.
-    fn clear(&mut self) {
-        // TODO(widders): derived piecewise clearing and replace-from decoding to reuse allocated
-        //  storage, maybe. this will probably mean reinstating the unsafety in the String parser
-        *self = Self::default();
-    }
 }
 
 /// Complementary underlying trait for distinguished messages, all of whose fields have a
@@ -361,6 +366,23 @@ pub trait RawDistinguishedMessage: RawMessage {
     ) -> Result<(), DecodeError>
     where
         Self: Sized;
+}
+
+impl<T> HasEmptyState for Box<T>
+where
+    T: HasEmptyState,
+{
+    fn empty() -> Self {
+        Self::new(T::empty())
+    }
+
+    fn is_empty(&self) -> bool {
+        self.as_ref().is_empty()
+    }
+
+    fn clear(&mut self) {
+        self.as_mut().clear()
+    }
 }
 
 impl<T> RawMessage for Box<T>

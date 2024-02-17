@@ -13,8 +13,8 @@ use bytes::{Buf, BufMut, Bytes};
 use crate::encoding::{
     delegate_encoding, delegate_value_encoding, encode_varint, encoded_len_varint,
     encoder_where_value_encoder, Capped, DecodeContext, DistinguishedEncoder,
-    DistinguishedValueEncoder, Encoder, EqualDefaultAlwaysEmpty, Fixed, Map, PlainBytes,
-    TagMeasurer, TagWriter, Unpacked, ValueEncoder, Varint, WireType, Wiretyped,
+    DistinguishedValueEncoder, Encoder, Fixed, HasEmptyState, Map, PlainBytes, TagMeasurer,
+    TagWriter, Unpacked, ValueEncoder, Varint, WireType, Wiretyped,
 };
 use crate::message::{merge, merge_distinguished, RawDistinguishedMessage, RawMessage};
 use crate::DecodeErrorKind::{InvalidValue, NotCanonical};
@@ -89,7 +89,22 @@ delegate_value_encoding!(delegate from (General) to (Varint)
 delegate_value_encoding!(delegate from (General) to (Fixed) for type (f32));
 delegate_value_encoding!(delegate from (General) to (Fixed) for type (f64));
 
-impl EqualDefaultAlwaysEmpty for String {}
+impl HasEmptyState for String {
+    #[inline]
+    fn empty() -> Self {
+        Self::new()
+    }
+
+    #[inline]
+    fn is_empty(&self) -> bool {
+        Self::is_empty(self)
+    }
+
+    #[inline]
+    fn clear(&mut self) {
+        Self::clear(self)
+    }
+}
 
 impl Wiretyped<String> for General {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
@@ -141,7 +156,29 @@ mod string {
     check_type_test!(General, distinguished, String, WireType::LengthDelimited);
 }
 
-impl EqualDefaultAlwaysEmpty for Cow<'_, str> {}
+impl HasEmptyState for Cow<'_, str> {
+    #[inline]
+    fn empty() -> Self {
+        Self::default()
+    }
+
+    #[inline]
+    fn is_empty(&self) -> bool {
+        str::is_empty(self)
+    }
+
+    #[inline]
+    fn clear(&mut self) {
+        match self {
+            Cow::Borrowed(_) => {
+                *self = Cow::default();
+            }
+            Cow::Owned(owned) => {
+                owned.clear();
+            }
+        }
+    }
+}
 
 impl Wiretyped<Cow<'_, str>> for General {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
@@ -186,7 +223,17 @@ mod cow_string {
 }
 
 #[cfg(feature = "bytestring")]
-impl EqualDefaultAlwaysEmpty for bytestring::ByteString {}
+impl HasEmptyState for bytestring::ByteString {
+    #[inline]
+    fn empty() -> Self {
+        Self::new()
+    }
+
+    #[inline]
+    fn is_empty(&self) -> bool {
+        str::is_empty(self)
+    }
+}
 
 #[cfg(feature = "bytestring")]
 impl Wiretyped<bytestring::ByteString> for General {
@@ -244,7 +291,17 @@ mod bytestring_string {
         WireType::LengthDelimited);
 }
 
-impl EqualDefaultAlwaysEmpty for Bytes {}
+impl HasEmptyState for Bytes {
+    #[inline]
+    fn empty() -> Self {
+        Self::new()
+    }
+
+    #[inline]
+    fn is_empty(&self) -> bool {
+        Self::is_empty(self)
+    }
+}
 
 impl Wiretyped<Bytes> for General {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
@@ -295,8 +352,6 @@ mod bytes_blob {
     check_type_test!(General, expedient, from Vec<u8>, into Bytes, WireType::LengthDelimited);
     check_type_test!(General, distinguished, from Vec<u8>, into Bytes, WireType::LengthDelimited);
 }
-
-impl EqualDefaultAlwaysEmpty for Blob {}
 
 impl Wiretyped<Blob> for General {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;

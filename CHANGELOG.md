@@ -5,6 +5,14 @@
 * Changed the name of the `detailed-errors` feature to have a hyphen instead of
   an underscore, consistent with the other feature names.
 * Renamed the `vecblob` encoder to `plainbytes`.
+* Encoded bilrost values and semantics no longer rely on the `Default`
+  implementation for their empty values.
+    * `Message` no longer requires, nor does its derive macro provide, an
+      implementation of `Default`.
+    * `Enumeration` no longer cares whether the type has a `Default`
+      implementation, only whether there is a variant whose Bilrost value is
+      exactly `0`.
+    * All of the above duties are taken on by the `HasEmptyState` trait, as does the base implementation for `NewForOverwrite`.
 
 ### New features
 

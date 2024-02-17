@@ -27,8 +27,8 @@ mod value_traits;
 mod varint;
 
 pub use value_traits::{
-    Collection, DistinguishedCollection, DistinguishedMapping, EqualDefaultAlwaysEmpty,
-    HasEmptyState, Mapping, NewForOverwrite,
+    Collection, DistinguishedCollection, DistinguishedMapping, HasEmptyState, Mapping,
+    NewForOverwrite,
 };
 
 /// Fixed-size encoder. Encodes integers in fixed-size format.
@@ -825,7 +825,7 @@ where
 
 /// Trait to be implemented by (or more commonly derived for) oneofs, which have knowledge of their
 /// variants' tags and encoding.
-pub trait Oneof: Default + HasEmptyState {
+pub trait Oneof: HasEmptyState {
     const FIELD_TAGS: &'static [u32];
 
     /// Encodes the fields of the oneof into the given buffer.
@@ -1239,6 +1239,32 @@ macro_rules! encoder_where_value_encoder {
     };
 }
 pub(crate) use encoder_where_value_encoder;
+
+/// Marks a type as deriving its `HasEmptyState` implementation from `Default` and `PartialEq`
+macro_rules! has_empty_state_via_default {
+    (
+        $ty:ty
+        $(, with generics ($($generics:tt)*))?
+        $(, with where clause ($($where_clause:tt)*))?
+    ) => {
+        impl<$($($generics)*)?> $crate::encoding::HasEmptyState for $ty
+        where
+            Self: Default + PartialEq,
+            $($($where_clause)*)?
+        {
+            #[inline]
+            fn empty() -> Self {
+                Self::default()
+            }
+
+            #[inline]
+            fn is_empty(&self) -> bool {
+                *self == Self::default()
+            }
+        }
+    };
+}
+pub(crate) use has_empty_state_via_default;
 
 #[cfg(test)]
 mod test {
