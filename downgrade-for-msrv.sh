@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Script which downgrades dependent packages to match our target MSRV.
 

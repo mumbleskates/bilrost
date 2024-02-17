@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Script which automates modifying source version fields, and creating a
 # pre-release commit, without a tag. The commit is not automatically pushed, nor
