@@ -33,13 +33,11 @@ impl Field {
     ) -> Result<Option<Field>, Error> {
         let attrs = bilrost_attrs(attrs)?;
 
-        // TODO: check for ignore attribute.
-
-        Ok(Some(if let Some(field) = oneof::Field::new(&ty, &attrs)? {
-            Field::Oneof(field)
+        Ok(if let Some(field) = oneof::Field::new(&ty, &attrs)? {
+            Some(Field::Oneof(field))
         } else {
-            Field::Value(value::Field::new(&ty, &attrs, inferred_tag)?)
-        }))
+            value::Field::new(&ty, &attrs, inferred_tag)?.map(Field::Value)
+        })
     }
 
     pub fn new_in_oneof(

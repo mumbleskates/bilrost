@@ -93,6 +93,7 @@ struct PreprocessedMessage<'a> {
     ty_generics: TypeGenerics<'a>,
     where_clause: Option<&'a WhereClause>,
     unsorted_fields: Vec<(TokenStream, Field)>,
+    has_ignored_fields: bool,
 }
 
 fn preprocess_message(input: &DeriveInput) -> Result<PreprocessedMessage, Error> {
@@ -106,15 +107,12 @@ fn preprocess_message(input: &DeriveInput) -> Result<PreprocessedMessage, Error>
         Data::Union(..) => bail!("Message can not be derived for a union"),
     };
 
-    // TODO(widders): make it possible to ignore fields. this should preclude distinguished encoding
-    //  and require an externally implemented `Default` to overlay empty fields onto
-
     let fields: Vec<syn::Field> = match variant_data {
         DataStruct {
             fields: Fields::Named(FieldsNamed { named: fields, .. }),
             ..
-        } => fields.into_iter().cloned().collect(),
-        DataStruct {
+        }
+        | DataStruct {
             fields:
                 Fields::Unnamed(FieldsUnnamed {
                     unnamed: fields, ..
@@ -128,6 +126,7 @@ fn preprocess_message(input: &DeriveInput) -> Result<PreprocessedMessage, Error>
     };
 
     let mut next_tag = Some(1);
+    let mut has_ignored_fields = false;
     let unsorted_fields: Vec<(TokenStream, Field)> = fields
         .into_iter()
         .enumerate()
@@ -144,7 +143,11 @@ fn preprocess_message(input: &DeriveInput) -> Result<PreprocessedMessage, Error>
                     next_tag = field.last_tag().checked_add(1);
                     Some(Ok((field_ident, field)))
                 }
-                Ok(None) => None,
+                Ok(None) => {
+                    // Field is ignored
+                    has_ignored_fields = true;
+                    None
+                },
                 Err(err) => Some(Err(
                     err.context(format!("invalid message field {}.{}", ident, field_ident))
                 )),
@@ -170,6 +173,7 @@ fn preprocess_message(input: &DeriveInput) -> Result<PreprocessedMessage, Error>
         ty_generics,
         where_clause,
         unsorted_fields,
+        has_ignored_fields,
     })
 }
 
@@ -348,6 +352,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         ty_generics,
         where_clause,
         unsorted_fields,
+        has_ignored_fields,
     } = preprocess_message(&input)?;
     let fields = sort_fields(unsorted_fields.clone());
     let where_clause = append_expedient_encoder_wheres(where_clause, None, &unsorted_fields);
@@ -510,6 +515,12 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         .map(|(field_ident, _)| field_ident)
         .collect();
 
+    let initialize_ignored = if has_ignored_fields {
+        quote!(..::core::default::Default::default())
+    } else {
+        quote!()
+    };
+
     let expanded = quote! {
         impl #impl_generics ::bilrost::RawMessage for #ident #ty_generics #where_clause {
             const __ASSERTIONS: () = { #(#static_guards)* };
@@ -554,6 +565,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
             fn empty() -> Self {
                 Self {
                     #(#field_idents: ::bilrost::encoding::EmptyState::empty(),)*
+                    #initialize_ignored
                 }
             }
 
@@ -598,7 +610,13 @@ fn try_distinguished_message(input: TokenStream) -> Result<TokenStream, Error> {
         ty_generics,
         where_clause,
         unsorted_fields,
+        has_ignored_fields,
     } = preprocess_message(&input)?;
+
+    if has_ignored_fields {
+        bail!("messages with ignored fields cannot be distinguished");
+    }
+
     let where_clause = append_distinguished_encoder_wheres(where_clause, None, &unsorted_fields);
 
     let decode = unsorted_fields.iter().map(|(field_ident, field)| {
