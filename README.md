@@ -44,7 +44,7 @@ is designed to be easily used by hand.
 TODO: reorder the whole document to reconcile with the TOC
 
 - [Quick start](#getting-started)
-    - [Using the derive macros](#example-derive-macro-applications)
+    - [Using the derive macros](#deriving-message)
     - [`no_std` support](#no_std-support)
     - [Changelog](./CHANGELOG.md) ([on github][ghchangelog])
 - [Differences from `prost`](#bilrost-vs-prost)
@@ -321,20 +321,20 @@ bilrost = { version = "0.1001.0-dev", default-features = false, features = ["der
 
 You can then import and use its traits and derive macros. The main three are:
 
-* `Message`: This is the basic working unit. Derive this for structs to enable
-  encoding and decoding them to and from binary data.
-* `Enumeration`: This is a derive only, not a trait, which implements support
-  for encoding an enum type with `bilrost`. The enum must have no fields, and
-  each of its variants will correspond to a different `u32` value that will
-  represent it in the encoding.
-* `Oneof`: This is a trait and derive macro for enumerations representing
-  mutually exclusive fields within a message struct. Each variant must have one
-  field, and each variant must have a unique field tag assigned to it, *both*
-  within the oneof and within the message of which it is a part. Types
-  with `Oneof` derived do not have `bilrost` APIs useful to library users except
-  when they are included in a `Message` struct.
+* [`Message`](#deriving-message): This is the basic working unit. Derive this
+  for structs to enable encoding and decoding them to and from binary data.
+* [`Enumeration`](#enumerations): This is a derive only, not a trait, which
+  implements support for encoding an enum type with `bilrost`. The enum must
+  have no fields, and each of its variants will correspond to a different `u32`
+  value that will represent it in the encoding.
+* [`Oneof`](#oneof-fields): This is a trait and derive macro for enumerations
+  representing mutually exclusive fields within a message struct. Each variant
+  must have one field, and each variant must have a unique field tag assigned to
+  it, *both* within the oneof and within the message of which it is a part.
+  Types with `Oneof` derived do not have `bilrost` APIs useful to library users
+  except when they are included in a `Message` struct.
 
-#### Example derive macro applications
+#### Deriving `Message`
 
 If not otherwise specified, fields are tagged sequentially in the order they
 are specified in the struct, starting with `1`.
@@ -424,20 +424,20 @@ TODO: this
 
 `bilrost` structs can encode fields with a wide variety of types:
 
-| Encoder              | Value type             | Encoded representation | Distinguished |
-|----------------------|------------------------|------------------------|---------------|
-| `general` & `fixed`  | `f32`                  | fixed-size 32 bits     | no            |
-| `general` & `fixed`  | `u32`, `i32`           | fixed-size 32 bits     | yes           |
-| `general` & `fixed`  | `f64`                  | fixed-size 64 bits     | no            |
-| `general` & `fixed`  | `u64`, `i64`           | fixed-size 64 bits     | yes           |
-| `general` & `varint` | `u64`, `u32`, `u16`    | varint                 | yes           |
-| `general` & `varint` | `i64`, `i32`, `i16`    | varint                 | yes           |
-| `general` & `varint` | `bool`                 | varint                 | yes           |
-| `general`            | derived `Enumeration`* | varint                 | yes           |
-| `general`            | [`String`][str]**      | length-delimited       | yes           |
-| `general`            | impl `Message`***      | length-delimited       | maybe         |
-| `varint`             | `u8`, `i8`             | varint                 | yes           |
-| `plainbytes`         | [`Vec<u8>`][vec]**     | length-delimited       | yes           |
+| Encoder              | Value type                                  | Encoded representation | Distinguished |
+|----------------------|---------------------------------------------|------------------------|---------------|
+| `general` & `fixed`  | [`f32`][prim]                               | fixed-size 32 bits     | no            |
+| `general` & `fixed`  | [`u32`][prim], [`i32`][prim]                | fixed-size 32 bits     | yes           |
+| `general` & `fixed`  | [`f64`][prim]                               | fixed-size 64 bits     | no            |
+| `general` & `fixed`  | [`u64`][prim], [`i64`][prim]                | fixed-size 64 bits     | yes           |
+| `general` & `varint` | [`u64`][prim], [`u32`][prim], [`u16`][prim] | varint                 | yes           |
+| `general` & `varint` | [`i64`][prim], [`i32`][prim], [`i16`][prim] | varint                 | yes           |
+| `general` & `varint` | [`bool`][prim]                              | varint                 | yes           |
+| `general`            | derived [`Enumeration`](#enumerations)*     | varint                 | yes           |
+| `general`            | [`String`][str]**                           | length-delimited       | yes           |
+| `general`            | impl [`Message`](#derive-macros) ***        | length-delimited       | maybe         |
+| `varint`             | `u8`, `i8`                                  | varint                 | yes           |
+| `plainbytes`         | [`Vec<u8>`][vec]**                          | length-delimited       | yes           |
 
 *`Enumeration` types can be directly included if they have a value that has a
 Bilrost representation of zero (represented as exactly the expression `0` either
@@ -446,8 +446,8 @@ discriminant value). Otherwise, enumeration types must always be nested.
 
 **Alternative types are available! See below.
 
-***`Message` types inside `Box` still impl `Message`, with a covering impl;
-message types can nest recursively this way.
+***`Message` types inside [`Box`][box] still impl `Message`, with a covering
+impl; message types can nest recursively this way.
 
 Any of these types may be included directly in a `bilrost` message struct. If
 that field's value is empty, no bytes will be emitted when it is encoded.
@@ -460,27 +460,27 @@ several different containers:
 | any encoder   | [`Option<T>`][opt]                      | identical; at least some bytes are always encoded if `Some`, nothing if `None` | no          | when `T` is        |
 | `unpacked<E>` | [`Vec<T>`][vec], [`BTreeSet<T>`][btset] | the same as encoder `E`, one field per value                                   | no          | when `T` is        |
 | `unpacked`    | *                                       | (the same as `unpacked<general>`)                                              | no          | *                  |
-| `packed<E>`   | `Vec<T>`, `BTreeSet<T>`                 | always length-delimited, successively encoded with `E`                         | yes         | when `T` is        |
+| `packed<E>`   | [`Vec<T>`][vec], [`BTreeSet<T>`][btset] | always length-delimited, successively encoded with `E`                         | yes         | when `T` is        |
 | `packed`      | *                                       | (the same as `packed<general>`)                                                | yes         | *                  |
 | `map<KE, VE>` | [`BTreeMap<K, V>`][btmap]               | always length-delimited, alternately encoded with `KE` and `VE`                | yes         | when `K` & `V` are |
-| `general`     | `Vec<T>`, `BTreeSet<T>`                 | (the same as `unpacked`)                                                       | no          | *                  |
-| `general`     | `BTreeMap`                              | (the same as `map<general, general>`)                                          | yes         | *                  |
+| `general`     | [`Vec<T>`][vec], [`BTreeSet<T>`][btset] | (the same as `unpacked`)                                                       | no          | *                  |
+| `general`     | [`BTreeMap`][btmap]                     | (the same as `map<general, general>`)                                          | yes         | *                  |
 
 Many alternative types are also available for both scalar values and containers!
 
-| Value type   | Alternative                       | Supporting encoder | Distinguished | Feature to enable |
-|--------------|-----------------------------------|--------------------|---------------|-------------------|
-| `Vec<u8>`    | `Blob`***                         | `general`          | yes           | (none)            |
-| `Vec<u8>`    | [`Cow<[u8]>`][cow]                | `plainbytes`       | yes           | (none)            |
-| `Vec<u8>`    | [`bytes::Bytes`][bytes]*          | `general`          | yes           | (none)            |
-| `Vec<u8>`    | [`[u8; N]`][arr]**                | `plainbytes`       | yes           | (none)            |
-| `u32`, `u64` | `[u8; 4]`, `[u8; 8]`              | `fixed`            | yes           | (none)            |
-| `String`     | [`Cow<str>`][cow]                 | `general`          | yes           | (none)            |
-| `String`     | [`bytestring::ByteString`][bstr]* | `general`          | yes           | "bytestring"      |
+| Value type   | Alternative                          | Supporting encoder | Distinguished | Feature to enable |
+|--------------|--------------------------------------|--------------------|---------------|-------------------|
+| `Vec<u8>`    | `Blob`***                            | `general`          | yes           | (none)            |
+| `Vec<u8>`    | [`Cow<[u8]>`][cow]                   | `plainbytes`       | yes           | (none)            |
+| `Vec<u8>`    | [`bytes::Bytes`][bytes]*             | `general`          | yes           | (none)            |
+| `Vec<u8>`    | [`[u8; N]`][prim]**                  | `plainbytes`       | yes           | (none)            |
+| `u32`, `u64` | [`[u8; 4]`][prim], [`[u8; 8]`][prim] | `fixed`            | yes           | (none)            |
+| `String`     | [`Cow<str>`][cow]                    | `general`          | yes           | (none)            |
+| `String`     | [`bytestring::ByteString`][bstr]*    | `general`          | yes           | "bytestring"      |
 
 *When decoding from a `bytes::Bytes` object, both `bytes::Bytes` and
 `bytes::ByteString` have a zero-copy optimization and will reference the decoded
-buffer rather than copying. (This would also work for any other input type that
+buffer rather than copying. (This could also work for any other input type that
 has a zero-copy `bytes::Buf::copy_to_bytes()` optimization.)
 
 **Plain byte arrays, as you might expect, only accept one exact length of data;
@@ -502,29 +502,17 @@ encoder will still encode a plain `Vec<u8>` as its bytes value.
 | `BTreeMap<T>`  | [`hashbrown::HashMap<T>`][hbmap]*     | no            | "hashbrown"       |
 | `BTreeSet<T>`  | [`hashbrown::HashSet<T>`][hbset]*     | no            | "hashbrown"       |
 
-[str]: https://doc.rust-lang.org/std/string/struct.String.html
-
-[vec]: https://doc.rust-lang.org/std/vec/struct.Vec.html
-
-[opt]: https://doc.rust-lang.org/std/option/enum.Option.html
-
-[btset]: https://doc.rust-lang.org/std/collections/struct.BTreeSet.html
-
-[btmap]: https://doc.rust-lang.org/std/collections/btree_map/struct.BTreeMap.html
-
-[cow]: https://doc.rust-lang.org/std/borrow/enum.Cow.html
-
-[bytes]: https://docs.rs/bytes/latest/bytes/struct.Bytes.html
-
-[arr]: https://doc.rust-lang.org/std/primitive.array.html
+[box]: https://doc.rust-lang.org/std/boxed/struct.Box.html
 
 [bstr]: https://docs.rs/bytestring/latest/bytestring/struct.ByteString.html
 
-[smallvec]: https://docs.rs/smallvec/latest/smallvec/struct.SmallVec.html
+[btmap]: https://doc.rust-lang.org/std/collections/btree_map/struct.BTreeMap.html
 
-[thinvec]: https://docs.rs/thin-vec/latest/thin_vec/struct.ThinVec.html
+[btset]: https://doc.rust-lang.org/std/collections/struct.BTreeSet.html
 
-[tinyvec]: https://docs.rs/tinyvec/latest/tinyvec/enum.TinyVec.html
+[bytes]: https://docs.rs/bytes/latest/bytes/struct.Bytes.html
+
+[cow]: https://doc.rust-lang.org/std/borrow/enum.Cow.html
 
 [hashmap]: https://doc.rust-lang.org/std/collections/struct.HashMap.html
 
@@ -533,6 +521,20 @@ encoder will still encode a plain `Vec<u8>` as its bytes value.
 [hbmap]: https://docs.rs/hashbrown/latest/hashbrown/struct.HashMap.html
 
 [hbset]: https://docs.rs/hashbrown/latest/hashbrown/struct.HashSet.html
+
+[opt]: https://doc.rust-lang.org/std/option/enum.Option.html
+
+[prim]: https://doc.rust-lang.org/std/index.html#primitives
+
+[smallvec]: https://docs.rs/smallvec/latest/smallvec/struct.SmallVec.html
+
+[str]: https://doc.rust-lang.org/std/string/struct.String.html
+
+[thinvec]: https://docs.rs/thin-vec/latest/thin_vec/struct.ThinVec.html
+
+[tinyvec]: https://docs.rs/tinyvec/latest/tinyvec/enum.TinyVec.html
+
+[vec]: https://doc.rust-lang.org/std/vec/struct.Vec.html
 
 *Hash-table-based maps and sets are implemented, but are not compatible with
 distinguished encoding or decoding. If distinguished encoding is required, a
@@ -990,7 +992,10 @@ Strengths of Bilrost's encoding include those of protocol buffers:
   nice to use!
 
 (*The main area of potential incompatibility is with the representation of
-signaling vs. quiet NaN floating point values; see `f64::to_bits()`.)
+signaling vs. quiet NaN floating point values; see
+[`f64::from_bits()`][floatbits].)
+
+[floatbits]: https://doc.rust-lang.org/std/primitive.f64.html#method.from_bits
 
 ## FAQ
 
