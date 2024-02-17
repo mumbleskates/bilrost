@@ -396,66 +396,6 @@ TODO: expand
 * example usage
 * with & without empty variant
 
-#### Enumerations
-
-Implementations for numeric enumerations without fields can be derived for
-inclusion in `bilrost` structs:
-
-```rust,
-# use bilrost::Enumeration;
-#[derive(Clone, PartialEq, Eq, Enumeration)]
-enum Foo {
-    A = 1,
-    B = 2,
-}
-```
-
-This implements several traits, including `Into<u32>`, `TryFrom<u32>`, and
-expedient & distinguished encoding support via the `general` encoder. At minimum
-the type must also support `Clone` and `Eq`.
-
-Enumerations' numeric discriminant values in Bilrost can be overridden or wholly
-specified by attributes:
-
-```rust,
-# use bilrost::Enumeration;
-#[derive(Clone, PartialEq, Eq, Enumeration)]
-enum Foo {
-    #[bilrost(2)]
-    A = 1,
-    #[bilrost(1)]
-    B = 2,
-    #[bilrost(3)]
-    C,
-}
-```
-
-If the discriminants conflict at all, compilation will fail; the discriminants
-must be unique within that enumeration.
-
-```rust,compile_fail
-# use bilrost::Enumeration;
-#[derive(Clone, PartialEq, Eq, Enumeration)]
-enum Foo {
-    A = 1,
-    #[bilrost(1)] // error: unreachable pattern
-    B = 2,
-}
-```
-
-The discriminants can be specified in any of several ways:
-
-* As a plain discriminant, `A = 1`
-* `#[bilrost(1)]`
-* As another valid discriminant, `A = CONSTANT_U32_ONE`
-* `#[bilrost(CONSTANT_U32_ONE)]`
-
-For an enumeration to qualify for direct inclusion as a message field rather
-than only as a nested value (within `Option`, `Vec`, etc.), one of the
-discriminants must be spelled exactly "0".
-
-TODO: enumeration helpers
-
 #### Encoders and other attributes
 
 TODO: expand
@@ -613,7 +553,7 @@ from an `enum` with no fields in its variants, where each variant has either
 
 1. an explicit discriminant that is a valid `u32` value, or
 2. a `#[bilrost = 123]` or `#[bilrost(123)]` attribute that specifies a valid
-   `u32` const expression (here with the example value `123`).
+   `u32` const expression and match pattern (here with the example value `123`).
 
 ```rust
 #[derive(Clone, PartialEq, Eq, bilrost::Enumeration)]
@@ -646,6 +586,23 @@ All enumeration types are encoded and decoded by conversion to and from the Rust
 `u32` type, using `Into<u32>` and `TryFrom<u32, Error = bilrost::DecodeError>`.
 In addition to deriving trait impls with `Enumeration`, the following additional
 traits are also mandatory: `Clone` and `Eq` (and thus `PartialEq` as well).
+
+If the discriminants of an enumeration conflict at all, compilation will fail;
+the discriminants must be unique within any given enumeration.
+
+```rust,compile_fail
+# use bilrost::Enumeration;
+#[derive(Clone, PartialEq, Eq, Enumeration)]
+enum Foo {
+    A = 1,
+    #[bilrost(1)] // error: unreachable pattern
+    B = 2,
+}
+```
+
+For an enumeration type to qualify for direct inclusion as a message field
+rather than only as a nested value (within `Option`, `Vec`, etc.), one of the
+discriminants must be spelled exactly "0".
 
 #### Compatible Widening
 
