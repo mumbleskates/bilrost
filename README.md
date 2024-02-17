@@ -396,6 +396,66 @@ TODO: expand
 * example usage
 * with & without empty variant
 
+#### Enumerations
+
+Implementations for numeric enumerations without fields can be derived for
+inclusion in `bilrost` structs:
+
+```rust,
+# use bilrost::Enumeration;
+#[derive(Clone, PartialEq, Eq, Enumeration)]
+enum Foo {
+    A = 1,
+    B = 2,
+}
+```
+
+This implements several traits, including `Into<u32>`, `TryFrom<u32>`, and
+expedient & distinguished encoding support via the `general` encoder. At minimum
+the type must also support `Clone` and `Eq`.
+
+Enumerations' numeric discriminant values in Bilrost can be overridden or wholly
+specified by attributes:
+
+```rust,
+# use bilrost::Enumeration;
+#[derive(Clone, PartialEq, Eq, Enumeration)]
+enum Foo {
+    #[bilrost(2)]
+    A = 1,
+    #[bilrost(1)]
+    B = 2,
+    #[bilrost(3)]
+    C,
+}
+```
+
+If the discriminants conflict at all, compilation will fail; the discriminants
+must be unique within that enumeration.
+
+```rust,compile_fail
+# use bilrost::Enumeration;
+#[derive(Clone, PartialEq, Eq, Enumeration)]
+enum Foo {
+    A = 1,
+    #[bilrost(1)] // error: unreachable pattern
+    B = 2,
+}
+```
+
+The discriminants can be specified in any of several ways:
+
+* As a plain discriminant, `A = 1`
+* `#[bilrost(1)]`
+* As another valid discriminant, `A = CONSTANT_U32_ONE`
+* `#[bilrost(CONSTANT_U32_ONE)]`
+
+For an enumeration to qualify for direct inclusion as a message field rather
+than only as a nested value (within `Option`, `Vec`, etc.), one of the
+discriminants must be spelled exactly "0".
+
+TODO: enumeration helpers
+
 #### Encoders and other attributes
 
 TODO: expand
