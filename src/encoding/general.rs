@@ -7,6 +7,7 @@ use core::hash::Hash;
 use core::str;
 #[cfg(feature = "std")]
 use std::collections::{HashMap, HashSet};
+use std::mem;
 
 use bytes::{Buf, BufMut, Bytes};
 
@@ -125,10 +126,43 @@ impl ValueEncoder<String> for General {
         mut buf: Capped<B>,
         _ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
-        let mut string_data = Vec::<u8>::new();
-        string_data.put(buf.take_length_delimited()?.take_all());
-        *value = String::from_utf8(string_data).map_err(|_| DecodeError::new(InvalidValue))?;
-        Ok(())
+        // ## Unsafety
+        //
+        // Copies string data from the buffer, with an additional check of utf-8 well-formedness.
+        // If the utf-8 is not well-formed, or if any other error occurs while copying the data,
+        // then the string is cleared so as to avoid leaking a string field with invalid data.
+        //
+        // This implementation uses the unsafe `String::as_mut_vec` method instead of the safe
+        // alternative of temporarily swapping an empty `String` into the field, because it results
+        // in up to 10% better performance on the protobuf message decoding benchmarks.
+        //
+        // It's required when using `String::as_mut_vec` that invalid utf-8 data not be leaked into
+        // the backing `String`. To enforce this, even in the event of a panic in the decoder or
+        // in the buf implementation, a drop guard is used.
+        struct DropGuard<'a>(&'a mut Vec<u8>);
+        impl Drop for DropGuard<'_> {
+            #[inline]
+            fn drop(&mut self) {
+                self.0.clear();
+            }
+        }
+
+        let source = buf.take_length_delimited()?.take_all();
+        // If we must copy, make sure to copy only once.
+        value.clear();
+        value.reserve(source.remaining());
+        unsafe {
+            let drop_guard = DropGuard(value.as_mut_vec());
+            drop_guard.0.put(source);
+            match str::from_utf8(drop_guard.0) {
+                Ok(_) => {
+                    // Success; do not clear the bytes.
+                    mem::forget(drop_guard);
+                    Ok(())
+                }
+                Err(_) => Err(DecodeError::new(InvalidValue)),
+            }
+        }
     }
 }
 
