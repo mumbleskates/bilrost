@@ -94,8 +94,6 @@ pub trait Message {
     fn decode_capped<B: Buf + ?Sized>(buf: Capped<B>) -> Result<Self, DecodeError>
     where
         Self: Sized;
-
-    // TODO(widders): encode and decode with unknown fields in an unknown-fields companion struct
 }
 
 /// An enhanced trait for Bilrost messages that promise a distinguished representation.
