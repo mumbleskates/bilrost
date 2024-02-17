@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 # Script that runs README.md and its code blocks through rustfmt. Requires the nightly toolchain.
+# This doesn't actually update the formatting, just prints out any desired changes.
 
 set -euo pipefail
 
