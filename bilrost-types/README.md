@@ -3,7 +3,7 @@
 
 # `bilrost-types`
 
-Bilrost definitions of Protocol Buffers well known types. See
+Bilrost definitions of analogs to Protocol Buffers well known types. See
 the [Protobuf reference][1] for more information about well known types.
 
 [1]: https://developers.google.com/protocol-buffers/docs/reference/google.protobuf
@@ -17,7 +17,7 @@ is included under its original ([BSD][2]) license.
 
 [2]: https://github.com/google/protobuf/blob/master/LICENSE
 
-See [LICENSE](..LICENSE) for details.
+See [LICENSE](../LICENSE) for details.
 
-Copyright 2023-2024 Kent Ross
+Copyright 2023-2024 Kent Ross  
 Copyright 2017 Dan Burkert
