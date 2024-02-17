@@ -5,8 +5,8 @@ use btreemultimap::BTreeMultiMap;
 use bytes::{Buf, BufMut};
 
 use crate::encoding::{
-    encode_varint, encoded_len_varint, Capped, DecodeContext, HasEmptyState, TagMeasurer,
-    TagWriter, WireType,
+    encode_varint, encoded_len_varint, Capped, DecodeContext, EmptyState, TagMeasurer, TagWriter,
+    WireType,
 };
 use crate::DecodeErrorKind::Truncated;
 use crate::{DecodeError, Message, RawDistinguishedMessage, RawMessage};
@@ -262,7 +262,7 @@ impl FromIterator<(u32, OpaqueValue)> for OpaqueMessage {
     }
 }
 
-impl HasEmptyState for OpaqueMessage {
+impl EmptyState for OpaqueMessage {
     #[inline]
     fn empty() -> Self {
         Self::new()

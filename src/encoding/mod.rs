@@ -27,8 +27,7 @@ mod value_traits;
 mod varint;
 
 pub use value_traits::{
-    Collection, DistinguishedCollection, DistinguishedMapping, HasEmptyState, Mapping,
-    NewForOverwrite,
+    Collection, DistinguishedCollection, DistinguishedMapping, EmptyState, Mapping, NewForOverwrite,
 };
 
 /// Fixed-size encoder. Encodes integers in fixed-size format.
@@ -825,7 +824,7 @@ where
 
 /// Trait to be implemented by (or more commonly derived for) oneofs, which have knowledge of their
 /// variants' tags and encoding.
-pub trait Oneof: HasEmptyState {
+pub trait Oneof: EmptyState {
     const FIELD_TAGS: &'static [u32];
 
     /// Encodes the fields of the oneof into the given buffer.
@@ -1170,19 +1169,19 @@ macro_rules! encoder_where_value_encoder {
         impl<T $(, $($generics)*)?> Encoder<T> for $encoder
         where
             $encoder: ValueEncoder<T>,
-            T: crate::encoding::value_traits::HasEmptyState,
+            T: crate::encoding::value_traits::EmptyState,
             $($($where_clause)*)?
         {
             #[inline]
             fn encode<B: BufMut + ?Sized>(tag: u32, value: &T, buf: &mut B, tw: &mut TagWriter) {
-                if !crate::encoding::value_traits::HasEmptyState::is_empty(value) {
+                if !crate::encoding::value_traits::EmptyState::is_empty(value) {
                     <Self as crate::encoding::FieldEncoder<T>>::encode_field(tag, value, buf, tw);
                 }
             }
 
             #[inline]
             fn encoded_len(tag: u32, value: &T, tm: &mut TagMeasurer) -> usize {
-                if !crate::encoding::value_traits::HasEmptyState::is_empty(value) {
+                if !crate::encoding::value_traits::EmptyState::is_empty(value) {
                     <Self as crate::encoding::FieldEncoder<T>>::field_encoded_len(tag, value, tm)
                 } else {
                     0
@@ -1211,7 +1210,7 @@ macro_rules! encoder_where_value_encoder {
         impl<T $(, $($generics)*)?> DistinguishedEncoder<T> for $encoder
         where
             $encoder: DistinguishedValueEncoder<T> + Encoder<T>,
-            T: Eq + crate::encoding::value_traits::HasEmptyState,
+            T: Eq + crate::encoding::value_traits::EmptyState,
             $($($where_clause)*)?
         {
             #[inline]
@@ -1240,14 +1239,14 @@ macro_rules! encoder_where_value_encoder {
 }
 pub(crate) use encoder_where_value_encoder;
 
-/// Marks a type as deriving its `HasEmptyState` implementation from `Default` and `PartialEq`
-macro_rules! has_empty_state_via_default {
+/// Implements `EmptyState` in terms of `Default`.
+macro_rules! empty_state_via_default {
     (
         $ty:ty
         $(, with generics ($($generics:tt)*))?
         $(, with where clause ($($where_clause:tt)*))?
     ) => {
-        impl<$($($generics)*)?> $crate::encoding::HasEmptyState for $ty
+        impl<$($($generics)*)?> $crate::encoding::EmptyState for $ty
         where
             Self: Default + PartialEq,
             $($($where_clause)*)?
@@ -1264,7 +1263,7 @@ macro_rules! has_empty_state_via_default {
         }
     };
 }
-pub(crate) use has_empty_state_via_default;
+pub(crate) use empty_state_via_default;
 
 #[cfg(test)]
 mod test {

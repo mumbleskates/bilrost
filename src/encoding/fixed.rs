@@ -2,7 +2,7 @@ use alloc::vec::Vec;
 
 use bytes::{Buf, BufMut};
 
-use crate::encoding::value_traits::HasEmptyState;
+use crate::encoding::value_traits::EmptyState;
 use crate::encoding::{
     delegate_encoding, encoder_where_value_encoder, Capped, DecodeContext, DistinguishedEncoder,
     DistinguishedValueEncoder, Encoder, TagMeasurer, TagWriter, ValueEncoder, WireType, Wiretyped,
@@ -108,7 +108,7 @@ macro_rules! fixed_width_float {
     ) => {
         fixed_width_common!($ty, $wire_type, $put, $get);
 
-        impl HasEmptyState for $ty {
+        impl EmptyState for $ty {
             #[inline]
             fn empty() -> Self {
                 0.0
@@ -116,7 +116,7 @@ macro_rules! fixed_width_float {
 
             #[inline]
             fn is_empty(&self) -> bool {
-                // Preserve -0.0. This is actually the original motivation for `HasEmptyState`.
+                // Preserve -0.0. This is actually the original motivation for `EmptyState`.
                 self.to_bits() == 0
             }
         }

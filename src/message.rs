@@ -4,7 +4,7 @@ use alloc::vec::Vec;
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 
 use crate::encoding::{
-    encode_varint, encoded_len_varint, Capped, DecodeContext, HasEmptyState, TagReader, WireType,
+    encode_varint, encoded_len_varint, Capped, DecodeContext, EmptyState, TagReader, WireType,
 };
 use crate::{DecodeError, EncodeError};
 
@@ -329,7 +329,7 @@ where
 
 /// Trait to be implemented by messages, which have knowledge of their fields' tags and encoding.
 /// The methods of this trait are meant to only be used by the `Message` implementation.
-pub trait RawMessage: HasEmptyState {
+pub trait RawMessage: EmptyState {
     const __ASSERTIONS: ();
 
     /// Encodes the message to a buffer.
@@ -368,9 +368,9 @@ pub trait RawDistinguishedMessage: RawMessage {
         Self: Sized;
 }
 
-impl<T> HasEmptyState for Box<T>
+impl<T> EmptyState for Box<T>
 where
-    T: HasEmptyState,
+    T: EmptyState,
 {
     fn empty() -> Self {
         Self::new(T::empty())

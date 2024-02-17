@@ -23,7 +23,7 @@ mod derived_message_tests {
     use bilrost::encoding::opaque::{OpaqueMessage, OpaqueValue as OV};
     use bilrost::encoding::{
         encode_varint, Collection, DistinguishedEncoder, DistinguishedOneof,
-        DistinguishedValueEncoder, Encoder, General, HasEmptyState, Mapping, Oneof, Packed,
+        DistinguishedValueEncoder, EmptyState, Encoder, General, Mapping, Oneof, Packed,
         ValueEncoder,
     };
     use bilrost::DecodeErrorKind::{
@@ -741,7 +741,7 @@ mod derived_message_tests {
 
         fn check_fixed_truncation<T>(val: OV)
         where
-            T: Debug + Eq + HasEmptyState,
+            T: Debug + Eq + EmptyState,
             bilrost::encoding::Fixed:
                 DistinguishedEncoder<T> + ValueEncoder<T> + DistinguishedValueEncoder<T>,
         {
@@ -801,7 +801,7 @@ mod derived_message_tests {
 
     fn parsing_string_type<'a, T>()
     where
-        T: 'a + Debug + Eq + From<&'a str> + HasEmptyState,
+        T: 'a + Debug + Eq + From<&'a str> + EmptyState,
         General: DistinguishedEncoder<T>,
     {
         #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
@@ -1057,7 +1057,7 @@ mod derived_message_tests {
 
     fn truncated_bool_string_map<T>()
     where
-        T: Debug + HasEmptyState + Mapping<Key = bool, Value = String>,
+        T: Debug + EmptyState + Mapping<Key = bool, Value = String>,
         General: Encoder<T>,
     {
         #[derive(Debug, PartialEq, Message)]
@@ -1082,7 +1082,7 @@ mod derived_message_tests {
 
     fn truncated_string_int_map<T>()
     where
-        T: Debug + HasEmptyState + Mapping<Key = String, Value = u64>,
+        T: Debug + EmptyState + Mapping<Key = String, Value = u64>,
         General: Encoder<T>,
     {
         #[derive(Debug, PartialEq, Message)]
@@ -1470,7 +1470,7 @@ mod derived_message_tests {
 
     fn truncated_packed_string<T>()
     where
-        T: Debug + HasEmptyState + Collection<Item = String>,
+        T: Debug + EmptyState + Collection<Item = String>,
         General: Encoder<T>,
         Packed: Encoder<T>,
     {
@@ -1493,7 +1493,7 @@ mod derived_message_tests {
 
     fn truncated_packed_int<T>()
     where
-        T: Debug + HasEmptyState + Collection<Item = u64>,
+        T: Debug + EmptyState + Collection<Item = u64>,
         General: Encoder<T>,
     {
         #[derive(Debug, PartialEq, Message)]
@@ -1833,7 +1833,7 @@ mod derived_message_tests {
         assert::decodes_distinguished(
             [(2, OV::string("abc"))],
             OuterDirect {
-                inner: HasEmptyState::empty(),
+                inner: EmptyState::empty(),
                 also: "abc".into(),
             },
         );
@@ -1855,7 +1855,7 @@ mod derived_message_tests {
         assert::decodes_distinguished(
             [(1, OV::message(&[].into_opaque_message()))],
             OuterOptional {
-                inner: Some(HasEmptyState::empty()),
+                inner: Some(EmptyState::empty()),
                 also: None,
             },
         );
@@ -1953,7 +1953,7 @@ mod derived_message_tests {
                 zero: "hello".into(),
                 four: Some(Nested(555)),
                 oneof: Three(Nested(301)),
-                ..HasEmptyState::empty()
+                ..EmptyState::empty()
             },
         );
         assert::decodes_only_expedient(
@@ -1967,7 +1967,7 @@ mod derived_message_tests {
                 zero: "hello".into(),
                 four: Some(Nested(555)),
                 oneof: Three(Nested(301)),
-                ..HasEmptyState::empty()
+                ..EmptyState::empty()
             },
             UnknownField,
         );
@@ -1990,7 +1990,7 @@ mod derived_message_tests {
                 zero: "hello".into(),
                 four: Some(Nested(555)),
                 oneof: Three(Nested(301)),
-                ..HasEmptyState::empty()
+                ..EmptyState::empty()
             },
             UnknownField,
         );
@@ -2013,7 +2013,7 @@ mod derived_message_tests {
                 zero: "hello".into(),
                 four: Some(Nested(555)),
                 oneof: Three(Nested(301)),
-                ..HasEmptyState::empty()
+                ..EmptyState::empty()
             },
             UnknownField,
         );

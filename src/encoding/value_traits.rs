@@ -21,7 +21,7 @@ pub trait NewForOverwrite {
 
 impl<T> NewForOverwrite for T
 where
-    T: HasEmptyState,
+    T: EmptyState,
 {
     #[inline]
     fn new_for_overwrite() -> Self {
@@ -33,7 +33,7 @@ where
 ///
 /// This type must be implemented for every type encodable as a directly included field in a bilrost
 /// message.
-pub trait HasEmptyState: Sized {
+pub trait EmptyState: Sized {
     /// Produces the empty state for this type.
     fn empty() -> Self;
 
@@ -47,7 +47,7 @@ pub trait HasEmptyState: Sized {
     }
 }
 
-impl<T> HasEmptyState for Option<T> {
+impl<T> EmptyState for Option<T> {
     #[inline]
     fn empty() -> Self {
         None
@@ -60,7 +60,7 @@ impl<T> HasEmptyState for Option<T> {
 }
 
 /// Trait for containers that store multiple items such as `Vec`, `BTreeSet`, and `HashSet`
-pub trait Collection: HasEmptyState {
+pub trait Collection: EmptyState {
     type Item;
     type RefIter<'a>: ExactSizeIterator<Item = &'a Self::Item>
     where
@@ -85,7 +85,7 @@ pub trait DistinguishedCollection: Collection + Eq {
 }
 
 /// Trait for associative containers, such as `BTreeMap` and `HashMap`.
-pub trait Mapping: HasEmptyState {
+pub trait Mapping: EmptyState {
     type Key;
     type Value;
     type RefIter<'a>: ExactSizeIterator<Item = (&'a Self::Key, &'a Self::Value)>
@@ -120,7 +120,7 @@ pub trait DistinguishedMapping: Mapping {
     ) -> Result<(), DecodeErrorKind>;
 }
 
-impl<T> HasEmptyState for Vec<T> {
+impl<T> EmptyState for Vec<T> {
     #[inline]
     fn empty() -> Self {
         Self::new()
@@ -182,7 +182,7 @@ where
     }
 }
 
-impl<T> HasEmptyState for Cow<'_, [T]>
+impl<T> EmptyState for Cow<'_, [T]>
 where
     T: Clone,
 {
@@ -254,7 +254,7 @@ where
 }
 
 #[cfg(feature = "smallvec")]
-impl<T, A: smallvec::Array<Item = T>> HasEmptyState for smallvec::SmallVec<A> {
+impl<T, A: smallvec::Array<Item = T>> EmptyState for smallvec::SmallVec<A> {
     #[inline]
     fn empty() -> Self {
         Self::new()
@@ -319,7 +319,7 @@ where
 }
 
 #[cfg(feature = "thin-vec")]
-impl<T> HasEmptyState for thin_vec::ThinVec<T> {
+impl<T> EmptyState for thin_vec::ThinVec<T> {
     #[inline]
     fn empty() -> Self {
         Self::new()
@@ -384,7 +384,7 @@ where
 }
 
 #[cfg(feature = "tinyvec")]
-impl<T, A: tinyvec::Array<Item = T>> HasEmptyState for tinyvec::TinyVec<A> {
+impl<T, A: tinyvec::Array<Item = T>> EmptyState for tinyvec::TinyVec<A> {
     #[inline]
     fn empty() -> Self {
         Self::new()
@@ -448,7 +448,7 @@ where
     }
 }
 
-impl<T> HasEmptyState for BTreeSet<T> {
+impl<T> EmptyState for BTreeSet<T> {
     #[inline]
     fn empty() -> Self {
         Self::new()
@@ -523,7 +523,7 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<T> HasEmptyState for HashSet<T> {
+impl<T> EmptyState for HashSet<T> {
     #[inline]
     fn empty() -> Self {
         Self::new()
@@ -571,7 +571,7 @@ where
 }
 
 #[cfg(feature = "hashbrown")]
-impl<T> HasEmptyState for hashbrown::HashSet<T> {
+impl<T> EmptyState for hashbrown::HashSet<T> {
     #[inline]
     fn empty() -> Self {
         Self::new()
@@ -618,7 +618,7 @@ where
     }
 }
 
-impl<K, V> HasEmptyState for BTreeMap<K, V> {
+impl<K, V> EmptyState for BTreeMap<K, V> {
     #[inline]
     fn empty() -> Self {
         Self::new()
@@ -702,7 +702,7 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<K, V> HasEmptyState for HashMap<K, V> {
+impl<K, V> EmptyState for HashMap<K, V> {
     #[inline]
     fn empty() -> Self {
         Self::new()
@@ -754,7 +754,7 @@ where
 }
 
 #[cfg(feature = "hashbrown")]
-impl<K, V> HasEmptyState for hashbrown::HashMap<K, V> {
+impl<K, V> EmptyState for hashbrown::HashMap<K, V> {
     #[inline]
     fn empty() -> Self {
         Self::new()

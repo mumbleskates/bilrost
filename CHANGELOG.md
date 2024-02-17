@@ -12,7 +12,9 @@
     * `Enumeration` no longer cares whether the type has a `Default`
       implementation, only whether there is a variant whose Bilrost value is
       exactly `0`.
-    * All of the above duties are taken on by the `HasEmptyState` trait, as does the base implementation for `NewForOverwrite`.
+    * All of the above duties are taken on by the `HasEmptyState` trait, as does
+      the base implementation for `NewForOverwrite`.
+* Following on that, renamed the `HasEmptyState` trait to `EmptyState`.
 
 ### New features
 

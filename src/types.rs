@@ -7,7 +7,7 @@ use core::ops::{Deref, DerefMut};
 
 use bytes::{Buf, BufMut};
 
-use crate::encoding::{skip_field, Capped, DecodeContext, HasEmptyState, WireType};
+use crate::encoding::{skip_field, Capped, DecodeContext, EmptyState, WireType};
 use crate::message::{RawDistinguishedMessage, RawMessage};
 use crate::DecodeError;
 use crate::DecodeErrorKind::UnknownField;
@@ -34,7 +34,7 @@ impl Blob {
     }
 }
 
-impl HasEmptyState for Blob {
+impl EmptyState for Blob {
     fn empty() -> Self {
         Self::new()
     }
@@ -156,7 +156,7 @@ impl proptest::arbitrary::Arbitrary for Blob {
     >;
 }
 
-impl HasEmptyState for () {
+impl EmptyState for () {
     fn empty() -> Self {}
 
     fn is_empty(&self) -> bool {

@@ -549,20 +549,20 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
             }
         }
 
-        impl #impl_generics ::bilrost::encoding::HasEmptyState
+        impl #impl_generics ::bilrost::encoding::EmptyState
         for #ident #ty_generics #where_clause {
             fn empty() -> Self {
                 Self {
-                    #(#field_idents: ::bilrost::encoding::HasEmptyState::empty(),)*
+                    #(#field_idents: ::bilrost::encoding::EmptyState::empty(),)*
                 }
             }
 
             fn is_empty(&self) -> bool {
-                true #(&& ::bilrost::encoding::HasEmptyState::is_empty(&self.#field_idents))*
+                true #(&& ::bilrost::encoding::EmptyState::is_empty(&self.#field_idents))*
             }
 
             fn clear(&mut self) {
-                #(::bilrost::encoding::HasEmptyState::clear(&mut self.#field_idents);)*
+                #(::bilrost::encoding::EmptyState::clear(&mut self.#field_idents);)*
             }
         }
     };
@@ -730,12 +730,12 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
 
     let is_valid_doc = format!("Returns `true` if `value` is a variant of `{}`.", ident);
 
-    // When the type has a zero-valued variant, we implement `HasEmptyState`. When it doesn't, we
+    // When the type has a zero-valued variant, we implement `EmptyState`. When it doesn't, we
     // need an alternate way to create a value to be overwritten, so we impl `NewForOverwrite`
     // directly.
     let creation_impl = if let Some(zero) = &zero_variant_ident {
         quote! {
-            impl #impl_generics ::bilrost::encoding::HasEmptyState
+            impl #impl_generics ::bilrost::encoding::EmptyState
             for #ident #ty_generics #where_clause {
                 fn empty() -> Self {
                     Self::#zero
@@ -760,7 +760,7 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
 
     let check_empty = if zero_variant_ident.is_some() {
         quote! {
-            if !allow_empty && ::bilrost::encoding::HasEmptyState::is_empty(value) {
+            if !allow_empty && ::bilrost::encoding::EmptyState::is_empty(value) {
                 return Err(::bilrost::DecodeError::new(
                     ::bilrost::DecodeErrorKind::NotCanonical
                 ));
@@ -1106,7 +1106,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
                     }
                 }
 
-                impl #impl_generics ::bilrost::encoding::HasEmptyState
+                impl #impl_generics ::bilrost::encoding::EmptyState
                 for #ident #ty_generics #where_clause {
                     #[inline]
                     fn empty() -> Self {

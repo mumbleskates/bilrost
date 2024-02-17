@@ -6,7 +6,7 @@ use bytes::{Buf, BufMut};
 
 use crate::encoding::{
     delegate_encoding, encode_varint, encoded_len_varint, encoder_where_value_encoder, Capped,
-    DecodeContext, DistinguishedEncoder, DistinguishedValueEncoder, Encoder, HasEmptyState,
+    DecodeContext, DistinguishedEncoder, DistinguishedValueEncoder, EmptyState, Encoder,
     TagMeasurer, TagWriter, ValueEncoder, WireType, Wiretyped,
 };
 use crate::DecodeError;
@@ -137,7 +137,7 @@ impl<const N: usize> Wiretyped<[u8; N]> for PlainBytes {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
 }
 
-impl<const N: usize> HasEmptyState for [u8; N] {
+impl<const N: usize> EmptyState for [u8; N] {
     #[inline]
     fn empty() -> Self {
         [0; N]

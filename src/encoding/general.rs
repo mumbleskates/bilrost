@@ -14,8 +14,8 @@ use bytes::{Buf, BufMut, Bytes};
 use crate::encoding::{
     delegate_encoding, delegate_value_encoding, encode_varint, encoded_len_varint,
     encoder_where_value_encoder, Capped, DecodeContext, DistinguishedEncoder,
-    DistinguishedValueEncoder, Encoder, Fixed, HasEmptyState, Map, PlainBytes, TagMeasurer,
-    TagWriter, Unpacked, ValueEncoder, Varint, WireType, Wiretyped,
+    DistinguishedValueEncoder, EmptyState, Encoder, Fixed, Map, PlainBytes, TagMeasurer, TagWriter,
+    Unpacked, ValueEncoder, Varint, WireType, Wiretyped,
 };
 use crate::message::{merge, merge_distinguished, RawDistinguishedMessage, RawMessage};
 use crate::DecodeErrorKind::{InvalidValue, NotCanonical};
@@ -90,7 +90,7 @@ delegate_value_encoding!(delegate from (General) to (Varint)
 delegate_value_encoding!(delegate from (General) to (Fixed) for type (f32));
 delegate_value_encoding!(delegate from (General) to (Fixed) for type (f64));
 
-impl HasEmptyState for String {
+impl EmptyState for String {
     #[inline]
     fn empty() -> Self {
         Self::new()
@@ -190,7 +190,7 @@ mod string {
     check_type_test!(General, distinguished, String, WireType::LengthDelimited);
 }
 
-impl HasEmptyState for Cow<'_, str> {
+impl EmptyState for Cow<'_, str> {
     #[inline]
     fn empty() -> Self {
         Self::default()
@@ -257,7 +257,7 @@ mod cow_string {
 }
 
 #[cfg(feature = "bytestring")]
-impl HasEmptyState for bytestring::ByteString {
+impl EmptyState for bytestring::ByteString {
     #[inline]
     fn empty() -> Self {
         Self::new()
@@ -325,7 +325,7 @@ mod bytestring_string {
         WireType::LengthDelimited);
 }
 
-impl HasEmptyState for Bytes {
+impl EmptyState for Bytes {
     #[inline]
     fn empty() -> Self {
         Self::new()
