@@ -443,7 +443,7 @@ TODO: this
 | `general`            | derived [`Enumeration`](#enumerations)*     | varint                 | yes           |
 | `general`            | [`String`][str]**                           | length-delimited       | yes           |
 | `general`            | impl [`Message`](#derive-macros) ***        | length-delimited       | maybe         |
-| `varint`             | `u8`, `i8`                                  | varint                 | yes           |
+| `varint`             | [`u8`][prim], [`i8`][prim]                  | varint                 | yes           |
 | `plainbytes`         | [`Vec<u8>`][vec]**                          | length-delimited       | yes           |
 
 *`Enumeration` types can be directly included if they have a value that has a
