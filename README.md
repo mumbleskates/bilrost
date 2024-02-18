@@ -865,8 +865,10 @@ order, and must have a [two's complement][twos] representation.
 Floating point numbers must be encoded in little-endian byte order, and must
 have [IEEE 754 binary32/binary64][ieee754] standard representation.
 
-Arrays, plain byte strings, vectors, etc. must be encoded in order, with their
-lowest-indexed (first) bytes or items encoded first.
+Arrays, plain byte strings, and collections must be encoded in order, with their
+lowest-indexed (first) bytes or items encoded first. For example, the
+fixed-width encodings of the `u8` array `[1, 2, 3, 4]` and the 32 bit unsigned
+integer `0x04030201` (67305985) are identical.
 
 Strings must always contain valid UTF-8 text, containing the canonical encoding
 for some sequence of Unicode codepoints. Over-long encodings of codepoints and
@@ -882,18 +884,17 @@ possible when the values themselves never have a length-delimited
 representation, in which case the wire-type of the field can be used to
 distinguish the two cases.
 
+Sets (collections of unique values) are encoded and decoded in exactly the same
+form as non-unique collections. If a value in a set appears more than once when
+decoding, the message must be rejected with an error in any decoding mode. In
+distinguished mode, the items must be in [canonical order](#canonical-ordering).
+
 Mappings are represented as a length-delimited value, containing alternately
 encoded keys and values for each entry in the mapping. Keys must be distinct,
 and if a map is found to have two equivalent keys the message must be rejected
 with an error in any decoding mode. In distinguished decoding mode, the entries
 in the mapping must be encoded in canonically ascending order (see the notes
 on [canonical order](#canonical-ordering)).
-
-Likewise to mappings, sets (collections of unique values) are encoded and
-decoded in exactly the same form as non-unique collections. If a value in a set
-appears more than once when decoding, the message must be rejected with an error
-in any decoding mode. In distinguished mode, the items must be in [canonical
-order](#canonical-ordering).
 
 Any field whose value is [empty](#empty-values) should always be omitted from
 the encoding.
