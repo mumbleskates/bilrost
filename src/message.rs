@@ -94,6 +94,17 @@ pub trait Message {
     fn decode_capped<B: Buf + ?Sized>(buf: Capped<B>) -> Result<Self, DecodeError>
     where
         Self: Sized;
+
+    /// Decodes the non-ignored fields of this message from the buffer, replacing their values.
+    fn replace_from<B: Buf>(&mut self, buf: B) -> Result<(), DecodeError>;
+
+    /// Decodes the non-ignored fields of this message, replacing their values from a
+    /// length-delimited value encoded in the buffer.
+    fn replace_from_length_delimited<B: Buf>(&mut self, buf: B) -> Result<(), DecodeError>;
+
+    /// Decodes the non-ignored fields of this message, replacing their values from the given capped
+    /// buffer.
+    fn replace_from_capped<B: Buf + ?Sized>(&mut self, buf: Capped<B>) -> Result<(), DecodeError>;
 }
 
 /// An enhanced trait for Bilrost messages that promise a distinguished representation.
@@ -120,6 +131,24 @@ pub trait DistinguishedMessage: Message + Eq {
     fn decode_distinguished_capped<B: Buf + ?Sized>(buf: Capped<B>) -> Result<Self, DecodeError>
     where
         Self: Sized;
+
+    /// Decodes the non-ignored fields of this message from the buffer in distinguished mode,
+    /// replacing their values.
+    fn replace_distinguished_from<B: Buf>(&mut self, buf: B) -> Result<(), DecodeError>;
+
+    /// Decodes the non-ignored fields of this message in distinguished mode, replacing their values
+    /// from a length-delimited value encoded in the buffer.
+    fn replace_distinguished_from_length_delimited<B: Buf>(
+        &mut self,
+        buf: B,
+    ) -> Result<(), DecodeError>;
+
+    /// Decodes the non-ignored fields of this message in distinguished mode, replacing their values
+    /// from the given capped buffer.
+    fn replace_distinguished_from_capped<B: Buf + ?Sized>(
+        &mut self,
+        buf: Capped<B>,
+    ) -> Result<(), DecodeError>;
 }
 
 /// `Message` is implemented as a usability layer on top of the basic functionality afforded by
@@ -206,6 +235,22 @@ where
         merge(&mut message, buf, DecodeContext::default())?;
         Ok(message)
     }
+
+    fn replace_from<B: Buf>(&mut self, mut buf: B) -> Result<(), DecodeError> {
+        self.replace_from_capped(Capped::new(&mut buf))
+    }
+
+    fn replace_from_length_delimited<B: Buf>(&mut self, mut buf: B) -> Result<(), DecodeError> {
+        self.replace_from_capped(Capped::new_length_delimited(&mut buf)?)
+    }
+
+    fn replace_from_capped<B: Buf + ?Sized>(&mut self, buf: Capped<B>) -> Result<(), DecodeError> {
+        self.clear();
+        merge(self, buf, DecodeContext::default()).map_err(|err| {
+            self.clear();
+            err
+        })
+    }
 }
 
 impl<T> DistinguishedMessage for T
@@ -225,6 +270,28 @@ where
         merge_distinguished(&mut message, buf, DecodeContext::default())?;
         Ok(message)
     }
+
+    fn replace_distinguished_from<B: Buf>(&mut self, mut buf: B) -> Result<(), DecodeError> {
+        self.replace_distinguished_from_capped(Capped::new(&mut buf))
+    }
+
+    fn replace_distinguished_from_length_delimited<B: Buf>(
+        &mut self,
+        mut buf: B,
+    ) -> Result<(), DecodeError> {
+        self.replace_distinguished_from_capped(Capped::new_length_delimited(&mut buf)?)
+    }
+
+    fn replace_distinguished_from_capped<B: Buf + ?Sized>(
+        &mut self,
+        buf: Capped<B>,
+    ) -> Result<(), DecodeError> {
+        self.clear();
+        merge_distinguished(self, buf, DecodeContext::default()).map_err(|err| {
+            self.clear();
+            err
+        })
+    }
 }
 
 /// Object-safe interface implemented for all `Message` types. Accepts `dyn Buf` and `dyn BufMut`
@@ -236,9 +303,10 @@ pub trait MessageDyn {
     fn encode_length_delimited_dyn(&self, buf: &mut dyn BufMut) -> Result<(), EncodeError>;
     fn encode_length_delimited_to_vec_dyn(&self) -> Vec<u8>;
     fn encode_length_delimited_to_bytes_dyn(&self) -> Bytes;
-    fn replace_from(&mut self, buf: &mut dyn Buf) -> Result<(), DecodeError>;
-    fn replace_from_length_delimited(&mut self, buf: &mut dyn Buf) -> Result<(), DecodeError>;
-    fn replace_from_capped(&mut self, buf: Capped<dyn Buf>) -> Result<(), DecodeError>;
+    fn replace_from_dyn(&mut self, buf: &mut dyn Buf) -> Result<(), DecodeError>;
+    fn replace_from_slice(&mut self, buf: &[u8]) -> Result<(), DecodeError>;
+    fn replace_from_length_delimited_dyn(&mut self, buf: &mut dyn Buf) -> Result<(), DecodeError>;
+    fn replace_from_capped_dyn(&mut self, buf: Capped<dyn Buf>) -> Result<(), DecodeError>;
 }
 
 impl<T> MessageDyn for T
@@ -269,30 +337,31 @@ where
         Message::encode_length_delimited_to_bytes(self)
     }
 
-    fn replace_from(&mut self, buf: &mut dyn Buf) -> Result<(), DecodeError> {
-        self.replace_from_capped(Capped::new(buf))
+    fn replace_from_dyn(&mut self, buf: &mut dyn Buf) -> Result<(), DecodeError> {
+        self.replace_from(buf)
     }
 
-    fn replace_from_length_delimited(&mut self, buf: &mut dyn Buf) -> Result<(), DecodeError> {
-        self.replace_from_capped(Capped::new_length_delimited(buf)?)
+    fn replace_from_slice(&mut self, buf: &[u8]) -> Result<(), DecodeError> {
+        self.replace_from(buf)
     }
 
-    fn replace_from_capped(&mut self, buf: Capped<dyn Buf>) -> Result<(), DecodeError> {
-        self.clear();
-        merge(self, buf, DecodeContext::default()).map_err(|err| {
-            self.clear();
-            err
-        })
+    fn replace_from_length_delimited_dyn(&mut self, buf: &mut dyn Buf) -> Result<(), DecodeError> {
+        self.replace_from_length_delimited(buf)
+    }
+
+    fn replace_from_capped_dyn(&mut self, buf: Capped<dyn Buf>) -> Result<(), DecodeError> {
+        self.replace_from_capped(buf)
     }
 }
 
 pub trait DistinguishedMessageDyn {
-    fn replace_distinguished_from(&mut self, buf: &mut dyn Buf) -> Result<(), DecodeError>;
-    fn replace_distinguished_from_length_delimited(
+    fn replace_distinguished_from_dyn(&mut self, buf: &mut dyn Buf) -> Result<(), DecodeError>;
+    fn replace_distinguished_from_slice(&mut self, buf: &[u8]) -> Result<(), DecodeError>;
+    fn replace_distinguished_from_length_delimited_dyn(
         &mut self,
         buf: &mut dyn Buf,
     ) -> Result<(), DecodeError>;
-    fn replace_distinguished_from_capped(
+    fn replace_distinguished_from_capped_dyn(
         &mut self,
         buf: Capped<dyn Buf>,
     ) -> Result<(), DecodeError>;
@@ -300,28 +369,28 @@ pub trait DistinguishedMessageDyn {
 
 impl<T> DistinguishedMessageDyn for T
 where
-    T: RawDistinguishedMessage,
+    T: RawDistinguishedMessage + Message + Eq,
 {
-    fn replace_distinguished_from(&mut self, buf: &mut dyn Buf) -> Result<(), DecodeError> {
-        self.replace_distinguished_from_capped(Capped::new(buf))
+    fn replace_distinguished_from_dyn(&mut self, buf: &mut dyn Buf) -> Result<(), DecodeError> {
+        self.replace_distinguished_from(buf)
     }
 
-    fn replace_distinguished_from_length_delimited(
+    fn replace_distinguished_from_slice(&mut self, buf: &[u8]) -> Result<(), DecodeError> {
+        self.replace_distinguished_from(buf)
+    }
+
+    fn replace_distinguished_from_length_delimited_dyn(
         &mut self,
         buf: &mut dyn Buf,
     ) -> Result<(), DecodeError> {
-        self.replace_distinguished_from_capped(Capped::new_length_delimited(buf)?)
+        self.replace_distinguished_from_length_delimited(buf)
     }
 
-    fn replace_distinguished_from_capped(
+    fn replace_distinguished_from_capped_dyn(
         &mut self,
         buf: Capped<dyn Buf>,
     ) -> Result<(), DecodeError> {
-        self.clear();
-        merge_distinguished(self, buf, DecodeContext::default()).map_err(|err| {
-            self.clear();
-            err
-        })
+        self.replace_distinguished_from_capped(buf)
     }
 }
 
@@ -443,7 +512,7 @@ mod tests {
 
         safe.encoded_len_dyn();
         safe.encode_dyn(&mut vec).unwrap();
-        safe.replace_from_length_delimited(&mut [0u8].as_slice())
+        safe.replace_from_length_delimited_dyn(&mut [0u8].as_slice())
             .unwrap();
 
         msg.encoded_len();
