@@ -2096,6 +2096,76 @@ mod test {
         }
 
         #[test]
+        fn u16_out_of_range(value in u16::MAX as u64 + 1..) {
+            let mut buf = Vec::<u8>::new();
+            General::encode_value(&value, &mut buf);
+            let mut out = 0u16;
+            prop_assert_eq!(
+                General::decode_value(
+                    &mut out,
+                    Capped::new(&mut &*buf),
+                    DecodeContext::default(),
+                ),
+                Err(DecodeError::new(OutOfDomainValue))
+            );
+        }
+
+        #[test]
+        fn i16_out_of_range(
+            low_value in ..i16::MIN as i64 - 1,
+            high_value in i16::MAX as i64 + 1..,
+        ) {
+            for value in [low_value, high_value] {
+                let mut buf = Vec::<u8>::new();
+                General::encode_value(&value, &mut buf);
+                let mut out = 0i16;
+                prop_assert_eq!(
+                    General::decode_value(
+                        &mut out,
+                        Capped::new(&mut &*buf),
+                        DecodeContext::default(),
+                    ),
+                    Err(DecodeError::new(OutOfDomainValue))
+                );
+            }
+        }
+
+        #[test]
+        fn u8_out_of_range(value in u8::MAX as u64 + 1..) {
+            let mut buf = Vec::<u8>::new();
+            Varint::encode_value(&value, &mut buf);
+            let mut out = 0u8;
+            prop_assert_eq!(
+                Varint::decode_value(
+                    &mut out,
+                    Capped::new(&mut &*buf),
+                    DecodeContext::default(),
+                ),
+                Err(DecodeError::new(OutOfDomainValue))
+            );
+        }
+
+        #[test]
+        fn i8_out_of_range(
+            low_value in ..i8::MIN as i64 - 1,
+            high_value in i8::MAX as i64 + 1..,
+        ) {
+            for value in [low_value, high_value] {
+                let mut buf = Vec::<u8>::new();
+                Varint::encode_value(&value, &mut buf);
+                let mut out = 0i8;
+                prop_assert_eq!(
+                    Varint::decode_value(
+                        &mut out,
+                        Capped::new(&mut &*buf),
+                        DecodeContext::default(),
+                    ),
+                    Err(DecodeError::new(OutOfDomainValue))
+                );
+            }
+        }
+
+        #[test]
         fn bool_out_of_range(varint in 2u64..) {
             let mut buf = Vec::<u8>::new();
             encode_varint(varint, &mut buf);
