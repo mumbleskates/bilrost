@@ -213,7 +213,7 @@ To use `bilrost`, first add it as a dependency in `Cargo.toml`, either with
 `cargo add bilrost` or manually:
 
 ```toml
-bilrost = "0.1001"
+bilrost = "0.1002.0-dev"
 ```
 
 Then, derive `bilrost::Message` for your struct type:
@@ -317,7 +317,7 @@ To enable `no_std` support, disable the `std` features in `bilrost` (and
 
 ```toml
 [dependencies]
-bilrost = { version = "0.1001", default-features = false, features = ["derive"] }
+bilrost = { version = "0.1002.0-dev", default-features = false, features = ["derive"] }
 ```
 
 ### Derive macros
