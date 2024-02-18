@@ -401,6 +401,7 @@ TODO: expand
 TODO: expand
 
 * different encoders and what they do
+* "ignore"
 * "enumeration" helpers
 * "recurses"
 

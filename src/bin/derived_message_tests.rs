@@ -479,6 +479,126 @@ mod derived_message_tests {
         assert::is_invalid_distinguished::<OpaqueMessage>(&buf[..buf.len() - 1], Truncated);
     }
 
+    #[test]
+    fn ignored_fields() {
+        #[derive(Debug, Default, PartialEq, Message)]
+        struct FooPlus {
+            x: i64,
+            y: i64,
+            #[bilrost(ignore)]
+            also: usize,
+        }
+
+        assert::decodes(
+            [(1, OV::i64(1)), (2, OV::i64(-2))],
+            FooPlus {
+                x: 1,
+                y: -2,
+                also: 0,
+            },
+        );
+
+        let mut foo = FooPlus {
+            x: 5,
+            y: 10,
+            also: 123,
+        };
+        assert::decodes(
+            foo.encode_to_vec(),
+            FooPlus {
+                x: 5,
+                y: 10,
+                also: 0,
+            },
+        );
+
+        foo.replace_from(
+            [
+                (1, OV::i64(6)),
+                (2, OV::i64(12)),
+                (333, OV::string("unknown")),
+            ]
+            .into_opaque_message()
+            .encode_to_vec()
+            .as_slice(),
+        )
+        .expect("replace failed unexpectedly");
+        assert_eq!(
+            foo,
+            FooPlus {
+                x: 6,
+                y: 12,
+                also: 123,
+            }
+        );
+
+        assert_eq!(
+            foo.replace_from(
+                [(1, OV::i64(456)), (2, OV::string("wrong wire type"))]
+                    .into_opaque_message()
+                    .encode_to_vec()
+                    .as_slice()
+            )
+            .expect_err("replace with wrong wire type succeeded unexpectedly")
+            .kind(),
+            WrongWireType
+        );
+        // After a failed decode, the message's non-ignored fields should be cleared rather than
+        // incompletely populated
+        assert_eq!(
+            foo,
+            FooPlus {
+                x: 0,
+                y: 0,
+                also: 123,
+            }
+        );
+    }
+
+    #[test]
+    fn ignored_fields_with_defaults() {
+        #[derive(Debug, PartialEq, Message)]
+        struct FooPlus {
+            x: i64,
+            y: i64,
+            #[bilrost(ignore)]
+            also: usize,
+        }
+
+        // Some Default implementation is required when there are ignored fields. It doesn't have
+        // to be the derived implementation, and it can have non-empty values for non-ignored
+        // fields.
+        impl Default for FooPlus {
+            fn default() -> Self {
+                Self {
+                    x: 111,
+                    y: 222,
+                    also: 12345,
+                }
+            }
+        }
+
+        // The empty value for the message will still have the empty value for all non-ignored
+        // fields; the rest will be taken from the `Default` implementation.
+        assert_eq!(
+            FooPlus::empty(),
+            FooPlus {
+                x: 0,
+                y: 0,
+                also: 12345
+            }
+        );
+
+        assert::decodes(
+            [(1, OV::i64(1))],
+            FooPlus {
+                x: 1,
+                y: 0,
+                also: 12345,
+            },
+        )
+    }
+
     // Varint tests
 
     #[test]
