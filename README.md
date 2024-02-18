@@ -94,7 +94,7 @@ portable not just across architectures and programs, but to other programming
 languages as well. There is currently one minor caveat: The *sort order* of
 values in Bilrost may matter.
 
-In distinguished encoding mode, canonical data must always be represented with
+In distinguished decoding mode, canonical data must always be represented with
 *sets* and *maps* having their items in sorted order. When the item type of a
 set (or the key type of a map) is not a simple type with an already-standardized
 sorting order (such as an integer or string), the canonical order of the items
@@ -109,7 +109,7 @@ which provides a distinguished decoding mode. Decoding in distinguished mode
 comes with an additional guarantee that the resulting message value will
 re-encode to the exact same sequence of bytes, and that *every* different
 sequence of bytes will either decode to a different value or fail to decode. Any
-message type that *can* implement distinguished encoding *will* always encode in
+message type that *can* implement distinguished decoding *will* always encode in
 its distinguished form; there is not an alternate encoding mode that is "more
 canonical".
 
@@ -125,7 +125,7 @@ The best proxy of this expectation of an [equivalence relation][equiv] in Rust
 is the [`Eq`][eq] trait, which denotes that there is an equivalence relation
 between all values of any type that implements it. Therefore, this trait is
 required of all field and message types in order to implement distinguished
-encoding in `bilrost`.
+decoding in `bilrost`.
 
 [equiv]: https://en.wikipedia.org/wiki/Equivalence_relation
 
@@ -167,7 +167,7 @@ same value with the exact same bits.
 [protonegzero]: https://github.com/protocolbuffers/protobuf/issues/7062
 
 For this reason it is not yet considered a good idea to implement distinguished
-encoding for third-party wrappers for Rust's floating point types that implement
+decoding for third-party wrappers for Rust's floating point types that implement
 [`Eq`][eq] and [`Ord`][ord] such as [`ordered_float`][ordered_float] and
 [`decorum`][decorum] because they still consider some sets of values that have
 *different bits* to be equal. Any future implementation of such a type would
@@ -538,7 +538,7 @@ encoder will still encode a plain `Vec<u8>` as its bytes value.
 [vec]: https://doc.rust-lang.org/std/vec/struct.Vec.html
 
 *Hash-table-based maps and sets are implemented, but are not compatible with
-distinguished encoding or decoding. If distinguished encoding is required, a
+distinguished encoding or decoding. If distinguished decoding is required, a
 container which stores its values in sorted order must be used.
 
 While it's possible to nest and recursively nest `Message` types with `Box`,
@@ -981,7 +981,7 @@ Strengths of Bilrost's encoding include those of protocol buffers:
 
 ...as well as more:
 
-* Bilrost supports distinguished encoding for types where it makes sense, and is
+* Bilrost supports distinguished decoding for types where it makes sense, and is
   designed from a protocol level to make invalid values unrepresentable where
   possible
 * Bilrost is more compact than protobuf without incurring significant overhead.
@@ -1043,7 +1043,7 @@ complications with trying to serialize Bilrost messages with Serde:
 - Bilrost messages must encode their fields in tag order, which may (in the case
   of `oneof` fields) vary depending on their value, and it's not clear how or if
   this could be solved in `serde`.
-- Bilrost has both expedient and distinguished encoding modes, and promises that
+- Bilrost has both expedient and distinguished decoding modes, and promises that
   encoding a message that implements `DistinguishedMessage` always produces
   canonical output. This may be beyond what is practical to implement.
 
