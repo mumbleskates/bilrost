@@ -585,7 +585,7 @@ mod derived_message_tests {
             FooPlus {
                 x: 0,
                 y: 0,
-                also: 12345
+                also: 12345,
             }
         );
 
@@ -597,6 +597,180 @@ mod derived_message_tests {
                 also: 12345,
             },
         )
+    }
+
+    #[test]
+    fn field_clearing() {
+        use alloc::collections::{BTreeMap, BTreeSet};
+        use bilrost::Blob;
+        use bytes::Bytes;
+        #[cfg(feature = "bytestring")]
+        use bytestring::ByteString;
+        #[cfg(feature = "smallvec")]
+        use smallvec::SmallVec;
+        #[cfg(feature = "std")]
+        use std::collections::{HashMap, HashSet};
+        #[cfg(feature = "thin-vec")]
+        use thin_vec::ThinVec;
+        #[cfg(feature = "tinyvec")]
+        use tinyvec::TinyVec;
+
+        #[derive(Clone, Debug, PartialEq, Eq, Enumeration)]
+        enum Hmm {
+            Nope = 0,
+            Maybe = 1,
+        }
+
+        #[derive(Debug, PartialEq, Message)]
+        struct Nested(u32);
+
+        #[derive(Debug, PartialEq, Message)]
+        struct Clearable<'a> {
+            #[bilrost(encoder(varint))]
+            a: u8,
+            #[bilrost(encoder(varint))]
+            b: i8,
+            c: u16,
+            d: i16,
+            e: u32,
+            f: i32,
+            g: u64,
+            h: i64,
+            i: bool,
+            j: f32,
+            k: f64,
+            string: String,
+            blob: Blob,
+            #[bilrost(encoder(plainbytes))]
+            byte_arr: [u8; 1],
+            hmm: Hmm,
+            nested: Nested,
+            opt: Option<u32>,
+            vec: Vec<u32>,
+            btmap: BTreeMap<u32, u32>,
+            btset: BTreeSet<u32>,
+            #[cfg(feature = "std")]
+            hashmap: HashMap<u32, u32>,
+            #[cfg(feature = "std")]
+            hashset: HashSet<u32>,
+            bytes: Bytes,
+            #[cfg(feature = "bytestring")]
+            bytestring: ByteString,
+            #[bilrost(encoder(plainbytes))]
+            cow_bytes_borrowed: Cow<'a, [u8]>,
+            #[bilrost(encoder(plainbytes))]
+            cow_bytes_owned: Cow<'a, [u8]>,
+            cow_str_borrowed: Cow<'a, str>,
+            cow_str_owned: Cow<'a, str>,
+            #[cfg(feature = "smallvec")]
+            smallvec: SmallVec<[u32; 1]>,
+            #[cfg(feature = "thin-vec")]
+            thin_vec: ThinVec<u32>,
+            #[cfg(feature = "tinyvec")]
+            tinyvec: TinyVec<[u32; 1]>,
+            #[cfg(feature = "hashbrown")]
+            hbmap: hashbrown::HashMap<u32, u32>,
+            #[cfg(feature = "hashbrown")]
+            hbset: hashbrown::HashSet<u32>,
+        }
+
+        impl Default for Clearable<'_> {
+            fn default() -> Self {
+                // Create a default value where every field is non-empty, and every field that may
+                // own memory has extra allocated capacity.
+                let mut result = Self {
+                    a: 1,
+                    b: 1,
+                    c: 1,
+                    d: 1,
+                    e: 1,
+                    f: 1,
+                    g: 1,
+                    h: 1,
+                    i: true,
+                    j: 1.0,
+                    k: 1.0,
+                    string: String::with_capacity(64),
+                    blob: Blob::from_vec(Vec::with_capacity(64)),
+                    byte_arr: [1],
+                    hmm: Hmm::Maybe,
+                    nested: Nested(1),
+                    opt: Some(1),
+                    vec: Vec::with_capacity(64),
+                    btmap: [(1, 1)].into(),
+                    btset: [1].into(),
+                    #[cfg(feature = "std")]
+                    hashmap: HashMap::with_capacity(64),
+                    #[cfg(feature = "std")]
+                    hashset: HashSet::with_capacity(64),
+                    bytes: b"foo".as_slice().into(),
+                    #[cfg(feature = "bytestring")]
+                    bytestring: "foo".into(),
+                    cow_bytes_borrowed: b"foo".into(),
+                    cow_bytes_owned: Vec::with_capacity(64).into(),
+                    cow_str_borrowed: "foo".into(),
+                    cow_str_owned: String::with_capacity(64).into(),
+                    #[cfg(feature = "smallvec")]
+                    smallvec: SmallVec::with_capacity(64),
+                    #[cfg(feature = "thin-vec")]
+                    thin_vec: ThinVec::with_capacity(64),
+                    #[cfg(feature = "tinyvec")]
+                    tinyvec: TinyVec::with_capacity(64),
+                    #[cfg(feature = "hashbrown")]
+                    hbmap: hashbrown::HashMap::with_capacity(64),
+                    #[cfg(feature = "hashbrown")]
+                    hbset: hashbrown::HashSet::with_capacity(64),
+                };
+                result.string.push_str("foo");
+                result.blob.push(1);
+                result.vec.push(1);
+                #[cfg(feature = "std")]
+                result.hashmap.insert(1, 1);
+                #[cfg(feature = "std")]
+                result.hashset.insert(1);
+                result.cow_bytes_owned.to_mut().push(1);
+                result.cow_str_owned.to_mut().push_str("foo");
+                #[cfg(feature = "smallvec")]
+                result.smallvec.push(1);
+                #[cfg(feature = "thin-vec")]
+                result.thin_vec.push(1);
+                #[cfg(feature = "tinyvec")]
+                result.tinyvec.push(1);
+                #[cfg(feature = "hashbrown")]
+                result.hbmap.insert(1, 1);
+                #[cfg(feature = "hashbrown")]
+                result.hbset.insert(1);
+                result
+            }
+        }
+
+        let mut clearable = Clearable::default();
+        assert!(!clearable.is_empty());
+        clearable.clear();
+        assert_eq!(clearable, Clearable::empty());
+        assert!(clearable.is_empty());
+        assert!(clearable.string.capacity() >= 64);
+        assert!(clearable.blob.capacity() >= 64);
+        assert!(clearable.vec.capacity() >= 64);
+        #[cfg(feature = "std")]
+        assert!(clearable.hashmap.capacity() >= 64);
+        #[cfg(feature = "std")]
+        assert!(clearable.hashset.capacity() >= 64);
+        assert!(clearable.cow_bytes_owned.to_mut().capacity() >= 64);
+        assert!(clearable.cow_str_owned.to_mut().capacity() >= 64);
+        #[cfg(feature = "smallvec")]
+        assert!(clearable.smallvec.capacity() >= 64);
+        #[cfg(feature = "thin-vec")]
+        assert!(clearable.thin_vec.capacity() >= 64);
+        #[cfg(feature = "tinyvec")]
+        assert!(clearable.tinyvec.capacity() >= 64);
+        #[cfg(feature = "hashbrown")]
+        assert!(clearable.hbmap.capacity() >= 64);
+        #[cfg(feature = "hashbrown")]
+        assert!(clearable.hbset.capacity() >= 64);
+
+        assert::decodes(Clearable::default().encode_to_vec(), Clearable::default());
+        assert::decodes([], Clearable::empty());
     }
 
     // Varint tests
