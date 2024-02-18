@@ -48,10 +48,6 @@ pub(crate) fn merge_distinguished<T: RawDistinguishedMessage, B: Buf + ?Sized>(
 
 /// A Bilrost message. Provides basic encoding and decoding functionality for message types. For
 /// an object-safe proxy trait, see `MessageDyn`.
-///
-/// Messages are expected to have a `Default` implementation that is exactly the same as each
-/// field's respective `Default` value; that is, functionally identical to a derived `Default`. This
-/// is automatically satisfied by the derive macro.
 pub trait Message {
     /// Returns the encoded length of the message without a length delimiter.
     fn encoded_len(&self) -> usize;
