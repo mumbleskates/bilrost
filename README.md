@@ -398,6 +398,7 @@ TODO: expand
 
 * example usage
 * with & without empty variant
+* with both struct & tuple style variants
 
 #### Encoders and other attributes
 

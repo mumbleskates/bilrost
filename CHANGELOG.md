@@ -42,8 +42,8 @@
   and `DistinguishedMessageDyn` traits.
 * Changed value-decoding to pass down whether or not an empty value is allowed,
   allowing implementations to err sooner and cheaper by detecting that the
-  encoded data is that which represents a default, rather than always checking
-  the value for emptiness after the fact.
+  encoded data is that which represents the empty value, rather than always
+  checking the value for emptiness after the fact.
 
 ### Fixes
 
