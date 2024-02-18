@@ -706,9 +706,9 @@ mod derived_message_tests {
                     bytes: b"foo".as_slice().into(),
                     #[cfg(feature = "bytestring")]
                     bytestring: "foo".into(),
-                    cow_bytes_borrowed: b"foo".into(),
+                    cow_bytes_borrowed: Cow::Borrowed(&b"foo"[..]),
                     cow_bytes_owned: Vec::with_capacity(64).into(),
-                    cow_str_borrowed: "foo".into(),
+                    cow_str_borrowed: Cow::Borrowed("foo"),
                     cow_str_owned: String::with_capacity(64).into(),
                     #[cfg(feature = "smallvec")]
                     smallvec: SmallVec::with_capacity(64),
