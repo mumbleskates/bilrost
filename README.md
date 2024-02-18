@@ -711,22 +711,17 @@ be rejected.
 
 #### Varints (LEB128-bijective encoding)
 
-Varints are a variable-length encoding of a non-negative integer, not greater
-than the maximum value representable by an unsigned 64 bit integer (2^64-1).
+Varints are a variable-length encoding of an unsigned 64 bit integer value.
 Encoded varints are between one and nine bytes, with lesser numeric values
 having shorter representations in the encoding. At the same time, each number in
 this range has exactly one possible encoded representation.
 
-The bytes that comprise an encoded varint have their most significant bit set
-whenever they are not the final byte, as a continuation bit. In varints that are
-nine bytes in length, the ninth and final byte may or may not have its most
-significant bit set. The first byte that does *not* have its most significant
-bit set (or the ninth if each byte's most significant bit is set) is the final
-byte.
-
-The value of the encoded varint is the sum of each byte's unsigned integer
-value, multiplied by 128 (shifted left by 7 bits) for each byte that preceded
-it.
+1. The final byte of a varint is the first byte that does not have its most
+   significant bit set, or the ninth byte, whichever comes first.
+2. The value of the encoded varint is the sum of each byte's unsigned integer
+   value, multiplied by 128 (shifted left by 7 bits) for each byte that preceded
+   it.
+3. Varints representing values greater than 2^64-1 are invalid.
 
 This scheme is very similar to that used by Git (see [`varint.c`][gitvarint]),
 but the Git scheme is big-endian whereas Bilrost varints are encoded least
@@ -738,15 +733,17 @@ significant byte first and limited to 9 bytes.
 
 Bilrost's varint representation is a base 128 [bijective numeration][bn] scheme
 with a continuation bit. In such a numbering scheme, each possible values in a
-given scheme is greater than each possible value with fewer digits.
+given scheme is greater than each possible value with fewer digits. (Many people
+are already unknowingly familiar with bijective numeration via the column names
+in spreadsheet software: A, B, ... Y, Z, AA, AB, ...)
 
 [bn]: https://en.wikipedia.org/wiki/Bijective_numeration
 
-Typical bijective numerations have no zero digit, but represent zero with the
+Classical bijective numerations have no zero digit, but represent zero with the
 empty string. This doesn't work for us because we must always encode at least
 one byte to avoid ambiguity. Consider instead:
 
-* A base 128 bijective numeration
+* A base 128 bijective numeration,
 * which represents the digits valued 1 through 128 with the byte values 0
   through 127,
 * is encoded least significant digit first with a continuation bit in the most
@@ -815,12 +812,10 @@ def encode_varint(n: int) -> bytes:
 
 def decode_varint_from_byte_iterator(it: Iterable[int]) -> int:
     n = 0
-    num_bytes_read = 0
-    for byte_value in it:
+    for byte_index, byte_value in enumerate(it):
         assert 0 <= byte_value < 256
-        n += byte_value * (128**num_bytes_read)
-        num_bytes_read += 1
-        if byte_value < 128 or num_bytes_read == 9:
+        n += byte_value * (128**byte_index)
+        if byte_value < 128 or byte_index == 8:
             # Varints encoding values greater than 64 bits MUST be rejected
             if n >= 2**64:
                 raise ValueError("invalid varint")
