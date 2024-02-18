@@ -121,6 +121,9 @@ will produce an error when decoded in this mode. If a message is successfully
 decoded from a byte string in distinguished mode, is not modified, and is then
 re-encoded, it will emit the exact same byte string.
 
+For this reason, `bilrost` will refuse to derive `DistinguishedMessage` if there
+are any ignored fields.
+
 The best proxy of this expectation of an [equivalence relation][equiv] in Rust
 is the [`Eq`][eq] trait, which denotes that there is an equivalence relation
 between all values of any type that implements it. Therefore, this trait is
@@ -137,7 +140,7 @@ non-canonically encoded values*. Most of the time, this is what is desired.
 
 *"Non-canonical" value encodings in Bilrost principally include fields that are
 represented in the encoding even though their value is considered empty. For
-message types, such as nested messages, it also encompasses the message
+message types, such as nested messages, it also includes the message
 representation containing fields with unknown tags.
 
 To support this "exactly 1:1" expectation for distinguished messages, certain
