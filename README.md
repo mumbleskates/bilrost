@@ -457,7 +457,8 @@ discriminant value). Otherwise, enumeration types must always be nested.
 impl; message types can nest recursively this way.
 
 Any of these types may be included directly in a `bilrost` message struct. If
-that field's value is empty, no bytes will be emitted when it is encoded.
+that field's value is [empty](#empty-values), no bytes will be emitted when it
+is encoded.
 
 In addition to including them directly, these types can also be nested within
 several different containers:
@@ -640,8 +641,8 @@ same representation.
 can also be changed between `unpacked` and `packed` encoding, as long as the
 inner value type `T` does not have a length-delimited representation. This will
 break compatibility with distinguished decoding in both directions whenever the
-field is present and not empty (non-optional and empty or None) because it will
-also change the encoded representation, but expedient decoding will still work.
+field is present and not [empty](#empty-values) because it will also change the
+encoded representation, but expedient decoding will still work.
 
 ## What Bilrost and the library won't do
 
@@ -894,20 +895,8 @@ appears more than once when decoding, the message must be rejected with an error
 in any decoding mode. In distinguished mode, the items must be in [canonical
 order](#canonical-ordering).
 
-Any field whose value is empty should always be canonically omitted from the
-encoding:
-
-| Type                                                  | Empty value                        |
-|-------------------------------------------------------|------------------------------------|
-| boolean                                               | false                              |
-| any integer                                           | 0                                  |
-| floating point number                                 | +0.0                               |
-| fixed-size byte array                                 | all zeros                          |
-| text string, byte string, collection, mapping, or set | containing zero bytes or items     |
-| `Enumeration` type                                    | the variant represented by 0       |
-| `Message`                                             | each field of the message is empty |
-| `Oneof`                                               | `None` or the empty variant        |
-| any optional value (`Option<T>`)                      | `None`                             |
+Any field whose value is [empty](#empty-values) should always be omitted from
+the encoding.
 
 Fields whose types do not encode into multiple fields must not occur more than
 once. If they do, the message must be rejected with an error in any decoding
@@ -925,14 +914,28 @@ in expedient decoding mode, it should be ignored for purposes of decoding.
 
 In distinguished decoding mode, in addition to the above constraints on value
 ordering in sets and mappings, all values must be represented in exactly the way
-they would encode. If an empty value is found to be represented in the encoding,
-the message is not canonical. (In the case of an optional field, `Some(0)` is
-not considered empty, and is distinct from the always-empty value `None`; this
-is the purpose of optional fields.)
+they would encode. If an [empty](#empty-values) value is found to be represented
+in the encoding, the message is not canonical. (In the case of an optional
+field, `Some(0)` is not considered empty, and is distinct from the always-empty
+value `None`; this is the purpose of optional fields.)
 
 Also in distinguished mode, fields whose tags are not specified in the message
 must never be present. If any is encountered, the message can no longer be
 canonical.
+
+#### Empty values
+
+| Type                                                  | Empty value                        |
+|-------------------------------------------------------|------------------------------------|
+| boolean                                               | false                              |
+| any integer                                           | 0                                  |
+| floating point number                                 | +0.0                               |
+| fixed-size byte array                                 | all zeros                          |
+| text string, byte string, collection, mapping, or set | containing zero bytes or items     |
+| `Enumeration` type                                    | the variant represented by 0       |
+| `Message`                                             | each field of the message is empty |
+| `Oneof`                                               | `None` or the empty variant        |
+| any optional value (`Option<T>`)                      | `None`                             |
 
 #### Canonical ordering
 
