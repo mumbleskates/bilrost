@@ -87,20 +87,7 @@ Bilrost is very similar to [protobuf][pb]. See also:
 #comparisons-to-other-encodings).
 
 Bilrost also has the ability to encode and decode data that is guaranteed to be
-canonically represented; see the [next section](#distinguished-decoding).
-
-Bilrost specifies most of what is required to make these message schemas
-portable not just across architectures and programs, but to other programming
-languages as well. There is currently one minor caveat: The *sort order* of
-values in Bilrost may matter.
-
-In distinguished decoding mode, canonical data must always be represented with
-*sets* and *maps* having their items in sorted order. When the item type of a
-set (or the key type of a map) is not a simple type with an already-standardized
-sorting order (such as an integer or string), the canonical order of the items
-depends on that type's implementation, and care must be taken to standardize
-that order in addition to the schema of the message's fields when defining
-distinguished types.
+canonically represented.
 
 ### Distinguished decoding
 
@@ -155,7 +142,22 @@ themselves.
 
 [ieee754]: https://en.wikipedia.org/wiki/IEEE_754
 
-#### Floating point values and distinguished encoding
+#### Canonical order and distinguished representation
+
+Bilrost specifies most of what is required to make these message schemas
+portable not just across architectures and programs, but to other programming
+languages as well. There is currently one minor caveat: The *sort order* of
+values in Bilrost may matter.
+
+In distinguished decoding mode, canonical data must always be represented with
+*sets* and *maps* having their items in sorted order. When the item type of a
+set (or the key type of a map) is not a simple type with an already-standardized
+sorting order (such as an integer or string), the canonical order of the items
+depends on that type's implementation, and care must be taken to standardize
+that order in addition to the schema of the message's fields when defining
+distinguished types.
+
+#### Floating point values and distinguished decoding
 
 Equivalence relations are also not quite sufficient to describe the desired
 properties of a distinguished type in Bilrost, either; not only must the values
@@ -725,6 +727,12 @@ The value of the encoded varint is the sum of each byte's unsigned integer
 value, multiplied by 128 (shifted left by 7 bits) for each byte that preceded
 it.
 
+This scheme is very similar to that used by Git (see [`varint.c`][gitvarint]),
+but the Git scheme is big-endian whereas Bilrost varints are encoded least
+significant byte first and limited to 9 bytes.
+
+[gitvarint]: https://git.kernel.org/pub/scm/git/git.git/tree/varint.c?h=v2.43.2
+
 ##### Mathematics
 
 Bilrost's varint representation is a base 128 [bijective numeration][bn] scheme
@@ -827,25 +835,130 @@ def decode_varint_from_byte_iterator(it: Iterable[int]) -> int:
 To make the encoding useful, these opaque values have standard interpretations
 for many common data types.
 
-* fixed-width encodings must be little-endian, text must be utf-8
-* complex types
-    * unpacked encodings for vecs and sets
-    * packed encodings for vecs and sets
-    * map encodings
-* disallowed decoding constraints
-    * unexpectedly repeated fields must err
-    * out-of-domain values must err
-    * text strings with invalid utf-8 must err
-    * sets with duplicated items must err
-    * maps with duplicated keys must err
-    * oneofs with conflicting fields must err
-* additional decoding constraints for distinguished
-    * fields' types must have an equivalence relation via their encoded
-      representations
-    * fields must never be present in the decoded data when they have an empty
-      value
-    * unknown fields must err
-    * maps' keys and sets' items must be ordered
+In general, whenever a decoded value represents a value that is outside the
+domain of the type of the field it is being decoded into (for instance, when the
+field type is `u16` but the value is a million, or when the field type is an
+enumeration and there is no corresponding variant of the enumeration) the
+decoding must be rejected with an error in any decoding mode.
+
+Unsigned integers represented as varints are interpreted exactly. The varint
+encoding of the number 10 has the same meaning in `u8`, `u16`, `u32`, and `u64`
+field types.
+
+Signed integers represented as varints are always [zig-zag encoded][zigzag],
+with the sign of the number denoted in the least significant bit. Thus,
+non-negative integers are translated to unsigned for encoding by doubling them,
+and negative integers are translated by negating, then doubling, then
+subtracting one.
+
+[zigzag]: https://en.wikipedia.org/wiki/Variable-length_quantity#Zigzag_encoding
+
+Booleans use the varint value 0 for `false`, and 1 for `true`.
+
+Unsigned integers encoded in fixed-width must be encoded in little-endian
+byte order; signed integers must likewise be encoded in little-endian byte
+order, and must have a [two's complement][twos] representation.
+
+[twos]: https://en.wikipedia.org/wiki/Two%27s_complement
+
+Floating point numbers must be encoded in little-endian byte order, and must
+have [IEEE 754 binary32/binary64][ieee754] standard representation.
+
+Arrays, plain byte strings, vectors, etc. must be encoded in order, with their
+lowest-indexed (first) bytes or items encoded first.
+
+Strings must always contain valid UTF-8 text, containing the canonical encoding
+for some sequence of Unicode codepoints. Over-long encodings of codepoints and
+surrogate codepoints must be rejected with an error in any decoding mode.
+
+Collections of items (such as `Vec<String>`) encoded in the unpacked
+representation consist of one field for each item. Collections encoded in the
+packed representation consist of a single length-delimited value, containing
+each item's value encoded one after the other. In expedient decoding mode,
+decoding should succeed when expecting a packed representation but finding an
+unpacked representation, or vice versa. Detecting this situation is only
+possible when the values themselves never have a length-delimited
+representation, in which case the wire-type of the field can be used to
+distinguish the two cases.
+
+Mappings are represented as a length-delimited value, containing alternately
+encoded keys and values for each entry in the mapping. Keys must be distinct,
+and if a map is found to have two equivalent keys the message must be rejected
+with an error in any decoding mode. In distinguished decoding mode, the entries
+in the mapping must be encoded in canonically ascending order (see the notes
+on [canonical order](#canonical-ordering)).
+
+Likewise to mappings, sets (collections of unique values) are encoded and
+decoded in exactly the same form as non-unique collections. If a value in a set
+appears more than once when decoding, the message must be rejected with an error
+in any decoding mode. In distinguished mode, the items must be in [canonical
+order](#canonical-ordering).
+
+Any field whose value is empty should always be canonically omitted from the
+encoding:
+
+| Type                                                  | Empty value                        |
+|-------------------------------------------------------|------------------------------------|
+| boolean                                               | false                              |
+| any integer                                           | 0                                  |
+| floating point number                                 | +0.0                               |
+| fixed-size byte array                                 | all zeros                          |
+| text string, byte string, collection, mapping, or set | containing zero bytes or items     |
+| `Enumeration` type                                    | the variant represented by 0       |
+| `Message`                                             | each field of the message is empty |
+| `Oneof`                                               | `None` or the empty variant        |
+| any optional value (`Option<T>`)                      | `None`                             |
+
+Fields whose types do not encode into multiple fields must not occur more than
+once. If they do, the message must be rejected with an error in any decoding
+mode. This currently includes every type of field not encoded with an unpacked
+representation.
+
+Oneofs, sets of mutually exclusive fields, must not have conflicting values
+present in the encoding. If they do, the message must be rejected with an error
+in any decoding mode.
+
+If a field whose tag that is not known/specified in the message is encountered
+in expedient decoding mode, it should be ignored for purposes of decoding.
+
+#### Distinguished constraints
+
+In distinguished decoding mode, in addition to the above constraints on value
+ordering in sets and mappings, all values must be represented in exactly the way
+they would encode. If an empty value is found to be represented in the encoding,
+the message is not canonical. (In the case of an optional field, `Some(0)` is
+not considered empty, and is distinct from the always-empty value `None`; this
+is the purpose of optional fields.)
+
+Also in distinguished mode, fields whose tags are not specified in the message
+must never be present. If any is encountered, the message can no longer be
+canonical.
+
+#### Canonical ordering
+
+For supported non-message types, the following orderings are standardized:
+
+| Type                                 | Standard ordering                                                                     |
+|--------------------------------------|---------------------------------------------------------------------------------------|
+| boolean                              | false, then true                                                                      |
+| integer                              | ascending numeric value                                                               |
+| text string, byte string, byte array | [lexicographically][lex] ascending, by bytes or UTF-8 bytes*                          |
+| collection (vec, set, etc.)          | lexicographically ascending, by nested values                                         |
+| mapping                              | lexicographically ascending, by alternating key-then-value                            |
+| floating point number                | [(not specified, nor recommended)](#floating-point-values-and-distinguished-decoding) |
+| `Enumeration` types                  | [(not specified)](#canonical-order-and-distinguished-representation)                  |
+| `Message` types                      | [(not specified)](#canonical-order-and-distinguished-representation)                  |
+| `Option<T>`                          | (not applicable, cannot repeat)                                                       |
+| `Oneof` types                        | (not applicable, not a single value, cannot repeat)                                   |
+
+[lex]: https://en.wikipedia.org/wiki/Lexicographic_order
+
+*Bytes are considered to be unsigned. The least-valued byte is the nul byte
+`0x00`, and the greatest is `0xff`.
+
+This standardization corresponds to the existing definitions of `Ord` in the
+Rust language for booleans, integers, strings, arrays/slices, ordered sets, and
+ordered maps.
 
 ## `bilrost` vs. `prost`
 
