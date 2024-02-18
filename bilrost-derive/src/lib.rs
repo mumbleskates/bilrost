@@ -147,7 +147,7 @@ fn preprocess_message(input: &DeriveInput) -> Result<PreprocessedMessage, Error>
                     // Field is ignored
                     has_ignored_fields = true;
                     None
-                },
+                }
                 Err(err) => Some(Err(
                     err.context(format!("invalid message field {}.{}", ident, field_ident))
                 )),
