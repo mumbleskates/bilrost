@@ -94,20 +94,31 @@ mod derived_message_tests {
 
         pub(super) fn decodes<M>(from: impl IntoOpaqueMessage, into: M)
         where
-            M: Message + Debug + PartialEq,
+            M: Message + Debug + PartialEq + EmptyState,
         {
             let encoded = from.into_opaque_message().encode_to_vec();
-            assert_eq!(M::decode(encoded.as_slice()), Ok(into));
+            assert_eq!(M::decode(encoded.as_slice()).as_ref(), Ok(&into));
+            let mut to_replace = M::empty();
+            to_replace.replace_from(encoded.as_slice()).unwrap();
+            assert_eq!(&to_replace, &into);
         }
 
         pub(super) fn doesnt_decode<M>(from: impl IntoOpaqueMessage, err: DecodeErrorKind)
         where
-            M: Message + Debug,
+            M: Message + Debug + EmptyState,
         {
             let encoded = from.into_opaque_message().encode_to_vec();
             assert_eq!(
                 M::decode(encoded.as_slice())
                     .expect_err("unexpectedly decoded without error")
+                    .kind(),
+                err
+            );
+            let mut to_replace = M::empty();
+            assert_eq!(
+                to_replace
+                    .replace_from(encoded.as_slice())
+                    .expect_err("unexpectedly replaced without error")
                     .kind(),
                 err
             );
@@ -117,7 +128,7 @@ mod derived_message_tests {
             from: impl IntoOpaqueMessage,
             err: DecodeErrorKind,
         ) where
-            M: DistinguishedMessage + Debug,
+            M: DistinguishedMessage + Debug + EmptyState,
         {
             let encoded = from.into_opaque_message().encode_to_vec();
             assert_eq!(
@@ -126,17 +137,36 @@ mod derived_message_tests {
                     .kind(),
                 err
             );
+            let mut to_replace = M::empty();
+            assert_eq!(
+                to_replace
+                    .replace_distinguished_from(encoded.as_slice())
+                    .expect_err("unexpectedly replaced without error")
+                    .kind(),
+                err
+            );
         }
 
         pub(super) fn decodes_distinguished<M>(from: impl IntoOpaqueMessage, into: M)
         where
-            M: DistinguishedMessage + Debug + Eq,
+            M: DistinguishedMessage + Debug + Eq + EmptyState,
         {
             let encoded = from.into_opaque_message().encode_to_vec();
             assert_eq!(M::decode(encoded.as_slice()).as_ref(), Ok(&into));
             assert_eq!(
                 M::decode_distinguished(encoded.as_slice()).as_ref(),
                 Ok(&into)
+            );
+            let mut to_replace = M::empty();
+            to_replace.replace_from(encoded.as_slice()).unwrap();
+            assert_eq!(&to_replace, &into, "doesn't match after expedient replace");
+            to_replace = M::empty();
+            to_replace
+                .replace_distinguished_from(encoded.as_slice())
+                .unwrap();
+            assert_eq!(
+                &to_replace, &into,
+                "doesn't match after distinguished replace"
             );
             assert_eq!(
                 encoded,
@@ -151,13 +181,24 @@ mod derived_message_tests {
             into: M,
             err: DecodeErrorKind,
         ) where
-            M: DistinguishedMessage + Debug + Eq,
+            M: DistinguishedMessage + Debug + Eq + EmptyState,
         {
             let encoded = from.into_opaque_message().encode_to_vec();
             assert_eq!(M::decode(encoded.as_slice()).as_ref(), Ok(&into));
+            let mut to_replace = M::empty();
+            to_replace.replace_from(encoded.as_slice()).unwrap();
+            assert_eq!(&to_replace, &into);
             assert_eq!(
                 M::decode_distinguished(encoded.as_slice())
                     .expect_err("unexpectedly decoded in distinguished mode without error")
+                    .kind(),
+                err
+            );
+            let mut to_replace = M::empty();
+            assert_eq!(
+                to_replace
+                    .replace_distinguished_from(encoded.as_slice())
+                    .expect_err("unexpectedly replaced in distinguished mode without error")
                     .kind(),
                 err
             );
@@ -175,7 +216,7 @@ mod derived_message_tests {
 
         pub(super) fn never_decodes<M>(from: impl IntoOpaqueMessage, err: DecodeErrorKind)
         where
-            M: DistinguishedMessage + Debug,
+            M: DistinguishedMessage + Debug + EmptyState,
         {
             let encoded = from.into_opaque_message().encode_to_vec();
             assert_eq!(
@@ -184,9 +225,25 @@ mod derived_message_tests {
                     .kind(),
                 err
             );
+            let mut to_replace = M::empty();
+            assert_eq!(
+                to_replace
+                    .replace_from(encoded.as_slice())
+                    .expect_err("unexpectedly replaced in expedient mode without error")
+                    .kind(),
+                err
+            );
             assert_eq!(
                 M::decode_distinguished(encoded.as_slice())
                     .expect_err("unexpectedly decoded in distinguished mode without error")
+                    .kind(),
+                err
+            );
+            let mut to_replace = M::empty();
+            assert_eq!(
+                to_replace
+                    .replace_distinguished_from(encoded.as_slice())
+                    .expect_err("unexpectedly replaced in distinguished mode without error")
                     .kind(),
                 err
             );
@@ -201,25 +258,41 @@ mod derived_message_tests {
             assert_eq!(value.encoded_len(), encoded.len(), "encoded_len was wrong");
         }
 
-        pub(super) fn is_invalid<M: Message + Debug>(
-            value: impl AsRef<[u8]>,
-            err: DecodeErrorKind,
-        ) {
+        pub(super) fn is_invalid<M>(value: impl AsRef<[u8]>, err: DecodeErrorKind)
+        where
+            M: Message + Debug + EmptyState,
+        {
             assert_eq!(
-                M::decode(&mut value.as_ref())
+                M::decode(value.as_ref())
                     .expect_err("decoded without error")
+                    .kind(),
+                err
+            );
+            let mut to_replace = M::empty();
+            assert_eq!(
+                to_replace
+                    .replace_from(value.as_ref())
+                    .expect_err("replaced without error")
                     .kind(),
                 err
             );
         }
 
-        pub(super) fn is_invalid_distinguished<M: DistinguishedMessage + Debug>(
-            value: impl AsRef<[u8]>,
-            err: DecodeErrorKind,
-        ) {
+        pub(super) fn is_invalid_distinguished<M>(value: impl AsRef<[u8]>, err: DecodeErrorKind)
+        where
+            M: DistinguishedMessage + Debug + EmptyState,
+        {
             assert_eq!(
-                M::decode_distinguished(&mut value.as_ref())
+                M::decode_distinguished(value.as_ref())
                     .expect_err("decoded without error")
+                    .kind(),
+                err
+            );
+            let mut to_replace = M::empty();
+            assert_eq!(
+                to_replace
+                    .replace_distinguished_from(value.as_ref())
+                    .expect_err("replaced without error")
                     .kind(),
                 err
             );
