@@ -983,6 +983,8 @@ ordered maps.
 
 ## Differences from Protobuf
 
+TODO: expand
+
 * major changes in relation to protobuf and the history there
     * bijective varints
         * what leb128 varints gave protobuf
