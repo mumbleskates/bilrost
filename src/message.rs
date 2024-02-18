@@ -87,6 +87,7 @@ pub trait Message {
         Self: Sized;
 
     /// Decodes an instance from the given `Capped` buffer, consuming it to its cap.
+    #[doc(hidden)]
     fn decode_capped<B: Buf + ?Sized>(buf: Capped<B>) -> Result<Self, DecodeError>
     where
         Self: Sized;
@@ -100,6 +101,7 @@ pub trait Message {
 
     /// Decodes the non-ignored fields of this message, replacing their values from the given capped
     /// buffer.
+    #[doc(hidden)]
     fn replace_from_capped<B: Buf + ?Sized>(&mut self, buf: Capped<B>) -> Result<(), DecodeError>;
 }
 
@@ -124,6 +126,7 @@ pub trait DistinguishedMessage: Message + Eq {
 
     /// Decodes an instance from the given `Capped` buffer in distinguished mode, consuming it to
     /// its cap.
+    #[doc(hidden)]
     fn decode_distinguished_capped<B: Buf + ?Sized>(buf: Capped<B>) -> Result<Self, DecodeError>
     where
         Self: Sized;
@@ -141,6 +144,7 @@ pub trait DistinguishedMessage: Message + Eq {
 
     /// Decodes the non-ignored fields of this message in distinguished mode, replacing their values
     /// from the given capped buffer.
+    #[doc(hidden)]
     fn replace_distinguished_from_capped<B: Buf + ?Sized>(
         &mut self,
         buf: Capped<B>,
@@ -226,6 +230,7 @@ where
         Self::decode_capped(Capped::new_length_delimited(&mut buf)?)
     }
 
+    #[doc(hidden)]
     fn decode_capped<B: Buf + ?Sized>(buf: Capped<B>) -> Result<Self, DecodeError> {
         let mut message = Self::empty();
         merge(&mut message, buf, DecodeContext::default())?;
@@ -240,6 +245,7 @@ where
         self.replace_from_capped(Capped::new_length_delimited(&mut buf)?)
     }
 
+    #[doc(hidden)]
     fn replace_from_capped<B: Buf + ?Sized>(&mut self, buf: Capped<B>) -> Result<(), DecodeError> {
         self.clear();
         merge(self, buf, DecodeContext::default()).map_err(|err| {
@@ -261,6 +267,7 @@ where
         Self::decode_distinguished_capped(Capped::new_length_delimited(&mut buf)?)
     }
 
+    #[doc(hidden)]
     fn decode_distinguished_capped<B: Buf + ?Sized>(buf: Capped<B>) -> Result<Self, DecodeError> {
         let mut message = Self::empty();
         merge_distinguished(&mut message, buf, DecodeContext::default())?;
@@ -278,6 +285,7 @@ where
         self.replace_distinguished_from_capped(Capped::new_length_delimited(&mut buf)?)
     }
 
+    #[doc(hidden)]
     fn replace_distinguished_from_capped<B: Buf + ?Sized>(
         &mut self,
         buf: Capped<B>,
@@ -302,6 +310,7 @@ pub trait MessageDyn {
     fn replace_from_dyn(&mut self, buf: &mut dyn Buf) -> Result<(), DecodeError>;
     fn replace_from_slice(&mut self, buf: &[u8]) -> Result<(), DecodeError>;
     fn replace_from_length_delimited_dyn(&mut self, buf: &mut dyn Buf) -> Result<(), DecodeError>;
+    #[doc(hidden)]
     fn replace_from_capped_dyn(&mut self, buf: Capped<dyn Buf>) -> Result<(), DecodeError>;
 }
 
@@ -345,6 +354,7 @@ where
         self.replace_from_length_delimited(buf)
     }
 
+    #[doc(hidden)]
     fn replace_from_capped_dyn(&mut self, buf: Capped<dyn Buf>) -> Result<(), DecodeError> {
         self.replace_from_capped(buf)
     }
@@ -357,6 +367,7 @@ pub trait DistinguishedMessageDyn {
         &mut self,
         buf: &mut dyn Buf,
     ) -> Result<(), DecodeError>;
+    #[doc(hidden)]
     fn replace_distinguished_from_capped_dyn(
         &mut self,
         buf: Capped<dyn Buf>,
@@ -382,6 +393,7 @@ where
         self.replace_distinguished_from_length_delimited(buf)
     }
 
+    #[doc(hidden)]
     fn replace_distinguished_from_capped_dyn(
         &mut self,
         buf: Capped<dyn Buf>,

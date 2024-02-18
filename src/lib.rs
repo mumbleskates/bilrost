@@ -84,6 +84,7 @@ pub fn decode_length_delimiter<B: Buf>(mut buf: B) -> Result<usize, DecodeError>
 }
 
 /// Helper function for derived types, asserting that lists of tags are equal at compile time.
+#[doc(hidden)]
 pub const fn assert_tags_are_equal(failure_description: &str, a: &[u32], b: &[u32]) {
     if a.len() != b.len() {
         #[cfg(feature = "extended-diagnostics")]

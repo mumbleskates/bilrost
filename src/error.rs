@@ -8,9 +8,9 @@ use core::fmt;
 pub enum DecodeErrorKind {
     /// Decoded data was truncated.
     Truncated,
-    /// Invalid varint. (The only invalid varints are ones that would encode values > u64::MAX.)
+    /// Invalid varint. (The only invalid varints are ones that would encode values > `u64::MAX`.)
     InvalidVarint,
-    /// A field key encoded a tag greater than u32::MAX.
+    /// A field key encoded a tag greater than `u32::MAX`.
     TagOverflowed,
     /// A field's wire type was encountered that cannot encode a valid value.
     WrongWireType,
