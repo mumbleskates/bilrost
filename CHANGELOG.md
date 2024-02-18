@@ -18,6 +18,10 @@
 * Usability fixes for `Blob`: `new(..)` has been changed to create an empty
   `Blob` with no arguments, and the functionality for wrapping a vec has been
   renamed to `from_vec(..)`.
+* Added APIs for `replace_from(..)` etc. to the regular non-dyn `Message`
+  traits, which is useful for messages with ignored fields but requires those
+  same APIs in the `MessageDyn` and `DistinguishedMessageDyn` traits to be
+  renamed to `replace_from_dyn(..)` etc.
 
 ### New features
 
@@ -30,6 +34,12 @@
 * Added support for `[u8; N]` with the `plainbytes` encoder, which only accepts
   values of the correct length.
 * Added support for `[u8; 4]` and `[u8; 8]` with the `fixed` encoder.
+* Added support for marking message fields with `#[bilrost(ignore)]`, which
+  causes the field to be excluded from encoding and decoding but precludes
+  distinguished decoding.
+* Added `replace_from_slice(&[u8])`
+  and `replace_distinguished_from_slice(&[u8])` to the `MessageDyn`
+  and `DistinguishedMessageDyn` traits.
 * Changed value-decoding to pass down whether or not an empty value is allowed,
   allowing implementations to err sooner and cheaper by detecting that the
   encoded data is that which represents a default, rather than always checking
