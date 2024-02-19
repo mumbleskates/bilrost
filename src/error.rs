@@ -42,7 +42,7 @@ impl fmt::Display for DecodeErrorKind {
             Truncated => "message or region truncated",
             InvalidVarint => "invalid varint",
             TagOverflowed => "tag overflowed",
-            WrongWireType => "wire type not understood by encoder",
+            WrongWireType => "wrong wire-type for value type",
             OutOfDomainValue => "value out of domain",
             InvalidValue => "invalid value",
             ConflictingFields => "conflicting mutually-exclusive fields",
