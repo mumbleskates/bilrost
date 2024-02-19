@@ -685,9 +685,9 @@ field's key is always encoded as a varint. The interpretation of the encoded
 value of that varint is in two parts: the value divided by 4 is the *tag-delta*,
 and the remainder of that division determines the value's *wire-type*. The
 tag-delta encodes the non-negative difference between the tag of the
-previously-encoded field (or zero, if it is the first field) and the field the
-key is part of. Wire-types map to the remainder, and determine the form and
-representation of the field value as follows:
+previously-encoded field (or zero, if it is the first field) and the tag of the
+field the key is part of. Wire-types map to the remainder, and determine the
+form and representation of the field value as follows:
 
 **0: varint** - the value is an opaque number, encoded as a single varint.
 
@@ -706,8 +706,8 @@ is not possible to encode fields in anything but sorted order according to their
 tags. Unsorted fields are *unrepresentable*.
 
 If a field key's tag-delta indicates a tag that is greater than would fit in an
-unsigned 32 bit integer (2^32-1), the encoded message is not valid and **must**
-be rejected.
+unsigned 32 bit integer (2^32-1), the encoded message is not valid and must be
+rejected.
 
 #### Varints (LEB128-bijective encoding)
 
@@ -831,6 +831,12 @@ def decode_varint_from_byte_iterator(it: Iterable[int]) -> int:
 To make the encoding useful, these opaque values have standard interpretations
 for many common data types.
 
+*The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD",
+"SHOULD NOT", "RECOMMENDED", "MAY", and "OPTIONAL" in this section are to be
+interpreted as described in [RFC 2119][rfc2119].*
+
+[rfc2119]: https://www.ietf.org/rfc/rfc2119.txt
+
 In general, whenever a decoded value represents a value that is outside the
 domain of the type of the field it is being decoded into (for instance, when the
 field type is `u16` but the value is a million, or when the field type is an
@@ -885,12 +891,12 @@ assert_eq!(
 String values must always be valid UTF-8 text, containing the canonical encoding
 for some sequence of Unicode codepoints. Codepoints with over-long encodings and
 surrogate codepoints should be rejected with an error in any decoding mode, and
-*must* be rejected in distinguished decoding mode. Bilrost does not impose any
-restrictions on the ordering or presence of valid non-surrogate codepoints; it
-may be desirable in an application to constrain text to a canonicalized form
-(such as [NFC][uninormal]), but that should be considered outside the scope of
-Bilrost's responsibilities of *encoding and decoding* and instead part of
-*validation,* which is the responsibility of the application.
+must be considered non-canonical. Bilrost does not impose any restrictions on
+the ordering or presence of valid non-surrogate codepoints; it may be desirable
+in an application to constrain text to a canonicalized form (such as
+[NFC][uninormal]), but that should be considered outside the scope of Bilrost's
+responsibilities of *encoding and decoding* and instead part of *validation,*
+which is the responsibility of the application.
 
 [uninormal]: https://en.wikipedia.org/wiki/Unicode_equivalence#Normal_forms
 
@@ -898,26 +904,28 @@ Collections of items (such as `Vec<String>`) encoded in the unpacked
 representation consist of one field for each item. Collections encoded in the
 packed representation consist of a single length-delimited value, containing
 each item's value encoded one after the other. In expedient decoding mode,
-decoding should succeed when expecting a packed representation but finding an
-unpacked representation, or vice versa. Detecting this situation is only
-possible when the values themselves never have a length-delimited
-representation, in which case the wire-type of the field can be used to
-distinguish the two cases.
+decoding should succeed when expecting a packed representation but detecting an
+unpacked representation, or vice versa (though the encoding must be considered
+non-canonical). Detecting this situation is only possible when the values
+themselves never have a length-delimited representation, in which case the
+wire-type of the field can be used to distinguish the two cases.
 
 Sets (collections of unique values) are encoded and decoded in exactly the same
 form as non-unique collections. If a value in a set appears more than once when
-decoding, the message must be rejected with an error in any decoding mode. In
-distinguished mode, the items must be in [canonical order](#canonical-ordering).
+decoding, the message must be rejected with an error in any decoding mode. The
+items must be in [canonical order](#canonical-ordering) for the encoding to be
+considered canonical.
 
 Mappings are represented as a length-delimited value, containing alternately
 encoded keys and values for each entry in the mapping. Keys must be distinct,
 and if a map is found to have two equivalent keys the message must be rejected
 with an error in any decoding mode. In distinguished decoding mode, the entries
-in the mapping must be encoded in canonically ascending order (see the notes
-on [canonical order](#canonical-ordering)).
+in the mapping must be encoded in [canonical order](#canonical-ordering) for the
+encoding to be considered canonical.
 
 Any field whose value is [empty](#empty-values) should always be omitted from
-the encoding.
+the encoding. The presence of any field represented in the encoding with an
+empty value must cause the encoding to be considered non-canonical.
 
 Fields whose types do not encode into multiple fields must not occur more than
 once. If they do, the message must be rejected with an error in any decoding
@@ -929,7 +937,8 @@ present in the encoding. If they do, the message must be rejected with an error
 in any decoding mode.
 
 If a field whose tag that is not known/specified in the message is encountered
-in expedient decoding mode, it should be ignored for purposes of decoding.
+in expedient decoding mode, it should be ignored for purposes of decoding, but
+the encoding must be considered non-canonical.
 
 #### Distinguished constraints
 
@@ -950,7 +959,7 @@ canonical.
 |-------------------------------------------------------|------------------------------------|
 | boolean                                               | false                              |
 | any integer                                           | 0                                  |
-| floating point number                                 | +0.0                               |
+| any floating point number                             | exactly +0.0                       |
 | fixed-size byte array                                 | all zeros                          |
 | text string, byte string, collection, mapping, or set | containing zero bytes or items     |
 | `Enumeration` type                                    | the variant represented by 0       |
