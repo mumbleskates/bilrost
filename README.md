@@ -6,13 +6,14 @@
 # *BILROST!*
 
 Bilrost is a binary encoding format designed for storing and transmitting
-structured data. The encoding is binary, and unsuitable for reading directly by
-humans; however, it does have other other useful properties and advantages. This
-crate, `bilrost`, is its first implementation and its first instantiation.
-Bilrost (as a specification) strives to provide a superset of the capabilities
-of protocol buffers while reducing some of the surface area for mistakes and
-surprises; `bilrost` (the implementing library) strives to provide access to all
-of those capabilities with maximum convenience.
+structured data, such as in file formats or network protocols. The encoding is
+binary, and unsuitable for reading directly by humans; however, it does have
+other other useful properties and advantages. This crate, `bilrost`, is its
+first implementation and its first instantiation. Bilrost (as a specification)
+strives to provide a superset of the capabilities of protocol buffers while
+reducing some of the surface area for mistakes and surprises; `bilrost` (the
+implementing library) strives to provide access to all of those capabilities
+with maximum convenience.
 
 Bilrost at the encoding level is based upon [Protocol Buffers][pb] (protobuf)
 and shares many of its traits, but is incompatible. It is in some ways simpler
@@ -87,7 +88,89 @@ Bilrost is very similar to [protobuf][pb]. See also:
 #comparisons-to-other-encodings).
 
 Bilrost also has the ability to encode and decode data that is guaranteed to be
-canonically represented.
+canonically represented: see the section on [distinguished decoding](
+#distinguished-decoding).
+
+### Design philosophy
+
+Bilrost is designed to be an encoding format that is simple to specify, simple
+to implement, simple to port across languages and machines, and easy to use
+correctly.
+
+#### Schema-ful encoding
+
+It is designed as a data model that has a schema, though it can of course also
+be used to encode representations of "schemaless" data. There are advantages and
+disadvantages to this form. The encoded data is significantly smaller, since
+repetitive names of fields are replaced with surrogate numbers. At the same
+time, it may be less clear what the data means because the inherent
+documentation of the fields' names is missing. Schemaless encodings like JSON
+can be decoded and accessed dynamically as pure data with far simpler, unified
+decoder implementations, whereas encodings like Bilrost and protobuf require a
+schema to even be sure of the values.
+
+One argument is that even if fields' names are all specified in the encoding,
+they are merely low-information documentation that aids *guessing* or
+reverse-engineering. They can help diagnose where *lost* data belongs, or what
+*mystery* data means by lightly self-documenting, but the *meaning* of the data
+is still determined by the code that emitted it. Data has meaning based on where
+it is found, and the documentation of that meaning cannot be fully replaced by
+simply including the names of all the fields in the data.
+
+Once that argument is conceded and a project is committed to maintaining schemas
+for its encoded data, there are no further distinct disadvantages. Numeric field
+tags should not be reused after they are deprecated, but neither should field
+names in a schemaless encoding.
+
+#### Non-coercion of data
+
+Bilrost aims to ensure that when a message is decoded without error, all the
+recognized values in its schema will have the exact value they were encoded
+with. This means that:
+
+* For boolean fields, 0 represents `false` and 1 represents `true`; if the value
+  2 is encountered, this is always an error.
+* For numeric fields, out-of-range values are never truncated to fit in a
+  smaller numeric type.
+* In `bilrost` (this Rust library), floating point values always round trip with
+  the *precise* bits of their representation. NaN bits and -0.0 are always
+  preserved.
+* If an key appears in a mapping multiple times, the whole message is considered
+  invalid; likewise for values in sets. There should be no room for alternate
+  interpretations of data that keep only the first or last such entry, or that
+  discard information about a set with repeated elements.
+
+Bilrost does not enforce these same constraints for unknown field data; if
+fields with tags not present in the schema are found in data, it will not be
+considered canonical but decoding may succeed. Because those fields are
+discarded, they are also not being coerced into different values so the promise
+holds.
+
+#### Designed for canonicity
+
+Bilrost is designed to make several classes of non-canonical states
+unrepresentable, making detection of non-canonical data far less complex.
+
+The biggest change is that message fields encoded out of order are
+unrepresentable; in protobuf this has long been an observed behavior for most
+message types, but has never been *promised* for a few reasons that are less
+relevant here (and are [discussed below](#differences-from-protobuf)). This
+increases the complexity of *encoding* the data *only* when a "oneof" (set of
+mutually exclusive fields) has tag numbers that may appear in different places
+in the ordering of a message's fields; in practice this is quite rare.
+
+The smaller change is that the [varint representation](
+#varints-leb128-bijective-encoding) that makes up the core of the encoding is
+designed to guarantee that there can only be a single representation for any
+given number. This may be marginally more expensive than traditional
+[LEB128][leb128] varints, but not by as much as one might think; rapid decoding
+of LEB128 varints is [quite complex][vectorleb128], and the biggest optimization
+for most varints is to take a shortcut when the value is small enough to fit in
+one byte, the range in which Bilrost's varints encode identically.
+
+[leb128]: https://en.wikipedia.org/wiki/LEB128
+
+[vectorleb128]: https://arxiv.org/pdf/1503.07387.pdf
 
 ### Distinguished decoding
 
@@ -192,20 +275,6 @@ representations of a floating point value**, it should first be cast to its bits
 as an unsigned integer and encoded that way. This reduces the surface area for
 mistakes, and makes it clearer that floating point numbers need special handling
 in code that cares very much about distinguished representations.
-
-## Design philosophy
-
-* the philosophy
-    * data has meaning based on where you find it
-    * encodings with explicit schemas can be easier to guess the meaning of
-      if you don't already know, but most of the time this is wasted bytes
-    * therefore it is often very sensible to encode data in a way that is
-      legible to you, with implicit schemas and room for extending
-    * the data you get back when decoding should not transform any of the field
-      values except by omitting extensions (no int coercion)
-    * as an encoding, Bilrost works to make invalid states unrepresentable
-      when practical where it doesn't greatly increase complexity
-    * Bilrost is designed to aid, but not require, distinguished encoding
 
 ## Using the library
 
