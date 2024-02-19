@@ -865,9 +865,34 @@ lowest-indexed (first) bytes or items encoded first. For example, the
 fixed-width encodings of the `u8` array `[1, 2, 3, 4]` and the 32 bit unsigned
 integer `0x04030201` (67305985) are identical.
 
-Strings must always contain valid UTF-8 text, containing the canonical encoding
-for some sequence of Unicode codepoints. Over-long encodings of codepoints and
-surrogate codepoints must be rejected with an error in any decoding mode.
+<details><summary>Demonstration of the above</summary>
+
+```rust
+use bilrost::Message;
+
+#[derive(Message)]
+struct Foo<T>(#[bilrost(encoder(fixed))] T);
+
+// Both of these messages encode as the bytes `b'\x06\x01\x02\x03\x04'`
+assert_eq!(
+    Foo(0x04030201u32).encode_to_vec(),
+    Foo([1u8, 2, 3, 4]).encode_to_vec(),
+);
+```
+
+</details>
+
+String values must always be valid UTF-8 text, containing the canonical encoding
+for some sequence of Unicode codepoints. Codepoints with over-long encodings and
+surrogate codepoints should be rejected with an error in any decoding mode, and
+*must* be rejected in distinguished decoding mode. Bilrost does not impose any
+restrictions on the ordering or presence of valid non-surrogate codepoints; it
+may be desirable in an application to constrain text to a canonicalized form
+(such as [NFC][uninormal]), but that should be considered outside the scope of
+Bilrost's responsibilities of *encoding and decoding* and instead part of
+*validation,* which is the responsibility of the application.
+
+[uninormal]: https://en.wikipedia.org/wiki/Unicode_equivalence#Normal_forms
 
 Collections of items (such as `Vec<String>`) encoded in the unpacked
 representation consist of one field for each item. Collections encoded in the
