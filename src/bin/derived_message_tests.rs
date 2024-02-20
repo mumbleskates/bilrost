@@ -26,13 +26,12 @@ mod derived_message_tests {
         DistinguishedValueEncoder, EmptyState, Encoder, General, Mapping, Oneof, Packed,
         ValueEncoder,
     };
+    use bilrost::Canonicity::{HasExtensions, NotCanonical};
     use bilrost::DecodeErrorKind::{
-        ConflictingFields, InvalidValue, NotCanonical, OutOfDomainValue, TagOverflowed, Truncated,
-        UnexpectedlyRepeated, UnknownField, WrongWireType,
+        ConflictingFields, InvalidValue, OutOfDomainValue, TagOverflowed, Truncated,
+        UnexpectedlyRepeated, WrongWireType,
     };
-    use bilrost::{
-        DecodeErrorKind, DistinguishedMessage, Enumeration, Message, Oneof, WithCanonicity,
-    };
+    use bilrost::{DecodeErrorKind, DistinguishedMessage, Enumeration, Message, Oneof};
     use bilrost_derive::DistinguishedOneof;
 
     trait IntoOpaqueMessage {
@@ -93,6 +92,7 @@ mod derived_message_tests {
 
     mod assert {
         use super::*;
+        use bilrost::Canonicity;
         use bilrost::Canonicity::Canonical;
 
         pub(super) fn decodes<M>(from: impl IntoOpaqueMessage, into: M)
@@ -158,7 +158,7 @@ mod derived_message_tests {
             assert_eq!(M::decode(encoded.as_slice()).as_ref(), Ok(&into));
             let (decoded, canon) =
                 M::decode_distinguished(encoded.as_slice()).expect("distinguished decoding failed");
-            assert_eq!(&decoded, &into);
+            assert_eq!(&decoded, &into, "distinguished decoded doesn't match");
             assert_eq!(canon, Canonical);
             let mut to_replace = M::empty();
             to_replace.replace_from(encoded.as_slice()).unwrap();
@@ -179,31 +179,33 @@ mod derived_message_tests {
             assert_eq!(into.encoded_len(), encoded.len(), "encoded_len was wrong");
         }
 
-        pub(super) fn decodes_only_expedient<M>(
+        pub(super) fn decodes_non_canonically<M>(
             from: impl IntoOpaqueMessage,
             into: M,
-            err: DecodeErrorKind,
+            expected_canon: Canonicity,
         ) where
             M: DistinguishedMessage + Debug + Eq + EmptyState,
         {
+            assert_ne!(expected_canon, Canonical); // otherwise why call this function
             let encoded = from.into_opaque_message().encode_to_vec();
             assert_eq!(M::decode(encoded.as_slice()).as_ref(), Ok(&into));
             let mut to_replace = M::empty();
             to_replace.replace_from(encoded.as_slice()).unwrap();
             assert_eq!(&to_replace, &into);
-            assert_eq!(
-                M::decode_distinguished(encoded.as_slice())
-                    .expect("error decoding in distinguished mode with non-canonical data")
-                    .canonical(),
-                Err(err)
-            );
+            let (decoded, canon) = M::decode_distinguished(encoded.as_slice())
+                .expect("error decoding in distinguished mode with non-canonical data");
+            assert_eq!(&decoded, &into, "distinguished decoded doesn't match");
+            assert_eq!(canon, expected_canon);
             let mut to_replace = M::empty();
             assert_eq!(
                 to_replace
                     .replace_distinguished_from(encoded.as_slice())
-                    .expect("error replacing in distinguished mode with non-canonical data")
-                    .canonical(),
-                Err(err)
+                    .expect("error replacing in distinguished mode with non-canonical data"),
+                expected_canon
+            );
+            assert_eq!(
+                &to_replace, &into,
+                "doesn't match after distinguished replace"
             );
             let round_tripped = into.encode_to_vec();
             assert_ne!(
@@ -459,7 +461,7 @@ mod derived_message_tests {
             [(u32::MAX, OV::bool(false)), (u32::MAX, OV::bool(true))],
             UnexpectedlyRepeated,
         );
-        assert::decodes_only_expedient(
+        assert::decodes_non_canonically(
             [
                 (0, OV::bool(true)),
                 (234234234, OV::string("unknown")), // unknown field
@@ -469,7 +471,7 @@ mod derived_message_tests {
                 minimum: Some(true),
                 maximum: Some(false),
             },
-            UnknownField,
+            HasExtensions,
         );
     }
 
@@ -904,7 +906,7 @@ mod derived_message_tests {
         assert_eq!(OV::bool(true), OV::Varint(1));
 
         assert::decodes_distinguished([], Foo(false));
-        assert::decodes_only_expedient([(1, OV::bool(false))], Foo(false), NotCanonical);
+        assert::decodes_non_canonically([(1, OV::bool(false))], Foo(false), NotCanonical);
         assert::decodes_distinguished([(1, OV::bool(true))], Foo(true));
         assert::never_decodes::<Foo>([(1, OV::Varint(2))], OutOfDomainValue);
     }
@@ -1277,17 +1279,17 @@ mod derived_message_tests {
         struct Foo<const N: usize>(#[bilrost(encoder(plainbytes))] [u8; N]);
 
         assert::decodes_distinguished([], Foo([]));
-        assert::decodes_only_expedient([(1, OV::blob([]))], Foo([]), NotCanonical);
+        assert::decodes_non_canonically([(1, OV::blob([]))], Foo([]), NotCanonical);
         assert::never_decodes::<Foo<0>>([(1, OV::blob([1]))], InvalidValue);
 
         assert::decodes_distinguished([(1, OV::blob([1, 2, 3, 4]))], Foo([1, 2, 3, 4]));
-        assert::decodes_only_expedient([(1, OV::blob([0; 4]))], Foo([0; 4]), NotCanonical);
+        assert::decodes_non_canonically([(1, OV::blob([0; 4]))], Foo([0; 4]), NotCanonical);
         assert::never_decodes::<Foo<4>>([(1, OV::blob([1; 3]))], InvalidValue);
         assert::never_decodes::<Foo<4>>([(1, OV::blob([1; 5]))], InvalidValue);
         assert::never_decodes::<Foo<4>>([(1, OV::fixed_u32(1))], WrongWireType);
 
         assert::decodes_distinguished([(1, OV::blob([13; 13]))], Foo([13; 13]));
-        assert::decodes_only_expedient([(1, OV::blob([0; 13]))], Foo([0; 13]), NotCanonical);
+        assert::decodes_non_canonically([(1, OV::blob([0; 13]))], Foo([0; 13]), NotCanonical);
 
         // Fixed-size wire types are implemented for appropriately sized u8 arrays
         #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
@@ -1297,9 +1299,9 @@ mod derived_message_tests {
         static_assertions::assert_not_impl_any!(Bar<2>: Message, DistinguishedMessage);
         static_assertions::assert_not_impl_any!(Bar<16>: Message, DistinguishedMessage);
         assert::decodes_distinguished([(1, OV::fixed_u32(0x04030201))], Bar([1, 2, 3, 4]));
-        assert::decodes_only_expedient([(1, OV::fixed_u32(0))], Bar([0; 4]), NotCanonical);
+        assert::decodes_non_canonically([(1, OV::fixed_u32(0))], Bar([0; 4]), NotCanonical);
         assert::decodes_distinguished([(1, OV::SixtyFourBit([8; 8]))], Bar([8; 8]));
-        assert::decodes_only_expedient([(1, OV::SixtyFourBit([0; 8]))], Bar([0; 8]), NotCanonical);
+        assert::decodes_non_canonically([(1, OV::SixtyFourBit([0; 8]))], Bar([0; 8]), NotCanonical);
         assert::never_decodes::<Bar<8>>([(1, OV::blob([8; 8]))], WrongWireType);
     }
 
@@ -1385,7 +1387,7 @@ mod derived_message_tests {
                     (true, "yes".to_string()),
                 ])),
             );
-            assert::decodes_only_expedient(
+            assert::decodes_non_canonically(
                 disordered_map,
                 Foo(BTreeMap::from([
                     (false, "no".to_string()),
@@ -1601,24 +1603,24 @@ mod derived_message_tests {
                 expected,
             )
         }) {
-            assert::decodes_only_expedient(packed, Oof(expected.clone(), vec![]), NotCanonical);
-            assert::decodes_only_expedient(unpacked, Oof(vec![], expected.clone()), NotCanonical);
-            assert::decodes_only_expedient(
+            assert::decodes_non_canonically(packed, Oof(expected.clone(), vec![]), NotCanonical);
+            assert::decodes_non_canonically(unpacked, Oof(vec![], expected.clone()), NotCanonical);
+            assert::decodes_non_canonically(
                 packed,
                 Oof(Cow::Borrowed(expected.as_slice()), Cow::default()),
                 NotCanonical,
             );
-            assert::decodes_only_expedient(
+            assert::decodes_non_canonically(
                 unpacked,
                 Oof(Cow::default(), Cow::Borrowed(expected.as_slice())),
                 NotCanonical,
             );
-            assert::decodes_only_expedient(
+            assert::decodes_non_canonically(
                 packed,
                 Oof(Cow::Owned(expected.clone()), Cow::default()),
                 NotCanonical,
             );
-            assert::decodes_only_expedient(
+            assert::decodes_non_canonically(
                 unpacked,
                 Oof(Cow::default(), Cow::Owned(expected.clone())),
                 NotCanonical,
@@ -1626,12 +1628,12 @@ mod derived_message_tests {
             #[allow(unused_macros)]
             macro_rules! test_vec {
                 ($vec_ty:ty) => {
-                    assert::decodes_only_expedient(
+                    assert::decodes_non_canonically(
                         packed,
                         Oof(expected.iter().cloned().collect(), <$vec_ty>::new()),
                         NotCanonical,
                     );
-                    assert::decodes_only_expedient(
+                    assert::decodes_non_canonically(
                         unpacked,
                         Oof(<$vec_ty>::new(), expected.iter().cloned().collect()),
                         NotCanonical,
@@ -1696,12 +1698,12 @@ mod derived_message_tests {
                 valid_set_unpacked,
                 Foo(BTreeSet::new(), BTreeSet::from(expected_items.clone())),
             );
-            assert::decodes_only_expedient(
+            assert::decodes_non_canonically(
                 disordered_set_packed,
                 Foo(BTreeSet::from(expected_items.clone()), BTreeSet::new()),
                 NotCanonical,
             );
-            assert::decodes_only_expedient(
+            assert::decodes_non_canonically(
                 disordered_set_unpacked,
                 Foo(BTreeSet::new(), BTreeSet::from(expected_items.clone())),
                 NotCanonical,
@@ -1784,12 +1786,12 @@ mod derived_message_tests {
         {
             use alloc::collections::BTreeSet;
             for (unmatching_packed, unmatching_unpacked) in [&valid, &disordered] {
-                assert::decodes_only_expedient(
+                assert::decodes_non_canonically(
                     unmatching_packed,
                     Oof(BTreeSet::from(expected_items), BTreeSet::new()),
                     NotCanonical,
                 );
-                assert::decodes_only_expedient(
+                assert::decodes_non_canonically(
                     unmatching_unpacked,
                     Oof(BTreeSet::new(), BTreeSet::from(expected_items)),
                     NotCanonical,
@@ -2068,7 +2070,7 @@ mod derived_message_tests {
         assert::decodes_distinguished([(1, OV::u32(5))], Foo(Some(Five), Zero));
         assert::decodes_distinguished([(1, OV::u32(10))], Foo(Some(Ten), Zero));
         assert::decodes_distinguished([(1, OV::u32(15))], Foo(Some(Fifteen), Zero));
-        assert::decodes_only_expedient([(2, OV::u32(0))], Foo(None, Zero), NotCanonical);
+        assert::decodes_non_canonically([(2, OV::u32(0))], Foo(None, Zero), NotCanonical);
         assert::decodes_distinguished([(2, OV::u32(1_000))], Foo(None, Big));
         assert::decodes_distinguished([(2, OV::u32(1_000_000))], Foo(None, Bigger));
     }
@@ -2167,7 +2169,7 @@ mod derived_message_tests {
         assert_eq!(Foo::try_from(u32::MAX), Ok(Foo::Z));
         assert_eq!(Foo::Z as u8, 255);
         assert::decodes_distinguished([], Bar(Foo::A));
-        assert::decodes_only_expedient([(1, OV::u32(0))], Bar(Foo::A), NotCanonical);
+        assert::decodes_non_canonically([(1, OV::u32(0))], Bar(Foo::A), NotCanonical);
         assert::decodes_distinguished([(1, OV::u32(5))], Bar(Foo::D));
         assert::decodes_distinguished([(1, OV::u32(10))], Bar(Foo::T));
         assert::decodes_distinguished([(1, OV::u32(11))], Bar(Foo::E));
@@ -2217,7 +2219,7 @@ mod derived_message_tests {
 
         // When the inner message is present in the encoding but empty, it's only canonical when
         // the field is optioned.
-        assert::decodes_only_expedient(
+        assert::decodes_non_canonically(
             [(1, OV::message(&[].into_opaque_message()))],
             OuterDirect::empty(),
             NotCanonical,
@@ -2326,7 +2328,7 @@ mod derived_message_tests {
                 ..EmptyState::empty()
             },
         );
-        assert::decodes_only_expedient(
+        assert::decodes_non_canonically(
             [
                 (0, OV::string("hello")),
                 (2, OV::u32(123)), // Unknown field
@@ -2339,9 +2341,9 @@ mod derived_message_tests {
                 oneof: Three(Nested(301)),
                 ..EmptyState::empty()
             },
-            UnknownField,
+            HasExtensions,
         );
-        assert::decodes_only_expedient(
+        assert::decodes_non_canonically(
             [
                 (0, OV::string("hello")),
                 (3, OV::message(&[(1, OV::i64(301))].into_opaque_message())),
@@ -2362,9 +2364,9 @@ mod derived_message_tests {
                 oneof: Three(Nested(301)),
                 ..EmptyState::empty()
             },
-            UnknownField,
+            HasExtensions,
         );
-        assert::decodes_only_expedient(
+        assert::decodes_non_canonically(
             [
                 (0, OV::string("hello")),
                 (
@@ -2385,7 +2387,7 @@ mod derived_message_tests {
                 oneof: Three(Nested(301)),
                 ..EmptyState::empty()
             },
-            UnknownField,
+            HasExtensions,
         );
     }
 }
