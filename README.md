@@ -176,29 +176,34 @@ one byte, the range in which Bilrost's varints encode identically.
 
 It is possible in `bilrost` to derive an extended trait, `DistinguishedMessage`,
 which provides a distinguished decoding mode. Decoding in distinguished mode
-comes with an additional guarantee that the resulting message value will
-re-encode to the exact same sequence of bytes, and that *every* different
-sequence of bytes will either decode to a different value or fail to decode. Any
-message type that *can* implement distinguished decoding *will* always encode in
-its distinguished form; there is not an alternate encoding mode that is "more
+comes with an additional canonicity check: the decoding result makes it possible
+to know whether the decoded message data was canonical. Any message type that
+*can* implement distinguished decoding *will* always encode in its fully
+canonical form; there is not an alternate encoding mode that is "more
 canonical".
 
 Formally, when a message type implements `DistinguishedMessage`, values of
-the message type are *bijective* to a subset of all byte strings. Each different
+the message type are *bijective* to a subset of all byte strings, each of which
+is considered to be a canonical encoding for that message value. Each different
 possible byte string decodes in distinguished mode to a message value that is
 distinct from the message values decoded from every other such byte string, or
-will produce an error when decoded in this mode. If a message is successfully
-decoded from a byte string in distinguished mode, is not modified, and is then
-re-encoded, it will emit the exact same byte string.
+will produce an error or non-canonical result when decoded in this mode. If a
+message is successfully and canonically decoded from a byte string in 
+distinguished mode, is not modified, and is then re-encoded, it will emit the
+exact same byte string.
 
 For this reason, `bilrost` will refuse to derive `DistinguishedMessage` if there
-are any ignored fields.
+are any ignored fields, as they may also participate in the type's equality.
 
 The best proxy of this expectation of an [equivalence relation][equiv] in Rust
 is the [`Eq`][eq] trait, which denotes that there is an equivalence relation
 between all values of any type that implements it. Therefore, this trait is
 required of all field and message types in order to implement distinguished
-decoding in `bilrost`.
+decoding in `bilrost`. `bilrost` distinguishes between canonical values of the
+type in a way that matches the *default* derived implementation of `Eq` (that
+is, it matches based on the `Eq` trait of each constituent field), but it does
+not derive this trait automatically and does not require that the type's actual
+`Eq` implementation works exactly this way.
 
 [equiv]: https://en.wikipedia.org/wiki/Equivalence_relation
 
@@ -256,8 +261,8 @@ same value with the exact same bits.
 
 For this reason it is not yet considered a good idea to implement distinguished
 decoding for third-party wrappers for Rust's floating point types that implement
-[`Eq`][eq] and [`Ord`][ord] such as [`ordered_float`][ordered_float] and
-[`decorum`][decorum] because they still consider some sets of values that have
+[`Eq`][eq] and [`Ord`][ord] (such as [`ordered_float`][ordered_float] and
+[`decorum`][decorum]) because they still consider some sets of values that have
 *different bits* to be equal. Any future implementation of such a type would
 have to take special care to unify the encoded representation of any equivalence
 classes in these types *and standardize this in a portable way*, which also
@@ -486,7 +491,9 @@ There are two derivable companion traits, `DistinguishedMessage`
 and `DistinguishedOneof`, that implement the extended traits for distinguished
 decoding when possible. Both messages and oneofs must contain only fields that
 support distinguished decoding in order to support it themselves. Distinguished
-encoding requires `Eq` and its semantics of each field, oneof, and message type.
+encoding requires `Eq` be implemented for each field, oneof, and message type;
+the trait is not used directly, but is trivial to derive for any compatible
+type.
 
 ### Encoding and decoding messages
 
@@ -1006,8 +1013,7 @@ present in the encoding. If they do, the message must be rejected with an error
 in any decoding mode.
 
 If a field whose tag that is not known/specified in the message is encountered
-in expedient decoding mode, it should be ignored for purposes of decoding, but
-the encoding must be considered non-canonical.
+in expedient decoding mode, it should be ignored for purposes of decoding.
 
 #### Distinguished constraints
 
@@ -1018,9 +1024,8 @@ in the encoding, the message is not canonical. (In the case of an optional
 field, `Some(0)` is not considered empty, and is distinct from the always-empty
 value `None`; this is the purpose of optional fields.)
 
-Also in distinguished mode, fields whose tags are not specified in the message
-must never be present. If any is encountered, the message can no longer be
-canonical.
+Also in distinguished mode, if fields whose tags are not specified are
+encountered the encoding can no longer be considered canonical.
 
 #### Empty values
 
