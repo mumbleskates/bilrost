@@ -2,7 +2,21 @@
 
 ### Breaking changes
 
+* Distinguished decoding traits now still succeed without error when decoding
+  non-canonical data, but additionally return information about the canonicity
+  of the message. The three levels of canonicity are "Canonical" (the only level
+  that was accepted previously), "HasExtensions" (all known fields are
+  canonical, but there are unknown fields), and "NotCanonical" (known fields
+  have non-canonically represented values).
+
 ### New features
+
+* The `Canonicity` enum has been introduced at the crate level, returned as
+  additional information by distinguished decoding traits.
+* Since distinguished encoders now return `Result<Canonicity, DecodeError>`
+  or `Result<(T, Canonicity), DecodeError>`, new helper traits have been added
+  to allow converting this information into errors when it is
+  unacceptable: `WithCanonicity` and `RequireCanonicity`.
 
 ### Fixes
 
