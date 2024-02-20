@@ -13,13 +13,13 @@ use bytes::{Buf, BufMut, Bytes};
 
 use crate::encoding::{
     delegate_encoding, delegate_value_encoding, encode_varint, encoded_len_varint,
-    encoder_where_value_encoder, Capped, DecodeContext, DistinguishedEncoder,
-    DistinguishedValueEncoder, EmptyState, Encoder, Fixed, Map, PlainBytes, TagMeasurer, TagWriter,
-    Unpacked, ValueEncoder, Varint, WireType, Wiretyped,
+    encoder_where_value_encoder, Canonicity, Capped, DecodeContext, DecodeError,
+    DistinguishedEncoder, DistinguishedValueEncoder, EmptyState, Encoder, Fixed, Map, PlainBytes,
+    TagMeasurer, TagWriter, Unpacked, ValueEncoder, Varint, WireType, Wiretyped,
 };
 use crate::message::{merge, merge_distinguished, RawDistinguishedMessage, RawMessage};
-use crate::DecodeErrorKind::{InvalidValue, NotCanonical};
-use crate::{Blob, Canonicity, DecodeError};
+use crate::Blob;
+use crate::DecodeErrorKind::InvalidValue;
 
 pub struct General;
 
@@ -479,7 +479,7 @@ where
         // here than to check after the value has been decoded and checking the message's
         // `is_empty()`.
         if !allow_empty && !buf.has_remaining() {
-            return Err(DecodeError::new(NotCanonical));
+            return Ok(Canonicity::NotCanonical);
         }
         merge_distinguished(value, buf, ctx.enter_recursion())
     }
