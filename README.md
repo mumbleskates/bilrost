@@ -803,11 +803,20 @@ this range has exactly one possible encoded representation.
    it.
 3. Varints representing values greater than 2^64-1 are invalid.
 
-This scheme is very similar to that used by Git (see [`varint.c`][gitvarint]),
-but the Git scheme is big-endian whereas Bilrost varints are encoded least
-significant byte first and limited to 9 bytes.
+Several outstanding examples of very similar varint encodings exist:
+
+| Implementation             | Format                         | Limits length?                           | Endianness | Bijective |
+|----------------------------|--------------------------------|------------------------------------------|------------|-----------|
+| [sqlite][sqlitevarint]     | base 128 with continuation bit | yes (9 bytes)                            | big        | no        |
+| [protobuf][protobufvarint] | base 128 with continuation bit | no (10th byte uses only 1 bit)           | little     | no        |
+| [git][gitvarint]           | base 128 with continuation bit | no (large values generally not relevant) | big        | yes       |
+| bilrost                    | base 128 with continuation bit | yes (9 bytes)                            | little     | yes       |
 
 [gitvarint]: https://git.kernel.org/pub/scm/git/git.git/tree/varint.c?h=v2.43.2
+
+[protobufvarint]: https://protobuf.dev/programming-guides/encoding/#varints
+
+[sqlitevarint]: https://www.sqlite.org/fileformat2.html#varint
 
 ##### Mathematics
 
@@ -1090,82 +1099,95 @@ ordered maps.
 
 ## Differences from Protobuf
 
-TODO: expand
+The Bilrost encoding is heavily based upon that of Protobuf, with a small number
+of key changes.
 
-* major changes in relation to protobuf and the history there
-    * bijective varints
-        * what leb128 varints gave protobuf
-            * simplicity
-            * zero-extension
-        * what bijective varints give us
-            * ez distinguished encoding
-            * very very close to the same read/write cost
-            * smaller size
-    * no non-zigzag signed varints
-        * these are just an efficiency footgun really
-        * even the `int32` protobuf type uses 10 entire bytes to encode negative
-          numbers just in case the type is widened to `int64` later. savings
-          seem minimal
-    * no integer domain coercion
-        * the data you get back should mean what it said or fail
-    * field ordering
-        * what unordered fields gave protobuf
-            * easy catting of partial messages
-            * overlays
-                * can be horrible, e.g. message fields upgraded to repeated
-        * what ordered fields give us
-            * no value stomping
-            * easy detection of repeated violation without presence data
-            * even makes required fields possible to detect, though that's
-              not implemented
-    * less constrained field tags
-        * protobuf constrained the whole field key, including wire type, to 32
-          bits. we can just not do that instead
-    * no groups
-        * historically these seem to be the original way data was nested, rather
-          than nesting messages as length-delimited values
-    * allowing packed length-delimited types
-        * risk of upgrading them is considered the user's responsibility
-    * first class maps
-        * maps in protobuf were a pain and seem like a bodge
-        * theoretically it's possible to widen that schema into a repeated
-          nested message with more fields, but this is almost never done
+* The varint encoding is different: Bilrost varints are bijective (having only
+  one possible representation per value) and have a shorter maximum length, as
+  it doesn't make sense to extend the encoding beyond 64 bit integers.
 
-* All varints (including tag fields and lengths) use [bijective numeration][bn],
-  which cannot be length-extended with trailing zeros the way protobuf varints
-  can (and are slightly more compact, especially at the 64bit limit where they
-  take up 9 bytes instead of 10). Varint encodings which would represent a value
-  greater than `u64::MAX` are invalid.
-* "Groups" are completely omitted as a wire-type, reducing the number of wire
-  types from 6 to 4.
-* These four wire types are packed into 2 bits instead of 3.
-* Fields are obligated to be encoded in order, and fields' tag numbers are
-  encoded as the difference from the previous field's tag. This means that
-  out-of-order fields cannot be represented in the encoding, and messages with
-  many different fields consume relatively fewer bytes encoding their tags. The
-  only time a field's tag is more than 1 byte is when more than 31 tag ids have
-  been skipped.
-* Field tags can be any `u32` value, without restriction.
-* Signed varint types that aren't encoded with their sign bit in the LSB ("zig
-  zag encoding") are omitted. There are no "gotcha" integer types whose negative
-  values always take up the maximum amount of space.
-* Enumerations are unsigned `u32`-typed, not `i32`.
-* Narrow integral types that encode as a varint field, such as `i32` and `bool`,
-  are checked and will cause decoding to err if their encoded range is
-  overflowed rather than coercing to a valid value (such as any nonzero value
-  becoming `true` in a `bool` field, or `u64::MAX` silently coercing to
-  `u32::MAX`). Another way to spell this behavior is that values that would not
-  round-trip are rejected during decoding.
-* Generally, varint fields can always be upgraded to a wider type with the same
-  representation and keep backwards compatibility. Likewise, fields can be
-  "widened" from optional to repeated, but the encoded values are never
-  backwards compatible when known fields' values would be altered or truncated
-  to fit: decoding a Bilrost message that has multiple occurrences of a non-
-  repeated field in it is also an error.
+  Despite Protobuf varints being nominally simpler, since they directly
+  transpose the bits of the encoding into the final value, it is difficult to
+  impossible to realize this simplicity as improved performance in reality;
+  almost all of the cost on modern computing hardware is consumed by the
+  fact that the values are a variable number of bytes in size.
 
-### Distinguished representation on the wire in Bilrost
+  Protobuf varints are also subject to zero-extension, because they are not
+  bijective. This is a recurring problem whenever attempts are made to guarantee
+  canonical representation in Protobuf data, and requires extra care.
+* Messages are only representable with their fields in ascending tag order,
+  something Protobuf has declined to enforce or guarantee for decades and
+  probably won't begin any time soon.
 
-TODO: enumerate key differences
+  Compliant Protobuf encoders allow several interesting operations by not
+  guaranteeing or enforcing field order:
+    * Unknown fields can be preserved as entirely opaque runs of bytes and
+      concatenated to a message
+    * Concatenating fields to a message has a *merge* semantic: singular fields'
+      values are replaced (or merged, if they are messages), and repeated fields
+      are appended to. This means that sometimes messages can be blindly
+      concatenated with patches that override some of their fields.
+
+  By guaranteeing field order in Bilrost, these (vanishingly rarely used or
+  wanted) abilities are lost, but several powerful advantages are gained:
+    * It is always trivially obvious when a field occurs more than once in a
+      message when it shouldn't. No decisions need to be made or special checks
+      performed to handle this case.
+    * If desired (it probably isn't), it is even possible to enforce the
+      required presence of particular fields in the encoding at run-time without
+      maintaining presence data for those fields when decoding.
+
+  Another hidden benefit of the obligate field ordering is that, because field
+  tags are encoded as deltas, messages with very large numbers of fields are
+  significantly smaller to encode. Protobuf field keys with tags above 15 always
+  take multiple bytes to encode; in Bilrost, the only time a field key takes
+  more than a single byte is when more than 31 tags have been skipped in a row.
+* Fields' tags are less constrained. In Protobuf field tags are restricted to
+  the range [1, 2^29-1]; in Bilrost we have made the decision to continue
+  numbering them naturally from 1, but to otherwise allow any unsigned 32 bit
+  integer as a tag number.
+* Protobuf uses three bits in field keys for the wire type, and has six of these
+  wire types allocated; two are used as data-less delimiting markers for
+  "groups", which are a legacy and long-deprecated method of nesting data within
+  messages.
+
+  In nearly twenty years, the Protobuf authors have never found cause to
+  populate the final two unallocated wire types, which gives us at least some
+  measure of confidence that the four that Bilrost has borrowed are sufficient
+  for practical use.
+
+There are also a couple key changes to how values are interpreted in Bilrost,
+informed by experience with Protobuf:
+
+* Bilrost representations of signed integers are always zig-zag encoded. In
+  Protobuf there are two different modes for signed integers: "int32" is always
+  encoded like two's complement, and "sint32" is zig-zag encoded. In practice
+  this is a tremendous footgun, because any negative integer always becomes
+  *ten bytes* on the wire. Yes, even the 32 bit ones, because they are
+  sign-extended all the way to 64 bits in case the field is to be widened in the
+  future.
+* Learning again from the footguns and mistakes of Protobuf (and C/C++ in
+  general), Bilrost also enforces errors when values are out of range. Protobuf
+  values will coerce to smaller types by truncation, and any nonzero varint will
+  silently convert to the boolean value `true`. This is often surprising,
+  bug-prone, and undesirable.
+* `bilrost` makes special effort to preserve every bit of floating-point numbers
+  when they are encoded and decoded. Whenever possible this should be matched by
+  Bilrost libraries for other languages.
+* Bilrost is much more permissive of nested values. Length-delimited values are
+  permitted to be encoded in a "packed" representation, with warnings to the
+  user; this allows nesting vecs within vecs, maps within maps, and more without
+  creating explicit sub-message schemas for every single level of nesting.
+* Bilrost has first-class mappings. Maps in Protobuf are a construct of unpacked
+  repeated values that are nested sub-messages with keys and values in fields
+  tagged 1 and 2, a situation whose official field types and APIs came long
+  after it was already in production. Protobuf also to this day forbids byte
+  strings as map keys, for unclear reasons possibly relating to the usage of
+  nul-terminated C-strings as the representation of map keys in some
+  implementations.
+
+  Because Bilrost maps are packed into a single length-delimited value, they can
+  freely have optional presence or be repeated or nested at will.
 
 ## Comparisons to other encodings
 
