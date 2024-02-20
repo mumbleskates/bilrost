@@ -623,7 +623,11 @@ fn try_distinguished_message(input: TokenStream) -> Result<TokenStream, Error> {
         bail!("messages with ignored fields cannot be distinguished");
     }
 
-    let where_clause = append_distinguished_encoder_wheres(where_clause, None, &unsorted_fields);
+    let where_clause = append_distinguished_encoder_wheres(
+        where_clause,
+        Some(quote!(Self: ::core::cmp::Eq)),
+        &unsorted_fields,
+    );
 
     let decode = unsorted_fields.iter().map(|(field_ident, field)| {
         let decode = field.decode_distinguished(quote!(value));

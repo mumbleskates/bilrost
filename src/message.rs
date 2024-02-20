@@ -367,7 +367,7 @@ where
 
 impl<T> DistinguishedMessage for T
 where
-    T: RawDistinguishedMessage + Message + Eq,
+    T: RawDistinguishedMessage + Message,
 {
     fn decode_distinguished<B: Buf>(mut buf: B) -> Result<(Self, Canonicity), DecodeError> {
         Self::decode_distinguished_capped(Capped::new(&mut buf))
@@ -476,7 +476,7 @@ pub trait RawMessage: EmptyState {
 
 /// Complementary underlying trait for distinguished messages, all of whose fields have a
 /// distinguished encoding.
-pub trait RawDistinguishedMessage: RawMessage {
+pub trait RawDistinguishedMessage: RawMessage + Eq {
     fn raw_decode_field_distinguished<B: Buf + ?Sized>(
         &mut self,
         tag: u32,
