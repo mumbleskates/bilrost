@@ -8,9 +8,9 @@
   that was accepted previously), "HasExtensions" (all known fields are
   canonical, but there are unknown fields), and "NotCanonical" (known fields
   have non-canonically represented values).
-* Fixes and expansions to traits and requirements to allow `Message` and
-  `DistinguishedMessage` to be object-safe with full functionality. `MessageDyn`
-  and `DistinguishedMessageDyn` have been removed.
+* As part of fixes and expansions to traits and requirements to allow `Message`
+  and `DistinguishedMessage` to be object-safe with full functionality,
+  `MessageDyn` and `DistinguishedMessageDyn` have been removed.
 
 ### New features
 
@@ -22,6 +22,9 @@
   unacceptable: `WithCanonicity` and `RequireCanonicity`.
 
 ### Fixes
+
+* Object-safe traits were broken and unfun to use. They've been implemented in a
+  much more correct way now.
 
 ### Cleanups
 
