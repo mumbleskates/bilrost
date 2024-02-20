@@ -607,6 +607,20 @@ pub trait Encoder<T> {
     ) -> Result<(), DecodeError>;
 }
 
+/// Extension trait for canonical encoding and decoding. Distinguished decoding is available via
+/// this trait, and any type that implements this trait is guaranteed to always emit canonical data
+/// via `Encoder`.
+pub trait DistinguishedEncoder<T>: Encoder<T> {
+    /// Decodes a field for the value, returning a value indicating how canonical the encoding was.
+    fn decode_distinguished<B: Buf + ?Sized>(
+        wire_type: WireType,
+        duplicated: bool,
+        value: &mut T,
+        buf: Capped<B>,
+        ctx: DecodeContext,
+    ) -> Result<Canonicity, DecodeError>;
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 #[repr(u8)]
 #[must_use]
@@ -770,18 +784,6 @@ where
             Err(err) => Err(err.kind()),
         }
     }
-}
-
-pub trait DistinguishedEncoder<T>: Encoder<T> {
-    /// Decodes a field for the value, returning an error if it is not precisely the encoding that
-    /// would have been emitted for the value.
-    fn decode_distinguished<B: Buf + ?Sized>(
-        wire_type: WireType,
-        duplicated: bool,
-        value: &mut T,
-        buf: Capped<B>,
-        ctx: DecodeContext,
-    ) -> Result<Canonicity, DecodeError>;
 }
 
 /// Encoders' wire-type is relied upon by both relaxed and distinguished encoders, but it is written
