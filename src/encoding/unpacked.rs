@@ -65,6 +65,7 @@ where
     Self: Encoder<C>,
     C: DistinguishedCollection<Item = T>,
     E: DistinguishedValueEncoder<T>,
+    Packed<E>: ValueEncoder<C>,
     T: NewForOverwrite + Eq,
 {
     fn decode_distinguished<B: Buf + ?Sized>(
@@ -80,7 +81,7 @@ where
             if duplicated {
                 return Err(DecodeError::new(UnexpectedlyRepeated));
             }
-            Packed::<E>::decode_value_distinguished(value, buf, false, ctx)?;
+            <Packed<E>>::decode_value(value, buf, ctx)?;
             Ok(Canonicity::NotCanonical)
         } else {
             // Otherwise, decode one field normally.

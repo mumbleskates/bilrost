@@ -164,9 +164,10 @@ mod derived_message_tests {
             to_replace.replace_from(encoded.as_slice()).unwrap();
             assert_eq!(&to_replace, &into, "doesn't match after expedient replace");
             to_replace = M::empty();
-            to_replace
-                .replace_distinguished_from(encoded.as_slice())
-                .unwrap();
+            assert_eq!(
+                to_replace.replace_distinguished_from(encoded.as_slice()),
+                Ok(Canonical)
+            );
             assert_eq!(
                 &to_replace, &into,
                 "doesn't match after distinguished replace"

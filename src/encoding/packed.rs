@@ -4,9 +4,8 @@ use core::cmp::min;
 use crate::encoding::value_traits::{Collection, DistinguishedCollection};
 use crate::encoding::{
     encode_varint, encoded_len_varint, Canonicity, Capped, DecodeContext, DecodeError,
-    DistinguishedEncoder, DistinguishedFieldEncoder, DistinguishedValueEncoder, Encoder,
-    FieldEncoder, General, NewForOverwrite, TagMeasurer, TagWriter, ValueEncoder, WireType,
-    Wiretyped,
+    DistinguishedEncoder, DistinguishedValueEncoder, Encoder, FieldEncoder, General,
+    NewForOverwrite, TagMeasurer, TagWriter, ValueEncoder, WireType, Wiretyped,
 };
 use crate::DecodeErrorKind::{Truncated, UnexpectedlyRepeated};
 
@@ -146,7 +145,7 @@ impl<C, T, E> DistinguishedEncoder<C> for Packed<E>
 where
     C: DistinguishedCollection<Item = T>,
     T: NewForOverwrite + Eq,
-    E: DistinguishedValueEncoder<T>,
+    E: DistinguishedValueEncoder<T> + FieldEncoder<T>,
     Self: DistinguishedValueEncoder<C> + Encoder<C>,
 {
     #[inline]
@@ -168,8 +167,8 @@ where
             // Otherwise, try decoding it in the unpacked representation
             // TODO(widders): we would take more fields greedily here
             let mut new_val = T::new_for_overwrite();
-            E::decode_field_distinguished(wire_type, &mut new_val, buf, true, ctx)?;
-            value.insert_distinguished(new_val)?;
+            E::decode_field(wire_type, &mut new_val, buf, ctx)?;
+            value.insert(new_val)?;
             Ok(Canonicity::NotCanonical)
         }
     }

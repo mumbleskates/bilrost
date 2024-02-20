@@ -609,6 +609,7 @@ pub trait Encoder<T> {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 #[repr(u8)]
+#[must_use]
 pub enum Canonicity {
     NotCanonical,
     HasExtensions,
@@ -1503,7 +1504,7 @@ mod test {
     }
 
     macro_rules! check_type {
-        ($kind:ident, $encoder_trait:ident, $decode:ident) => {
+        ($kind:ident, $encoder_trait:ident, $decode:ident $(, enforce with $require:ident)?) => {
             pub mod $kind {
                 use super::*;
                 use bytes::BytesMut;
@@ -1564,6 +1565,7 @@ mod test {
                         buf.lend(),
                         DecodeContext::default(),
                     )
+                    $(.$require())?
                     .map_err(|error| TestCaseError::fail(error.to_string()))?;
 
                     prop_assert!(
@@ -1633,6 +1635,7 @@ mod test {
                             buf.lend(),
                             DecodeContext::default(),
                         )
+                        $(.$require())?
                         .map_err(|error| TestCaseError::fail(error.to_string()))?;
                         not_first = true;
                     }
@@ -1645,7 +1648,8 @@ mod test {
         };
     }
     check_type!(expedient, Encoder, decode);
-    check_type!(distinguished, DistinguishedEncoder, decode_distinguished);
+    check_type!(distinguished, DistinguishedEncoder, decode_distinguished,
+        enforce with require_canonical);
 
     fn present_and_defaulted_errs<T, E>()
     where
