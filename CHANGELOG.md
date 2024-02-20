@@ -20,7 +20,12 @@
 
 ### Fixes
 
+* Fixes and expansions to traits and requirements to allow `EmptyState::clear`
+  to be available on all messages and dyn message traits.
+
 ### Cleanups
+
+* Significant readme expansion and organization.
 
 ## v0.1001.0
 
