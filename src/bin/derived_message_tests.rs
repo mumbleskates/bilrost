@@ -1601,27 +1601,27 @@ mod derived_message_tests {
                 expected,
             )
         }) {
-            assert::decodes_only_expedient(packed, Oof(expected.clone(), vec![]), WrongWireType);
-            assert::decodes_only_expedient(unpacked, Oof(vec![], expected.clone()), WrongWireType);
+            assert::decodes_only_expedient(packed, Oof(expected.clone(), vec![]), NotCanonical);
+            assert::decodes_only_expedient(unpacked, Oof(vec![], expected.clone()), NotCanonical);
             assert::decodes_only_expedient(
                 packed,
                 Oof(Cow::Borrowed(expected.as_slice()), Cow::default()),
-                WrongWireType,
+                NotCanonical,
             );
             assert::decodes_only_expedient(
                 unpacked,
                 Oof(Cow::default(), Cow::Borrowed(expected.as_slice())),
-                WrongWireType,
+                NotCanonical,
             );
             assert::decodes_only_expedient(
                 packed,
                 Oof(Cow::Owned(expected.clone()), Cow::default()),
-                WrongWireType,
+                NotCanonical,
             );
             assert::decodes_only_expedient(
                 unpacked,
                 Oof(Cow::default(), Cow::Owned(expected.clone())),
-                WrongWireType,
+                NotCanonical,
             );
             #[allow(unused_macros)]
             macro_rules! test_vec {
@@ -1629,12 +1629,12 @@ mod derived_message_tests {
                     assert::decodes_only_expedient(
                         packed,
                         Oof(expected.iter().cloned().collect(), <$vec_ty>::new()),
-                        WrongWireType,
+                        NotCanonical,
                     );
                     assert::decodes_only_expedient(
                         unpacked,
                         Oof(<$vec_ty>::new(), expected.iter().cloned().collect()),
-                        WrongWireType,
+                        NotCanonical,
                     );
                 };
             }
@@ -1787,18 +1787,18 @@ mod derived_message_tests {
                 assert::decodes_only_expedient(
                     unmatching_packed,
                     Oof(BTreeSet::from(expected_items), BTreeSet::new()),
-                    WrongWireType,
+                    NotCanonical,
                 );
                 assert::decodes_only_expedient(
                     unmatching_unpacked,
                     Oof(BTreeSet::new(), BTreeSet::from(expected_items)),
-                    WrongWireType,
+                    NotCanonical,
                 );
             }
             assert::doesnt_decode::<Oof<BTreeSet<u32>>>(&repeated_set_packed, UnexpectedlyRepeated);
             assert::doesnt_decode_distinguished::<Oof<BTreeSet<u32>>>(
                 &repeated_set_packed,
-                WrongWireType,
+                UnexpectedlyRepeated,
             );
             assert::doesnt_decode::<Oof<BTreeSet<u32>>>(
                 &repeated_set_unpacked,
@@ -1806,7 +1806,7 @@ mod derived_message_tests {
             );
             assert::doesnt_decode_distinguished::<Oof<BTreeSet<u32>>>(
                 &repeated_set_unpacked,
-                WrongWireType,
+                UnexpectedlyRepeated,
             );
         }
         #[allow(unused_macros)]
