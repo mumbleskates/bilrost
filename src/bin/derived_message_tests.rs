@@ -2265,6 +2265,13 @@ mod derived_message_tests {
                 also: Some("abc".into()),
             },
         );
+
+        assert::never_decodes::<OuterDirect>([(1, OV::Varint(1))], WrongWireType);
+        assert::never_decodes::<OuterOptional>([(1, OV::Varint(1))], WrongWireType);
+        assert::never_decodes::<OuterDirect>([(1, OV::ThirtyTwoBit([1; 4]))], WrongWireType);
+        assert::never_decodes::<OuterOptional>([(1, OV::ThirtyTwoBit([1; 4]))], WrongWireType);
+        assert::never_decodes::<OuterDirect>([(1, OV::SixtyFourBit([1; 8]))], WrongWireType);
+        assert::never_decodes::<OuterOptional>([(1, OV::SixtyFourBit([1; 8]))], WrongWireType);
     }
 
     #[test]
@@ -2287,7 +2294,7 @@ mod derived_message_tests {
     }
 
     #[test]
-    fn reject_unknown_fields_distinguished() {
+    fn unknown_fields_distinguished() {
         #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
         struct Nested(i64);
 
@@ -2388,6 +2395,65 @@ mod derived_message_tests {
                 ..EmptyState::empty()
             },
             HasExtensions,
+        );
+
+        // We should be sensitive to multiple tiers of non-canonicity
+        assert::decodes_distinguished(
+            [
+                (1, OV::u64(1)),
+                (3, OV::message(&[(1, OV::i64(1))].into_opaque_message())),
+            ],
+            Foo {
+                one: 1,
+                oneof: Three(Nested(1)),
+                ..EmptyState::empty()
+            },
+        );
+        // We can see when there are extensions in both the inner and outer message...
+        assert::decodes_non_canonically(
+            [
+                (1, OV::u64(1)),
+                (
+                    3,
+                    OV::message(
+                        &[(1, OV::i64(1)), (2, OV::string("unknown"))].into_opaque_message(),
+                    ),
+                ),
+            ],
+            Foo {
+                one: 1,
+                oneof: Three(Nested(1)),
+                ..EmptyState::empty()
+            },
+            HasExtensions,
+        );
+        assert::decodes_non_canonically(
+            [
+                (1, OV::u64(1)),
+                (2, OV::string("unknown")),
+                (3, OV::message(&[(1, OV::i64(1))].into_opaque_message())),
+            ],
+            Foo {
+                one: 1,
+                oneof: Three(Nested(1)),
+                ..EmptyState::empty()
+            },
+            HasExtensions,
+        );
+        // and a non-canonical field that occurs later in the message overrides the canonicity to
+        // the worse `NotCanonical`
+        assert::decodes_non_canonically(
+            [
+                (1, OV::u64(1)),
+                (2, OV::string("unknown")),
+                (3, OV::message(&[(1, OV::i64(0))].into_opaque_message())),
+            ],
+            Foo {
+                one: 1,
+                oneof: Three(Nested(0)),
+                ..EmptyState::empty()
+            },
+            NotCanonical,
         );
     }
 }
