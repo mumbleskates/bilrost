@@ -127,29 +127,6 @@ mod derived_message_tests {
             );
         }
 
-        pub(super) fn doesnt_decode_distinguished<M>(
-            from: impl IntoOpaqueMessage,
-            err: DecodeErrorKind,
-        ) where
-            M: DistinguishedMessage + Debug + EmptyState,
-        {
-            let encoded = from.into_opaque_message().encode_to_vec();
-            assert_eq!(
-                M::decode_distinguished(encoded.as_slice())
-                    .expect_err("unexpectedly decoded without error")
-                    .kind(),
-                err
-            );
-            let mut to_replace = M::empty();
-            assert_eq!(
-                to_replace
-                    .replace_distinguished_from(encoded.as_slice())
-                    .expect_err("unexpectedly replaced without error")
-                    .kind(),
-                err
-            );
-        }
-
         pub(super) fn decodes_distinguished<M>(from: impl IntoOpaqueMessage, into: M)
         where
             M: DistinguishedMessage + Debug + Eq + EmptyState,
@@ -1798,16 +1775,8 @@ mod derived_message_tests {
                     NotCanonical,
                 );
             }
-            assert::doesnt_decode::<Oof<BTreeSet<u32>>>(&repeated_set_packed, UnexpectedlyRepeated);
-            assert::doesnt_decode_distinguished::<Oof<BTreeSet<u32>>>(
-                &repeated_set_packed,
-                UnexpectedlyRepeated,
-            );
-            assert::doesnt_decode::<Oof<BTreeSet<u32>>>(
-                &repeated_set_unpacked,
-                UnexpectedlyRepeated,
-            );
-            assert::doesnt_decode_distinguished::<Oof<BTreeSet<u32>>>(
+            assert::never_decodes::<Oof<BTreeSet<u32>>>(&repeated_set_packed, UnexpectedlyRepeated);
+            assert::never_decodes::<Oof<BTreeSet<u32>>>(
                 &repeated_set_unpacked,
                 UnexpectedlyRepeated,
             );
