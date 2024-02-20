@@ -81,6 +81,7 @@ where
             if duplicated {
                 return Err(DecodeError::new(UnexpectedlyRepeated));
             }
+            // The data is already known to be non-canonical; use expedient decoding
             <Packed<E>>::decode_value(value, buf, ctx)?;
             Ok(Canonicity::NotCanonical)
         } else {

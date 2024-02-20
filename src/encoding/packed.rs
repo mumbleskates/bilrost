@@ -167,6 +167,7 @@ where
             // Otherwise, try decoding it in the unpacked representation
             // TODO(widders): we would take more fields greedily here
             let mut new_val = T::new_for_overwrite();
+            // The data is already known to be non-canonical; use expedient decoding
             E::decode_field(wire_type, &mut new_val, buf, ctx)?;
             value.insert(new_val)?;
             Ok(Canonicity::NotCanonical)
