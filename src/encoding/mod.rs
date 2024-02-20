@@ -631,13 +631,12 @@ pub trait WithCanonicity {
     /// The type of the value without any canonicity information.
     type Value;
     // Type the value is turned into when non-canonical states are turned into error states.
-    type Result;
 
     /// Get the value if it is fully canonical, otherwise returning an error.
-    fn canonical(self) -> Self::Result;
+    fn canonical(self) -> Result<Self::Value, DecodeErrorKind>;
 
     /// Get the value as long as its known fields are canonical, otherwise returning an error.
-    fn canonical_with_extensions(self) -> Self::Result;
+    fn canonical_with_extensions(self) -> Result<Self::Value, DecodeErrorKind>;
 
     /// Discards the canonicity.
     fn value(self) -> Self::Value;
@@ -645,9 +644,8 @@ pub trait WithCanonicity {
 
 impl WithCanonicity for Canonicity {
     type Value = ();
-    type Result = Result<(), DecodeErrorKind>;
 
-    fn canonical(self) -> Self::Result {
+    fn canonical(self) -> Result<(), DecodeErrorKind> {
         match self {
             Canonicity::NotCanonical => Err(NotCanonical),
             Canonicity::HasExtensions => Err(UnknownField),
@@ -655,7 +653,7 @@ impl WithCanonicity for Canonicity {
         }
     }
 
-    fn canonical_with_extensions(self) -> Self::Result {
+    fn canonical_with_extensions(self) -> Result<(), DecodeErrorKind> {
         match self {
             Canonicity::NotCanonical | Canonicity::HasExtensions => Ok(()),
             Canonicity::Canonical => Err(NotCanonical),
@@ -667,7 +665,6 @@ impl WithCanonicity for Canonicity {
 
 impl<T> WithCanonicity for (T, Canonicity) {
     type Value = T;
-    type Result = Result<T, DecodeErrorKind>;
 
     fn canonical(self) -> Result<T, DecodeErrorKind> {
         self.1.canonical()?;
@@ -686,7 +683,6 @@ impl<T> WithCanonicity for (T, Canonicity) {
 
 impl<'a, T> WithCanonicity for &'a (T, Canonicity) {
     type Value = &'a T;
-    type Result = Result<&'a T, DecodeErrorKind>;
 
     fn canonical(self) -> Result<&'a T, DecodeErrorKind> {
         self.1.canonical()?;
@@ -700,6 +696,78 @@ impl<'a, T> WithCanonicity for &'a (T, Canonicity) {
 
     fn value(self) -> &'a T {
         &self.0
+    }
+}
+
+/// Helper trait for converting `Result`s with values that contain canonicity information by
+/// specifying how strict decoding should be.
+pub trait RequireCanonicity {
+    type Result;
+
+    /// Converts this result, turning any non-canonical status in an `Ok(..)` value into a
+    /// corresponding error.
+    fn require_canonical(self) -> Self::Result;
+
+    /// Converts this result, turning non-canonical status in an `Ok(..)` value into a corresponding
+    /// error, but permitting extensions without error. Only fields that are known to the message
+    /// can be checked for canonicity.
+    fn allow_extensions(self) -> Self::Result;
+
+    /// Converts this result, discarding any canonicity information from the value.
+    ///
+    /// If this method is always being used and canonicity information is always discarded,
+    /// distinguished decoding may not be needed, and the program can be made more efficient by
+    /// simply using expedient decoding mode.
+    fn allow_any(self) -> Self::Result;
+}
+
+impl<T, E> RequireCanonicity for Result<T, E>
+where
+    T: WithCanonicity,
+    E: From<DecodeErrorKind>,
+{
+    type Result = Result<T::Value, E>;
+
+    fn require_canonical(self) -> Self::Result {
+        Ok(self?.canonical()?)
+    }
+
+    fn allow_extensions(self) -> Self::Result {
+        Ok(self?.canonical_with_extensions()?)
+    }
+
+    fn allow_any(self) -> Self::Result {
+        Ok(self?.value())
+    }
+}
+
+/// Impl for `Result` types returned by distinguished decoding which are then taken `.as_ref()`.
+/// This discards any extra information carried by the `DecodeError` but avoids copying it.
+impl<'a, T> RequireCanonicity for Result<&'a T, &'a DecodeError>
+where
+    &'a T: WithCanonicity,
+{
+    type Result = Result<<&'a T as WithCanonicity>::Value, DecodeErrorKind>;
+
+    fn require_canonical(self) -> Self::Result {
+        match self {
+            Ok(val) => val.canonical(),
+            Err(err) => Err(err.kind()),
+        }
+    }
+
+    fn allow_extensions(self) -> Self::Result {
+        match self {
+            Ok(val) => val.canonical_with_extensions(),
+            Err(err) => Err(err.kind()),
+        }
+    }
+
+    fn allow_any(self) -> Self::Result {
+        match self {
+            Ok(val) => Ok(val.value()),
+            Err(err) => Err(err.kind()),
+        }
     }
 }
 
