@@ -505,7 +505,28 @@ TODO: this
 
 #### Using `dyn` with object-safe message traits
 
-TODO: this
+The `Message` and `DistinguishedMessage` traits are object-safe and can be used
+via [trait objects][traitobj]. All of their functionality (except the `decode`
+methods for creating a message value from data *ex nihilo*) is available via
+object-safe alternatives. Messages can be cleared (reset to empty values);
+measured for their encoded byte length; encoded to [`Vec<u8>`][vec],
+[`Bytes`][bytes], or into a [`&mut dyn Buf`][bytes]; or decoded (replacing the
+value) from [`&[u8]` slice][slice] or a [`&mut dyn BufMut`][bufmut].
+
+[buf]: https://docs.rs/bytes/latest/bytes/buf/trait.Buf.html
+
+[bufmut]: https://docs.rs/bytes/latest/bytes/buf/trait.BufMut.html
+
+[slice]: https://doc.rust-lang.org/std/primitive.slice.html
+
+[traitobj]: https://doc.rust-lang.org/reference/types/trait-object.html
+
+Methods that decode to or from trait object buffers are likely to be less
+efficient than their generic, non-object-safe counterparts; it is preferable to
+use `encode(..)` rather than `encode_dyn(..)`, and likewise for any other
+"`_dyn`" method. Likewise, `replace_from_slice(..)` is equivalent to
+`replace_from(..)`, just object safe; the same goes for other "`_slice`"
+methods.
 
 ### Supported message field types
 
