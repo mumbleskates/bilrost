@@ -7,7 +7,7 @@ use core::ops::{Deref, DerefMut};
 
 use bytes::{Buf, BufMut};
 
-use crate::encoding::{skip_field, Capped, DecodeContext, EmptyState, WireType, Canonicity};
+use crate::encoding::{skip_field, Canonicity, Capped, DecodeContext, EmptyState, WireType};
 use crate::message::{RawDistinguishedMessage, RawMessage};
 use crate::DecodeError;
 
