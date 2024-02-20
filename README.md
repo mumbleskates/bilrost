@@ -1248,6 +1248,16 @@ informed by experience with Protobuf:
 
 </details>
 
+### Distinguished representation on the wire in `bilrost`
+
+Leveraging the changes to varint representation and field order, Bilrost
+standardizes easily-distinguishable canonical encodings for many message types.
+Zero-extension of varints and unordered fields are the two main things that can
+lead Protobuf encodings to vary for the same meaning, and most of what remains
+involves enforcing that empty values are never encoded, packed/unpacked
+collections have a matching representation, map keys are in sorted order, and
+keeping track of whether any unknown fields exist in the encoding.
+
 ## Comparisons to other encodings
 
 TODO: compare here (big table: schemaful, schemaless, distinguished) with
