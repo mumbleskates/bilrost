@@ -1114,13 +1114,16 @@ use without any generated code other than the derive macros. (This same
 trait-based dispatch could be back-ported to `prost` to make it easier to use,
 but it might be a significant API break.)
 
-`bilrost` also provides object safe traits, `MessageDyn` and
-`DistinguishedMessageDyn`, which can be used to do most operations to messages
-via trait objects. At time of writing, `prost 0.12.3` has very little
-functionality exposed in an object-safe way; the only object-safe methods
-compute the encoded length of the message and clear its fields.
+`bilrost` has also implemented a couple requested features not yet available in
+`prost`:
 
-TODO: look over more unsolved complaints in the prost issues
+* message fields can be ignored via attribute
+* implementations are available for `no_std`-compatible hash maps, vecs that
+  inline short values, `ByteString`, etc.
+* `Message` and `DistinguishedMessage` traits are object-safe and provide full
+  functionality as trait objects. At time of writing, `prost 0.12.3` has very
+  little functionality exposed in an object-safe way; the only object-safe
+  methods compute the encoded length of the message and clear its fields.
 
 ## Differences from Protobuf
 
