@@ -19,7 +19,7 @@ use crate::encoding::{
 };
 use crate::message::{merge, merge_distinguished, RawDistinguishedMessage, RawMessage};
 use crate::DecodeErrorKind::{InvalidValue, NotCanonical};
-use crate::{Blob, DecodeError};
+use crate::{Blob, Canonicity, DecodeError};
 
 pub struct General;
 
@@ -172,13 +172,13 @@ impl DistinguishedValueEncoder<String> for General {
         buf: Capped<B>,
         allow_empty: bool,
         ctx: DecodeContext,
-    ) -> Result<(), DecodeError> {
+    ) -> Result<Canonicity, DecodeError> {
         Self::decode_value(value, buf, ctx)?;
-        if !allow_empty && value.is_empty() {
-            Err(DecodeError::new(NotCanonical))
+        Ok(if !allow_empty && value.is_empty() {
+            Canonicity::NotCanonical
         } else {
-            Ok(())
-        }
+            Canonicity::Canonical
+        })
     }
 }
 
@@ -243,7 +243,7 @@ impl DistinguishedValueEncoder<Cow<'_, str>> for General {
         buf: Capped<B>,
         allow_empty: bool,
         ctx: DecodeContext,
-    ) -> Result<(), DecodeError> {
+    ) -> Result<Canonicity, DecodeError> {
         Self::decode_value_distinguished(value.to_mut(), buf, allow_empty, ctx)
     }
 }
@@ -305,13 +305,13 @@ impl DistinguishedValueEncoder<bytestring::ByteString> for General {
         buf: Capped<B>,
         allow_empty: bool,
         ctx: DecodeContext,
-    ) -> Result<(), DecodeError> {
+    ) -> Result<Canonicity, DecodeError> {
         Self::decode_value(value, buf, ctx)?;
-        if !allow_empty && value.is_empty() {
-            Err(DecodeError::new(NotCanonical))
+        Ok(if !allow_empty && value.is_empty() {
+            Canonicity::NotCanonical
         } else {
-            Ok(())
-        }
+            Canonicity::Canonical
+        })
     }
 }
 
@@ -369,13 +369,13 @@ impl DistinguishedValueEncoder<Bytes> for General {
         buf: Capped<B>,
         allow_empty: bool,
         ctx: DecodeContext,
-    ) -> Result<(), DecodeError> {
+    ) -> Result<Canonicity, DecodeError> {
         Self::decode_value(value, buf, ctx)?;
-        if !allow_empty && value.is_empty() {
-            Err(DecodeError::new(NotCanonical))
+        Ok(if !allow_empty && value.is_empty() {
+            Canonicity::NotCanonical
         } else {
-            Ok(())
-        }
+            Canonicity::Canonical
+        })
     }
 }
 
@@ -419,7 +419,7 @@ impl DistinguishedValueEncoder<Blob> for General {
         buf: Capped<B>,
         allow_empty: bool,
         ctx: DecodeContext,
-    ) -> Result<(), DecodeError> {
+    ) -> Result<Canonicity, DecodeError> {
         PlainBytes::decode_value_distinguished(&mut **value, buf, allow_empty, ctx)
     }
 }
@@ -472,7 +472,7 @@ where
         mut buf: Capped<B>,
         allow_empty: bool,
         ctx: DecodeContext,
-    ) -> Result<(), DecodeError> {
+    ) -> Result<Canonicity, DecodeError> {
         ctx.limit_reached()?;
         let buf = buf.take_length_delimited()?;
         // Empty message types always encode and decode from zero bytes. It is far cheaper to check

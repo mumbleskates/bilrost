@@ -1,13 +1,14 @@
 use bytes::{Buf, BufMut};
+use std::cmp::min;
 
 use crate::encoding::value_traits::{Collection, DistinguishedCollection};
 use crate::encoding::{
-    encode_varint, encoded_len_varint, Capped, DecodeContext, DistinguishedEncoder,
-    DistinguishedFieldEncoder, DistinguishedValueEncoder, Encoder, FieldEncoder, General,
-    NewForOverwrite, TagMeasurer, TagWriter, ValueEncoder, WireType, Wiretyped,
+    encode_varint, encoded_len_varint, Canonicity, Capped, DecodeContext, DecodeError,
+    DistinguishedEncoder, DistinguishedFieldEncoder, DistinguishedValueEncoder, Encoder,
+    FieldEncoder, General, NewForOverwrite, TagMeasurer, TagWriter, ValueEncoder, WireType,
+    Wiretyped,
 };
-use crate::DecodeError;
-use crate::DecodeErrorKind::{NotCanonical, Truncated, UnexpectedlyRepeated};
+use crate::DecodeErrorKind::{Truncated, UnexpectedlyRepeated};
 
 pub struct Packed<E = General>(E);
 
@@ -46,14 +47,14 @@ where
         }) {
             return Err(DecodeError::new(Truncated));
         }
-        for val in capped.consume(|buf| {
-            let mut new_val = T::new_for_overwrite();
-            E::decode_value(&mut new_val, buf.lend(), ctx.clone())?;
-            Ok(new_val)
-        }) {
-            value.insert(val?).map_err(DecodeError::new)?;
-        }
-        Ok(())
+        capped
+            .consume(|buf| {
+                let mut new_val = T::new_for_overwrite();
+                E::decode_value(&mut new_val, buf.lend(), ctx.clone())?;
+                Ok(new_val)
+            })
+            .map(|val| Ok(value.insert(val?)?))
+            .collect()
     }
 }
 
@@ -68,25 +69,29 @@ where
         mut buf: Capped<B>,
         allow_empty: bool,
         ctx: DecodeContext,
-    ) -> Result<(), DecodeError> {
+    ) -> Result<Canonicity, DecodeError> {
         let capped = buf.take_length_delimited()?;
         if !capped.has_remaining() && !allow_empty {
-            return Err(DecodeError::new(NotCanonical));
+            return Ok(Canonicity::NotCanonical);
         }
         if E::WIRE_TYPE.fixed_size().map_or(false, |fixed_size| {
             capped.remaining_before_cap() % fixed_size != 0
         }) {
             return Err(DecodeError::new(Truncated));
         }
-        for val in capped.consume(|buf| {
-            let mut new_val = T::new_for_overwrite();
-            // Pass allow_empty=true: nested values may be empty
-            E::decode_value_distinguished(&mut new_val, buf.lend(), true, ctx.clone())?;
-            Ok(new_val)
-        }) {
-            value.insert_distinguished(val?).map_err(DecodeError::new)?;
-        }
-        Ok(())
+        capped
+            .consume(|buf| {
+                let mut new_val = T::new_for_overwrite();
+                // Pass allow_empty=true: nested values may be empty
+                let item_canon =
+                    E::decode_value_distinguished(&mut new_val, buf.lend(), true, ctx.clone())?;
+                Ok((new_val, item_canon))
+            })
+            .map(|val| {
+                let (to_insert, item_canon) = val?;
+                Ok(min(value.insert_distinguished(to_insert)?, item_canon))
+            })
+            .collect()
     }
 }
 
@@ -129,19 +134,20 @@ where
             }
             Self::decode_value(value, buf, ctx)
         } else {
-            // Otherwise, try decoding it in the
+            // Otherwise, try decoding it in the unpacked representation
             // TODO(widders): we would take more fields greedily here
             let mut new_val = T::new_for_overwrite();
             E::decode_field(wire_type, &mut new_val, buf, ctx)?;
-            value.insert(new_val).map_err(DecodeError::new)?;
-            Ok(())
+            Ok(value.insert(new_val)?)
         }
     }
 }
 
-impl<C, E> DistinguishedEncoder<C> for Packed<E>
+impl<C, T, E> DistinguishedEncoder<C> for Packed<E>
 where
-    C: DistinguishedCollection,
+    C: DistinguishedCollection<Item = T>,
+    T: NewForOverwrite + Eq,
+    E: DistinguishedValueEncoder<T>,
     Self: DistinguishedValueEncoder<C> + Encoder<C>,
 {
     #[inline]
@@ -151,11 +157,21 @@ where
         value: &mut C,
         buf: Capped<B>,
         ctx: DecodeContext,
-    ) -> Result<(), DecodeError> {
-        if duplicated {
-            return Err(DecodeError::new(UnexpectedlyRepeated));
+    ) -> Result<Canonicity, DecodeError> {
+        if wire_type == WireType::LengthDelimited {
+            // We've encountered the expected length-delimited type: decode it in packed format.
+            if duplicated {
+                return Err(DecodeError::new(UnexpectedlyRepeated));
+            }
+            // Set allow_empty=false: empty collections are not canonical
+            Self::decode_value_distinguished(value, buf, false, ctx)
+        } else {
+            // Otherwise, try decoding it in the unpacked representation
+            // TODO(widders): we would take more fields greedily here
+            let mut new_val = T::new_for_overwrite();
+            E::decode_field_distinguished(wire_type, &mut new_val, buf, true, ctx)?;
+            value.insert_distinguished(new_val)?;
+            Ok(Canonicity::NotCanonical)
         }
-        // Set allow_empty=false: empty collections are not canonical
-        Self::decode_field_distinguished(wire_type, value, buf, false, ctx)
     }
 }

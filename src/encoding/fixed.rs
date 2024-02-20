@@ -4,11 +4,12 @@ use bytes::{Buf, BufMut};
 
 use crate::encoding::value_traits::EmptyState;
 use crate::encoding::{
-    delegate_encoding, encoder_where_value_encoder, Capped, DecodeContext, DistinguishedEncoder,
-    DistinguishedValueEncoder, Encoder, TagMeasurer, TagWriter, ValueEncoder, WireType, Wiretyped,
+    delegate_encoding, encoder_where_value_encoder, Canonicity, Capped, DecodeContext,
+    DistinguishedEncoder, DistinguishedValueEncoder, Encoder, TagMeasurer, TagWriter, ValueEncoder,
+    WireType, Wiretyped,
 };
 use crate::DecodeError;
-use crate::DecodeErrorKind::{NotCanonical, Truncated};
+use crate::DecodeErrorKind::Truncated;
 
 pub struct Fixed;
 
@@ -73,13 +74,13 @@ macro_rules! fixed_width_int {
                 buf: Capped<B>,
                 allow_empty: bool,
                 ctx: DecodeContext,
-            ) -> Result<(), DecodeError> {
+            ) -> Result<Canonicity, DecodeError> {
                 Fixed::decode_value(value, buf, ctx)?;
-                if !allow_empty && value.is_empty() {
-                    return Err(DecodeError::new(NotCanonical));
+                Ok(if !allow_empty && value.is_empty() {
+                    Canonicity::NotCanonical
                 } else {
-                    Ok(())
-                }
+                    Canonicity::Canonical
+                })
             }
         }
 
@@ -177,13 +178,13 @@ macro_rules! fixed_width_array {
                 buf: Capped<B>,
                 allow_empty: bool,
                 ctx: DecodeContext,
-            ) -> Result<(), DecodeError> {
+            ) -> Result<Canonicity, DecodeError> {
                 Fixed::decode_value(value, buf, ctx)?;
-                if !allow_empty && value.is_empty() {
-                    return Err(DecodeError::new(NotCanonical));
+                Ok(if !allow_empty && value.is_empty() {
+                    Canonicity::NotCanonical
                 } else {
-                    Ok(())
-                }
+                    Canonicity::Canonical
+                })
             }
         }
 

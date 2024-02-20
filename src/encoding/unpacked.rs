@@ -1,4 +1,5 @@
 use bytes::{Buf, BufMut};
+use std::cmp::min;
 
 use crate::encoding::value_traits::{Collection, DistinguishedCollection};
 use crate::encoding::{
@@ -6,8 +7,8 @@ use crate::encoding::{
     DistinguishedValueEncoder, Encoder, FieldEncoder, General, NewForOverwrite, Packed,
     TagMeasurer, TagWriter, ValueEncoder, WireType,
 };
-use crate::DecodeError;
 use crate::DecodeErrorKind::UnexpectedlyRepeated;
+use crate::{Canonicity, DecodeError};
 
 pub struct Unpacked<E = General>(E);
 
@@ -53,8 +54,7 @@ where
             // TODO(widders): we would take more fields greedily here
             let mut new_val = T::new_for_overwrite();
             E::decode_field(wire_type, &mut new_val, buf, ctx)?;
-            value.insert(new_val).map_err(DecodeError::new)?;
-            Ok(())
+            Ok(value.insert(new_val)?)
         }
     }
 }
@@ -73,13 +73,12 @@ where
         value: &mut C,
         buf: Capped<B>,
         ctx: DecodeContext,
-    ) -> Result<(), DecodeError> {
+    ) -> Result<Canonicity, DecodeError> {
         let mut new_val = T::new_for_overwrite();
-        E::decode_field_distinguished(wire_type, &mut new_val, buf, true, ctx)?;
-        value
-            .insert_distinguished(new_val)
-            .map_err(DecodeError::new)?;
-        Ok(())
+        Ok(min(
+            E::decode_field_distinguished(wire_type, &mut new_val, buf, true, ctx)?,
+            value.insert_distinguished(new_val)?,
+        ))
     }
 }
 

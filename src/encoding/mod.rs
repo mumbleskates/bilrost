@@ -10,7 +10,8 @@ use bytes::buf::Take;
 use bytes::{Buf, BufMut};
 
 use crate::DecodeErrorKind::{
-    InvalidVarint, TagOverflowed, Truncated, UnexpectedlyRepeated, WrongWireType,
+    InvalidVarint, NotCanonical, TagOverflowed, Truncated, UnexpectedlyRepeated, UnknownField,
+    WrongWireType,
 };
 use crate::{decode_length_delimiter, DecodeError};
 
@@ -606,6 +607,105 @@ pub trait Encoder<T> {
     ) -> Result<(), DecodeError>;
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[repr(u8)]
+pub enum Canonicity {
+    NotCanonical,
+    HasExtensions,
+    Canonical,
+}
+
+impl Canonicity {
+    pub fn update(&mut self, other: Self) {
+        *self = min(*self, other);
+    }
+}
+
+impl FromIterator<Canonicity> for Canonicity {
+    fn from_iter<T: IntoIterator<Item = Canonicity>>(iter: T) -> Self {
+        iter.into_iter().min().unwrap_or(Canonicity::Canonical)
+    }
+}
+
+pub trait WithCanonicity {
+    type Value;
+    type Result;
+
+    /// Get the value if it is fully canonical, otherwise returning an error.
+    fn canonical(self) -> Self::Result;
+
+    /// Get the value as long as its known fields are canonical.
+    fn canonical_with_extensions(self) -> Self::Result;
+
+    /// Get the value regardless of its canonical value.
+    fn value(self) -> Self::Value;
+}
+
+impl<T> WithCanonicity for (T, Canonicity) {
+    type Value = T;
+    type Result = Result<T, DecodeError>;
+
+    fn canonical(self) -> Self::Result {
+        match self.1 {
+            Canonicity::NotCanonical => Ok(self.0),
+            Canonicity::HasExtensions => Err(DecodeError::new(UnknownField)),
+            Canonicity::Canonical => Err(DecodeError::new(NotCanonical)),
+        }
+    }
+
+    fn canonical_with_extensions(self) -> Self::Result {
+        match self.1 {
+            Canonicity::NotCanonical | Canonicity::HasExtensions => Ok(self.0),
+            Canonicity::Canonical => Err(DecodeError::new(NotCanonical)),
+        }
+    }
+
+    fn value(self) -> Self::Value {
+        self.0
+    }
+}
+
+impl<'a, T> WithCanonicity for &'a (T, Canonicity) {
+    type Value = &'a T;
+    type Result = Result<&'a T, DecodeError>;
+
+    fn canonical(self) -> Self::Result {
+        match self.1 {
+            Canonicity::NotCanonical => Ok(&self.0),
+            Canonicity::HasExtensions => Err(DecodeError::new(UnknownField)),
+            Canonicity::Canonical => Err(DecodeError::new(NotCanonical)),
+        }
+    }
+
+    fn canonical_with_extensions(self) -> Self::Result {
+        match self.1 {
+            Canonicity::NotCanonical | Canonicity::HasExtensions => Ok(&self.0),
+            Canonicity::Canonical => Err(DecodeError::new(NotCanonical)),
+        }
+    }
+
+    fn value(self) -> Self::Value {
+        &self.0
+    }
+}
+
+impl<T: WithCanonicity<Result = Result<T, DecodeError>>> WithCanonicity for Result<T, DecodeError> {
+    type Value = Result<T::Value, DecodeError>;
+    type Result = Result<T, DecodeError>;
+
+    fn canonical(self) -> Self::Result {
+        self?.canonical()
+    }
+
+    fn canonical_with_extensions(self) -> Self::Result {
+        self?.canonical_with_extensions()
+    }
+
+    fn value(self) -> Self::Value {
+        Ok(self?.value())
+    }
+}
+
 pub trait DistinguishedEncoder<T>: Encoder<T> {
     /// Decodes a field for the value, returning an error if it is not precisely the encoding that
     /// would have been emitted for the value.
@@ -615,7 +715,7 @@ pub trait DistinguishedEncoder<T>: Encoder<T> {
         value: &mut T,
         buf: Capped<B>,
         ctx: DecodeContext,
-    ) -> Result<(), DecodeError>;
+    ) -> Result<Canonicity, DecodeError>;
 }
 
 /// Encoders' wire-type is relied upon by both relaxed and distinguished encoders, but it is written
@@ -669,7 +769,7 @@ where
         buf: Capped<B>,
         allow_empty: bool,
         ctx: DecodeContext,
-    ) -> Result<(), DecodeError>;
+    ) -> Result<Canonicity, DecodeError>;
 }
 
 /// Affiliated helper trait for ValueEncoder that provides obligate implementations for handling
@@ -723,7 +823,7 @@ pub trait DistinguishedFieldEncoder<T> {
         buf: Capped<B>,
         allow_empty: bool,
         ctx: DecodeContext,
-    ) -> Result<(), DecodeError>;
+    ) -> Result<Canonicity, DecodeError>;
 }
 
 impl<T, E> DistinguishedFieldEncoder<T> for E
@@ -738,7 +838,7 @@ where
         buf: Capped<B>,
         allow_empty: bool,
         ctx: DecodeContext,
-    ) -> Result<(), DecodeError> {
+    ) -> Result<Canonicity, DecodeError> {
         check_wire_type(Self::WIRE_TYPE, wire_type)?;
         Self::decode_value_distinguished(value, buf, allow_empty, ctx)
     }
@@ -803,7 +903,7 @@ where
         value: &mut Option<T>,
         buf: Capped<B>,
         ctx: DecodeContext,
-    ) -> Result<(), DecodeError> {
+    ) -> Result<Canonicity, DecodeError> {
         if duplicated {
             return Err(DecodeError::new(UnexpectedlyRepeated));
         }
@@ -1059,7 +1159,7 @@ macro_rules! delegate_encoding {
                 value: &mut $value_ty,
                 buf: $crate::encoding::Capped<B>,
                 ctx: $crate::encoding::DecodeContext,
-            ) -> Result<(), $crate::DecodeError> {
+            ) -> Result<$crate::Canonicity, $crate::DecodeError> {
                 <$to_ty>::decode_distinguished(wire_type, duplicated, value, buf, ctx)
             }
         }
@@ -1143,7 +1243,7 @@ macro_rules! delegate_value_encoding {
                 buf: $crate::encoding::Capped<B>,
                 allow_empty: bool,
                 ctx: $crate::encoding::DecodeContext,
-            ) -> Result<(), $crate::DecodeError> {
+            ) -> Result<$crate::Canonicity, $crate::DecodeError> {
                 <$to_ty>::decode_value_distinguished(value, buf, allow_empty, ctx)
             }
         }
@@ -1215,7 +1315,7 @@ macro_rules! encoder_where_value_encoder {
                 value: &mut T,
                 buf: Capped<B>,
                 ctx: DecodeContext,
-            ) -> Result<(), crate::DecodeError> {
+            ) -> Result<crate::Canonicity, crate::DecodeError> {
                 if duplicated {
                     return Err(
                         crate::DecodeError::new(crate::DecodeErrorKind::UnexpectedlyRepeated)
@@ -1272,7 +1372,7 @@ mod test {
 
     use crate::encoding::*;
     use crate::Blob;
-    use crate::DecodeErrorKind::{NotCanonical, OutOfDomainValue, WrongWireType};
+    use crate::DecodeErrorKind::{OutOfDomainValue, WrongWireType};
 
     /// Generalized proptest macro. Kind must be either `expedient`, `hashable`, or `distinguished`.
     macro_rules! check_type_test {
@@ -1506,9 +1606,8 @@ mod test {
                 capped,
                 DecodeContext::default(),
             )
-            .expect_err("decoding a plain field with an encoded defaulted value should fail")
-            .kind(),
-            NotCanonical
+            .expect("decoding a plain field with an encoded defaulted value should succeed"),
+            Canonicity::NotCanonical
         );
     }
 

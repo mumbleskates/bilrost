@@ -20,6 +20,7 @@ mod types;
 #[doc(hidden)]
 pub mod encoding;
 
+pub use crate::encoding::{Canonicity, WithCanonicity};
 pub use crate::error::{DecodeError, DecodeErrorKind, EncodeError};
 pub use crate::message::{DistinguishedMessage, DistinguishedMessageDyn, Message, MessageDyn};
 #[doc(hidden)]

@@ -4,7 +4,8 @@ use alloc::vec::Vec;
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 
 use crate::encoding::{
-    encode_varint, encoded_len_varint, Capped, DecodeContext, EmptyState, TagReader, WireType,
+    encode_varint, encoded_len_varint, Canonicity, Capped, DecodeContext, EmptyState, TagReader,
+    WireType,
 };
 use crate::{DecodeError, EncodeError};
 
@@ -34,7 +35,7 @@ pub(crate) fn merge_distinguished<T: RawDistinguishedMessage, B: Buf + ?Sized>(
     value: &mut T,
     buf: Capped<B>,
     ctx: DecodeContext,
-) -> Result<(), DecodeError> {
+) -> Result<Canonicity, DecodeError> {
     let tr = &mut TagReader::new();
     let mut last_tag = None::<u32>;
     buf.consume(|buf| {
@@ -115,32 +116,36 @@ pub trait DistinguishedMessage: Message + Eq {
     /// Decodes an instance of the message from a buffer in distinguished mode.
     ///
     /// The entire buffer will be consumed.
-    fn decode_distinguished<B: Buf>(buf: B) -> Result<Self, DecodeError>
+    fn decode_distinguished<B: Buf>(buf: B) -> Result<(Self, Canonicity), DecodeError>
     where
         Self: Sized;
 
     /// Decodes a length-delimited instance of the message from the buffer in distinguished mode.
-    fn decode_distinguished_length_delimited<B: Buf>(buf: B) -> Result<Self, DecodeError>
+    fn decode_distinguished_length_delimited<B: Buf>(
+        buf: B,
+    ) -> Result<(Self, Canonicity), DecodeError>
     where
         Self: Sized;
 
     /// Decodes an instance from the given `Capped` buffer in distinguished mode, consuming it to
     /// its cap.
     #[doc(hidden)]
-    fn decode_distinguished_capped<B: Buf + ?Sized>(buf: Capped<B>) -> Result<Self, DecodeError>
+    fn decode_distinguished_capped<B: Buf + ?Sized>(
+        buf: Capped<B>,
+    ) -> Result<(Self, Canonicity), DecodeError>
     where
         Self: Sized;
 
     /// Decodes the non-ignored fields of this message from the buffer in distinguished mode,
     /// replacing their values.
-    fn replace_distinguished_from<B: Buf>(&mut self, buf: B) -> Result<(), DecodeError>;
+    fn replace_distinguished_from<B: Buf>(&mut self, buf: B) -> Result<Canonicity, DecodeError>;
 
     /// Decodes the non-ignored fields of this message in distinguished mode, replacing their values
     /// from a length-delimited value encoded in the buffer.
     fn replace_distinguished_from_length_delimited<B: Buf>(
         &mut self,
         buf: B,
-    ) -> Result<(), DecodeError>;
+    ) -> Result<Canonicity, DecodeError>;
 
     /// Decodes the non-ignored fields of this message in distinguished mode, replacing their values
     /// from the given capped buffer.
@@ -148,7 +153,7 @@ pub trait DistinguishedMessage: Message + Eq {
     fn replace_distinguished_from_capped<B: Buf + ?Sized>(
         &mut self,
         buf: Capped<B>,
-    ) -> Result<(), DecodeError>;
+    ) -> Result<Canonicity, DecodeError>;
 }
 
 /// `Message` is implemented as a usability layer on top of the basic functionality afforded by
@@ -259,29 +264,36 @@ impl<T> DistinguishedMessage for T
 where
     T: RawDistinguishedMessage + Message + Eq,
 {
-    fn decode_distinguished<B: Buf>(mut buf: B) -> Result<Self, DecodeError> {
+    fn decode_distinguished<B: Buf>(mut buf: B) -> Result<(Self, Canonicity), DecodeError> {
         Self::decode_distinguished_capped(Capped::new(&mut buf))
     }
 
-    fn decode_distinguished_length_delimited<B: Buf>(mut buf: B) -> Result<Self, DecodeError> {
+    fn decode_distinguished_length_delimited<B: Buf>(
+        mut buf: B,
+    ) -> Result<(Self, Canonicity), DecodeError> {
         Self::decode_distinguished_capped(Capped::new_length_delimited(&mut buf)?)
     }
 
     #[doc(hidden)]
-    fn decode_distinguished_capped<B: Buf + ?Sized>(buf: Capped<B>) -> Result<Self, DecodeError> {
+    fn decode_distinguished_capped<B: Buf + ?Sized>(
+        buf: Capped<B>,
+    ) -> Result<(Self, Canonicity), DecodeError> {
         let mut message = Self::empty();
-        merge_distinguished(&mut message, buf, DecodeContext::default())?;
-        Ok(message)
+        let canon = merge_distinguished(&mut message, buf, DecodeContext::default())?;
+        Ok((message, canon))
     }
 
-    fn replace_distinguished_from<B: Buf>(&mut self, mut buf: B) -> Result<(), DecodeError> {
+    fn replace_distinguished_from<B: Buf>(
+        &mut self,
+        mut buf: B,
+    ) -> Result<Canonicity, DecodeError> {
         self.replace_distinguished_from_capped(Capped::new(&mut buf))
     }
 
     fn replace_distinguished_from_length_delimited<B: Buf>(
         &mut self,
         mut buf: B,
-    ) -> Result<(), DecodeError> {
+    ) -> Result<Canonicity, DecodeError> {
         self.replace_distinguished_from_capped(Capped::new_length_delimited(&mut buf)?)
     }
 
@@ -289,7 +301,7 @@ where
     fn replace_distinguished_from_capped<B: Buf + ?Sized>(
         &mut self,
         buf: Capped<B>,
-    ) -> Result<(), DecodeError> {
+    ) -> Result<Canonicity, DecodeError> {
         self.clear();
         merge_distinguished(self, buf, DecodeContext::default()).map_err(|err| {
             self.clear();
@@ -361,35 +373,41 @@ where
 }
 
 pub trait DistinguishedMessageDyn {
-    fn replace_distinguished_from_dyn(&mut self, buf: &mut dyn Buf) -> Result<(), DecodeError>;
-    fn replace_distinguished_from_slice(&mut self, buf: &[u8]) -> Result<(), DecodeError>;
+    fn replace_distinguished_from_dyn(
+        &mut self,
+        buf: &mut dyn Buf,
+    ) -> Result<Canonicity, DecodeError>;
+    fn replace_distinguished_from_slice(&mut self, buf: &[u8]) -> Result<Canonicity, DecodeError>;
     fn replace_distinguished_from_length_delimited_dyn(
         &mut self,
         buf: &mut dyn Buf,
-    ) -> Result<(), DecodeError>;
+    ) -> Result<Canonicity, DecodeError>;
     #[doc(hidden)]
     fn replace_distinguished_from_capped_dyn(
         &mut self,
         buf: Capped<dyn Buf>,
-    ) -> Result<(), DecodeError>;
+    ) -> Result<Canonicity, DecodeError>;
 }
 
 impl<T> DistinguishedMessageDyn for T
 where
     T: RawDistinguishedMessage + Message + Eq,
 {
-    fn replace_distinguished_from_dyn(&mut self, buf: &mut dyn Buf) -> Result<(), DecodeError> {
+    fn replace_distinguished_from_dyn(
+        &mut self,
+        buf: &mut dyn Buf,
+    ) -> Result<Canonicity, DecodeError> {
         self.replace_distinguished_from(buf)
     }
 
-    fn replace_distinguished_from_slice(&mut self, buf: &[u8]) -> Result<(), DecodeError> {
+    fn replace_distinguished_from_slice(&mut self, buf: &[u8]) -> Result<Canonicity, DecodeError> {
         self.replace_distinguished_from(buf)
     }
 
     fn replace_distinguished_from_length_delimited_dyn(
         &mut self,
         buf: &mut dyn Buf,
-    ) -> Result<(), DecodeError> {
+    ) -> Result<Canonicity, DecodeError> {
         self.replace_distinguished_from_length_delimited(buf)
     }
 
@@ -397,7 +415,7 @@ where
     fn replace_distinguished_from_capped_dyn(
         &mut self,
         buf: Capped<dyn Buf>,
-    ) -> Result<(), DecodeError> {
+    ) -> Result<Canonicity, DecodeError> {
         self.replace_distinguished_from_capped(buf)
     }
 }
@@ -438,7 +456,7 @@ pub trait RawDistinguishedMessage: RawMessage {
         duplicated: bool,
         buf: Capped<B>,
         ctx: DecodeContext,
-    ) -> Result<(), DecodeError>
+    ) -> Result<Canonicity, DecodeError>
     where
         Self: Sized;
 }
@@ -500,7 +518,7 @@ where
         duplicated: bool,
         buf: Capped<B>,
         ctx: DecodeContext,
-    ) -> Result<(), DecodeError>
+    ) -> Result<Canonicity, DecodeError>
     where
         Self: Sized,
     {

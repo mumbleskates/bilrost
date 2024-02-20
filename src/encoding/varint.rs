@@ -1,10 +1,10 @@
 use crate::encoding::{
     empty_state_via_default, encode_varint, encoded_len_varint, encoder_where_value_encoder, Buf,
-    BufMut, Capped, DecodeContext, DistinguishedEncoder, DistinguishedValueEncoder, EmptyState,
-    Encoder, TagMeasurer, TagWriter, ValueEncoder, WireType, Wiretyped,
+    BufMut, Canonicity, Capped, DecodeContext, DistinguishedEncoder, DistinguishedValueEncoder,
+    EmptyState, Encoder, TagMeasurer, TagWriter, ValueEncoder, WireType, Wiretyped,
 };
 use crate::DecodeError;
-use crate::DecodeErrorKind::{NotCanonical, OutOfDomainValue};
+use crate::DecodeErrorKind::OutOfDomainValue;
 
 pub struct Varint;
 
@@ -96,13 +96,13 @@ macro_rules! varint {
                 buf: Capped<B>,
                 allow_empty: bool,
                 ctx: DecodeContext,
-            ) -> Result<(), DecodeError> {
+            ) -> Result<Canonicity, DecodeError> {
                 Self::decode_value(value, buf, ctx)?;
-                if !allow_empty && value.is_empty() {
-                    Err(DecodeError::new(NotCanonical))
+                Ok(if !allow_empty && value.is_empty() {
+                    Canonicity::NotCanonical
                 } else {
-                    Ok(())
-                }
+                    Canonicity::Canonical
+                })
             }
         }
 

@@ -106,6 +106,12 @@ impl DecodeError {
     }
 }
 
+impl From<DecodeErrorKind> for DecodeError {
+    fn from(kind: DecodeErrorKind) -> Self {
+        Self::new(kind)
+    }
+}
+
 impl fmt::Debug for DecodeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut s = f.debug_struct("DecodeError");

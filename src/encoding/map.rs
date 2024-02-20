@@ -1,13 +1,13 @@
 use bytes::{Buf, BufMut};
+use std::cmp::min;
 
 use crate::encoding::value_traits::{DistinguishedMapping, Mapping};
 use crate::encoding::{
-    encode_varint, encoded_len_varint, encoder_where_value_encoder, Capped, DecodeContext,
-    DistinguishedEncoder, DistinguishedValueEncoder, Encoder, NewForOverwrite, TagMeasurer,
-    TagWriter, ValueEncoder, WireType, Wiretyped,
+    encode_varint, encoded_len_varint, encoder_where_value_encoder, Canonicity, Capped,
+    DecodeContext, DecodeError, DistinguishedEncoder, DistinguishedValueEncoder, Encoder,
+    NewForOverwrite, TagMeasurer, TagWriter, ValueEncoder, WireType, Wiretyped,
 };
-use crate::DecodeError;
-use crate::DecodeErrorKind::{NotCanonical, Truncated};
+use crate::DecodeErrorKind::Truncated;
 
 pub struct Map<KE, VE>(KE, VE);
 
@@ -74,17 +74,19 @@ where
         }) {
             return Err(DecodeError::new(Truncated));
         }
-        for item in capped.consume(|buf| {
-            let mut new_key = K::new_for_overwrite();
-            let mut new_val = V::new_for_overwrite();
-            KE::decode_value(&mut new_key, buf.lend(), ctx.clone())?;
-            VE::decode_value(&mut new_val, buf.lend(), ctx.clone())?;
-            Ok((new_key, new_val))
-        }) {
-            let (key, val) = item?;
-            value.insert(key, val).map_err(DecodeError::new)?;
-        }
-        Ok(())
+        capped
+            .consume(|buf| {
+                let mut new_key = K::new_for_overwrite();
+                let mut new_val = V::new_for_overwrite();
+                KE::decode_value(&mut new_key, buf.lend(), ctx.clone())?;
+                VE::decode_value(&mut new_val, buf.lend(), ctx.clone())?;
+                Ok((new_key, new_val))
+            })
+            .map(|item| {
+                let (key, val) = item?;
+                Ok(value.insert(key, val)?)
+            })
+            .collect()
     }
 }
 
@@ -101,29 +103,40 @@ where
         mut buf: Capped<B>,
         allow_empty: bool,
         ctx: DecodeContext,
-    ) -> Result<(), DecodeError> {
+    ) -> Result<Canonicity, DecodeError> {
         let capped = buf.take_length_delimited()?;
         if !allow_empty && !capped.has_remaining() {
-            return Err(DecodeError::new(NotCanonical));
+            return Ok(Canonicity::NotCanonical);
         }
         if combined_fixed_size(KE::WIRE_TYPE, VE::WIRE_TYPE).map_or(false, |fixed_size| {
             capped.remaining_before_cap() % fixed_size != 0
         }) {
             return Err(DecodeError::new(Truncated));
         }
-        for item in capped.consume(|buf| {
-            let mut new_key = K::new_for_overwrite();
-            let mut new_val = V::new_for_overwrite();
-            KE::decode_value_distinguished(&mut new_key, buf.lend(), true, ctx.clone())?;
-            VE::decode_value_distinguished(&mut new_val, buf.lend(), true, ctx.clone())?;
-            Ok((new_key, new_val))
-        }) {
-            let (key, val) = item?;
-            value
-                .insert_distinguished(key, val)
-                .map_err(DecodeError::new)?;
-        }
-        Ok(())
+        capped
+            .consume(|buf| {
+                let mut new_key = K::new_for_overwrite();
+                let mut new_val = V::new_for_overwrite();
+                let mut item_canon = Canonicity::Canonical;
+                item_canon.update(KE::decode_value_distinguished(
+                    &mut new_key,
+                    buf.lend(),
+                    true,
+                    ctx.clone(),
+                )?);
+                item_canon.update(VE::decode_value_distinguished(
+                    &mut new_val,
+                    buf.lend(),
+                    true,
+                    ctx.clone(),
+                )?);
+                Ok((new_key, new_val, item_canon))
+            })
+            .map(|item| {
+                let (key, val, item_canon) = item?;
+                Ok(min(value.insert_distinguished(key, val)?, item_canon))
+            })
+            .collect()
     }
 }
 

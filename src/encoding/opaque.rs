@@ -9,7 +9,7 @@ use crate::encoding::{
     WireType,
 };
 use crate::DecodeErrorKind::Truncated;
-use crate::{DecodeError, Message, RawDistinguishedMessage, RawMessage};
+use crate::{Canonicity, DecodeError, Message, RawDistinguishedMessage, RawMessage};
 
 /// Represents an opaque bilrost field value. Can represent any valid encoded value.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -320,10 +320,11 @@ impl RawDistinguishedMessage for OpaqueMessage {
         duplicated: bool,
         buf: Capped<B>,
         ctx: DecodeContext,
-    ) -> Result<(), DecodeError>
+    ) -> Result<Canonicity, DecodeError>
     where
         Self: Sized,
     {
-        self.raw_decode_field(tag, wire_type, duplicated, buf, ctx)
+        self.raw_decode_field(tag, wire_type, duplicated, buf, ctx)?;
+        Ok(Canonicity::Canonical)
     }
 }

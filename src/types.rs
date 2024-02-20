@@ -7,10 +7,9 @@ use core::ops::{Deref, DerefMut};
 
 use bytes::{Buf, BufMut};
 
-use crate::encoding::{skip_field, Capped, DecodeContext, EmptyState, WireType};
+use crate::encoding::{skip_field, Capped, DecodeContext, EmptyState, WireType, Canonicity};
 use crate::message::{RawDistinguishedMessage, RawMessage};
 use crate::DecodeError;
-use crate::DecodeErrorKind::UnknownField;
 
 /// Newtype wrapper to act as a simple "bytes data" type in Bilrost. It transparently wraps a
 /// `Vec<u8>` and is fully supported by the `General` encoder.
@@ -192,14 +191,15 @@ impl RawDistinguishedMessage for () {
     fn raw_decode_field_distinguished<B: Buf + ?Sized>(
         &mut self,
         _tag: u32,
-        _wire_type: WireType,
+        wire_type: WireType,
         _duplicated: bool,
-        _buf: Capped<B>,
+        buf: Capped<B>,
         _ctx: DecodeContext,
-    ) -> Result<(), DecodeError>
+    ) -> Result<Canonicity, DecodeError>
     where
         Self: Sized,
     {
-        Err(DecodeError::new(UnknownField))
+        skip_field(wire_type, buf)?;
+        Ok(Canonicity::HasExtensions)
     }
 }

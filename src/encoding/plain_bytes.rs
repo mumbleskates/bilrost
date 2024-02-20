@@ -5,12 +5,11 @@ use core::ops::Deref;
 use bytes::{Buf, BufMut};
 
 use crate::encoding::{
-    delegate_encoding, encode_varint, encoded_len_varint, encoder_where_value_encoder, Capped,
-    DecodeContext, DistinguishedEncoder, DistinguishedValueEncoder, EmptyState, Encoder,
-    TagMeasurer, TagWriter, ValueEncoder, WireType, Wiretyped,
+    delegate_encoding, encode_varint, encoded_len_varint, encoder_where_value_encoder, Canonicity,
+    Capped, DecodeContext, DecodeError, DistinguishedEncoder, DistinguishedValueEncoder,
+    EmptyState, Encoder, TagMeasurer, TagWriter, ValueEncoder, WireType, Wiretyped,
 };
-use crate::DecodeError;
-use crate::DecodeErrorKind::{InvalidValue, NotCanonical};
+use crate::DecodeErrorKind::InvalidValue;
 
 /// `PlainBytes` implements encoding for blob values directly into `Vec<u8>`, and provides the base
 /// implementation for that functionality. `Vec<u8>` cannot generically dispatch to `General`'s
@@ -54,13 +53,13 @@ impl DistinguishedValueEncoder<Vec<u8>> for PlainBytes {
         buf: Capped<B>,
         allow_empty: bool,
         ctx: DecodeContext,
-    ) -> Result<(), DecodeError> {
+    ) -> Result<Canonicity, DecodeError> {
         Self::decode_value(value, buf, ctx)?;
-        if !allow_empty && value.is_empty() {
-            Err(DecodeError::new(NotCanonical))
+        Ok(if !allow_empty && value.is_empty() {
+            Canonicity::NotCanonical
         } else {
-            Ok(())
-        }
+            Canonicity::Canonical
+        })
     }
 }
 
@@ -115,7 +114,7 @@ impl DistinguishedValueEncoder<Cow<'_, [u8]>> for PlainBytes {
         buf: Capped<B>,
         allow_empty: bool,
         ctx: DecodeContext,
-    ) -> Result<(), DecodeError> {
+    ) -> Result<Canonicity, DecodeError> {
         Self::decode_value_distinguished(value.to_mut(), buf, allow_empty, ctx)
     }
 }
@@ -187,13 +186,13 @@ impl<const N: usize> DistinguishedValueEncoder<[u8; N]> for PlainBytes {
         buf: Capped<B>,
         allow_empty: bool,
         ctx: DecodeContext,
-    ) -> Result<(), DecodeError> {
+    ) -> Result<Canonicity, DecodeError> {
         Self::decode_value(value, buf, ctx)?;
-        if !allow_empty && value.is_empty() {
-            Err(DecodeError::new(NotCanonical))
+        Ok(if !allow_empty && value.is_empty() {
+            Canonicity::NotCanonical
         } else {
-            Ok(())
-        }
+            Canonicity::Canonical
+        })
     }
 }
 

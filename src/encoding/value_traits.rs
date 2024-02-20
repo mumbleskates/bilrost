@@ -7,8 +7,8 @@ use core::hash::Hash;
 #[cfg(feature = "std")]
 use std::collections::{hash_map, hash_set, HashMap, HashSet};
 
-use crate::DecodeErrorKind;
-use crate::DecodeErrorKind::{NotCanonical, UnexpectedlyRepeated};
+use crate::DecodeErrorKind::UnexpectedlyRepeated;
+use crate::{Canonicity, DecodeErrorKind};
 
 /// Trait for cheaply producing a new value that will always be overwritten or decoded into, rather
 /// than a value that is definitely empty. This is implemented for types that can be present
@@ -81,7 +81,7 @@ pub trait DistinguishedCollection: Collection + Eq {
         Self: 'a;
 
     fn reversed(&self) -> Self::ReverseIter<'_>;
-    fn insert_distinguished(&mut self, item: Self::Item) -> Result<(), DecodeErrorKind>;
+    fn insert_distinguished(&mut self, item: Self::Item) -> Result<Canonicity, DecodeErrorKind>;
 }
 
 /// Trait for associative containers, such as `BTreeMap` and `HashMap`.
@@ -117,7 +117,7 @@ pub trait DistinguishedMapping: Mapping {
         &mut self,
         key: Self::Key,
         value: Self::Value,
-    ) -> Result<(), DecodeErrorKind>;
+    ) -> Result<Canonicity, DecodeErrorKind>;
 }
 
 impl<T> EmptyState for Vec<T> {
@@ -176,9 +176,9 @@ where
     }
 
     #[inline]
-    fn insert_distinguished(&mut self, item: Self::Item) -> Result<(), DecodeErrorKind> {
+    fn insert_distinguished(&mut self, item: Self::Item) -> Result<Canonicity, DecodeErrorKind> {
         Vec::push(self, item);
-        Ok(())
+        Ok(Canonicity::Canonical)
     }
 }
 
@@ -247,9 +247,9 @@ where
     }
 
     #[inline]
-    fn insert_distinguished(&mut self, item: Self::Item) -> Result<(), DecodeErrorKind> {
+    fn insert_distinguished(&mut self, item: Self::Item) -> Result<Canonicity, DecodeErrorKind> {
         self.to_mut().push(item);
-        Ok(())
+        Ok(Canonicity::Canonical)
     }
 }
 
@@ -312,9 +312,9 @@ where
     }
 
     #[inline]
-    fn insert_distinguished(&mut self, item: Self::Item) -> Result<(), DecodeErrorKind> {
+    fn insert_distinguished(&mut self, item: Self::Item) -> Result<Canonicity, DecodeErrorKind> {
         smallvec::SmallVec::push(self, item);
-        Ok(())
+        Ok(Canonicity::Canonical)
     }
 }
 
@@ -377,9 +377,9 @@ where
     }
 
     #[inline]
-    fn insert_distinguished(&mut self, item: Self::Item) -> Result<(), DecodeErrorKind> {
+    fn insert_distinguished(&mut self, item: Self::Item) -> Result<Canonicity, DecodeErrorKind> {
         thin_vec::ThinVec::push(self, item);
-        Ok(())
+        Ok(Canonicity::Canonical)
     }
 }
 
@@ -442,9 +442,9 @@ where
     }
 
     #[inline]
-    fn insert_distinguished(&mut self, item: Self::Item) -> Result<(), DecodeErrorKind> {
+    fn insert_distinguished(&mut self, item: Self::Item) -> Result<Canonicity, DecodeErrorKind> {
         tinyvec::TinyVec::push(self, item);
-        Ok(())
+        Ok(Canonicity::Canonical)
     }
 }
 
@@ -509,14 +509,20 @@ where
     }
 
     #[inline]
-    fn insert_distinguished(&mut self, item: Self::Item) -> Result<(), DecodeErrorKind> {
+    fn insert_distinguished(&mut self, item: Self::Item) -> Result<Canonicity, DecodeErrorKind> {
         // MSRV: can't use .last()
         match Some(&item).cmp(&self.iter().next_back()) {
-            Less => Err(NotCanonical),
+            Less => {
+                if self.insert(item) {
+                    Ok(Canonicity::NotCanonical)
+                } else {
+                    Err(UnexpectedlyRepeated)
+                }
+            }
             Equal => Err(UnexpectedlyRepeated),
             Greater => {
                 self.insert(item);
-                Ok(())
+                Ok(Canonicity::Canonical)
             }
         }
     }
@@ -689,13 +695,19 @@ where
         &mut self,
         key: Self::Key,
         value: Self::Value,
-    ) -> Result<(), DecodeErrorKind> {
+    ) -> Result<Canonicity, DecodeErrorKind> {
         match Some(&key).cmp(&self.keys().next_back()) {
-            Less => Err(NotCanonical),
+            Less => {
+                if self.insert(key, value).is_none() {
+                    Ok(Canonicity::NotCanonical)
+                } else {
+                    Err(UnexpectedlyRepeated)
+                }
+            }
             Equal => Err(UnexpectedlyRepeated),
             Greater => {
                 self.insert(key, value);
-                Ok(())
+                Ok(Canonicity::Canonical)
             }
         }
     }
