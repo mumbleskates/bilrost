@@ -82,11 +82,10 @@ where
                 VE::decode_value(&mut new_val, buf.lend(), ctx.clone())?;
                 Ok((new_key, new_val))
             })
-            .map(|item| {
+            .try_for_each(|item| {
                 let (key, val) = item?;
                 Ok(value.insert(key, val)?)
             })
-            .collect()
     }
 }
 

@@ -53,8 +53,7 @@ where
                 E::decode_value(&mut new_val, buf.lend(), ctx.clone())?;
                 Ok(new_val)
             })
-            .map(|val| Ok(value.insert(val?)?))
-            .collect()
+            .try_for_each(|val| Ok(value.insert(val?)?))
     }
 }
 
