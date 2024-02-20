@@ -1014,7 +1014,7 @@ pub trait DistinguishedOneof: Oneof {
         duplicated: bool,
         buf: Capped<B>,
         ctx: DecodeContext,
-    ) -> Result<(), DecodeError>;
+    ) -> Result<Canonicity, DecodeError>;
 }
 
 /// Underlying trait for a oneof that has no inherent "empty" variant, opting instead to be wrapped
@@ -1028,7 +1028,7 @@ pub trait NonEmptyDistinguishedOneof: Sized {
         duplicated: bool,
         buf: Capped<B>,
         ctx: DecodeContext,
-    ) -> Result<(), DecodeError>;
+    ) -> Result<Canonicity, DecodeError>;
 }
 
 impl<T> DistinguishedOneof for Option<T>
@@ -1043,7 +1043,7 @@ where
         duplicated: bool,
         buf: Capped<B>,
         ctx: DecodeContext,
-    ) -> Result<(), DecodeError> {
+    ) -> Result<Canonicity, DecodeError> {
         T::oneof_decode_field_distinguished(self, tag, wire_type, duplicated, buf, ctx)
     }
 }
