@@ -1117,7 +1117,8 @@ but it might be a significant API break.)
 `bilrost` also provides object safe traits, `MessageDyn` and
 `DistinguishedMessageDyn`, which can be used to do most operations to messages
 via trait objects. At time of writing, `prost 0.12.3` has very little
-functionality exposed in an object-safe way.
+functionality exposed in an object-safe way; the only object-safe methods
+compute the encoded length of the message and clear its fields.
 
 TODO: look over more unsolved complaints in the prost issues
 
