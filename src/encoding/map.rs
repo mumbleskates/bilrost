@@ -116,24 +116,14 @@ where
             .consume(|buf| {
                 let mut new_key = K::new_for_overwrite();
                 let mut new_val = V::new_for_overwrite();
-                let mut item_canon = Canonicity::Canonical;
-                item_canon.update(KE::decode_value_distinguished(
-                    &mut new_key,
-                    buf.lend(),
-                    true,
-                    ctx.clone(),
-                )?);
-                item_canon.update(VE::decode_value_distinguished(
-                    &mut new_val,
-                    buf.lend(),
-                    true,
-                    ctx.clone(),
-                )?);
-                Ok((new_key, new_val, item_canon))
-            })
-            .map(|item| {
-                let (key, val, item_canon) = item?;
-                Ok(min(value.insert_distinguished(key, val)?, item_canon))
+                let item_canon = min(
+                    KE::decode_value_distinguished(&mut new_key, buf.lend(), true, ctx.clone())?,
+                    VE::decode_value_distinguished(&mut new_val, buf.lend(), true, ctx.clone())?,
+                );
+                Ok(min(
+                    item_canon,
+                    value.insert_distinguished(new_key, new_val)?,
+                ))
             })
             .collect()
     }

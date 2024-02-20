@@ -81,13 +81,10 @@ where
             .consume(|buf| {
                 let mut new_val = T::new_for_overwrite();
                 // Pass allow_empty=true: nested values may be empty
-                let item_canon =
-                    E::decode_value_distinguished(&mut new_val, buf.lend(), true, ctx.clone())?;
-                Ok((new_val, item_canon))
-            })
-            .map(|val| {
-                let (to_insert, item_canon) = val?;
-                Ok(min(value.insert_distinguished(to_insert)?, item_canon))
+                Ok(min(
+                    E::decode_value_distinguished(&mut new_val, buf.lend(), true, ctx.clone())?,
+                    value.insert_distinguished(new_val)?,
+                ))
             })
             .collect()
     }
