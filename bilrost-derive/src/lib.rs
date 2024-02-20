@@ -664,6 +664,7 @@ fn try_distinguished_message(input: TokenStream) -> Result<TokenStream, Error> {
                     #(#decode)*
                     _ => {
                         canon.update(::bilrost::Canonicity::HasExtensions);
+                        ::bilrost::encoding::skip_field(wire_type, buf)?;
                     }
                 }
                 Ok(canon)
