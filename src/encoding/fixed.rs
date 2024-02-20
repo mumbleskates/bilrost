@@ -120,6 +120,11 @@ macro_rules! fixed_width_float {
                 // Preserve -0.0. This is actually the original motivation for `EmptyState`.
                 self.to_bits() == 0
             }
+
+            #[inline]
+            fn clear(&mut self) {
+                *self = Self::empty();
+            }
         }
 
         #[cfg(test)]

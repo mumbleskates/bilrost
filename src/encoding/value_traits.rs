@@ -33,18 +33,16 @@ where
 ///
 /// This type must be implemented for every type encodable as a directly included field in a bilrost
 /// message.
-pub trait EmptyState: Sized {
+pub trait EmptyState {
     /// Produces the empty state for this type.
-    fn empty() -> Self;
+    fn empty() -> Self
+    where
+        Self: Sized;
 
     /// Returns true iff this instance is in the empty state.
     fn is_empty(&self) -> bool;
 
-    /// Sets this instance to the empty state.
-    // TODO(widders): test this for every type
-    fn clear(&mut self) {
-        *self = Self::empty();
-    }
+    fn clear(&mut self);
 }
 
 impl<T> EmptyState for Option<T> {
@@ -56,6 +54,11 @@ impl<T> EmptyState for Option<T> {
     #[inline]
     fn is_empty(&self) -> bool {
         Self::is_none(self)
+    }
+
+    #[inline]
+    fn clear(&mut self) {
+        *self = Self::empty();
     }
 }
 

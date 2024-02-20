@@ -146,6 +146,11 @@ impl<const N: usize> EmptyState for [u8; N] {
     fn is_empty(&self) -> bool {
         self.iter().all(|&byte| byte == 0)
     }
+
+    #[inline]
+    fn clear(&mut self) {
+        *self = Self::empty();
+    }
 }
 
 impl<const N: usize> ValueEncoder<[u8; N]> for PlainBytes {

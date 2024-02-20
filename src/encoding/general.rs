@@ -267,6 +267,11 @@ impl EmptyState for bytestring::ByteString {
     fn is_empty(&self) -> bool {
         str::is_empty(self)
     }
+
+    #[inline]
+    fn clear(&mut self) {
+        *self = Self::empty();
+    }
 }
 
 #[cfg(feature = "bytestring")]
@@ -334,6 +339,11 @@ impl EmptyState for Bytes {
     #[inline]
     fn is_empty(&self) -> bool {
         Self::is_empty(self)
+    }
+
+    #[inline]
+    fn clear(&mut self) {
+        *self = Self::empty();
     }
 }
 

@@ -1423,6 +1423,11 @@ macro_rules! empty_state_via_default {
             fn is_empty(&self) -> bool {
                 *self == Self::default()
             }
+
+    #[inline]
+    fn clear(&mut self) {
+        *self = Self::empty();
+    }
         }
     };
 }

@@ -161,6 +161,8 @@ impl EmptyState for () {
     fn is_empty(&self) -> bool {
         true
     }
+
+    fn clear(&mut self) {}
 }
 
 impl RawMessage for () {

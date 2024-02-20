@@ -766,12 +766,19 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
         quote! {
             impl #impl_generics ::bilrost::encoding::EmptyState
             for #ident #ty_generics #where_clause {
+                #[inline]
                 fn empty() -> Self {
                     Self::#zero
                 }
 
+                #[inline]
                 fn is_empty(&self) -> bool {
                     matches!(self, Self::#zero)
+                }
+
+                #[inline]
+                fn clear(&mut self) {
+                    *self = Self::empty();
                 }
             }
         }
@@ -1143,6 +1150,11 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
                     #[inline]
                     fn is_empty(&self) -> bool {
                         matches!(self, #ident::#empty_ident)
+                    }
+
+                    #[inline]
+                    fn clear(&mut self) {
+                        *self = Self::empty();
                     }
                 }
             };

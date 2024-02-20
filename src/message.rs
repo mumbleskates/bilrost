@@ -49,7 +49,7 @@ pub(crate) fn merge_distinguished<T: RawDistinguishedMessage, B: Buf + ?Sized>(
 
 /// A Bilrost message. Provides basic encoding and decoding functionality for message types. For
 /// an object-safe proxy trait, see `MessageDyn`.
-pub trait Message {
+pub trait Message: EmptyState {
     /// Returns the encoded length of the message without a length delimiter.
     fn encoded_len(&self) -> usize;
 
@@ -312,10 +312,11 @@ where
 
 /// Object-safe interface implemented for all `Message` types. Accepts `dyn Buf` and `dyn BufMut`
 /// for encoding and decoding, and `replace`-* methods for decoding in-place.
-pub trait MessageDyn {
+pub trait MessageDyn: EmptyState {
     fn encoded_len_dyn(&self) -> usize;
     fn encode_dyn(&self, buf: &mut dyn BufMut) -> Result<(), EncodeError>;
     fn encode_to_vec_dyn(&self) -> Vec<u8>;
+    fn encode_to_bytes_dyn(&self) -> Bytes;
     fn encode_length_delimited_dyn(&self, buf: &mut dyn BufMut) -> Result<(), EncodeError>;
     fn encode_length_delimited_to_vec_dyn(&self) -> Vec<u8>;
     fn encode_length_delimited_to_bytes_dyn(&self) -> Bytes;
@@ -340,6 +341,10 @@ where
 
     fn encode_to_vec_dyn(&self) -> Vec<u8> {
         Message::encode_to_vec(self)
+    }
+
+    fn encode_to_bytes_dyn(&self) -> Bytes {
+        Message::encode_to_bytes(self)
     }
 
     fn encode_length_delimited_dyn(&self, buf: &mut dyn BufMut) -> Result<(), EncodeError> {
@@ -372,7 +377,7 @@ where
     }
 }
 
-pub trait DistinguishedMessageDyn {
+pub trait DistinguishedMessageDyn: MessageDyn {
     fn replace_distinguished_from_dyn(
         &mut self,
         buf: &mut dyn Buf,
@@ -529,6 +534,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::{DistinguishedMessageDyn, Message, MessageDyn, Vec};
+    use crate::{DistinguishedMessage, RequireCanonicity};
 
     const _MESSAGE_DYN_IS_OBJECT_SAFE: Option<&dyn MessageDyn> = None;
     const _DISTINGUISHED_MESSAGE_DYN_IS_OBJECT_SAFE: Option<&dyn DistinguishedMessageDyn> = None;
@@ -544,12 +550,35 @@ mod tests {
         msg.encoded_len();
         msg = M::decode_length_delimited(&mut [0u8].as_slice()).unwrap();
         msg.encode(&mut vec).unwrap();
+        msg.clear();
+    }
+
+    fn use_dyn_distinguished_messages<M: DistinguishedMessage>(
+        safe: &mut dyn DistinguishedMessageDyn,
+        mut msg: M,
+    ) {
+        let mut vec = Vec::<u8>::new();
+
+        safe.encoded_len_dyn();
+        safe.encode_dyn(&mut vec).unwrap();
+        safe.replace_from_length_delimited_dyn(&mut [0u8].as_slice())
+            .unwrap();
+        safe.replace_distinguished_from_length_delimited_dyn(&mut [0u8].as_slice())
+            .require_canonical()
+            .unwrap();
+        safe.clear();
+
+        msg.encoded_len();
+        msg = M::decode_length_delimited(&mut [0u8].as_slice()).unwrap();
+        msg.encode(&mut vec).unwrap();
+        msg.clear();
     }
 
     #[test]
     fn using_dyn_messages() {
         let mut vec = Vec::<u8>::new();
         use_dyn_messages(&mut (), ());
+        use_dyn_distinguished_messages(&mut (), ());
         assert_eq!(().encoded_len(), 0);
         assert_eq!(().encoded_len_dyn(), 0);
         ().encode(&mut vec).unwrap();
