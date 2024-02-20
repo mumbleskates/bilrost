@@ -22,7 +22,7 @@ pub mod encoding;
 
 pub use crate::encoding::{Canonicity, RequireCanonicity, WithCanonicity};
 pub use crate::error::{DecodeError, DecodeErrorKind, EncodeError};
-pub use crate::message::{DistinguishedMessage, DistinguishedMessageDyn, Message, MessageDyn};
+pub use crate::message::{DistinguishedMessage, Message};
 #[doc(hidden)]
 pub use crate::message::{RawDistinguishedMessage, RawMessage};
 

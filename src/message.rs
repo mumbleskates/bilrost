@@ -47,33 +47,26 @@ pub(crate) fn merge_distinguished<T: RawDistinguishedMessage, B: Buf + ?Sized>(
     .collect()
 }
 
-/// A Bilrost message. Provides basic encoding and decoding functionality for message types. For
-/// an object-safe proxy trait, see `MessageDyn`.
+/// An enhanced trait for Bilrost messages that promise a distinguished representation.
+/// Implementation of this trait comes with the following promises:
+///
+///  1. The message will always encode to the same bytes as any other message with an equal value
+///  2. A message equal to that value will only ever decode without error and with
+///    `Canonicity::Canonical` from that exact sequence of bytes, not from any other.
 pub trait Message: EmptyState {
-    /// Returns the encoded length of the message without a length delimiter.
-    fn encoded_len(&self) -> usize;
-
     /// Encodes the message to a buffer.
     ///
     /// An error will be returned if the buffer does not have sufficient capacity.
-    fn encode<B: BufMut + ?Sized>(&self, buf: &mut B) -> Result<(), EncodeError>;
-
-    /// Encodes the message to a newly allocated buffer.
-    fn encode_to_vec(&self) -> Vec<u8>;
-
-    /// Encodes the message to a `Bytes` buffer.
-    fn encode_to_bytes(&self) -> Bytes;
+    fn encode<B: BufMut + ?Sized>(&self, buf: &mut B) -> Result<(), EncodeError>
+    where
+        Self: Sized;
 
     /// Encodes the message with a length-delimiter to a buffer.
     ///
     /// An error will be returned if the buffer does not have sufficient capacity.
-    fn encode_length_delimited<B: BufMut + ?Sized>(&self, buf: &mut B) -> Result<(), EncodeError>;
-
-    /// Encodes the message with a length-delimiter to a newly allocated buffer.
-    fn encode_length_delimited_to_vec(&self) -> Vec<u8>;
-
-    /// Encodes the message with a length-delimiter to a `Bytes` buffer.
-    fn encode_length_delimited_to_bytes(&self) -> Bytes;
+    fn encode_length_delimited<B: BufMut + ?Sized>(&self, buf: &mut B) -> Result<(), EncodeError>
+    where
+        Self: Sized;
 
     /// Decodes an instance of the message from a buffer.
     ///
@@ -94,25 +87,68 @@ pub trait Message: EmptyState {
         Self: Sized;
 
     /// Decodes the non-ignored fields of this message from the buffer, replacing their values.
-    fn replace_from<B: Buf>(&mut self, buf: B) -> Result<(), DecodeError>;
+    fn replace_from<B: Buf>(&mut self, buf: B) -> Result<(), DecodeError>
+    where
+        Self: Sized;
 
     /// Decodes the non-ignored fields of this message, replacing their values from a
     /// length-delimited value encoded in the buffer.
-    fn replace_from_length_delimited<B: Buf>(&mut self, buf: B) -> Result<(), DecodeError>;
+    fn replace_from_length_delimited<B: Buf>(&mut self, buf: B) -> Result<(), DecodeError>
+    where
+        Self: Sized;
 
     /// Decodes the non-ignored fields of this message, replacing their values from the given capped
     /// buffer.
     #[doc(hidden)]
-    fn replace_from_capped<B: Buf + ?Sized>(&mut self, buf: Capped<B>) -> Result<(), DecodeError>;
+    fn replace_from_capped<B: Buf + ?Sized>(&mut self, buf: Capped<B>) -> Result<(), DecodeError>
+    where
+        Self: Sized;
+
+    // ------------ Object-safe methods follow ------------
+
+    /// Returns the encoded length of the message without a length delimiter.
+    fn encoded_len(&self) -> usize;
+
+    /// Encodes the message to a newly allocated buffer.
+    fn encode_to_vec(&self) -> Vec<u8>;
+
+    /// Encodes the message to a `Bytes` buffer.
+    fn encode_to_bytes(&self) -> Bytes;
+
+    /// Encodes the message to a `Bytes` buffer.
+    fn encode_dyn(&self, buf: &mut dyn BufMut) -> Result<(), EncodeError>;
+
+    /// Encodes the message with a length-delimiter to a newly allocated buffer.
+    fn encode_length_delimited_to_vec(&self) -> Vec<u8>;
+
+    /// Encodes the message with a length-delimiter to a `Bytes` buffer.
+    fn encode_length_delimited_to_bytes(&self) -> Bytes;
+
+    /// Encodes the message with a length-delimiter to a `Bytes` buffer.
+    fn encode_length_delimited_dyn(&self, buf: &mut dyn BufMut) -> Result<(), EncodeError>;
+
+    /// Decodes the non-ignored fields of this message from the buffer, replacing their values.
+    fn replace_from_slice(&mut self, buf: &[u8]) -> Result<(), DecodeError>;
+
+    /// Decodes the non-ignored fields of this message, replacing their values from a
+    /// length-delimited value encoded in the buffer.
+    fn replace_from_length_delimited_slice(&mut self, buf: &[u8]) -> Result<(), DecodeError>;
+
+    /// Decodes the non-ignored fields of this message from the buffer, replacing their values.
+    fn replace_from_dyn(&mut self, buf: &mut dyn Buf) -> Result<(), DecodeError>;
+
+    /// Decodes the non-ignored fields of this message, replacing their values from a
+    /// length-delimited value encoded in the buffer.
+    fn replace_from_length_delimited_dyn(&mut self, buf: &mut dyn Buf) -> Result<(), DecodeError>;
+
+    /// Decodes the non-ignored fields of this message, replacing their values from the given capped
+    /// buffer.
+    #[doc(hidden)]
+    fn replace_from_capped_dyn(&mut self, buf: Capped<dyn Buf>) -> Result<(), DecodeError>;
 }
 
-/// An enhanced trait for Bilrost messages that promise a distinguished representation.
-/// Implementation of this trait comes with the following promises:
-///
-///  1. The message will always encode to the same bytes as any other message with an equal value
-///  2. A message equal to that value will only ever decode without error from that exact sequence
-///     of bytes, not from any other.
-pub trait DistinguishedMessage: Message + Eq {
+/// Object-safe trait for distinguished message types.
+pub trait DistinguishedMessage: Message {
     /// Decodes an instance of the message from a buffer in distinguished mode.
     ///
     /// The entire buffer will be consumed.
@@ -138,14 +174,18 @@ pub trait DistinguishedMessage: Message + Eq {
 
     /// Decodes the non-ignored fields of this message from the buffer in distinguished mode,
     /// replacing their values.
-    fn replace_distinguished_from<B: Buf>(&mut self, buf: B) -> Result<Canonicity, DecodeError>;
+    fn replace_distinguished_from<B: Buf>(&mut self, buf: B) -> Result<Canonicity, DecodeError>
+    where
+        Self: Sized;
 
     /// Decodes the non-ignored fields of this message in distinguished mode, replacing their values
     /// from a length-delimited value encoded in the buffer.
     fn replace_distinguished_from_length_delimited<B: Buf>(
         &mut self,
         buf: B,
-    ) -> Result<Canonicity, DecodeError>;
+    ) -> Result<Canonicity, DecodeError>
+    where
+        Self: Sized;
 
     /// Decodes the non-ignored fields of this message in distinguished mode, replacing their values
     /// from the given capped buffer.
@@ -153,6 +193,42 @@ pub trait DistinguishedMessage: Message + Eq {
     fn replace_distinguished_from_capped<B: Buf + ?Sized>(
         &mut self,
         buf: Capped<B>,
+    ) -> Result<Canonicity, DecodeError>
+    where
+        Self: Sized;
+
+    // ------------ Object-safe methods follow ------------
+
+    /// Decodes a length-delimited instance of the message from the buffer in distinguished mode.
+    fn replace_distinguished_from_slice(&mut self, buf: &[u8]) -> Result<Canonicity, DecodeError>;
+
+    /// Decodes the non-ignored fields of this message, replacing their values from a
+    /// length-delimited value encoded in the buffer in distinguished mode.
+    fn replace_distinguished_from_dyn(
+        &mut self,
+        buf: &mut dyn Buf,
+    ) -> Result<Canonicity, DecodeError>;
+
+    /// Decodes the non-ignored fields of this message from the buffer in distinguished mode,
+    /// replacing their values.
+    fn replace_distinguished_from_length_delimited_slice(
+        &mut self,
+        buf: &[u8],
+    ) -> Result<Canonicity, DecodeError>;
+
+    /// Decodes the non-ignored fields of this message, replacing their values from a
+    /// length-delimited value encoded in the buffer in distinguished mode.
+    fn replace_distinguished_from_length_delimited_dyn(
+        &mut self,
+        buf: &mut dyn Buf,
+    ) -> Result<Canonicity, DecodeError>;
+
+    /// Decodes the non-ignored fields of this message, replacing their values from the given capped
+    /// buffer in distinguished mode.
+    #[doc(hidden)]
+    fn replace_distinguished_from_capped_dyn(
+        &mut self,
+        buf: Capped<dyn Buf>,
     ) -> Result<Canonicity, DecodeError>;
 }
 
@@ -170,10 +246,6 @@ impl<T> Message for T
 where
     T: RawMessage,
 {
-    fn encoded_len(&self) -> usize {
-        self.raw_encoded_len()
-    }
-
     fn encode<B: BufMut + ?Sized>(&self, buf: &mut B) -> Result<(), EncodeError> {
         let required = self.encoded_len();
         let remaining = buf.remaining_mut();
@@ -183,18 +255,6 @@ where
 
         self.raw_encode(buf);
         Ok(())
-    }
-
-    fn encode_to_vec(&self) -> Vec<u8> {
-        let mut buf = Vec::with_capacity(self.encoded_len());
-        self.raw_encode(&mut buf);
-        buf
-    }
-
-    fn encode_to_bytes(&self) -> Bytes {
-        let mut buf = BytesMut::with_capacity(self.encoded_len());
-        self.raw_encode(&mut buf);
-        buf.freeze()
     }
 
     fn encode_length_delimited<B: BufMut + ?Sized>(&self, buf: &mut B) -> Result<(), EncodeError> {
@@ -207,24 +267,6 @@ where
         encode_varint(len as u64, buf);
         self.raw_encode(buf);
         Ok(())
-    }
-
-    fn encode_length_delimited_to_vec(&self) -> Vec<u8> {
-        let len = self.encoded_len();
-        let mut buf = Vec::with_capacity(len + encoded_len_varint(len as u64));
-
-        encode_varint(len as u64, &mut buf);
-        self.raw_encode(&mut buf);
-        buf
-    }
-
-    fn encode_length_delimited_to_bytes(&self) -> Bytes {
-        let len = self.encoded_len();
-        let mut buf = BytesMut::with_capacity(len + encoded_len_varint(len as u64));
-
-        encode_varint(len as u64, &mut buf);
-        self.raw_encode(&mut buf);
-        buf.freeze()
     }
 
     fn decode<B: Buf>(mut buf: B) -> Result<Self, DecodeError> {
@@ -257,6 +299,69 @@ where
             self.clear();
             err
         })
+    }
+
+    fn encoded_len(&self) -> usize {
+        self.raw_encoded_len()
+    }
+
+    fn encode_to_vec(&self) -> Vec<u8> {
+        let mut buf = Vec::with_capacity(self.encoded_len());
+        self.raw_encode(&mut buf);
+        buf
+    }
+
+    fn encode_to_bytes(&self) -> Bytes {
+        let mut buf = BytesMut::with_capacity(self.encoded_len());
+        self.raw_encode(&mut buf);
+        buf.freeze()
+    }
+
+    fn encode_dyn(&self, buf: &mut dyn BufMut) -> Result<(), EncodeError> {
+        self.encode(buf)
+    }
+
+    fn encode_length_delimited_to_vec(&self) -> Vec<u8> {
+        let len = self.encoded_len();
+        let mut buf = Vec::with_capacity(len + encoded_len_varint(len as u64));
+
+        encode_varint(len as u64, &mut buf);
+        self.raw_encode(&mut buf);
+        buf
+    }
+
+    fn encode_length_delimited_to_bytes(&self) -> Bytes {
+        let len = self.encoded_len();
+        let mut buf = BytesMut::with_capacity(len + encoded_len_varint(len as u64));
+
+        encode_varint(len as u64, &mut buf);
+        self.raw_encode(&mut buf);
+        buf.freeze()
+    }
+
+    fn encode_length_delimited_dyn(&self, buf: &mut dyn BufMut) -> Result<(), EncodeError> {
+        self.encode_length_delimited(buf)
+    }
+
+    fn replace_from_slice(&mut self, buf: &[u8]) -> Result<(), DecodeError> {
+        self.replace_from(buf)
+    }
+
+    fn replace_from_length_delimited_slice(&mut self, buf: &[u8]) -> Result<(), DecodeError> {
+        self.replace_from_length_delimited(buf)
+    }
+
+    fn replace_from_dyn(&mut self, buf: &mut dyn Buf) -> Result<(), DecodeError> {
+        self.replace_from(buf)
+    }
+
+    fn replace_from_length_delimited_dyn(&mut self, buf: &mut dyn Buf) -> Result<(), DecodeError> {
+        self.replace_from_length_delimited(buf)
+    }
+
+    #[doc(hidden)]
+    fn replace_from_capped_dyn(&mut self, buf: Capped<dyn Buf>) -> Result<(), DecodeError> {
+        self.replace_from_capped(buf)
     }
 }
 
@@ -308,96 +413,11 @@ where
             err
         })
     }
-}
 
-/// Object-safe interface implemented for all `Message` types. Accepts `dyn Buf` and `dyn BufMut`
-/// for encoding and decoding, and `replace`-* methods for decoding in-place.
-pub trait MessageDyn: EmptyState {
-    fn encoded_len_dyn(&self) -> usize;
-    fn encode_dyn(&self, buf: &mut dyn BufMut) -> Result<(), EncodeError>;
-    fn encode_to_vec_dyn(&self) -> Vec<u8>;
-    fn encode_to_bytes_dyn(&self) -> Bytes;
-    fn encode_length_delimited_dyn(&self, buf: &mut dyn BufMut) -> Result<(), EncodeError>;
-    fn encode_length_delimited_to_vec_dyn(&self) -> Vec<u8>;
-    fn encode_length_delimited_to_bytes_dyn(&self) -> Bytes;
-    fn replace_from_dyn(&mut self, buf: &mut dyn Buf) -> Result<(), DecodeError>;
-    fn replace_from_slice(&mut self, buf: &[u8]) -> Result<(), DecodeError>;
-    fn replace_from_length_delimited_dyn(&mut self, buf: &mut dyn Buf) -> Result<(), DecodeError>;
-    #[doc(hidden)]
-    fn replace_from_capped_dyn(&mut self, buf: Capped<dyn Buf>) -> Result<(), DecodeError>;
-}
-
-impl<T> MessageDyn for T
-where
-    T: RawMessage,
-{
-    fn encoded_len_dyn(&self) -> usize {
-        Message::encoded_len(self)
+    fn replace_distinguished_from_slice(&mut self, buf: &[u8]) -> Result<Canonicity, DecodeError> {
+        self.replace_distinguished_from(buf)
     }
 
-    fn encode_dyn(&self, buf: &mut dyn BufMut) -> Result<(), EncodeError> {
-        Message::encode(self, buf)
-    }
-
-    fn encode_to_vec_dyn(&self) -> Vec<u8> {
-        Message::encode_to_vec(self)
-    }
-
-    fn encode_to_bytes_dyn(&self) -> Bytes {
-        Message::encode_to_bytes(self)
-    }
-
-    fn encode_length_delimited_dyn(&self, buf: &mut dyn BufMut) -> Result<(), EncodeError> {
-        Message::encode_length_delimited(self, buf)
-    }
-
-    fn encode_length_delimited_to_vec_dyn(&self) -> Vec<u8> {
-        Message::encode_length_delimited_to_vec(self)
-    }
-
-    fn encode_length_delimited_to_bytes_dyn(&self) -> Bytes {
-        Message::encode_length_delimited_to_bytes(self)
-    }
-
-    fn replace_from_dyn(&mut self, buf: &mut dyn Buf) -> Result<(), DecodeError> {
-        self.replace_from(buf)
-    }
-
-    fn replace_from_slice(&mut self, buf: &[u8]) -> Result<(), DecodeError> {
-        self.replace_from(buf)
-    }
-
-    fn replace_from_length_delimited_dyn(&mut self, buf: &mut dyn Buf) -> Result<(), DecodeError> {
-        self.replace_from_length_delimited(buf)
-    }
-
-    #[doc(hidden)]
-    fn replace_from_capped_dyn(&mut self, buf: Capped<dyn Buf>) -> Result<(), DecodeError> {
-        self.replace_from_capped(buf)
-    }
-}
-
-pub trait DistinguishedMessageDyn: MessageDyn {
-    fn replace_distinguished_from_dyn(
-        &mut self,
-        buf: &mut dyn Buf,
-    ) -> Result<Canonicity, DecodeError>;
-    fn replace_distinguished_from_slice(&mut self, buf: &[u8]) -> Result<Canonicity, DecodeError>;
-    fn replace_distinguished_from_length_delimited_dyn(
-        &mut self,
-        buf: &mut dyn Buf,
-    ) -> Result<Canonicity, DecodeError>;
-    #[doc(hidden)]
-    fn replace_distinguished_from_capped_dyn(
-        &mut self,
-        buf: Capped<dyn Buf>,
-    ) -> Result<Canonicity, DecodeError>;
-}
-
-impl<T> DistinguishedMessageDyn for T
-where
-    T: RawDistinguishedMessage + Message + Eq,
-{
     fn replace_distinguished_from_dyn(
         &mut self,
         buf: &mut dyn Buf,
@@ -405,8 +425,11 @@ where
         self.replace_distinguished_from(buf)
     }
 
-    fn replace_distinguished_from_slice(&mut self, buf: &[u8]) -> Result<Canonicity, DecodeError> {
-        self.replace_distinguished_from(buf)
+    fn replace_distinguished_from_length_delimited_slice(
+        &mut self,
+        buf: &[u8],
+    ) -> Result<Canonicity, DecodeError> {
+        self.replace_distinguished_from_length_delimited(buf)
     }
 
     fn replace_distinguished_from_length_delimited_dyn(
@@ -533,17 +556,18 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{DistinguishedMessageDyn, Message, MessageDyn, Vec};
-    use crate::{DistinguishedMessage, RequireCanonicity};
+    use super::{DistinguishedMessage, Message, Vec};
+    use crate::RequireCanonicity;
 
-    const _MESSAGE_DYN_IS_OBJECT_SAFE: Option<&dyn MessageDyn> = None;
-    const _DISTINGUISHED_MESSAGE_DYN_IS_OBJECT_SAFE: Option<&dyn DistinguishedMessageDyn> = None;
+    const _MESSAGE_DYN_IS_OBJECT_SAFE: Option<&dyn Message> = None;
+    const _DISTINGUISHED_MESSAGE_DYN_IS_OBJECT_SAFE: Option<&dyn DistinguishedMessage> = None;
 
-    fn use_dyn_messages<M: Message>(safe: &mut dyn MessageDyn, mut msg: M) {
+    fn use_dyn_messages<M: Message>(safe: &mut dyn Message, mut msg: M) {
         let mut vec = Vec::<u8>::new();
 
-        safe.encoded_len_dyn();
+        safe.encoded_len();
         safe.encode_dyn(&mut vec).unwrap();
+        assert_eq!(vec, safe.encode_to_vec());
         safe.replace_from_length_delimited_dyn(&mut [0u8].as_slice())
             .unwrap();
 
@@ -554,13 +578,14 @@ mod tests {
     }
 
     fn use_dyn_distinguished_messages<M: DistinguishedMessage>(
-        safe: &mut dyn DistinguishedMessageDyn,
+        safe: &mut dyn DistinguishedMessage,
         mut msg: M,
     ) {
         let mut vec = Vec::<u8>::new();
 
-        safe.encoded_len_dyn();
+        safe.encoded_len();
         safe.encode_dyn(&mut vec).unwrap();
+        assert_eq!(vec, safe.encode_to_vec());
         safe.replace_from_length_delimited_dyn(&mut [0u8].as_slice())
             .unwrap();
         safe.replace_distinguished_from_length_delimited_dyn(&mut [0u8].as_slice())
@@ -580,7 +605,6 @@ mod tests {
         use_dyn_messages(&mut (), ());
         use_dyn_distinguished_messages(&mut (), ());
         assert_eq!(().encoded_len(), 0);
-        assert_eq!(().encoded_len_dyn(), 0);
         ().encode(&mut vec).unwrap();
         ().encode_dyn(&mut vec).unwrap();
         <()>::decode(&mut [].as_slice()).unwrap();

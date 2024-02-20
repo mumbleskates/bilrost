@@ -8,6 +8,9 @@
   that was accepted previously), "HasExtensions" (all known fields are
   canonical, but there are unknown fields), and "NotCanonical" (known fields
   have non-canonically represented values).
+* Fixes and expansions to traits and requirements to allow `Message` and
+  `DistinguishedMessage` to be object-safe with full functionality. `MessageDyn`
+  and `DistinguishedMessageDyn` have been removed.
 
 ### New features
 
@@ -19,9 +22,6 @@
   unacceptable: `WithCanonicity` and `RequireCanonicity`.
 
 ### Fixes
-
-* Fixes and expansions to traits and requirements to allow `EmptyState::clear`
-  to be available on all messages and dyn message traits.
 
 ### Cleanups
 
