@@ -69,16 +69,30 @@ where
 {
     fn decode_distinguished<B: Buf + ?Sized>(
         wire_type: WireType,
-        _duplicated: bool,
+        duplicated: bool,
         value: &mut C,
         buf: Capped<B>,
         ctx: DecodeContext,
     ) -> Result<Canonicity, DecodeError> {
-        let mut new_val = T::new_for_overwrite();
-        Ok(min(
-            E::decode_field_distinguished(wire_type, &mut new_val, buf, true, ctx)?,
-            value.insert_distinguished(new_val)?,
-        ))
+        if wire_type == WireType::LengthDelimited && E::WIRE_TYPE != WireType::LengthDelimited {
+            // We've encountered a length-delimited field when we aren't expecting one; try decoding
+            // it in packed format instead.
+            if duplicated {
+                return Err(DecodeError::new(UnexpectedlyRepeated));
+            }
+            Ok(min(
+                Packed::<E>::decode_value_distinguished(value, buf, false, ctx)?,
+                Canonicity::NotCanonical,
+            ))
+        } else {
+            // Otherwise, decode one field normally.
+            // TODO(widders): we would take more fields greedily here
+            let mut new_val = T::new_for_overwrite();
+            Ok(min(
+                E::decode_field_distinguished(wire_type, &mut new_val, buf, true, ctx)?,
+                value.insert_distinguished(new_val)?,
+            ))
+        }
     }
 }
 
