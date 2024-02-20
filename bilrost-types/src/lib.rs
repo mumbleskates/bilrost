@@ -1,11 +1,13 @@
 #![doc(html_root_url = "https://docs.rs/bilrost-types/0.1002.0-dev")]
 
-//! Analogs for protobuf well-known types.
+//! Analogs for protobuf well-known types, implemented alongside the
+//! [`bilrost`][bilrost] crate. See that crate's documentation for details about the
+//! library, and the [Protobuf reference][1] for more information about the use cases and semantics
+//! of these types.
 //!
-//! See the [Protobuf reference][1] for more information about the use cases and semantics of these
-//! types.
+//! [bilrost]: https://docs.rs/bilrost
 //!
-//! [1]: https://developers.google.com/protocol-buffers/docs/reference/google.protobuf
+//! [proto]: https://developers.google.com/protocol-buffers/docs/reference/google.protobuf
 
 #![cfg_attr(not(feature = "std"), no_std)]
 

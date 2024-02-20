@@ -2,6 +2,12 @@
 // The `quote!` macro requires deep recursion.
 #![recursion_limit = "4096"]
 
+//! This crate contains the derive macro implementations for the
+//! [`bilrost`][bilrost] crate; see the documentation in that crate for usage and
+//! details.
+//!
+//! [bilrost]: https://docs.rs/bilrost
+
 use std::collections::{BTreeMap, BTreeSet};
 use std::mem::take;
 use std::ops::Deref;
