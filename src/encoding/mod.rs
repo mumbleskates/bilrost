@@ -13,7 +13,7 @@ use crate::DecodeErrorKind::{
     InvalidVarint, NotCanonical, TagOverflowed, Truncated, UnexpectedlyRepeated, UnknownField,
     WrongWireType,
 };
-use crate::{decode_length_delimiter, DecodeError};
+use crate::{decode_length_delimiter, DecodeError, DecodeErrorKind};
 
 mod fixed;
 mod general;
@@ -628,81 +628,78 @@ impl FromIterator<Canonicity> for Canonicity {
 }
 
 pub trait WithCanonicity {
+    /// The type of the value without any canonicity information.
     type Value;
+    // Type the value is turned into when non-canonical states are turned into error states.
     type Result;
 
     /// Get the value if it is fully canonical, otherwise returning an error.
     fn canonical(self) -> Self::Result;
 
-    /// Get the value as long as its known fields are canonical.
+    /// Get the value as long as its known fields are canonical, otherwise returning an error.
     fn canonical_with_extensions(self) -> Self::Result;
 
-    /// Get the value regardless of its canonical value.
+    /// Discards the canonicity.
     fn value(self) -> Self::Value;
 }
 
-impl<T> WithCanonicity for (T, Canonicity) {
-    type Value = T;
-    type Result = Result<T, DecodeError>;
+impl WithCanonicity for Canonicity {
+    type Value = ();
+    type Result = Result<(), DecodeErrorKind>;
 
     fn canonical(self) -> Self::Result {
-        match self.1 {
-            Canonicity::NotCanonical => Ok(self.0),
-            Canonicity::HasExtensions => Err(DecodeError::new(UnknownField)),
-            Canonicity::Canonical => Err(DecodeError::new(NotCanonical)),
+        match self {
+            Canonicity::NotCanonical => Err(NotCanonical),
+            Canonicity::HasExtensions => Err(UnknownField),
+            Canonicity::Canonical => Ok(()),
         }
     }
 
     fn canonical_with_extensions(self) -> Self::Result {
-        match self.1 {
-            Canonicity::NotCanonical | Canonicity::HasExtensions => Ok(self.0),
-            Canonicity::Canonical => Err(DecodeError::new(NotCanonical)),
+        match self {
+            Canonicity::NotCanonical | Canonicity::HasExtensions => Ok(()),
+            Canonicity::Canonical => Err(NotCanonical),
         }
     }
 
-    fn value(self) -> Self::Value {
+    fn value(self) -> Self::Value {}
+}
+
+impl<T> WithCanonicity for (T, Canonicity) {
+    type Value = T;
+    type Result = Result<T, DecodeErrorKind>;
+
+    fn canonical(self) -> Result<T, DecodeErrorKind> {
+        self.1.canonical()?;
+        Ok(self.0)
+    }
+
+    fn canonical_with_extensions(self) -> Result<T, DecodeErrorKind> {
+        self.1.canonical_with_extensions()?;
+        Ok(self.0)
+    }
+
+    fn value(self) -> T {
         self.0
     }
 }
 
 impl<'a, T> WithCanonicity for &'a (T, Canonicity) {
     type Value = &'a T;
-    type Result = Result<&'a T, DecodeError>;
+    type Result = Result<&'a T, DecodeErrorKind>;
 
-    fn canonical(self) -> Self::Result {
-        match self.1 {
-            Canonicity::NotCanonical => Ok(&self.0),
-            Canonicity::HasExtensions => Err(DecodeError::new(UnknownField)),
-            Canonicity::Canonical => Err(DecodeError::new(NotCanonical)),
-        }
+    fn canonical(self) -> Result<&'a T, DecodeErrorKind> {
+        self.1.canonical()?;
+        Ok(&self.0)
     }
 
-    fn canonical_with_extensions(self) -> Self::Result {
-        match self.1 {
-            Canonicity::NotCanonical | Canonicity::HasExtensions => Ok(&self.0),
-            Canonicity::Canonical => Err(DecodeError::new(NotCanonical)),
-        }
+    fn canonical_with_extensions(self) -> Result<&'a T, DecodeErrorKind> {
+        self.1.canonical_with_extensions()?;
+        Ok(&self.0)
     }
 
-    fn value(self) -> Self::Value {
+    fn value(self) -> &'a T {
         &self.0
-    }
-}
-
-impl<T: WithCanonicity<Result = Result<T, DecodeError>>> WithCanonicity for Result<T, DecodeError> {
-    type Value = Result<T::Value, DecodeError>;
-    type Result = Result<T, DecodeError>;
-
-    fn canonical(self) -> Self::Result {
-        self?.canonical()
-    }
-
-    fn canonical_with_extensions(self) -> Self::Result {
-        self?.canonical_with_extensions()
-    }
-
-    fn value(self) -> Self::Value {
-        Ok(self?.value())
     }
 }
 
