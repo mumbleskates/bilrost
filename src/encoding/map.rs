@@ -1,5 +1,5 @@
 use bytes::{Buf, BufMut};
-use std::cmp::min;
+use core::cmp::min;
 
 use crate::encoding::value_traits::{DistinguishedMapping, Mapping};
 use crate::encoding::{
