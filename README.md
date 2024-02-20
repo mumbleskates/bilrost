@@ -188,7 +188,7 @@ is considered to be a canonical encoding for that message value. Each different
 possible byte string decodes in distinguished mode to a message value that is
 distinct from the message values decoded from every other such byte string, or
 will produce an error or non-canonical result when decoded in this mode. If a
-message is successfully and canonically decoded from a byte string in 
+message is successfully and canonically decoded from a byte string in
 distinguished mode, is not modified, and is then re-encoded, it will emit the
 exact same byte string.
 
@@ -199,11 +199,15 @@ The best proxy of this expectation of an [equivalence relation][equiv] in Rust
 is the [`Eq`][eq] trait, which denotes that there is an equivalence relation
 between all values of any type that implements it. Therefore, this trait is
 required of all field and message types in order to implement distinguished
-decoding in `bilrost`. `bilrost` distinguishes between canonical values of the
-type in a way that matches the *default* derived implementation of `Eq` (that
-is, it matches based on the `Eq` trait of each constituent field), but it does
-not derive this trait automatically and does not require that the type's actual
-`Eq` implementation works exactly this way.
+decoding in `bilrost`.
+
+`bilrost` distinguishes between canonical values of the type in a way that
+matches the automatically derived implementation of `Eq` (that is, it matches
+based on the `Eq` trait of each constituent field). It is ***strongly
+recommended,*** but not required, that the equality traits be derived
+automatically. `bilrost` does not directly rely on the implementation of the
+type's equality at all; rather, it acts as a contractual guardrail, setting a
+minimum expectation.
 
 [equiv]: https://en.wikipedia.org/wiki/Equivalence_relation
 
