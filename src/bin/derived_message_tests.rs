@@ -30,7 +30,9 @@ mod derived_message_tests {
         ConflictingFields, InvalidValue, NotCanonical, OutOfDomainValue, TagOverflowed, Truncated,
         UnexpectedlyRepeated, UnknownField, WrongWireType,
     };
-    use bilrost::{DecodeErrorKind, DistinguishedMessage, Enumeration, Message, Oneof};
+    use bilrost::{
+        DecodeErrorKind, DistinguishedMessage, Enumeration, Message, Oneof, WithCanonicity,
+    };
     use bilrost_derive::DistinguishedOneof;
 
     trait IntoOpaqueMessage {
@@ -91,6 +93,7 @@ mod derived_message_tests {
 
     mod assert {
         use super::*;
+        use bilrost::Canonicity::Canonical;
 
         pub(super) fn decodes<M>(from: impl IntoOpaqueMessage, into: M)
         where
@@ -153,10 +156,10 @@ mod derived_message_tests {
         {
             let encoded = from.into_opaque_message().encode_to_vec();
             assert_eq!(M::decode(encoded.as_slice()).as_ref(), Ok(&into));
-            assert_eq!(
-                M::decode_distinguished(encoded.as_slice()).as_ref(),
-                Ok(&into)
-            );
+            let (decoded, canon) =
+                M::decode_distinguished(encoded.as_slice()).expect("distinguished decoding failed");
+            assert_eq!(&decoded, &into);
+            assert_eq!(canon, Canonical);
             let mut to_replace = M::empty();
             to_replace.replace_from(encoded.as_slice()).unwrap();
             assert_eq!(&to_replace, &into, "doesn't match after expedient replace");
@@ -190,17 +193,17 @@ mod derived_message_tests {
             assert_eq!(&to_replace, &into);
             assert_eq!(
                 M::decode_distinguished(encoded.as_slice())
-                    .expect_err("unexpectedly decoded in distinguished mode without error")
-                    .kind(),
-                err
+                    .expect("error decoding in distinguished mode with non-canonical data")
+                    .canonical(),
+                Err(err)
             );
             let mut to_replace = M::empty();
             assert_eq!(
                 to_replace
                     .replace_distinguished_from(encoded.as_slice())
-                    .expect_err("unexpectedly replaced in distinguished mode without error")
-                    .kind(),
-                err
+                    .expect("error replacing in distinguished mode with non-canonical data")
+                    .canonical(),
+                Err(err)
             );
             let round_tripped = into.encode_to_vec();
             assert_ne!(
