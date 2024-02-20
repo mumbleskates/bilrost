@@ -80,10 +80,8 @@ where
             if duplicated {
                 return Err(DecodeError::new(UnexpectedlyRepeated));
             }
-            Ok(min(
-                Packed::<E>::decode_value_distinguished(value, buf, false, ctx)?,
-                Canonicity::NotCanonical,
-            ))
+            Packed::<E>::decode_value_distinguished(value, buf, false, ctx)?;
+            Ok(Canonicity::NotCanonical)
         } else {
             // Otherwise, decode one field normally.
             // TODO(widders): we would take more fields greedily here
