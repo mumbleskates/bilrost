@@ -627,10 +627,10 @@ fn try_distinguished_message(input: TokenStream) -> Result<TokenStream, Error> {
         quote! {
             #(#tags)* => {
                 let mut value = &mut self.#field_ident;
-                #decode.map_err(|mut error| {
+                canon.update(#decode.map_err(|mut error| {
                     error.push(STRUCT_NAME, stringify!(#field_ident));
                     error
-                })
+                })?);
             },
         }
     });
@@ -654,15 +654,19 @@ fn try_distinguished_message(input: TokenStream) -> Result<TokenStream, Error> {
                 duplicated: bool,
                 buf: ::bilrost::encoding::Capped<__B>,
                 ctx: ::bilrost::encoding::DecodeContext,
-            ) -> ::core::result::Result<(), ::bilrost::DecodeError>
+            ) -> ::core::result::Result<::bilrost::Canonicity, ::bilrost::DecodeError>
             where
                 __B: ::bilrost::bytes::Buf + ?Sized,
             {
                 #struct_name
+                let mut canon = ::bilrost::Canonicity::Canonical;
                 match tag {
                     #(#decode)*
-                    _ => Err(::bilrost::DecodeError::new(::bilrost::DecodeErrorKind::UnknownField)),
+                    _ => {
+                        canon.update(::bilrost::Canonicity::HasExtensions);
+                    }
                 }
+                Ok(canon)
             }
         }
     };
@@ -779,9 +783,7 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
     let check_empty = if zero_variant_ident.is_some() {
         quote! {
             if !allow_empty && ::bilrost::encoding::EmptyState::is_empty(value) {
-                return Err(::bilrost::DecodeError::new(
-                    ::bilrost::DecodeErrorKind::NotCanonical
-                ));
+                return Ok(::bilrost::Canonicity::NotCanonical);
             }
         }
     } else {
@@ -864,10 +866,10 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
                 buf: ::bilrost::encoding::Capped<B>,
                 allow_empty: bool,
                 ctx: ::bilrost::encoding::DecodeContext,
-            ) -> Result<(), ::bilrost::DecodeError> {
+            ) -> Result<::bilrost::Canonicity, ::bilrost::DecodeError> {
                 <Self as ::bilrost::encoding::ValueEncoder<#ident>>::decode_value(value, buf, ctx)?;
                 #check_empty
-                Ok(())
+                Ok(::bilrost::Canonicity::Canonical)
             }
         }
     };
@@ -1261,9 +1263,9 @@ fn try_distinguished_oneof(input: TokenStream) -> Result<TokenStream, Error> {
                         let mut new_value =
                             ::bilrost::encoding::NewForOverwrite::new_for_overwrite();
                         let mut value = &mut new_value;
-                        #decode?;
+                        let canon = #decode?;
                         *self = #ident::#variant_ident #with_new_value;
-                        Ok(())
+                        Ok(canon)
                     }
                     #ident::#variant_ident #with_value => {
                         #decode
@@ -1286,7 +1288,7 @@ fn try_distinguished_oneof(input: TokenStream) -> Result<TokenStream, Error> {
                     duplicated: bool,
                     buf: ::bilrost::encoding::Capped<__B>,
                     ctx: ::bilrost::encoding::DecodeContext,
-                ) -> ::core::result::Result<(), ::bilrost::DecodeError> {
+                ) -> ::core::result::Result<::bilrost::Canonicity, ::bilrost::DecodeError> {
                     match tag {
                         #(#decode,)*
                         _ => unreachable!(
@@ -1309,9 +1311,9 @@ fn try_distinguished_oneof(input: TokenStream) -> Result<TokenStream, Error> {
                         let mut new_value =
                             ::bilrost::encoding::NewForOverwrite::new_for_overwrite();
                         let value = &mut new_value;
-                        #decode?;
+                        let canon = #decode?;
                         *field = Some(#ident::#variant_ident #with_new_value);
-                        Ok(())
+                        Ok(canon)
                     }
                     ::core::option::Option::Some(#ident::#variant_ident #with_value) => {
                         #decode
@@ -1334,7 +1336,7 @@ fn try_distinguished_oneof(input: TokenStream) -> Result<TokenStream, Error> {
                     duplicated: bool,
                     buf: ::bilrost::encoding::Capped<__B>,
                     ctx: ::bilrost::encoding::DecodeContext,
-                ) -> ::core::result::Result<(), ::bilrost::DecodeError> {
+                ) -> ::core::result::Result<::bilrost::Canonicity, ::bilrost::DecodeError> {
                     match tag {
                         #(#decode,)*
                         _ => unreachable!(
