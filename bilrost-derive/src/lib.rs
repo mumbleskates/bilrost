@@ -759,7 +759,7 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
 
     let try_from = variants
         .iter()
-        .map(|(variant, value)| quote!(#value => ::core::result::Result::Ok(#ident::#variant)));
+        .map(|(variant, value)| quote!(#value => #ident::#variant));
 
     let is_valid_doc = format!("Returns `true` if `value` is a variant of `{}`.", ident);
 
@@ -828,17 +828,15 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
             }
         }
 
-        // TODO(widders): Error = u32
         impl #impl_generics ::core::convert::TryFrom<u32> for #ident #ty_generics #where_clause {
-            type Error = ::bilrost::DecodeError;
+            type Error = u32;
 
-            fn try_from(value: u32) -> ::core::result::Result<#ident, ::bilrost::DecodeError> {
+            fn try_from(value: u32) -> ::core::result::Result<#ident, u32> {
                 #[forbid(unreachable_patterns)]
-                match value {
+                ::core::result::Result::Ok(match value {
                     #(#try_from,)*
-                    _ => ::core::result::Result::Err(
-                        ::bilrost::DecodeError::new(::bilrost::DecodeErrorKind::OutOfDomainValue)),
-                }
+                    _ => ::core::result::Result::Err(value)?,
+                })
             }
         }
 
@@ -867,12 +865,17 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
                 mut buf: ::bilrost::encoding::Capped<B>,
                 _ctx: ::bilrost::encoding::DecodeContext,
             ) -> Result<(), ::bilrost::DecodeError> {
-                let int_value = <u32 as ::core::convert::TryFrom<_>>::try_from(buf.decode_varint()?)
-                    .map_err(|_| ::bilrost::DecodeError::new(
-                        ::bilrost::DecodeErrorKind::OutOfDomainValue
-                    ))?;
-                *value = <#ident #ty_generics as ::core::convert::TryFrom<_>>::try_from(int_value)?;
-                Ok(())
+                if let ::core::result::Result::Ok(int_value) =
+                    <u32 as ::core::convert::TryFrom<_>>::try_from(buf.decode_varint()?)
+                {
+                    if let ::core::result::Result::Ok(converted) =
+                        <#ident #ty_generics as ::core::convert::TryFrom<_>>::try_from(int_value)
+                    {
+                        *value = converted;
+                        return Ok(());
+                    }
+                }
+                Err(::bilrost::DecodeError::new(::bilrost::DecodeErrorKind::OutOfDomainValue))
             }
         }
 

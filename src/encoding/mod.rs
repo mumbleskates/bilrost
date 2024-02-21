@@ -1128,32 +1128,32 @@ pub trait EnumerationHelper<FieldType> {
 
 impl<T> EnumerationHelper<u32> for T
 where
-    T: Into<u32> + TryFrom<u32, Error = DecodeError>,
+    T: Into<u32> + TryFrom<u32, Error = u32>,
 {
     type Input = T;
-    type Output = Result<T, DecodeError>;
+    type Output = Result<T, u32>;
 
     fn help_set(enum_val: Self) -> u32 {
         enum_val.into()
     }
 
-    fn help_get(field_val: u32) -> Result<T, DecodeError> {
+    fn help_get(field_val: u32) -> Result<T, u32> {
         T::try_from(field_val)
     }
 }
 
 impl<T> EnumerationHelper<Option<u32>> for T
 where
-    T: Into<u32> + TryFrom<u32, Error = DecodeError>,
+    T: Into<u32> + TryFrom<u32, Error = u32>,
 {
     type Input = Option<T>;
-    type Output = Option<Result<T, DecodeError>>;
+    type Output = Option<Result<T, u32>>;
 
     fn help_set(enum_val: Option<T>) -> Option<u32> {
         enum_val.map(Into::into)
     }
 
-    fn help_get(field_val: Option<u32>) -> Option<Result<T, DecodeError>> {
+    fn help_get(field_val: Option<u32>) -> Option<Result<T, u32>> {
         field_val.map(TryFrom::try_from)
     }
 }

@@ -2074,19 +2074,11 @@ mod derived_message_tests {
             optional: Some(222),
         };
         assert::decodes_distinguished([(1, OV::u32(222)), (2, OV::u32(222))], val.clone());
-        assert_eq!(
-            val.regular()
-                .expect_err("bad enumeration value parsed successfully")
-                .kind(),
-            OutOfDomainValue,
-        );
-        assert_eq!(
-            val.optional()
-                .unwrap()
-                .expect_err("bad enumeration value parsed successfully")
-                .kind(),
-            OutOfDomainValue,
-        );
+        val.regular()
+            .expect_err("bad enumeration value parsed successfully");
+        val.optional()
+            .unwrap()
+            .expect_err("bad enumeration value parsed successfully");
 
         let val = HelpedStruct::empty();
         assert_eq!(val.optional(), None);
