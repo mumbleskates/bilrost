@@ -122,6 +122,15 @@ for its encoded data, there are no further distinct disadvantages. Numeric field
 tags should not be reused after they are deprecated, but neither should field
 names in a schemaless encoding.
 
+Perhaps the biggest caveat is the simultaneous invention problem. If multiple
+parties were to implement extensions without communicating with each other they
+may choose the same tags, which would cause conflicts in the meaning of those
+fields. Sequential numeric tags are more likely to be chosen in conflict by both
+parties than names would. The best way to resolve this is to plan ahead for
+extensions, encouraging potential collaborators to synchronize and choose
+allocated tags from some range reserved for extensions or providing room for
+extensions within the schema that have names or UUIDs.
+
 #### Non-coercion of data
 
 Bilrost aims to ensure that when a message is decoded without error, all the
