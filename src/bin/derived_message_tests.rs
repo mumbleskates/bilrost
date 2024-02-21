@@ -323,6 +323,17 @@ mod derived_message_tests {
         static_assertions::assert_not_impl_any!(Foo<bool, bool, X>: Message, DistinguishedMessage);
     }
 
+    #[test]
+    fn recursive_messages() {
+        #[derive(PartialEq, Eq, Message, DistinguishedMessage)]
+        struct Tree {
+            #[bilrost(recurses)]
+            children: Vec<Tree>,
+        }
+
+        static_assertions::assert_impl_all!(Tree: Message, DistinguishedMessage);
+    }
+
     // Tests for encoding rigor
 
     #[test]
