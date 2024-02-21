@@ -215,12 +215,13 @@ minimum expectation.
 
 Normal ("expedient") decoding may accept other byte strings as valid
 encodings of a given value, such as encodings that contain unknown fields or
-non-canonically encoded values*. Most of the time, this is what is desired.
+non-canonically encoded values[^noncanon]. Most of the time, this is what is
+desired.
 
-*"Non-canonical" value encodings in Bilrost principally include fields that are
-represented in the encoding even though their value is considered empty. For
-message types, such as nested messages, it also includes the message
-representation containing fields with unknown tags.
+[^noncanon]: "Non-canonical" value encodings in Bilrost principally include
+fields that are represented in the encoding even though their value is
+considered empty. For message types, such as nested messages, it also includes
+the message representation containing fields with unknown tags.
 
 To support this "exactly 1:1" expectation for distinguished messages, certain
 types are forbidden and not implemented in disinguished mode, even though they
@@ -646,31 +647,31 @@ methods.
 
 `bilrost` structs can encode fields with a wide variety of types:
 
-| Encoder              | Value type                                  | Encoded representation | Distinguished |
-|----------------------|---------------------------------------------|------------------------|---------------|
-| `general` & `fixed`  | [`f32`][prim]                               | fixed-size 32 bits     | no            |
-| `general` & `fixed`  | [`u32`][prim], [`i32`][prim]                | fixed-size 32 bits     | yes           |
-| `general` & `fixed`  | [`f64`][prim]                               | fixed-size 64 bits     | no            |
-| `general` & `fixed`  | [`u64`][prim], [`i64`][prim]                | fixed-size 64 bits     | yes           |
-| `general` & `varint` | [`u64`][prim], [`u32`][prim], [`u16`][prim] | varint                 | yes           |
-| `general` & `varint` | [`i64`][prim], [`i32`][prim], [`i16`][prim] | varint                 | yes           |
-| `general` & `varint` | [`bool`][prim]                              | varint                 | yes           |
-| `general`            | derived [`Enumeration`](#enumerations)*     | varint                 | yes           |
-| `general`            | [`String`][str]**                           | length-delimited       | yes           |
-| `general`            | impl [`Message`](#derive-macros) ***        | length-delimited       | maybe         |
-| `varint`             | [`u8`][prim], [`i8`][prim]                  | varint                 | yes           |
-| `plainbytes`         | [`Vec<u8>`][vec]**                          | length-delimited       | yes           |
+| Encoder              | Value type                                    | Encoded representation | Distinguished |
+|----------------------|-----------------------------------------------|------------------------|---------------|
+| `general` & `fixed`  | [`f32`][prim]                                 | fixed-size 32 bits     | no            |
+| `general` & `fixed`  | [`u32`][prim], [`i32`][prim]                  | fixed-size 32 bits     | yes           |
+| `general` & `fixed`  | [`f64`][prim]                                 | fixed-size 64 bits     | no            |
+| `general` & `fixed`  | [`u64`][prim], [`i64`][prim]                  | fixed-size 64 bits     | yes           |
+| `general` & `varint` | [`u64`][prim], [`u32`][prim], [`u16`][prim]   | varint                 | yes           |
+| `general` & `varint` | [`i64`][prim], [`i32`][prim], [`i16`][prim]   | varint                 | yes           |
+| `general` & `varint` | [`bool`][prim]                                | varint                 | yes           |
+| `general`            | derived [`Enumeration`](#enumerations)[^enum] | varint                 | yes           |
+| `general`            | [`String`][str]*                              | length-delimited       | yes           |
+| `general`            | impl [`Message`](#derive-macros)[^boxmsg]     | length-delimited       | maybe         |
+| `varint`             | [`u8`][prim], [`i8`][prim]                    | varint                 | yes           |
+| `plainbytes`         | [`Vec<u8>`][vec]*                             | length-delimited       | yes           |
 
-*`Enumeration` types can be directly included if they have a value that has a
-Bilrost representation of zero (represented as exactly the expression `0` either
-via a `#[bilrost(0)]` attribute or, absent an attribute, via a normal
+*Alternative types are available! See below.
+
+[^enum]: `Enumeration` types can be directly included if they have a value that
+has a Bilrost representation of zero (represented as exactly the expression `0`
+either via a `#[bilrost(0)]` attribute or, absent an attribute, via a normal
 discriminant value). Otherwise, enumeration types must always be nested.
 
-**Alternative types are available! See below.
-
-***`Message` types inside [`Box`][box] still impl `Message`, with a covering
-impl; message types [can nest recursively](#writing-recursive-messages) this
-way.
+[^boxmsg]: `Message` types inside [`Box`][box] still impl `Message`, with a
+covering impl; message types [can nest recursively](#writing-recursive-messages)
+this way.
 
 Any of these types may be included directly in a `bilrost` message struct. If
 that field's value is [empty](#empty-values), no bytes will be emitted when it
@@ -692,39 +693,39 @@ several different containers:
 
 Many alternative types are also available for both scalar values and containers!
 
-| Value type   | Alternative                          | Supporting encoder | Distinguished | Feature to enable |
-|--------------|--------------------------------------|--------------------|---------------|-------------------|
-| `Vec<u8>`    | `Blob`***                            | `general`          | yes           | (none)            |
-| `Vec<u8>`    | [`Cow<[u8]>`][cow]                   | `plainbytes`       | yes           | (none)            |
-| `Vec<u8>`    | [`bytes::Bytes`][bytes]*             | `general`          | yes           | (none)            |
-| `Vec<u8>`    | [`[u8; N]`][prim]**                  | `plainbytes`       | yes           | (none)            |
-| `u32`, `u64` | [`[u8; 4]`][prim], [`[u8; 8]`][prim] | `fixed`            | yes           | (none)            |
-| `String`     | [`Cow<str>`][cow]                    | `general`          | yes           | (none)            |
-| `String`     | [`bytestring::ByteString`][bstr]*    | `general`          | yes           | "bytestring"      |
+| Value type   | Alternative                               | Supporting encoder | Distinguished | Feature to enable |
+|--------------|-------------------------------------------|--------------------|---------------|-------------------|
+| `Vec<u8>`    | `Blob`[^blob]                             | `general`          | yes           | (none)            |
+| `Vec<u8>`    | [`Cow<[u8]>`][cow]                        | `plainbytes`       | yes           | (none)            |
+| `Vec<u8>`    | [`bytes::Bytes`][bytes][^bzcopy]          | `general`          | yes           | (none)            |
+| `Vec<u8>`    | [`[u8; N]`][prim][^plainbytearr]          | `plainbytes`       | yes           | (none)            |
+| `u32`, `u64` | [`[u8; 4]`][prim], [`[u8; 8]`][prim]      | `fixed`            | yes           | (none)            |
+| `String`     | [`Cow<str>`][cow]                         | `general`          | yes           | (none)            |
+| `String`     | [`bytestring::ByteString`][bstr][^bzcopy] | `general`          | yes           | "bytestring"      |
 
-*When decoding from a `bytes::Bytes` object, both `bytes::Bytes` and
+[^bzcopy]: When decoding from a `bytes::Bytes` object, both `bytes::Bytes` and
 `bytes::ByteString` have a zero-copy optimization and will reference the decoded
 buffer rather than copying. (This could also work for any other input type that
 has a zero-copy `bytes::Buf::copy_to_bytes()` optimization.)
 
-**Plain byte arrays, as we might expect, only accept one exact length of data;
-other lengths are considered invalid values.
+[^plainbytearr]: Plain byte arrays, as we might expect, only accept one exact
+length of data; other lengths are considered invalid values.
 
-***`bilrost::Blob` is a transparent wrapper for `Vec<u8>` in that is a drop-in
-replacement in most situations and is supported by the default `general` encoder
-for maximum ease of use. If nothing but `Vec<u8>` will do, the `plainbytes`
-encoder will still encode a plain `Vec<u8>` as its bytes value.
+[^blob]: `bilrost::Blob` is a transparent wrapper for `Vec<u8>` in that is a
+drop-in replacement in most situations and is supported by the default `general`
+encoder for maximum ease of use. If nothing but `Vec<u8>` will do,
+the `plainbytes` encoder will still encode a plain `Vec<u8>` as its bytes value.
 
-| Container type | Alternative                           | Distinguished | Feature to enable |
-|----------------|---------------------------------------|---------------|-------------------|
-| `Vec<T>`       | [`Cow<[T]>`][cow]                     | when `T` is   | (none)            |
-| `Vec<T>`       | [`smallvec::SmallVec<[T]>`][smallvec] | when `T` is   | "smallvec"        |
-| `Vec<T>`       | [`thin_vec::ThinVec<[T]>`][thinvec]   | when `T` is   | "thin_vec"        |
-| `Vec<T>`       | [`tinyvec::TinyVec<[T]>`][tinyvec]    | when `T` is   | "tinyvec"         |
-| `BTreeMap<T>`  | [`HashMap<T>`][hashmap]*              | no            | "std" (default)   |
-| `BTreeSet<T>`  | [`HashSet<T>`][hashset]*              | no            | "std" (default)   |
-| `BTreeMap<T>`  | [`hashbrown::HashMap<T>`][hbmap]*     | no            | "hashbrown"       |
-| `BTreeSet<T>`  | [`hashbrown::HashSet<T>`][hbset]*     | no            | "hashbrown"       |
+| Container type | Alternative                                     | Distinguished | Feature to enable |
+|----------------|-------------------------------------------------|---------------|-------------------|
+| `Vec<T>`       | [`Cow<[T]>`][cow]                               | when `T` is   | (none)            |
+| `Vec<T>`       | [`smallvec::SmallVec<[T]>`][smallvec]           | when `T` is   | "smallvec"        |
+| `Vec<T>`       | [`thin_vec::ThinVec<[T]>`][thinvec]             | when `T` is   | "thin_vec"        |
+| `Vec<T>`       | [`tinyvec::TinyVec<[T]>`][tinyvec]              | when `T` is   | "tinyvec"         |
+| `BTreeMap<T>`  | [`HashMap<T>`][hashmap][^hashnoncanon]          | no            | "std" (default)   |
+| `BTreeSet<T>`  | [`HashSet<T>`][hashset][^hashnoncanon]          | no            | "std" (default)   |
+| `BTreeMap<T>`  | [`hashbrown::HashMap<T>`][hbmap][^hashnoncanon] | no            | "hashbrown"       |
+| `BTreeSet<T>`  | [`hashbrown::HashSet<T>`][hbset][^hashnoncanon] | no            | "hashbrown"       |
 
 [box]: https://doc.rust-lang.org/std/boxed/struct.Box.html
 
@@ -760,9 +761,9 @@ encoder will still encode a plain `Vec<u8>` as its bytes value.
 
 [vec]: https://doc.rust-lang.org/std/vec/struct.Vec.html
 
-*Hash-table-based maps and sets are implemented, but are not compatible with
-distinguished encoding or decoding. If distinguished decoding is required, a
-container which stores its values in sorted order must be used.
+[^hashnoncanon]: Hash-table-based maps and sets are implemented, but are not
+compatible with distinguished encoding or decoding. If distinguished decoding is
+required, a container which stores its values in sorted order must be used.
 
 While it's possible to nest and recursively nest `Message` types with `Box`,
 `Vec`, etc., `bilrost` does not do any kind of runtime check to avoid infinite
@@ -1198,7 +1199,7 @@ For supported non-message types, the following orderings are standardized:
 |--------------------------------------|---------------------------------------------------------------------------------------|
 | boolean                              | false, then true                                                                      |
 | integer                              | ascending numeric value                                                               |
-| text string, byte string, byte array | [lexicographically][lex] ascending, by bytes or UTF-8 bytes*                          |
+| text string, byte string, byte array | [lexicographically][lex] ascending, by bytes or UTF-8 bytes[^u8bytes]                 |
 | collection (vec, set, etc.)          | lexicographically ascending, by nested values                                         |
 | mapping                              | lexicographically ascending, by alternating key-then-value                            |
 | floating point number                | [(not specified, nor recommended)](#floating-point-values-and-distinguished-decoding) |
@@ -1209,8 +1210,8 @@ For supported non-message types, the following orderings are standardized:
 
 [lex]: https://en.wikipedia.org/wiki/Lexicographic_order
 
-*Bytes are considered to be unsigned. The least-valued byte is the nul byte
-`0x00`, and the greatest is `0xff`.
+[^u8bytes]: Bytes are considered to be unsigned. The least-valued byte is the
+nul byte `0x00`, and the greatest is `0xff`.
 
 This standardization corresponds to the existing definitions of `Ord` in the
 Rust language for booleans, integers, strings, arrays/slices, ordered sets, and
@@ -1409,8 +1410,8 @@ Strengths of Bilrost's encoding include those of protocol buffers:
   compatibility
 * the encoded messages are relatively very compact, and their representation "on
   the wire" is very simple
-* the encoding is minimally* platform-dependent; each byte is specified, and
-  there are no endianness incompatibility issues
+* the encoding is minimally[^floatbits] platform-dependent; each byte is
+  specified, and there are no endianness incompatibility issues
 * when decoding, string and byte-string data is represented verbatim and can be
   referenced without copying
 * skipping irrelevant or undesired data is inexpensive, as most nested and
@@ -1429,9 +1430,9 @@ Strengths of Bilrost's encoding include those of protocol buffers:
   annotations and derive macros. It's possible for such a library to be quite
   nice to use!
 
-(*The main area of potential incompatibility is with the representation of
-signaling vs. quiet NaN floating point values; see
-[`f64::from_bits()`][floatbits].)
+[^floatbits]: The main area of potential incompatibility is with the
+representation of signaling vs. quiet NaN floating point values; see
+[`f64::from_bits()`][floatbits].
 
 [floatbits]: https://doc.rust-lang.org/std/primitive.f64.html#method.from_bits
 
