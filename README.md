@@ -68,11 +68,11 @@ Bilrost is an encoding scheme for converting in-memory data structs into plain
 byte strings and vice versa. It's generally suitable for both network transport
 and data retained over the long-term. Its encoded data is not human-readable,
 but it is encoded quite simply. It supports integral and floating point numbers,
-strings and byte strings, nested messages, and recursively nested messages. All
-of the above are supported as optional values, repeated values, sets of unique
-values, and key/value mappings where sensible. With appropriate choices of
-encoders (which determine the representation), most of these constructs can be
-nested almost arbitrarily.
+strings and byte strings, nested messages, and [recursively](
+#writing-recursive-messages) nested messages. All of the above are supported as
+optional values, repeated values, sets of unique values, and key/value mappings
+where sensible. With appropriate choices of encoders (which determine the
+representation), most of these constructs can be nested almost arbitrarily.
 
 Encoded Bilrost data does not include the names of its fields; they are instead
 assigned numbers agreed upon in advance by the message schema that specifies it.
@@ -669,7 +669,8 @@ discriminant value). Otherwise, enumeration types must always be nested.
 **Alternative types are available! See below.
 
 ***`Message` types inside [`Box`][box] still impl `Message`, with a covering
-impl; message types can nest recursively this way.
+impl; message types [can nest recursively](#writing-recursive-messages) this
+way.
 
 Any of these types may be included directly in a `bilrost` message struct. If
 that field's value is [empty](#empty-values), no bytes will be emitted when it
@@ -1252,13 +1253,14 @@ but it might be a significant API break.)
 `bilrost` has also implemented a couple requested features not yet available in
 `prost`:
 
-* message fields can be ignored via attribute
+* message fields can be [ignored via attribute](#ignoring-fields)
 * implementations are available for `no_std`-compatible hash maps, vecs that
   inline short values, `ByteString`, etc.
-* `Message` and `DistinguishedMessage` traits are object-safe and provide full
-  functionality as trait objects. At time of writing, `prost 0.12.3` has very
-  little functionality exposed in an object-safe way; the only object-safe
-  methods compute the encoded length of the message and clear its fields.
+* `Message` and `DistinguishedMessage` traits are object-safe and provide [full
+  functionality as trait objects](#using-dyn-with-object-safe-message-traits).
+  At time of writing, `prost 0.12.3` has very little functionality exposed in an
+  object-safe way; the only object-safe methods compute the encoded length of
+  the message and clear its fields.
 
 ## Differences from Protobuf
 
