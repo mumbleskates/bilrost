@@ -422,7 +422,14 @@ You can then import and use its traits and derive macros. The main three are:
 If not otherwise specified, fields are tagged sequentially in the order they
 are specified in the struct, starting with `1`.
 
-You may skip tags which have been reserved, or where there are gaps between
+Tags can also be explicitly specified. If a field's tag is the only attribute
+provided, the number of the tag can be provided with no ceremony as the only
+content of the "bilrost" attribute, like `#[bilrost(1)]`. If other attributes
+are included, the "tag" attribute must be specified by name; for example, like
+`#[bilrost(tag(1), encoder(fixed))]`. The "tag" attribute can also be spelled
+`tag = 1` or `tag = "1"`.
+
+We may skip tags which have been reserved, or where there are gaps between
 sequentially occurring tag values by specifying the tag number to skip to with
 the `tag` attribute on the first field after the gap. The following fields will
 be tagged sequentially starting from the next number.
@@ -480,14 +487,121 @@ TODO: expand
 * with & without empty variant
 * with both struct & tuple style variants
 
-#### Encoders and other attributes
+#### Encoders
 
-TODO: expand
+`bilrost` message fields and oneof variants can be annotated with an "encoder"
+attribute that specifies which encoder is responsible for encoding and decoding
+that field's value. `bilrost` provides several standard encoders which can be
+used and composed to choose how the field is represented.
 
-* different encoders and what they do
-* "ignore"
-* "enumeration" helpers
-* "recurses"
+```rust,
+# use bilrost::Message;
+#[derive(Message)]
+struct Foo {
+    #[bilrost(encoder(general))]
+    name: String,
+}
+```
+
+Encoder attributes can be specified two ways, either in the form shown above or
+as a string, like `#[bilrost(encoder = "general")]`. The value of this attribute
+specifies a type name, using normal Rust type syntax. The standard encoders are
+also available and can addressed explicitly; there is no practical reason to do
+this, but as a demonstration:
+
+```rust,
+# use bilrost::Message;
+#[derive(Message)]
+struct Bar(
+    // This is the same type as "general"
+    #[bilrost(encoder = "::bilrost::encoding::General")] String,
+);
+
+assert_eq!(
+    Bar("bar".to_string()).encode_to_vec(),
+    b"\x05\x03bar".as_slice()
+);
+```
+
+Where these encoders' type names are evaluated the standard encoders are made
+available as aliases, all-lower-cased to ensure that these aliases are unlikely
+to collide with other type names that are in scope. These standard aliases are:
+
+* `general`: the default encoder, suitable for most field types. Delegates
+  encoding of collections (vecs and sets) to `unpacked<general>` and mapping
+  types to `map<general, general>`.
+* `varint`: primitive numeric types and bool, encodes as varint.
+* `fixed`: fixed-width four- and eight-byte values for integers, floats, and
+  byte arrays. Delegates encoding of collections to `unpacked<fixed>`
+* `plainbytes`: encodes byte arrays, `Vec<u8>`, and `Cow<[u8]>` as
+  length-delimited values. Delegates encoding of `Vec<Vec<u8>>`
+  and `Vec<Cow<[u8]>>` to `unpacked<plainbytes>`
+* `unpacked` (`unpacked<E = general>`): : encodes collections with their values
+  unpacked as zero or more normally encoded fields, one per value. The fields
+  are encoded with the parametrized encoder `E`, which defaults to `general`
+* `packed` (`packed<E = general>`): encodes collections with their values packed
+  into a single length-delimited value. The values are encoded with the
+  parametrized encoder `E`, which defaults to `general`
+* `map<KE, VE>`: encodes mappings with their keys (encoded with parametrized
+  encoder `KE`) and values (encoded with `VE`) packed alternating into a single
+  length-delimited value.
+
+It's possible that more standard encoders may be added in the future, but they
+will be similarly lower-cased.
+
+#### Other attributes
+
+There are a few other attributes available inside the "bilrost" attribute for
+fields:
+
+##### Ignoring fields
+
+* **"ignore"**: must be alone, with no tag or other attribute. This causes the
+  field
+  to be ignored by the generated message implementation. If any fields in a
+  message are ignored, it must implement `Default` to implement `Message`, so
+  there is a value for those fields to take on when they are created from
+  encoded data.
+
+  Ignored fields are not currently considered compatible with distinguished
+  decoding.
+
+##### Helper methods
+
+* **"enumeration"**: if a field is of type `u32` or `Option<u32>`, this causes
+  the message type to have helper methods named after the type that get and set
+  its value as the enumeration type specified by this attribute.
+
+##### Writing recursive messages
+
+* **"recurses"**: It is possible to nest messages recursively in `bilrost`. If
+  they are, the `Message` traits are currently all always disabled because there
+  is an unresolvable circular dependency of a message type on its own traits:
+
+```rust,compile_fail
+# use bilrost::Message;
+#[derive(Message)]
+//       ^^^^^^^ the trait `Encoder<Vec<Tree>>` is not implemented for `General`
+struct Tree {
+    name: String,
+    children: Vec<Tree>,
+}
+```
+
+Somewhere along the line, we have to break this circular chain of dependencies.
+To do that, annotate one of the fields in the chain with the "recurses"
+attribute and its type will no longer participate in the `where` clause of the
+message implementations, the cycle will be broken, and the message can be used:
+
+```rust,
+# use bilrost::Message;
+#[derive(Message)]
+struct Tree {
+    name: String,
+    #[bilrost(recurses)]
+    children: Vec<Tree>,
+}
+```
 
 ### Distinguished derive macros
 
