@@ -945,8 +945,8 @@ this range has exactly one possible encoded representation.
 1. The final byte of a varint is the first byte that does not have its most
    significant bit set, or the ninth byte, whichever comes first.
 2. The value of the encoded varint is the sum of each byte's unsigned integer
-   value, multiplied by 128 (shifted left by 7 bits) for each byte that preceded
-   it.
+   value, multiplied by 128 (shifted left/up by 7 bits) for each byte that
+   preceded it.
 3. Varints representing values greater than 2^64-1 are invalid.
 
 Several outstanding examples of very similar varint encodings exist:
