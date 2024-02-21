@@ -2,8 +2,8 @@
 
 //! Analogs for protobuf well-known types, implemented alongside the
 //! [`bilrost`][bilrost] crate. See that crate's documentation for details about the
-//! library, and the [Protobuf reference][1] for more information about the use cases and semantics
-//! of these types.
+//! library, and the [Protobuf reference][proto] for more information about the use cases and
+//! semantics of these types.
 //!
 //! [bilrost]: https://docs.rs/bilrost
 //!
