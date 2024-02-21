@@ -1,6 +1,6 @@
 [package]
 name = "bilrost"
-version = "0.1002.0-dev"
+version = "0.1002.0"
 authors = [
     "Dan Burkert <dan@danburkert.com>",
     "Lucio Franco <luciofranco14@gmail.com",
@@ -50,7 +50,7 @@ thin-vec = ["dep:thin-vec"]
 tinyvec = ["dep:tinyvec"]
 
 [dependencies]
-bilrost-derive = { version = "0.1002.0-dev", path = "bilrost-derive", optional = true }
+bilrost-derive = { version = "0.1002.0", path = "bilrost-derive", optional = true }
 btreemultimap = { version = "0.1", optional = true }
 bytes = { version = "1", default-features = false }
 bytestring = { version = ">=1", optional = true }

@@ -1,4 +1,4 @@
-## v0.1002.0-dev
+## 0.1002.0
 
 ### Breaking changes
 
