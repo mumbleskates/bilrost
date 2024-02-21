@@ -25,6 +25,9 @@
 
 * Object-safe traits were broken and unfun to use. They've been implemented in a
   much more correct way now.
+* Derived Enumeration types now convert via `TryFrom<u32, Error = u32>` instead
+  of `Error = DecodeError`. The old implementation wasn't really helping anyone
+  by discarding the untranslated value.
 
 ### Cleanups
 
