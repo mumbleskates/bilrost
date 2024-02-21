@@ -289,14 +289,14 @@ in code that cares very much about distinguished representations.
 
 ### Getting started
 
-To use `bilrost`, first add it as a dependency in `Cargo.toml`, either with
+To use `bilrost`, we first add it as a dependency in `Cargo.toml`, either with
 `cargo add bilrost` or manually:
 
 ```toml
 bilrost = "0.1002.0-dev"
 ```
 
-Then, derive `bilrost::Message` for your struct type:
+Then, we derive `bilrost::Message` for our struct type:
 
 ```rust,
 use bilrost::Message;
@@ -366,8 +366,8 @@ The `bilrost` crate has several optional features:
 
 * "std" (default): provides support for `HashMap` and `HashSet`.
 * "derive" (default): includes the `bilrost-derive` crate and re-exports its
-  derive macros. It's unlikely this should ever be disabled if you are
-  using `bilrost` normally.
+  derive macros. It's unlikely this should ever be disabled if `bilrost` is used
+  normally.
 * "detailed-errors" (default): the decode error type returned by messages will
   have more information on the path to the exact field in the decoded data that
   encountered an error. With this disabled errors are more opaque, but may be
@@ -402,7 +402,7 @@ bilrost = { version = "0.1002.0-dev", default-features = false, features = ["der
 
 ### Derive macros
 
-You can then import and use its traits and derive macros. The main three are:
+We can now import and use its traits and derive macros. The main three are:
 
 * [`Message`](#deriving-message): This is the basic working unit. Derive this
   for structs to enable encoding and decoding them to and from binary data.
@@ -707,7 +707,7 @@ Many alternative types are also available for both scalar values and containers!
 buffer rather than copying. (This could also work for any other input type that
 has a zero-copy `bytes::Buf::copy_to_bytes()` optimization.)
 
-**Plain byte arrays, as you might expect, only accept one exact length of data;
+**Plain byte arrays, as we might expect, only accept one exact length of data;
 other lengths are considered invalid values.
 
 ***`bilrost::Blob` is a transparent wrapper for `Vec<u8>` in that is a drop-in
