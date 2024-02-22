@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/bilrost/0.1002.0")]
+#![doc(html_root_url = "https://docs.rs/bilrost/0.1002.1")]
 #![cfg_attr(not(feature = "std"), no_std)]
 #![doc = include_str!("../README.md")]
 
