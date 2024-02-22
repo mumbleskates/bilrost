@@ -645,7 +645,9 @@ impl FromIterator<Canonicity> for Canonicity {
 pub trait WithCanonicity {
     /// The type of the value without any canonicity information.
     type Value;
-    // Type the value is turned into when non-canonical states are turned into error states.
+    // Type the value is turned into when non-canonical states are turned into error states or
+    // removed.
+    type WithoutCanonicity;
 
     /// Get the value if it is fully canonical, otherwise returning an error.
     fn canonical(self) -> Result<Self::Value, DecodeErrorKind>;
@@ -654,11 +656,16 @@ pub trait WithCanonicity {
     fn canonical_with_extensions(self) -> Result<Self::Value, DecodeErrorKind>;
 
     /// Discards the canonicity.
-    fn value(self) -> Self::Value;
+    /// 
+    /// If this method is always being used and canonicity information is always discarded,
+    /// distinguished decoding may not be needed, and the program can be made more efficient by
+    /// simply using expedient decoding mode.
+    fn value(self) -> Self::WithoutCanonicity;
 }
 
 impl WithCanonicity for Canonicity {
     type Value = ();
+    type WithoutCanonicity = Self::Value;
 
     fn canonical(self) -> Result<(), DecodeErrorKind> {
         match self {
@@ -670,16 +677,39 @@ impl WithCanonicity for Canonicity {
 
     fn canonical_with_extensions(self) -> Result<(), DecodeErrorKind> {
         match self {
-            Canonicity::NotCanonical | Canonicity::HasExtensions => Ok(()),
-            Canonicity::Canonical => Err(NotCanonical),
+            Canonicity::NotCanonical => Err(NotCanonical),
+            Canonicity::HasExtensions | Canonicity::Canonical => Ok(()),
         }
     }
 
-    fn value(self) -> Self::Value {}
+    fn value(self) {}
+}
+
+impl WithCanonicity for &Canonicity {
+    type Value = ();
+    type WithoutCanonicity = Self::Value;
+
+    fn canonical(self) -> Result<(), DecodeErrorKind> {
+        match self {
+            Canonicity::NotCanonical => Err(NotCanonical),
+            Canonicity::HasExtensions => Err(UnknownField),
+            Canonicity::Canonical => Ok(()),
+        }
+    }
+
+    fn canonical_with_extensions(self) -> Result<(), DecodeErrorKind> {
+        match self {
+            Canonicity::NotCanonical => Err(NotCanonical), 
+            Canonicity::HasExtensions | Canonicity::Canonical => Ok(()),
+        }
+    }
+
+    fn value(self) {}
 }
 
 impl<T> WithCanonicity for (T, Canonicity) {
     type Value = T;
+    type WithoutCanonicity = Self::Value;
 
     fn canonical(self) -> Result<T, DecodeErrorKind> {
         self.1.canonical()?;
@@ -698,6 +728,7 @@ impl<T> WithCanonicity for (T, Canonicity) {
 
 impl<'a, T> WithCanonicity for &'a (T, Canonicity) {
     type Value = &'a T;
+    type WithoutCanonicity = Self::Value;
 
     fn canonical(self) -> Result<&'a T, DecodeErrorKind> {
         self.1.canonical()?;
@@ -714,75 +745,381 @@ impl<'a, T> WithCanonicity for &'a (T, Canonicity) {
     }
 }
 
-/// Helper trait for converting `Result`s with values that contain canonicity information by
-/// specifying how strict decoding should be.
-pub trait RequireCanonicity {
-    type Result;
-
-    /// Converts this result, turning any non-canonical status in an `Ok(..)` value into a
-    /// corresponding error.
-    fn require_canonical(self) -> Self::Result;
-
-    /// Converts this result, turning non-canonical status in an `Ok(..)` value into a corresponding
-    /// error, but permitting extensions without error. Only fields that are known to the message
-    /// can be checked for canonicity.
-    fn allow_extensions(self) -> Self::Result;
-
-    /// Converts this result, discarding any canonicity information from the value.
-    ///
-    /// If this method is always being used and canonicity information is always discarded,
-    /// distinguished decoding may not be needed, and the program can be made more efficient by
-    /// simply using expedient decoding mode.
-    fn allow_any(self) -> Self::Result;
-}
-
-impl<T, E> RequireCanonicity for Result<T, E>
+impl<T, E> WithCanonicity for Result<T, E>
 where
     T: WithCanonicity,
-    E: From<DecodeErrorKind>,
+    DecodeErrorKind: From<E>,
 {
-    type Result = Result<T::Value, E>;
+    type Value = T::Value;
+    type WithoutCanonicity = Result<T::WithoutCanonicity, DecodeErrorKind>;
 
-    fn require_canonical(self) -> Self::Result {
-        Ok(self?.canonical()?)
+    fn canonical(self) -> Result<T::Value, DecodeErrorKind> {
+        self?.canonical()
     }
 
-    fn allow_extensions(self) -> Self::Result {
-        Ok(self?.canonical_with_extensions()?)
+    fn canonical_with_extensions(self) -> Result<T::Value, DecodeErrorKind> {
+        self?.canonical_with_extensions()
     }
 
-    fn allow_any(self) -> Self::Result {
+    fn value(self) -> Result<T::WithoutCanonicity, DecodeErrorKind> {
         Ok(self?.value())
     }
 }
 
-/// Impl for `Result` types returned by distinguished decoding which are then taken `.as_ref()`.
-/// This discards any extra information carried by the `DecodeError` but avoids copying it.
-impl<'a, T> RequireCanonicity for Result<&'a T, &'a DecodeError>
-where
-    &'a T: WithCanonicity,
-{
-    type Result = Result<<&'a T as WithCanonicity>::Value, DecodeErrorKind>;
+#[cfg(test)]
+mod with_canonicity {
+    use super::{
+        Canonicity::{self, *},
+        DecodeError, DecodeErrorKind, WithCanonicity,
+    };
 
-    fn require_canonical(self) -> Self::Result {
-        match self {
-            Ok(val) => val.canonical(),
-            Err(err) => Err(err.kind()),
-        }
-    }
+    #[test]
+    fn usability() {
+        // `Canonicity`
+        assert_eq!(Canonical.canonical(), Ok(()));
+        assert_eq!(
+            HasExtensions.canonical(),
+            Err(DecodeErrorKind::UnknownField)
+        );
+        assert_eq!(NotCanonical.canonical(), Err(DecodeErrorKind::NotCanonical));
+        assert_eq!(Canonical.canonical_with_extensions(), Ok(()));
+        assert_eq!(HasExtensions.canonical_with_extensions(), Ok(()));
+        assert_eq!(
+            NotCanonical.canonical_with_extensions(),
+            Err(DecodeErrorKind::NotCanonical)
+        );
+        let _: () = Canonical.value();
+        let _: () = HasExtensions.value();
+        let _: () = NotCanonical.value();
 
-    fn allow_extensions(self) -> Self::Result {
-        match self {
-            Ok(val) => val.canonical_with_extensions(),
-            Err(err) => Err(err.kind()),
-        }
-    }
+        // `&Canonicity`
+        assert_eq!((&Canonical).canonical(), Ok(()));
+        assert_eq!(
+            (&HasExtensions).canonical(),
+            Err(DecodeErrorKind::UnknownField)
+        );
+        assert_eq!(
+            (&NotCanonical).canonical(),
+            Err(DecodeErrorKind::NotCanonical)
+        );
+        assert_eq!((&Canonical).canonical_with_extensions(), Ok(()));
+        assert_eq!((&HasExtensions).canonical_with_extensions(), Ok(()));
+        assert_eq!(
+            (&NotCanonical).canonical_with_extensions(),
+            Err(DecodeErrorKind::NotCanonical)
+        );
+        let _: () = (&Canonical).value();
+        let _: () = (&HasExtensions).value();
+        let _: () = (&NotCanonical).value();
 
-    fn allow_any(self) -> Self::Result {
-        match self {
-            Ok(val) => Ok(val.value()),
-            Err(err) => Err(err.kind()),
-        }
+        // `(T, Canonicity)`
+        assert_eq!(("foo", Canonical).canonical(), Ok("foo"));
+        assert_eq!(
+            ("foo", HasExtensions).canonical(),
+            Err(DecodeErrorKind::UnknownField)
+        );
+        assert_eq!(
+            ("foo", NotCanonical).canonical(),
+            Err(DecodeErrorKind::NotCanonical)
+        );
+        assert_eq!(("foo", Canonical).canonical_with_extensions(), Ok("foo"));
+        assert_eq!(
+            ("foo", HasExtensions).canonical_with_extensions(),
+            Ok("foo")
+        );
+        assert_eq!(
+            ("foo", NotCanonical).canonical_with_extensions(),
+            Err(DecodeErrorKind::NotCanonical)
+        );
+        assert_eq!(("foo", Canonical).value(), "foo");
+        assert_eq!(("foo", HasExtensions).value(), "foo");
+        assert_eq!(("foo", NotCanonical).value(), "foo");
+
+        // `&(T, Canonicity)`
+        assert_eq!((&("foo", Canonical)).canonical(), Ok(&"foo"));
+        assert_eq!(
+            (&("foo", HasExtensions)).canonical(),
+            Err(DecodeErrorKind::UnknownField)
+        );
+        assert_eq!(
+            (&("foo", NotCanonical)).canonical(),
+            Err(DecodeErrorKind::NotCanonical)
+        );
+        assert_eq!(
+            (&("foo", Canonical)).canonical_with_extensions(),
+            Ok(&"foo")
+        );
+        assert_eq!(
+            (&("foo", HasExtensions)).canonical_with_extensions(),
+            Ok(&"foo")
+        );
+        assert_eq!(
+            (&("foo", NotCanonical)).canonical_with_extensions(),
+            Err(DecodeErrorKind::NotCanonical)
+        );
+        assert_eq!((&("foo", Canonical)).value(), &"foo");
+        assert_eq!((&("foo", HasExtensions)).value(), &"foo");
+        assert_eq!((&("foo", NotCanonical)).value(), &"foo");
+
+        // `Result<(T, Canonicity), DecodeError>` with Ok
+        assert_eq!(
+            Result::<_, DecodeError>::Ok(("foo", Canonical)).canonical(),
+            Ok("foo")
+        );
+        assert_eq!(
+            Result::<_, DecodeError>::Ok(("foo", HasExtensions)).canonical(),
+            Err(DecodeErrorKind::UnknownField)
+        );
+        assert_eq!(
+            Result::<_, DecodeError>::Ok(("foo", NotCanonical)).canonical(),
+            Err(DecodeErrorKind::NotCanonical)
+        );
+        assert_eq!(
+            Result::<_, DecodeError>::Ok(("foo", Canonical)).canonical_with_extensions(),
+            Ok("foo")
+        );
+        assert_eq!(
+            Result::<_, DecodeError>::Ok(("foo", HasExtensions)).canonical_with_extensions(),
+            Ok("foo")
+        );
+        assert_eq!(
+            Result::<_, DecodeError>::Ok(("foo", NotCanonical)).canonical_with_extensions(),
+            Err(DecodeErrorKind::NotCanonical)
+        );
+        assert_eq!(
+            Result::<_, DecodeError>::Ok(("foo", Canonical)).value(),
+            Ok("foo")
+        );
+        assert_eq!(
+            Result::<_, DecodeError>::Ok(("foo", HasExtensions)).value(),
+            Ok("foo")
+        );
+        assert_eq!(
+            Result::<_, DecodeError>::Ok(("foo", NotCanonical)).value(),
+            Ok("foo")
+        );
+
+        // `Result<&(T, Canonicity), &DecodeError>` with Ok
+        assert_eq!(
+            Result::<_, DecodeError>::Ok(("foo", Canonical))
+                .as_ref()
+                .canonical(),
+            Ok(&"foo")
+        );
+        assert_eq!(
+            Result::<_, DecodeError>::Ok(("foo", HasExtensions))
+                .as_ref()
+                .canonical(),
+            Err(DecodeErrorKind::UnknownField)
+        );
+        assert_eq!(
+            Result::<_, DecodeError>::Ok(("foo", NotCanonical))
+                .as_ref()
+                .canonical(),
+            Err(DecodeErrorKind::NotCanonical)
+        );
+        assert_eq!(
+            Result::<_, DecodeError>::Ok(("foo", Canonical))
+                .as_ref()
+                .canonical_with_extensions(),
+            Ok(&"foo")
+        );
+        assert_eq!(
+            Result::<_, DecodeError>::Ok(("foo", HasExtensions))
+                .as_ref()
+                .canonical_with_extensions(),
+            Ok(&"foo")
+        );
+        assert_eq!(
+            Result::<_, DecodeError>::Ok(("foo", NotCanonical))
+                .as_ref()
+                .canonical_with_extensions(),
+            Err(DecodeErrorKind::NotCanonical)
+        );
+        assert_eq!(
+            Result::<_, DecodeError>::Ok(("foo", Canonical))
+                .as_ref()
+                .value(),
+            Ok(&"foo")
+        );
+        assert_eq!(
+            Result::<_, DecodeError>::Ok(("foo", HasExtensions))
+                .as_ref()
+                .value(),
+            Ok(&"foo")
+        );
+        assert_eq!(
+            Result::<_, DecodeError>::Ok(("foo", NotCanonical))
+                .as_ref()
+                .value(),
+            Ok(&"foo")
+        );
+
+        // `Result<_, DecodeError>` with Err
+        assert_eq!(
+            Result::<Canonicity, DecodeError>::Err(DecodeError::new(DecodeErrorKind::Other))
+                .canonical(),
+            Err(DecodeErrorKind::Other)
+        );
+        assert_eq!(
+            Result::<Canonicity, DecodeError>::Err(DecodeError::new(DecodeErrorKind::Other))
+                .canonical_with_extensions(),
+            Err(DecodeErrorKind::Other)
+        );
+        assert_eq!(
+            Result::<Canonicity, DecodeError>::Err(DecodeError::new(DecodeErrorKind::Other))
+                .value(),
+            Err(DecodeErrorKind::Other)
+        );
+
+        // `Result<&_, &DecodeError>` with Err
+        assert_eq!(
+            Result::<Canonicity, DecodeError>::Err(DecodeError::new(DecodeErrorKind::Other))
+                .as_ref()
+                .canonical(),
+            Err(DecodeErrorKind::Other)
+        );
+        assert_eq!(
+            Result::<Canonicity, DecodeError>::Err(DecodeError::new(DecodeErrorKind::Other))
+                .as_ref()
+                .canonical_with_extensions(),
+            Err(DecodeErrorKind::Other)
+        );
+        assert_eq!(
+            Result::<Canonicity, DecodeError>::Err(DecodeError::new(DecodeErrorKind::Other))
+                .as_ref()
+                .value(),
+            Err(DecodeErrorKind::Other)
+        );
+
+        // `Result<(T, Canonicity), DecodeErrorKind>` with Ok
+        assert_eq!(
+            Result::<_, DecodeErrorKind>::Ok(("foo", Canonical)).canonical(),
+            Ok("foo")
+        );
+        assert_eq!(
+            Result::<_, DecodeErrorKind>::Ok(("foo", HasExtensions)).canonical(),
+            Err(DecodeErrorKind::UnknownField)
+        );
+        assert_eq!(
+            Result::<_, DecodeErrorKind>::Ok(("foo", NotCanonical)).canonical(),
+            Err(DecodeErrorKind::NotCanonical)
+        );
+        assert_eq!(
+            Result::<_, DecodeErrorKind>::Ok(("foo", Canonical)).canonical_with_extensions(),
+            Ok("foo")
+        );
+        assert_eq!(
+            Result::<_, DecodeErrorKind>::Ok(("foo", HasExtensions)).canonical_with_extensions(),
+            Ok("foo")
+        );
+        assert_eq!(
+            Result::<_, DecodeErrorKind>::Ok(("foo", NotCanonical)).canonical_with_extensions(),
+            Err(DecodeErrorKind::NotCanonical)
+        );
+        assert_eq!(
+            Result::<_, DecodeErrorKind>::Ok(("foo", Canonical)).value(),
+            Ok("foo")
+        );
+        assert_eq!(
+            Result::<_, DecodeErrorKind>::Ok(("foo", HasExtensions)).value(),
+            Ok("foo")
+        );
+        assert_eq!(
+            Result::<_, DecodeErrorKind>::Ok(("foo", NotCanonical)).value(),
+            Ok("foo")
+        );
+
+        // `Result<&(T, Canonicity), &DecodeErrorKind>` with Ok
+        assert_eq!(
+            Result::<_, DecodeErrorKind>::Ok(("foo", Canonical))
+                .as_ref()
+                .canonical(),
+            Ok(&"foo")
+        );
+        assert_eq!(
+            Result::<_, DecodeErrorKind>::Ok(("foo", HasExtensions))
+                .as_ref()
+                .canonical(),
+            Err(DecodeErrorKind::UnknownField)
+        );
+        assert_eq!(
+            Result::<_, DecodeErrorKind>::Ok(("foo", NotCanonical))
+                .as_ref()
+                .canonical(),
+            Err(DecodeErrorKind::NotCanonical)
+        );
+        assert_eq!(
+            Result::<_, DecodeErrorKind>::Ok(("foo", Canonical))
+                .as_ref()
+                .canonical_with_extensions(),
+            Ok(&"foo")
+        );
+        assert_eq!(
+            Result::<_, DecodeErrorKind>::Ok(("foo", HasExtensions))
+                .as_ref()
+                .canonical_with_extensions(),
+            Ok(&"foo")
+        );
+        assert_eq!(
+            Result::<_, DecodeErrorKind>::Ok(("foo", NotCanonical))
+                .as_ref()
+                .canonical_with_extensions(),
+            Err(DecodeErrorKind::NotCanonical)
+        );
+        assert_eq!(
+            Result::<_, DecodeErrorKind>::Ok(("foo", Canonical))
+                .as_ref()
+                .value(),
+            Ok(&"foo")
+        );
+        assert_eq!(
+            Result::<_, DecodeErrorKind>::Ok(("foo", HasExtensions))
+                .as_ref()
+                .value(),
+            Ok(&"foo")
+        );
+        assert_eq!(
+            Result::<_, DecodeErrorKind>::Ok(("foo", NotCanonical))
+                .as_ref()
+                .value(),
+            Ok(&"foo")
+        );
+
+        // `Result<_, DecodeErrorKind>` with Err
+        assert_eq!(
+            Result::<Canonicity, DecodeErrorKind>::Err(DecodeErrorKind::Other).canonical(),
+            Err(DecodeErrorKind::Other)
+        );
+        assert_eq!(
+            Result::<Canonicity, DecodeErrorKind>::Err(DecodeErrorKind::Other)
+                .canonical_with_extensions(),
+            Err(DecodeErrorKind::Other)
+        );
+        assert_eq!(
+            Result::<Canonicity, DecodeErrorKind>::Err(DecodeErrorKind::Other).value(),
+            Err(DecodeErrorKind::Other)
+        );
+
+        // `Result<&_, &DecodeErrorKind>` with Err
+        assert_eq!(
+            Result::<Canonicity, DecodeErrorKind>::Err(DecodeErrorKind::Other)
+                .as_ref()
+                .canonical(),
+            Err(DecodeErrorKind::Other)
+        );
+        assert_eq!(
+            Result::<Canonicity, DecodeErrorKind>::Err(DecodeErrorKind::Other)
+                .as_ref()
+                .canonical_with_extensions(),
+            Err(DecodeErrorKind::Other)
+        );
+        assert_eq!(
+            Result::<Canonicity, DecodeErrorKind>::Err(DecodeErrorKind::Other)
+                .as_ref()
+                .value(),
+            Err(DecodeErrorKind::Other)
+        );
     }
 }
 
@@ -1656,7 +1993,7 @@ mod test {
     }
     check_type!(expedient, Encoder, decode);
     check_type!(distinguished, DistinguishedEncoder, decode_distinguished,
-        enforce with require_canonical);
+        enforce with canonical);
 
     fn present_and_defaulted_errs<T, E>()
     where

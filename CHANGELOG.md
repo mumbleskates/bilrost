@@ -2,9 +2,15 @@
 
 ### Breaking changes
 
+* Removed the recently added `RequireCanonicity` trait and fold its
+  functionality into `WithCanonicity` now that we figured out how to spell that.
+
 ### New features
 
 ### Fixes
+
+* `WithCanonicity::canonical_with_extensions` no longer swaps the meaning of
+  `Canonical` and `NotCanonical`
 
 ### Cleanups
 

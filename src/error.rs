@@ -56,6 +56,24 @@ impl fmt::Display for DecodeErrorKind {
     }
 }
 
+impl From<&DecodeErrorKind> for DecodeErrorKind {
+    fn from(value: &DecodeErrorKind) -> Self {
+        *value
+    }
+}
+
+impl From<DecodeError> for DecodeErrorKind {
+    fn from(value: DecodeError) -> Self {
+        value.kind()
+    }
+}
+
+impl From<&DecodeError> for DecodeErrorKind {
+    fn from(value: &DecodeError) -> Self {
+        value.kind()
+    }
+}
+
 /// A Bilrost message decoding error.
 ///
 /// `DecodeError` indicates that the input buffer does not contain a valid Bilrost message. The

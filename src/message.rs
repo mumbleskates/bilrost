@@ -557,7 +557,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::{DistinguishedMessage, Message, Vec};
-    use crate::RequireCanonicity;
+    use crate::WithCanonicity;
 
     const _MESSAGE_DYN_IS_OBJECT_SAFE: Option<&dyn Message> = None;
     const _DISTINGUISHED_MESSAGE_DYN_IS_OBJECT_SAFE: Option<&dyn DistinguishedMessage> = None;
@@ -589,7 +589,7 @@ mod tests {
         safe.replace_from_length_delimited_dyn(&mut [0u8].as_slice())
             .unwrap();
         safe.replace_distinguished_from_length_delimited_dyn(&mut [0u8].as_slice())
-            .require_canonical()
+            .canonical()
             .unwrap();
         safe.clear();
 
