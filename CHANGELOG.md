@@ -1,12 +1,10 @@
 ## 0.1002.1
 
-### Breaking changes
-
-### New features
-
 ### Fixes
 
-### Cleanups
+* `WithCanonicity::canonical_with_extensions` and
+  `RequireCanonicity::allow_extensions` no longer swap the meaning of
+  `Canonical` and `NotCanonical`.
 
 ## 0.1002.0
 
