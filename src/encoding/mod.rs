@@ -766,6 +766,7 @@ where
     }
 }
 
+#[allow(clippy::let_unit_value)]
 #[cfg(test)]
 mod with_canonicity {
     use super::{
