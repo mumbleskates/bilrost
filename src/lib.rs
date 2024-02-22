@@ -2,11 +2,9 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![doc = include_str!("../README.md")]
 
-// Re-export the alloc crate for use within derived code.
-#[doc(hidden)]
-pub extern crate alloc;
+extern crate alloc;
 
-// Re-export the bytes crate for use within derived code.
+/// Re-export of the bytes crate for use within derived code.
 pub use bytes;
 
 #[cfg(feature = "derive")]

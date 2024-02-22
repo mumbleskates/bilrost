@@ -1,6 +1,6 @@
-use bilrost::alloc::collections::BTreeMap;
-use bilrost::alloc::string::String;
-use bilrost::alloc::vec::Vec;
+use alloc::collections::BTreeMap;
+use alloc::string::String;
+use alloc::vec::Vec;
 use bilrost::Message;
 
 /// A Duration represents a signed, fixed-length span of time represented
