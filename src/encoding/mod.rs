@@ -653,7 +653,7 @@ pub trait WithCanonicity {
     fn canonical_with_extensions(self) -> Result<Self::Value, DecodeErrorKind>;
 
     /// Discards the canonicity.
-    /// 
+    ///
     /// If this method is always being used and canonicity information is always discarded,
     /// distinguished decoding may not be needed, and the program can be made more efficient by
     /// simply using expedient decoding mode.
@@ -814,7 +814,7 @@ where
 mod with_canonicity {
     use super::{
         Canonicity::{self, *},
-        DecodeError, DecodeErrorKind, WithCanonicity, RequireCanonicity,
+        DecodeError, DecodeErrorKind, RequireCanonicity, WithCanonicity,
     };
 
     #[test]
@@ -1080,8 +1080,7 @@ mod with_canonicity {
             Err(DecodeErrorKind::Other)
         );
         assert_eq!(
-            Result::<Canonicity, DecodeErrorKind>::Err(DecodeErrorKind::Other)
-                .allow_extensions(),
+            Result::<Canonicity, DecodeErrorKind>::Err(DecodeErrorKind::Other).allow_extensions(),
             Err(DecodeErrorKind::Other)
         );
         assert_eq!(
