@@ -1784,7 +1784,7 @@ mod test {
     use crate::Blob;
     use crate::DecodeErrorKind::{OutOfDomainValue, WrongWireType};
 
-    /// Generalized proptest macro. Kind must be either `expedient`, `hashable`, or `distinguished`.
+    /// Generalized proptest macro. Kind must be either `expedient` or `distinguished`.
     macro_rules! check_type_test {
         ($encoder:ty, $kind:ident, $ty:ty, $wire_type:expr) => {
             crate::encoding::test::check_type_test!($encoder, $kind, from $ty, into $ty,
