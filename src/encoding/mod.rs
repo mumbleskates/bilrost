@@ -656,7 +656,7 @@ pub trait WithCanonicity {
     fn canonical_with_extensions(self) -> Result<Self::Value, DecodeErrorKind>;
 
     /// Discards the canonicity.
-    /// 
+    ///
     /// If this method is always being used and canonicity information is always discarded,
     /// distinguished decoding may not be needed, and the program can be made more efficient by
     /// simply using expedient decoding mode.
@@ -699,7 +699,7 @@ impl WithCanonicity for &Canonicity {
 
     fn canonical_with_extensions(self) -> Result<(), DecodeErrorKind> {
         match self {
-            Canonicity::NotCanonical => Err(NotCanonical), 
+            Canonicity::NotCanonical => Err(NotCanonical),
             Canonicity::HasExtensions | Canonicity::Canonical => Ok(()),
         }
     }
