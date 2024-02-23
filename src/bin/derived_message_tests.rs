@@ -663,13 +663,13 @@ mod derived_message_tests {
 
     #[test]
     fn field_clearing() {
-        use std::collections::{BTreeMap, BTreeSet};
         use bilrost::Blob;
         use bytes::Bytes;
         #[cfg(feature = "bytestring")]
         use bytestring::ByteString;
         #[cfg(feature = "smallvec")]
         use smallvec::SmallVec;
+        use std::collections::{BTreeMap, BTreeSet};
         #[cfg(feature = "std")]
         use std::collections::{HashMap, HashSet};
         #[cfg(feature = "thin-vec")]
