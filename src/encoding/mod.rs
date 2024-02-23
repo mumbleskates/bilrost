@@ -1771,7 +1771,6 @@ pub(crate) use empty_state_via_default;
 #[cfg(test)]
 mod test {
     use alloc::collections::{BTreeMap, BTreeSet};
-    #[cfg(not(feature = "std"))]
     use alloc::format;
     use alloc::string::{String, ToString};
     use alloc::vec::Vec;

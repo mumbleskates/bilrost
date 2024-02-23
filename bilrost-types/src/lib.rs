@@ -1,3 +1,4 @@
+#![no_std]
 #![doc(html_root_url = "https://docs.rs/bilrost-types/0.1003.0-dev")]
 
 //! Analogs for protobuf well-known types, implemented alongside the
@@ -9,9 +10,9 @@
 //!
 //! [proto]: https://developers.google.com/protocol-buffers/docs/reference/google.protobuf
 
-#![cfg_attr(not(feature = "std"), no_std)]
-
 extern crate alloc;
+#[cfg(feature = "std")]
+extern crate std;
 
 mod datetime;
 mod types;
@@ -481,9 +482,11 @@ mod tests {
     use super::*;
 
     #[cfg(feature = "std")]
-    use proptest::prelude::*;
-    #[cfg(feature = "std")]
-    use std::time::{self, SystemTime, UNIX_EPOCH};
+    use ::{
+        alloc::format,
+        proptest::prelude::*,
+        std::time::{self, SystemTime, UNIX_EPOCH},
+    };
 
     use crate::datetime::DateTime;
 
@@ -699,28 +702,28 @@ mod tests {
             Timestamp::from(UNIX_EPOCH - time::Duration::new(1_001, 0)),
             Timestamp {
                 seconds: -1_001,
-                nanos: 0
+                nanos: 0,
             }
         );
         assert_eq!(
             Timestamp::from(UNIX_EPOCH - time::Duration::new(0, 999_999_900)),
             Timestamp {
                 seconds: -1,
-                nanos: 100
+                nanos: 100,
             }
         );
         assert_eq!(
             Timestamp::from(UNIX_EPOCH - time::Duration::new(2_001_234, 12_300)),
             Timestamp {
                 seconds: -2_001_235,
-                nanos: 999_987_700
+                nanos: 999_987_700,
             }
         );
         assert_eq!(
             Timestamp::from(UNIX_EPOCH - time::Duration::new(768, 65_432_100)),
             Timestamp {
                 seconds: -769,
-                nanos: 934_567_900
+                nanos: 934_567_900,
             }
         );
     }
@@ -733,21 +736,21 @@ mod tests {
             Timestamp::from(UNIX_EPOCH - time::Duration::new(0, 999_999_999)),
             Timestamp {
                 seconds: -1,
-                nanos: 1
+                nanos: 1,
             }
         );
         assert_eq!(
             Timestamp::from(UNIX_EPOCH - time::Duration::new(1_234_567, 123)),
             Timestamp {
                 seconds: -1_234_568,
-                nanos: 999_999_877
+                nanos: 999_999_877,
             }
         );
         assert_eq!(
             Timestamp::from(UNIX_EPOCH - time::Duration::new(890, 987_654_321)),
             Timestamp {
                 seconds: -891,
-                nanos: 12_345_679
+                nanos: 12_345_679,
             }
         );
     }

@@ -3,6 +3,9 @@
 
 use core::fmt;
 
+#[cfg(all(test, feature = "std"))]
+use ::{alloc::format, alloc::string::ToString};
+
 use crate::Duration;
 use crate::Timestamp;
 

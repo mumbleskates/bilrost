@@ -8,15 +8,10 @@ fn main() {
 
 #[cfg(test)]
 mod derived_message_tests {
-    extern crate alloc;
-
-    use alloc::borrow::Cow;
-    use alloc::string::{String, ToString};
-    use alloc::vec;
-    use alloc::vec::Vec;
-    use core::default::Default;
-    use core::fmt::Debug;
-    use core::iter;
+    use std::borrow::Cow;
+    use std::default::Default;
+    use std::fmt::Debug;
+    use std::iter;
 
     use itertools::{repeat_n, Itertools};
 
@@ -668,7 +663,7 @@ mod derived_message_tests {
 
     #[test]
     fn field_clearing() {
-        use alloc::collections::{BTreeMap, BTreeSet};
+        use std::collections::{BTreeMap, BTreeSet};
         use bilrost::Blob;
         use bytes::Bytes;
         #[cfg(feature = "bytestring")]
@@ -1368,7 +1363,7 @@ mod derived_message_tests {
         )];
 
         {
-            use alloc::collections::BTreeMap;
+            use std::collections::BTreeMap;
             assert::decodes_distinguished(
                 valid_map,
                 Foo(BTreeMap::from([
@@ -1678,7 +1673,7 @@ mod derived_message_tests {
         let expected_items = ["foo".to_string(), "bar".to_string(), "baz".to_string()];
 
         {
-            use alloc::collections::BTreeSet;
+            use std::collections::BTreeSet;
             assert::decodes_distinguished(
                 valid_set_packed,
                 Foo(BTreeSet::from(expected_items.clone()), BTreeSet::new()),
@@ -1773,7 +1768,7 @@ mod derived_message_tests {
         // In expedient mode, packed sets will decode unpacked values and vice versa, but this is
         // only detectable when the values are not length-delimited.
         {
-            use alloc::collections::BTreeSet;
+            use std::collections::BTreeSet;
             for (unmatching_packed, unmatching_unpacked) in [&valid, &disordered] {
                 assert::decodes_non_canonically(
                     unmatching_packed,
@@ -1868,7 +1863,7 @@ mod derived_message_tests {
     #[test]
     fn truncated_packed_collection() {
         {
-            use alloc::vec::Vec;
+            use std::vec::Vec;
             truncated_packed_string::<Vec<String>>();
             truncated_packed_int::<Vec<u64>>();
         }
@@ -1895,7 +1890,7 @@ mod derived_message_tests {
             truncated_packed_int::<TinyVec<[u64; 2]>>();
         }
         {
-            use alloc::collections::BTreeSet;
+            use std::collections::BTreeSet;
             truncated_packed_string::<BTreeSet<String>>();
             truncated_packed_int::<BTreeSet<u64>>();
         }

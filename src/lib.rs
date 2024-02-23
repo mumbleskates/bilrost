@@ -1,8 +1,10 @@
+#![no_std]
 #![doc(html_root_url = "https://docs.rs/bilrost/0.1003.0-dev")]
-#![cfg_attr(not(feature = "std"), no_std)]
 #![doc = include_str!("../README.md")]
 
 extern crate alloc;
+#[cfg(feature = "std")]
+extern crate std;
 
 /// Re-export of the bytes crate for use within derived code.
 pub use bytes;
