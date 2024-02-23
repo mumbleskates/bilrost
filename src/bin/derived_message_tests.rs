@@ -1464,7 +1464,7 @@ mod derived_message_tests {
     #[test]
     fn truncated_map() {
         {
-            use alloc::collections::BTreeMap;
+            use std::collections::BTreeMap;
             truncated_bool_string_map::<BTreeMap<bool, String>>();
             truncated_string_int_map::<BTreeMap<String, u64>>();
         }
