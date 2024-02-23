@@ -1,5 +1,3 @@
-#[cfg(all(test, not(feature = "std")))]
-use alloc::format;
 use core::cmp::{min, Eq, PartialEq};
 use core::convert::TryFrom;
 use core::default::Default;
@@ -1774,6 +1772,8 @@ pub(crate) use empty_state_via_default;
 #[cfg(test)]
 mod test {
     use alloc::collections::{BTreeMap, BTreeSet};
+    #[cfg(not(feature = "std"))]
+    use alloc::format;
     use alloc::string::{String, ToString};
     use alloc::vec::Vec;
     use core::borrow::Borrow;
@@ -1781,7 +1781,7 @@ mod test {
 
     use proptest::{prelude::*, test_runner::TestCaseResult};
 
-    use crate::encoding::*;
+    use super::*;
     use crate::Blob;
     use crate::DecodeErrorKind::{OutOfDomainValue, WrongWireType};
 
