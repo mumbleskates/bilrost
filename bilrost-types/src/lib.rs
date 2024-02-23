@@ -16,7 +16,6 @@ extern crate alloc;
 mod datetime;
 mod types;
 
-use core::convert::TryFrom;
 use core::fmt;
 use core::str::FromStr;
 use core::time;
