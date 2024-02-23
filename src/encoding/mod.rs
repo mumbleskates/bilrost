@@ -1782,7 +1782,7 @@ mod test {
 
     use super::*;
     use crate::Blob;
-    use crate::DecodeErrorKind::{OutOfDomainValue, WrongWireType};
+    use crate::DecodeErrorKind::OutOfDomainValue;
 
     /// Generalized proptest macro. Kind must be either `expedient` or `distinguished`.
     macro_rules! check_type_test {
