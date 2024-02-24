@@ -542,7 +542,9 @@ enum NameOrUUID {
     #[bilrost(2)]
     Name(String),
     #[bilrost(tag(3), encoder(plainbytes))]
-    UUID { octets: [u8; 16] },
+    UUID {
+        octets: [u8; 16],
+    },
     Neither,
 }
 
@@ -686,6 +688,71 @@ support distinguished decoding in order to support it themselves. Distinguished
 encoding requires `Eq` be implemented for each field, oneof, and message type;
 the trait is not used directly, but is trivial to derive for any compatible
 type.
+
+<details><summary>Example</summary>
+
+```rust,
+use bilrost::{
+    DistinguishedMessage, DistinguishedOneof, Message, Oneof,
+    WithCanonicity,
+};
+use bytes::Bytes;
+use std::collections::BTreeMap;
+
+#[derive(Debug, PartialEq, Eq, Oneof, DistinguishedOneof)]
+enum PubKeyMaterial {
+    Empty,
+    #[bilrost(1)]
+    Rsa(Bytes),
+    #[bilrost(2)]
+    ED25519(Bytes),
+}
+
+use PubKeyMaterial::*;
+
+#[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+struct PubKey {
+    #[bilrost(oneof(1, 2))]
+    key: PubKeyMaterial,
+    #[bilrost(3)]
+    expiry: i64, // See also: `bilrost_types::Timestamp`
+}
+
+#[derive(Debug, Default, PartialEq, Eq, Message, DistinguishedMessage)]
+struct PubKeyRegistry {
+    keys_by_owner: BTreeMap<String, PubKey>,
+}
+
+let mut registry = PubKeyRegistry::default();
+registry.keys_by_owner.insert(
+    "Alice".to_string(),
+    PubKey {
+        key: ED25519(Bytes::from_static(b"not a secret")),
+        expiry: 1600999999,
+    },
+);
+registry.keys_by_owner.insert(
+    "Bob".to_string(),
+    PubKey {
+        key: Rsa(Bytes::from_static(b"pkey")),
+        expiry: 1500000001,
+    },
+);
+let encoded = registry.encode_to_vec();
+assert_eq!(
+    encoded,
+    b"\x05\x2c\
+      \x05Alice\x14\x09\x0cnot a secret\x04\xfe\xc7\xe9\xf5\x0a\
+      \x03Bob\x0c\x05\x04pkey\x08\x82\xbb\xc0\x95\x0a"
+        .as_slice()
+);
+let decoded = PubKeyRegistry::decode_distinguished(encoded.as_slice())
+    .canonical() // Check that the decoded data was canonical
+    .unwrap();
+assert_eq!(registry, decoded);
+```
+
+</details>
 
 ### Encoding and decoding messages
 
