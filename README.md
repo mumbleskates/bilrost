@@ -756,7 +756,50 @@ assert_eq!(registry, decoded);
 
 ### Encoding and decoding messages
 
-TODO: this
+There are a variety of methods and associated functions available for encoding
+and decoding data in `Message` implementations:
+
+* `encode`: encodes the message into a `&mut bytes::BufMut`
+* `encode_length_delimited`: encodes the message prefixed with a length
+  delimiter
+* `decode`, `decode_length_delimited`: decodes the message likewise, from a
+  `bytes::Buf`
+* `replace_from`, `replace_from_length_delimited`: like `decode`, but rather
+  than returning a `Result` with a new instance of the message, these are
+  mutating methods that replace the value in an existing instance. If decoding
+  fails, the message will be left with its fields empty.
+* `encode_to_vec`, `encode_to_slice`, `encode_length_delimited_to_vec`, ...:
+  encodes the message into a new vec or bytes and returns that container
+* There are also `encode_dyn`, `replace_from_slice`, and `replace_from_dyn`
+  methods for encoding and decoding that do not provide anything the above
+  methods do not, but are callable from a trait object.
+
+#### Decoding in distinguished mode
+
+`DistinguishedMessage` has corresponding methods for decoding and replacing
+named `decode_distinguished_..` and `replace_distinguished_..`. Instead of
+returning `Result<(), DecodeError>` or `Result<Foo, DecodeError>`, these return
+`Result<Canonicity, DecodeError>` or `Result<(Foo, Canonicity), DecodeError>`.
+`Canonicity` is a simple enum that indicates whether the decoded data was
+`Canonical`, `HasExtensions`, or is `NotCanonical`.
+
+The `bilrost::WithCanonicity` trait is made available to unwrap values and
+results that have canonicity information:
+
+* `.canonical()`: Converts to an error if not fully canonical, otherwise unwraps
+* `.canonical_with_extensions()`: Converts to an error if any *known* fields
+  were not canonical, otherwise unwraps
+* `.value()`: Always unwraps, discarding the canonicity information.
+
+This trait is implemented for `Canonicity` itself, `(T, Canonicity)`, `Result`
+types where the value implements `WithCanonicity` and the error is convertible
+to `DecodeErrorKind`, and corresponding references/[`.as_ref()`][resref] types.
+The error in the returned result types is `DecodeErrorKind`, which discards any
+"detailed-errors" information that would have indicated which field a decode
+error occurred in; if that information is needed, check the decoding error
+before the canonicity error.
+
+[resref]: https://doc.rust-lang.org/std/result/enum.Result.html#method.as_ref
 
 #### Using `dyn` with object-safe message traits
 
