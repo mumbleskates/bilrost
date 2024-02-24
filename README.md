@@ -447,8 +447,6 @@ When defining message types for interoperation, or when fields are likely to
 be added, removed, or shuffled, it may be good practice to explicitly specify
 the tags of all fields in a struct instead, but this is not mandatory.
 
-TODO: clean up this example
-
 ```rust,
 use bilrost::{Enumeration, Message};
 
@@ -457,27 +455,32 @@ struct Person {
     #[bilrost(tag = 1)]
     pub id: String, // tag=1
     // NOTE: Old "name" field has been removed
-    // pub name: String, // tag=2 (Removed)
+    // pub name: String,
+    // given_name has tag 6
     #[bilrost(6)]
-    pub given_name: String, // tag=6
-    pub family_name: String,    // tag=7
-    pub formatted_name: String, // tag=8
+    pub given_name: String,
+    // family_name has tag 7
+    pub family_name: String,
+    // formatted_name has tag 8
+    pub formatted_name: String,
+    // age has tag 3
     #[bilrost(tag = "3")]
-    pub age: u32, // tag=3
-    pub height: u32,            // tag=4
+    pub age: u32,
+    // height has tag 4
+    pub height: u32,
+    // gender has tag 5
     #[bilrost(enumeration(Gender))]
-    pub gender: u32, // tag=5
+    pub gender: u32,
     // NOTE: Skip to less commonly occurring fields
     #[bilrost(tag(16))]
-    pub name_prefix: String, // tag=16  (eg. mr/mrs/ms)
-    pub name_suffix: String, // tag=17  (eg. jr/esq)
-    pub maiden_name: String, // tag=18
+    pub name_prefix: String, // has tag 16  (eg. mr/mrs/ms)
+    pub name_suffix: String, // has tag 17  (eg. jr/esq)
+    pub maiden_name: String, // has tag 18
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Enumeration)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Enumeration)]
 #[non_exhaustive]
 pub enum Gender {
-    #[default]
     Unknown = 0,
     Female = 1,
     Male = 2,
@@ -492,6 +495,8 @@ may be present at a time. These are represented by `enum` types where each
 variant has one field and is assigned a field tag; the `Oneof` derive macro can
 then be used to derive an implementation that allow the oneof to be included in
 a message.
+
+<details><summary>Example message with a oneof</summary>
 
 ```rust
 use bilrost::{Message, Oneof};
@@ -515,6 +520,8 @@ struct Widget {
 }
 ```
 
+</details>
+
 When the oneof is included in a message, it has to be declared with the "oneof"
 attribute, providing a comma-separated list of all its field tags. (This
 attribute can also be spelled like `oneof = "2, 3"`.) It isn't possible for the
@@ -533,6 +540,8 @@ In the example above, the `NameOrUUID` oneof must be nested in an `Option` to
 enable it to represent the empty state where none of its fields are present. It
 is also possible to include *up to one* unit variant in a oneof enum. Any such
 variant will be used to represent its empty state.
+
+<details><summary>Example of a oneof with an "empty" variant</summary>
 
 ```rust
 use bilrost::{Message, Oneof};
@@ -558,6 +567,8 @@ struct Widget {
     description: String,
 }
 ```
+
+</details>
 
 When a oneof enum type has the empty variant, it can only be included in a
 message directly; when it has none, it can only be included nested within an
