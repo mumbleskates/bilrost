@@ -42,10 +42,9 @@ is designed to be easily used by hand.
 
 ## Contents
 
-TODO: reorder the whole document to reconcile with the TOC
-
 - [Quick start](#getting-started)
     - [Using the derive macros](#deriving-message)
+    - [Encoding and decoding](#encoding-and-decoding-messages)
     - [`no_std` support](#no_std-support)
     - [Changelog](./CHANGELOG.md) ([on github][ghchangelog])
 - [Differences from `prost`](#bilrost-vs-prost)
@@ -870,6 +869,43 @@ break compatibility with distinguished decoding in both directions whenever the
 field is present and not [empty](#empty-values) because it will also change the
 encoded representation, but expedient decoding will still work.
 
+## Strengths, Aims, and Advantages
+
+Strengths of Bilrost's encoding include those of protocol buffers:
+
+* Encoded messages are very durable, with greatly extensible forward
+  compatibility
+* Encoded messages are relatively very compact, and their representation "on the
+  wire" is very simple
+* The encoding is minimally[^floatbits] platform-dependent; each byte is
+  specified, and there are no endianness incompatibility issues
+* When decoding, text-string and byte-string data is represented verbatim and
+  can be referenced without copying
+* Skipping irrelevant, undesired, or unknown-extension data is inexpensive as
+  most nested and repeated fields are stored with a length prefix
+
+...as well as more:
+
+* In Bilrost, decoded data means what it says. If a value is decoded, it
+  contains all the information that was present in the encoding (no silent
+  integer truncation!)
+* Bilrost supports distinguished decoding for types where it makes sense, and is
+  designed from a protocol level to make invalid values unrepresentable where
+  possible
+* Bilrost is more compact than protobuf without incurring significant overhead.
+  nuances of representation in protobuf that Bilrost cannot represent or has no
+  analog for are either permanently deprecated, or all conforming decoders are
+  required to discard the difference anyway.
+* `bilrost` aims to be as ergonomic as is practical in plain rust, with basic
+  annotations and derive macros. It's possible for such a library to be quite
+  nice to use!
+
+[^floatbits]: The main area of potential incompatibility is with the
+representation of signaling vs. quiet NaN floating point values; see
+[`f64::from_bits()`][floatbits].
+
+[floatbits]: https://doc.rust-lang.org/std/primitive.f64.html#method.from_bits
+
 ## What Bilrost and the library won't do
 
 Bilrost does *not* have a robust reflection ecosystem. It does not (yet) have an
@@ -1410,40 +1446,6 @@ schemaless (key names are encoded in the data):
 * cbor
 * ion
 * XML
-
-## Strengths, Aims, and Advantages
-
-Strengths of Bilrost's encoding include those of protocol buffers:
-
-* the encoded messages are very durable, with greatly extensible forward
-  compatibility
-* the encoded messages are relatively very compact, and their representation "on
-  the wire" is very simple
-* the encoding is minimally[^floatbits] platform-dependent; each byte is
-  specified, and there are no endianness incompatibility issues
-* when decoding, string and byte-string data is represented verbatim and can be
-  referenced without copying
-* skipping irrelevant or undesired data is inexpensive, as most nested and
-  repeated is stored with a length prefix
-
-...as well as more:
-
-* Bilrost supports distinguished decoding for types where it makes sense, and is
-  designed from a protocol level to make invalid values unrepresentable where
-  possible
-* Bilrost is more compact than protobuf without incurring significant overhead.
-  nuances of representation in protobuf that Bilrost cannot represent or has no
-  analog for are either permanently deprecated, or all conforming decoders are
-  required to discard the difference anyway.
-* `bilrost` aims to be as ergonomic as is practical in plain rust, with basic
-  annotations and derive macros. It's possible for such a library to be quite
-  nice to use!
-
-[^floatbits]: The main area of potential incompatibility is with the
-representation of signaling vs. quiet NaN floating point values; see
-[`f64::from_bits()`][floatbits].
-
-[floatbits]: https://doc.rust-lang.org/std/primitive.f64.html#method.from_bits
 
 ## FAQ
 
