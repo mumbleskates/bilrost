@@ -302,9 +302,9 @@ pub enum WireType {
     SixtyFourBit = 3,
 }
 
-impl From<u64> for WireType {
+impl From<u8> for WireType {
     #[inline]
-    fn from(value: u64) -> Self {
+    fn from(value: u8) -> Self {
         match value & 0b11 {
             0 => WireType::Varint,
             1 => WireType::LengthDelimited,
@@ -398,7 +398,7 @@ impl TagReader {
             .last_tag
             .checked_add(tag_delta)
             .ok_or_else(|| DecodeError::new(TagOverflowed))?;
-        let wire_type = WireType::from(key);
+        let wire_type = WireType::from(key as u8);
         self.last_tag = tag;
         Ok((tag, wire_type))
     }

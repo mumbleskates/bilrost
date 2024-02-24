@@ -3,7 +3,7 @@ use core::cmp::min;
 
 use crate::encoding::value_traits::{Collection, DistinguishedCollection};
 use crate::encoding::{
-    encode_varint, encoded_len_varint, Canonicity, Capped, DecodeContext, DecodeError,
+    encode_varint, encoded_len_varint, unpacked, Canonicity, Capped, DecodeContext, DecodeError,
     DistinguishedEncoder, DistinguishedValueEncoder, Encoder, FieldEncoder, General,
     NewForOverwrite, TagMeasurer, TagWriter, ValueEncoder, WireType, Wiretyped,
 };
@@ -122,18 +122,15 @@ where
         buf: Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
+        if duplicated {
+            return Err(DecodeError::new(UnexpectedlyRepeated));
+        }
         if wire_type == WireType::LengthDelimited {
             // We've encountered the expected length-delimited type: decode it in packed format.
-            if duplicated {
-                return Err(DecodeError::new(UnexpectedlyRepeated));
-            }
             Self::decode_value(value, buf, ctx)
         } else {
             // Otherwise, try decoding it in the unpacked representation
-            // TODO(widders): we would take more fields greedily here
-            let mut new_val = T::new_for_overwrite();
-            E::decode_field(wire_type, &mut new_val, buf, ctx)?;
-            Ok(value.insert(new_val)?)
+            unpacked::decode::<C, E>(wire_type, value, buf, ctx)
         }
     }
 }
@@ -142,7 +139,7 @@ impl<C, T, E> DistinguishedEncoder<C> for Packed<E>
 where
     C: DistinguishedCollection<Item = T>,
     T: NewForOverwrite + Eq,
-    E: DistinguishedValueEncoder<T> + FieldEncoder<T>,
+    E: DistinguishedValueEncoder<T> + ValueEncoder<T>,
     Self: DistinguishedValueEncoder<C> + Encoder<C>,
 {
     #[inline]
@@ -153,20 +150,16 @@ where
         buf: Capped<B>,
         ctx: DecodeContext,
     ) -> Result<Canonicity, DecodeError> {
+        if duplicated {
+            return Err(DecodeError::new(UnexpectedlyRepeated));
+        }
         if wire_type == WireType::LengthDelimited {
             // We've encountered the expected length-delimited type: decode it in packed format.
-            if duplicated {
-                return Err(DecodeError::new(UnexpectedlyRepeated));
-            }
             // Set allow_empty=false: empty collections are not canonical
             Self::decode_value_distinguished(value, buf, false, ctx)
         } else {
             // Otherwise, try decoding it in the unpacked representation
-            // TODO(widders): we would take more fields greedily here
-            let mut new_val = T::new_for_overwrite();
-            // The data is already known to be non-canonical; use expedient decoding
-            E::decode_field(wire_type, &mut new_val, buf, ctx)?;
-            value.insert(new_val)?;
+            unpacked::decode::<C, E>(wire_type, value, buf, ctx)?;
             Ok(Canonicity::NotCanonical)
         }
     }

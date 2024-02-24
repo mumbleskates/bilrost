@@ -1,24 +1,105 @@
 use bytes::{Buf, BufMut};
-use core::cmp::min;
 
 use crate::encoding::value_traits::{Collection, DistinguishedCollection};
 use crate::encoding::{
-    Capped, DecodeContext, DistinguishedEncoder, DistinguishedFieldEncoder,
-    DistinguishedValueEncoder, Encoder, FieldEncoder, General, NewForOverwrite, Packed,
-    TagMeasurer, TagWriter, ValueEncoder, WireType,
+    check_wire_type, Capped, DecodeContext, DistinguishedEncoder, DistinguishedValueEncoder,
+    Encoder, FieldEncoder, General, NewForOverwrite, Packed, TagMeasurer, TagWriter, ValueEncoder,
+    WireType,
 };
 use crate::DecodeErrorKind::UnexpectedlyRepeated;
 use crate::{Canonicity, DecodeError};
 
 pub struct Unpacked<E = General>(E);
 
+/// Returns `Some` if there are more bytes in the buffer and the next data in the buffer begins
+/// with a "repeated" field key (a key with a tag delta of zero).
+#[inline(always)]
+fn peek_repeated_field<B: Buf + ?Sized>(buf: &mut Capped<B>) -> Option<WireType> {
+    if !buf.has_remaining() {
+        return None;
+    }
+    // Peek the first byte of the next field's key.
+    let peek_key = buf.chunk()[0];
+    if peek_key >= 4 {
+        return None; // The next field has a different tag than this one.
+    }
+    // The next field's key has a repeated tag (its delta is zero). Consume the peeked key and
+    // return its wire type
+    buf.advance(1);
+    Some(WireType::from(peek_key))
+}
+
+/// Decodes a collection value from the unpacked representation. This greedily consumes consecutive
+/// fields as long as they have the same tag.
+pub(crate) fn decode<T, E>(
+    wire_type: WireType,
+    collection: &mut T,
+    mut buf: Capped<impl Buf + ?Sized>,
+    ctx: DecodeContext,
+) -> Result<(), DecodeError>
+where
+    T: Collection,
+    E: ValueEncoder<T::Item>,
+    T::Item: NewForOverwrite,
+{
+    check_wire_type(E::WIRE_TYPE, wire_type)?;
+    loop {
+        // Decode one item
+        let mut new_item = T::Item::new_for_overwrite();
+        E::decode_value(&mut new_item, buf.lend(), ctx.clone())?;
+        collection.insert(new_item)?;
+
+        if let Some(next_wire_type) = peek_repeated_field(&mut buf) {
+            check_wire_type(E::WIRE_TYPE, next_wire_type)?;
+        } else {
+            break;
+        }
+    }
+    Ok(())
+}
+
+/// Decodes a collection value from the unpacked representation in distinguished mode. This greedily
+/// consumes consecutive fields as long as they have the same tag.
+pub(crate) fn decode_distinguished<T, E>(
+    wire_type: WireType,
+    collection: &mut T,
+    mut buf: Capped<impl Buf + ?Sized>,
+    ctx: DecodeContext,
+) -> Result<Canonicity, DecodeError>
+where
+    T: DistinguishedCollection,
+    E: DistinguishedValueEncoder<T::Item>,
+    T::Item: NewForOverwrite + Eq,
+{
+    check_wire_type(E::WIRE_TYPE, wire_type)?;
+    let mut canon = Canonicity::Canonical;
+    loop {
+        // Decode one item
+        let mut new_item = T::Item::new_for_overwrite();
+        canon.update(E::decode_value_distinguished(
+            &mut new_item,
+            buf.lend(),
+            true,
+            ctx.clone(),
+        )?);
+        canon.update(collection.insert_distinguished(new_item)?);
+
+        if let Some(next_wire_type) = peek_repeated_field(&mut buf) {
+            check_wire_type(E::WIRE_TYPE, next_wire_type)?;
+        } else {
+            break;
+        }
+    }
+    Ok(canon)
+}
+
 /// Unpacked encodes vecs as repeated fields and in relaxed decoding will accept both packed
 /// and un-packed encodings.
 impl<C, T, E> Encoder<C> for Unpacked<E>
 where
     C: Collection<Item = T>,
-    E: ValueEncoder<T>,
     T: NewForOverwrite,
+    E: ValueEncoder<T>,
 {
     fn encode<B: BufMut + ?Sized>(tag: u32, value: &C, buf: &mut B, tw: &mut TagWriter) {
         for val in value.iter() {
@@ -42,19 +123,16 @@ where
         buf: Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
+        if duplicated {
+            return Err(DecodeError::new(UnexpectedlyRepeated));
+        }
         if wire_type == WireType::LengthDelimited && E::WIRE_TYPE != WireType::LengthDelimited {
             // We've encountered a length-delimited field when we aren't expecting one; try decoding
             // it in packed format instead.
-            if duplicated {
-                return Err(DecodeError::new(UnexpectedlyRepeated));
-            }
             Packed::<E>::decode_value(value, buf, ctx)
         } else {
-            // Otherwise, decode one field normally.
-            // TODO(widders): we would take more fields greedily here
-            let mut new_val = T::new_for_overwrite();
-            E::decode_field(wire_type, &mut new_val, buf, ctx)?;
-            Ok(value.insert(new_val)?)
+            // Otherwise, decode in unpacked mode.
+            decode::<C, E>(wire_type, value, buf, ctx)
         }
     }
 }
@@ -75,23 +153,18 @@ where
         buf: Capped<B>,
         ctx: DecodeContext,
     ) -> Result<Canonicity, DecodeError> {
+        if duplicated {
+            return Err(DecodeError::new(UnexpectedlyRepeated));
+        }
         if wire_type == WireType::LengthDelimited && E::WIRE_TYPE != WireType::LengthDelimited {
             // We've encountered a length-delimited field when we aren't expecting one; try decoding
             // it in packed format instead.
-            if duplicated {
-                return Err(DecodeError::new(UnexpectedlyRepeated));
-            }
             // The data is already known to be non-canonical; use expedient decoding
             <Packed<E>>::decode_value(value, buf, ctx)?;
             Ok(Canonicity::NotCanonical)
         } else {
-            // Otherwise, decode one field normally.
-            // TODO(widders): we would take more fields greedily here
-            let mut new_val = T::new_for_overwrite();
-            Ok(min(
-                E::decode_field_distinguished(wire_type, &mut new_val, buf, true, ctx)?,
-                value.insert_distinguished(new_val)?,
-            ))
+            // Otherwise, decode in unpacked mode.
+            decode_distinguished::<C, E>(wire_type, value, buf, ctx)
         }
     }
 }

@@ -56,6 +56,7 @@ mod derived_message_tests {
 
     impl IntoOpaqueMessage for Vec<u8> {
         fn into_opaque_message(self) -> OpaqueMessage {
+            <() as Message>::decode(self.as_slice()).expect("did not decode with ignore unit");
             OpaqueMessage::decode(self.as_slice()).expect("did not decode")
         }
     }
@@ -1312,18 +1313,74 @@ mod derived_message_tests {
     fn duplicated_packed_decoding() {
         #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
         struct Foo(#[bilrost(encoder = "packed")] Vec<bool>);
+        #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+        struct Bar(#[bilrost(encoder = "unpacked")] Vec<bool>);
 
         assert::decodes_distinguished([(1, OV::packed([OV::bool(true)]))], Foo(vec![true]));
+        assert::decodes_non_canonically(
+            [(1, OV::packed([OV::bool(true)]))],
+            Bar(vec![true]),
+            NotCanonical,
+        );
+
         assert::decodes_distinguished(
             [(1, OV::packed([OV::bool(true), OV::bool(false)]))],
             Foo(vec![true, false]),
         );
+        assert::decodes_non_canonically(
+            [(1, OV::packed([OV::bool(true), OV::bool(false)]))],
+            Bar(vec![true, false]),
+            NotCanonical,
+        );
+
+        // Two packed fields should never decode
         assert::never_decodes::<Foo>(
             [
                 (1, OV::packed([OV::bool(true), OV::bool(false)])),
                 (1, OV::packed([OV::bool(false)])),
             ],
             UnexpectedlyRepeated,
+        );
+        assert::never_decodes::<Bar>(
+            [
+                (1, OV::packed([OV::bool(true), OV::bool(false)])),
+                (1, OV::packed([OV::bool(false)])),
+            ],
+            UnexpectedlyRepeated,
+        );
+
+        // Packed followed by unpacked should never decode
+        assert::never_decodes::<Foo>(
+            [
+                (1, OV::packed([OV::bool(true), OV::bool(false)])),
+                (1, OV::bool(false)),
+            ],
+            UnexpectedlyRepeated,
+        );
+        assert::never_decodes::<Bar>(
+            [
+                (1, OV::packed([OV::bool(true), OV::bool(false)])),
+                (1, OV::bool(false)),
+            ],
+            UnexpectedlyRepeated,
+        );
+
+        // Unpacked followed by packed should never decode
+        assert::never_decodes::<Foo>(
+            [
+                (1, OV::bool(true)),
+                (1, OV::bool(false)),
+                (1, OV::packed([OV::bool(false)])),
+            ],
+            WrongWireType,
+        );
+        assert::never_decodes::<Bar>(
+            [
+                (1, OV::bool(true)),
+                (1, OV::bool(false)),
+                (1, OV::packed([OV::bool(false)])),
+            ],
+            WrongWireType,
         );
     }
 
