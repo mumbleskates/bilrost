@@ -485,16 +485,81 @@ pub enum Gender {
 }
 ```
 
-#### Oneof Fields
+#### Oneof fields
 
-Oneof fields are enums with their own derive macro, which represent multiple
-fields in the message, only one of which may be present in a valid message.
+Bilrost messages can have sets of mutually exclusive fields, only one of which
+may be present at a time. These are represented by `enum` types where each
+variant has one field and is assigned a field tag; the `Oneof` derive macro can
+then be used to derive an implementation that allow the oneof to be included in
+a message.
 
-TODO: expand
+```rust
+use bilrost::{Message, Oneof};
 
-* example usage
-* with & without empty variant
-* with both struct & tuple style variants
+#[derive(Oneof)]
+enum NameOrUUID {
+    #[bilrost(2)]
+    Name(String),
+    #[bilrost(tag(3), encoder(plainbytes))]
+    UUID([u8; 16]),
+}
+
+#[derive(Message)]
+struct Widget {
+    #[bilrost(1)]
+    id: u32,
+    #[bilrost(oneof(2, 3))]
+    label: Option<NameOrUUID>,
+    #[bilrost(4)]
+    description: String,
+}
+```
+
+When the oneof is included in a message, it has to be declared with the "oneof"
+attribute, providing a comma-separated list of all its field tags. (This
+attribute can also be spelled like `oneof = "2, 3"`.) It isn't possible for the
+derive macro to know what those tag numbers are when it runs because it can't
+have access to the definitions of the field's type, but the list of tags
+declared in this attribute and the list of tags that the oneof actually has are
+statically checked for equality at compile time.
+
+The field tags in the oneof must be unique, both within the oneof itself and
+within any message containing it. Oneof variants can only contain types that
+can be nested (so "unpacked" collections cannot be supported). Mechanically, a
+oneof works exactly the same as if there were an `Option<T>` field for each of
+its variants, except at most one of them can be `Some`.
+
+In the example above, the `NameOrUUID` oneof must be nested in an `Option` to
+enable it to represent the empty state where none of its fields are present. It
+is also possible to include *up to one* unit variant in a oneof enum. Any such
+variant will be used to represent its empty state.
+
+```rust
+use bilrost::{Message, Oneof};
+
+#[derive(Oneof)]
+enum NameOrUUID {
+    #[bilrost(2)]
+    Name(String),
+    #[bilrost(tag(3), encoder(plainbytes))]
+    UUID { octets: [u8; 16] },
+    Neither,
+}
+
+#[derive(Message)]
+struct Widget {
+    #[bilrost(1)]
+    id: u32,
+    #[bilrost(oneof(2, 3))]
+    label: NameOrUUID,
+    #[bilrost(4)]
+    description: String,
+}
+```
+
+When a oneof enum type has the empty variant, it can only be included in a
+message directly; when it has none, it can only be included nested within an
+`Option`.
 
 #### Encoders
 
