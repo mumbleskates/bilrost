@@ -10,7 +10,9 @@
 ### Fixes
 
 * `WithCanonicity::canonical_with_extensions` no longer swaps the meaning of
-  `Canonical` and `NotCanonical`
+  `Canonical` and `NotCanonical`.
+* More aggressive inlining for very hot functions may increase encoding/decoding
+  performance significantly.
 
 ### Cleanups
 
