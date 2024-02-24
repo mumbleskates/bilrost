@@ -47,7 +47,7 @@ pub use varint::Varint;
 
 /// Encodes an integer value into LEB128-bijective variable length format, and writes it to the
 /// buffer. The buffer must have enough remaining space (maximum 9 bytes).
-#[inline]
+#[inline(always)]
 pub fn encode_varint<B: BufMut + ?Sized>(mut value: u64, buf: &mut B) {
     for _ in 0..9 {
         if value < 0x80 {
@@ -61,7 +61,7 @@ pub fn encode_varint<B: BufMut + ?Sized>(mut value: u64, buf: &mut B) {
 }
 
 /// Decodes a LEB128-bijective-encoded variable length integer from the buffer.
-#[inline]
+#[inline(always)]
 pub fn decode_varint<B: Buf + ?Sized>(buf: &mut B) -> Result<u64, DecodeError> {
     let bytes = buf.chunk();
     let len = bytes.len();
@@ -100,7 +100,7 @@ pub fn decode_varint<B: Buf + ?Sized>(buf: &mut B) -> Result<u64, DecodeError> {
 ///
 /// [1]: https://github.com/google/protobuf/blob/3.3.x/src/google/protobuf/io/coded_stream.cc#L365-L406
 /// [2]: https://github.com/protocolbuffers/protobuf-go/blob/v1.27.1/encoding/protowire/wire.go#L358
-#[inline]
+#[inline(always)]
 fn decode_varint_slice(bytes: &[u8]) -> Result<(u64, usize), DecodeError> {
     // Fully unrolled varint decoding loop. Splitting into 32-bit pieces gives better performance.
 
@@ -253,7 +253,7 @@ impl DecodeContext {
 
 /// Returns the encoded length of the value in LEB128-bijective variable length format.
 /// The returned value will be between 1 and 9, inclusive.
-#[inline]
+#[inline(always)]
 pub const fn encoded_len_varint(value: u64) -> usize {
     const LIMIT: [u64; 9] = [
         0,
@@ -343,7 +343,7 @@ impl TagWriter {
     /// is encoded in the bits above the lowest two bits in the key delta, which encode the wire
     /// type. When decoding, the wire type is taken as-is, and the tag delta added to the tag of the
     /// last field decoded.
-    #[inline]
+    #[inline(always)]
     pub fn encode_key<B: BufMut + ?Sized>(&mut self, tag: u32, wire_type: WireType, buf: &mut B) {
         let tag_delta = tag
             .checked_sub(self.last_tag)
@@ -366,7 +366,7 @@ impl TagMeasurer {
 
     /// Returns the number of bytes that would be written if the given tag was encoded next, and
     /// also advances the state of the encoder as if that tag was written.
-    #[inline]
+    #[inline(always)]
     pub fn key_len(&mut self, tag: u32) -> usize {
         let tag_delta = tag
             .checked_sub(self.last_tag)
@@ -445,6 +445,7 @@ impl<'a, B: 'a + Buf + ?Sized> Capped<'a, B> {
         })
     }
 
+    #[inline(always)]
     pub fn lend(&mut self) -> Capped<B> {
         Capped {
             buf: self.buf,
@@ -455,6 +456,7 @@ impl<'a, B: 'a + Buf + ?Sized> Capped<'a, B> {
     /// Reads a length delimiter from the beginning of the wrapped buffer, then returns a subsidiary
     /// Capped instance for the delineated bytes if it does not overrun the underlying buffer or
     /// this instance's cap.
+    #[inline]
     pub fn take_length_delimited(&mut self) -> Result<Capped<B>, DecodeError> {
         let len = decode_length_delimiter(&mut *self.buf)?;
         let remaining = self.buf.remaining();
@@ -505,19 +507,19 @@ impl<'a, B: 'a + Buf + ?Sized> Capped<'a, B> {
     }
 
     /// Returns the number of bytes left before the cap.
-    #[inline]
+    #[inline(always)]
     pub fn remaining_before_cap(&self) -> usize {
         self.buf
             .remaining()
             .saturating_sub(self.extra_bytes_remaining)
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn over_cap(&self) -> bool {
         self.buf.remaining() < self.extra_bytes_remaining
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn has_remaining(&self) -> bool {
         self.buf.remaining() > self.extra_bytes_remaining
     }
