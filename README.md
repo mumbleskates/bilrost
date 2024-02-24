@@ -1608,7 +1608,10 @@ keeping track of whether any unknown fields exist in the encoding.
 
 ## Comparisons to other encodings
 
-A very incomplete comparison of various alternative encodings we might consider.
+A very [incomplete][formats] comparison of various alternative encodings we
+might consider.
+
+[formats]: https://en.wikipedia.org/wiki/Comparison_of_data-serialization_formats
 
 | Encoding             | Encoding complexity | Schemaless?           | Backwards/forwards compatible? | Human readable? | Canonical encodings?                          | Better than Bilrost                                                                   | Worse than Bilrost                                      |
 |----------------------|---------------------|-----------------------|--------------------------------|-----------------|-----------------------------------------------|---------------------------------------------------------------------------------------|---------------------------------------------------------|
