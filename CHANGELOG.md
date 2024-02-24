@@ -14,6 +14,8 @@
 
 ### Cleanups
 
+* The readme is feature-complete!
+
 ## 0.1002.1
 
 ### Fixes
