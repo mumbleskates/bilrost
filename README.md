@@ -1608,30 +1608,46 @@ keeping track of whether any unknown fields exist in the encoding.
 
 ## Comparisons to other encodings
 
-TODO: compare here (big table: schemaful, schemaless, distinguished) with
-features, traits, and why to prefer bilrost or the other one
+A very incomplete comparison of various alternative encodings we might consider.
 
-uses schema:
+| Encoding             | Encoding complexity | Schemaless?           | Backwards/forwards compatible? | Human readable? | Canonical encodings?            | Better than Bilrost                                                                   | Worse than Bilrost                                      |
+|----------------------|---------------------|-----------------------|--------------------------------|-----------------|---------------------------------|---------------------------------------------------------------------------------------|---------------------------------------------------------|
+| Bilrost              | very low            | schemaful             | yes                            | no              | [yes](#distinguished-decoding)! | 🌈                                                                                    | 🌈                                                      |
+| [Protobuf][pb]       | almost as simple    | schemaful             | yes                            | no              | no                              | big ecosystem, has a schema DSL                                                       | slightly less compact, more footguns, less type support |
+| [ASN.1 DER][asn1]    | quite high          | schemaful             | yes                            | no              | [yes][asn1]                     | highly standardized & validated canonicity                                            | painful to use & implement                              |
+| [Cap'n Proto][capnp] | medium              | schemaful             | yes                            | no              | no                              | very fast, supports zero-copy style decoding, schema DSL, lots of languages supported | less compact, heavily relies on generated types         |
+| [Flatbuffers][flatb] | medium              | schemaful             | yes                            | no              | no                              | very fast, supports zero-copy style decoding, schema DSL, lots of languages supported | less compact, heavily relies on generated types         |
+| [rkyv][rkyv]         | ?                   | fixed to struct       | no                             | no              | ?                               | extremely fast zero-copy archival encoding                                            | built for a very different purpose                      |
+| [bincode][bincode]   | low                 | fixed to struct       | no                             | no              | ?                               | faster, more compact                                                                  | not compatible when new fields are added                |
+| [JSON][json]         | medium-low          | schemaless            | yes                            | yes             | no / DIY                        | near-universal support, readability                                                   | less compact, more lossy, poor fit for many value types |
+| [BSON][bson]         | medium              | schemaless            | yes                            | no              | no                              | it's JSON but compact                                                                 | less compact, not canonical                             |
+| [msgpack][msgpack]   | medium-high         | schemaless            | yes                            | no              | no                              | it's JSON but compact                                                                 | less compact, not canonical                             |
+| [CBOR][cbor]         | medium-high         | schemaless            | yes                            | no              | [yes][cborcanon]                | it's JSON but compact                                                                 | standardized,                                           |
+| [XML][xml]           | high                | philosophers disagree | yes                            | yes             | [apparently yes][xmlcanon]      | you've heard of it, you know it, it's everywhere                                      | far less compact, an inelegant weapon from a bygone era |
 
-* protobuf
-* capnp
-* flatbuffers
+[asn1]: https://www.itu.int/rec/T-REC-X.690/
 
-schemaful but extensions break compatibility:
+[bincode]: https://docs.rs/bincode/latest/bincode/
 
-* rkyv
-* borsh
-* bincode
+[bson]: https://bsonspec.org/
 
-schemaless (key names are encoded in the data):
+[capnp]: https://capnproto.org/
 
-* asn.1 / X.690
-* JSON
-* bson
-* msgpack
-* cbor
-* ion
-* XML
+[cbor]: https://cbor.io/
+
+[cborcanon]: https://datatracker.ietf.org/doc/html/rfc8949#det-enc
+
+[flatb]: https://flatbuffers.dev/
+
+[json]: https://www.json.org/json-en.html
+
+[msgpack]: https://msgpack.org/index.html
+
+[rkyv]: https://rkyv.org/
+
+[xml]: https://www.w3.org/TR/xml/
+
+[xmlcanon]: https://www.w3.org/TR/xml-c14n11/#XMLCanonicalization
 
 ## FAQ
 
