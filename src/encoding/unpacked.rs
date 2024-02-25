@@ -31,6 +31,7 @@ fn peek_repeated_field<B: Buf + ?Sized>(buf: &mut Capped<B>) -> Option<WireType>
 
 /// Decodes a collection value from the unpacked representation. This greedily consumes consecutive
 /// fields as long as they have the same tag.
+#[inline]
 pub(crate) fn decode<T, E>(
     wire_type: WireType,
     collection: &mut T,
@@ -60,6 +61,7 @@ where
 
 /// Decodes a collection value from the unpacked representation in distinguished mode. This greedily
 /// consumes consecutive fields as long as they have the same tag.
+#[inline]
 pub(crate) fn decode_distinguished<T, E>(
     wire_type: WireType,
     collection: &mut T,
