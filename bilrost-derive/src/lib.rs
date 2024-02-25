@@ -541,6 +541,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
             }
 
             #[allow(unused_variables)]
+            #[inline]
             fn raw_decode_field<__B>(
                 &mut self,
                 tag: u32,

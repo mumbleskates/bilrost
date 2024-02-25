@@ -45,6 +45,7 @@ const RECURSION_LIMIT: u32 = 100;
 ///
 /// An error will be returned if the buffer does not have sufficient capacity to encode the
 /// delimiter.
+#[inline]
 pub fn encode_length_delimiter<B>(length: usize, buf: &mut B) -> Result<(), EncodeError>
 where
     B: BufMut,
@@ -63,6 +64,7 @@ where
 ///
 /// Applications may use this method to ensure sufficient buffer capacity before calling
 /// `encode_length_delimiter`. The returned size will be between 1 and 9, inclusive.
+#[inline(always)]
 pub fn length_delimiter_len(length: usize) -> usize {
     encoded_len_varint(length as u64)
 }
@@ -78,6 +80,7 @@ pub fn length_delimiter_len(length: usize) -> usize {
 ///    input is required to decode the full delimiter.
 ///  * If the supplied buffer contains 9 or more bytes, then the buffer contains an invalid
 ///    delimiter, and typically the buffer should be considered corrupt.
+#[inline(always)]
 pub fn decode_length_delimiter<B: Buf>(mut buf: B) -> Result<usize, DecodeError> {
     decode_varint(&mut buf)?
         .try_into()

@@ -542,6 +542,7 @@ where
 {
     type Item = Result<T, DecodeError>;
 
+    #[inline]
     fn next(&mut self) -> Option<Result<T, DecodeError>> {
         if self.capped.buf.remaining() == self.capped.extra_bytes_remaining {
             return None;
