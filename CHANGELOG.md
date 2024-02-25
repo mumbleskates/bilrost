@@ -13,6 +13,9 @@
   `Canonical` and `NotCanonical`.
 * More aggressive inlining for very hot functions may increase encoding/decoding
   performance significantly.
+* Decoding messages with mixed packed and unpacked representations in the same
+  field is now always an error, regardless of what order they appear in. This
+  was formerly a constraint of the way unpacked fields were decoded.
 
 ### Cleanups
 
