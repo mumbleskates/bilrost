@@ -1,12 +1,8 @@
 ## 0.1003.1
 
-### Breaking changes
-
-### New features
-
 ### Fixes
 
-### Cleanups
+* Fixed some incorrect documentation.
 
 ## 0.1003.0
 
