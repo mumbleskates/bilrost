@@ -6,6 +6,8 @@
 
 ### Fixes
 
+* Fixed some incorrect documentation.
+
 ### Cleanups
 
 ## 0.1003.0
