@@ -96,7 +96,7 @@ fn benchmark_decode_key(criterion: &mut Criterion, name: &str, mut values: Vec<u
                 b.iter(|| {
                     let mut to_decode = buf.as_slice();
                     let mut buf = Capped::new(&mut to_decode);
-                    while buf.has_remaining() {
+                    while buf.remaining() > 0 {
                         let result = TagReader::new().decode_key(buf.lend());
                         debug_assert!(result.is_ok());
                         criterion::black_box(&result);

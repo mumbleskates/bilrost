@@ -488,7 +488,7 @@ where
         // Empty message types always encode and decode from zero bytes. It is far cheaper to check
         // here than to check after the value has been decoded and checking the message's
         // `is_empty()`.
-        if !allow_empty && !buf.has_remaining() {
+        if !allow_empty && buf.remaining_before_cap() == 0 {
             return Ok(Canonicity::NotCanonical);
         }
         merge_distinguished(value, buf, ctx.enter_recursion())

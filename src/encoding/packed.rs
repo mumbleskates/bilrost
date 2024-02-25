@@ -40,19 +40,18 @@ where
         mut buf: Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
-        let capped = buf.take_length_delimited()?;
+        let mut capped = buf.take_length_delimited()?;
         if E::WIRE_TYPE.fixed_size().map_or(false, |fixed_size| {
             capped.remaining_before_cap() % fixed_size != 0
         }) {
             return Err(DecodeError::new(Truncated));
         }
-        capped
-            .consume(|buf| {
-                let mut new_val = T::new_for_overwrite();
-                E::decode_value(&mut new_val, buf.lend(), ctx.clone())?;
-                Ok(new_val)
-            })
-            .try_for_each(|val| Ok(value.insert(val?)?))
+        while capped.has_remaining()? {
+            let mut new_val = T::new_for_overwrite();
+            E::decode_value(&mut new_val, capped.lend(), ctx.clone())?;
+            value.insert(new_val)?;
+        }
+        Ok(())
     }
 }
 
@@ -68,8 +67,8 @@ where
         allow_empty: bool,
         ctx: DecodeContext,
     ) -> Result<Canonicity, DecodeError> {
-        let capped = buf.take_length_delimited()?;
-        if !capped.has_remaining() && !allow_empty {
+        let mut capped = buf.take_length_delimited()?;
+        if !allow_empty && capped.remaining_before_cap() == 0 {
             return Ok(Canonicity::NotCanonical);
         }
         if E::WIRE_TYPE.fixed_size().map_or(false, |fixed_size| {
@@ -78,15 +77,15 @@ where
             return Err(DecodeError::new(Truncated));
         }
         let mut canon = Canonicity::Canonical;
-        for res in capped.consume(|buf| {
+        while capped.has_remaining()? {
             let mut new_val = T::new_for_overwrite();
-            // Pass allow_empty=true: nested values may be empty
-            Ok(min(
-                E::decode_value_distinguished(&mut new_val, buf.lend(), true, ctx.clone())?,
-                value.insert_distinguished(new_val)?,
-            ))
-        }) {
-            canon.update(res?);
+            canon.update(E::decode_value_distinguished(
+                &mut new_val,
+                capped.lend(),
+                true,
+                ctx.clone(),
+            )?);
+            canon.update(value.insert_distinguished(new_val)?);
         }
         Ok(canon)
     }

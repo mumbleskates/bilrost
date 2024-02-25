@@ -2,6 +2,7 @@ use core::cmp::{min, Eq, PartialEq};
 use core::default::Default;
 use core::fmt::Debug;
 use core::ops::{Deref, DerefMut};
+use std::cmp::Ordering;
 
 use bytes::buf::Take;
 use bytes::{Buf, BufMut};
@@ -473,15 +474,6 @@ impl<'a, B: 'a + Buf + ?Sized> Capped<'a, B> {
         })
     }
 
-    /// Consume the buffer as an iterator.
-    #[inline]
-    pub fn consume<F, R, E>(self, read_with: F) -> CappedConsumer<'a, B, F>
-    where
-        F: FnMut(&mut Capped<B>) -> Result<R, E>,
-    {
-        CappedConsumer::new(self, read_with)
-    }
-
     #[inline]
     pub fn buf(&mut self) -> &mut B {
         self.buf
@@ -515,43 +507,17 @@ impl<'a, B: 'a + Buf + ?Sized> Capped<'a, B> {
     }
 
     #[inline(always)]
-    pub fn over_cap(&self) -> bool {
+    fn over_cap(&self) -> bool {
         self.buf.remaining() < self.extra_bytes_remaining
     }
 
     #[inline(always)]
-    pub fn has_remaining(&self) -> bool {
-        self.buf.remaining() > self.extra_bytes_remaining
-    }
-}
-
-pub struct CappedConsumer<'a, B: Buf + ?Sized, F> {
-    capped: Capped<'a, B>,
-    reader: F,
-}
-
-impl<'a, B: Buf + ?Sized, F> CappedConsumer<'a, B, F> {
-    fn new(capped: Capped<'a, B>, reader: F) -> Self {
-        Self { capped, reader }
-    }
-}
-
-impl<'a, B: Buf + ?Sized, T, F> Iterator for CappedConsumer<'a, B, F>
-where
-    F: FnMut(&mut Capped<B>) -> Result<T, DecodeError>,
-{
-    type Item = Result<T, DecodeError>;
-
-    #[inline]
-    fn next(&mut self) -> Option<Result<T, DecodeError>> {
-        if self.capped.buf.remaining() == self.capped.extra_bytes_remaining {
-            return None;
+    pub fn has_remaining(&self) -> Result<bool, DecodeErrorKind> {
+        match self.buf.remaining().cmp(&self.extra_bytes_remaining) {
+            Ordering::Less => Err(Truncated),
+            Ordering::Equal => Ok(false),
+            Ordering::Greater => Ok(true),
         }
-        let res = (self.reader)(&mut self.capped);
-        if res.is_ok() && self.capped.buf.remaining() < self.capped.extra_bytes_remaining {
-            return Some(Err(DecodeError::new(Truncated)));
-        }
-        Some(res)
     }
 }
 
@@ -1883,7 +1849,7 @@ mod test {
                         buf.remaining()
                     );
 
-                    if !buf.has_remaining() {
+                    if buf.remaining() == 0 {
                         // Short circuit for empty packed values.
                         return Ok(());
                     }
@@ -1921,7 +1887,7 @@ mod test {
                     .map_err(|error| TestCaseError::fail(error.to_string()))?;
 
                     prop_assert!(
-                        !buf.has_remaining(),
+                        !buf.remaining() > 0,
                         "expected buffer to be empty, remaining: {}",
                         buf.remaining()
                     );
@@ -1959,7 +1925,7 @@ mod test {
 
                     let mut roundtrip_value = T::new_for_overwrite();
                     let mut not_first = false;
-                    while buf.has_remaining() {
+                    while buf.remaining() > 0 {
                         let (decoded_tag, decoded_wire_type) = tr
                             .decode_key(buf.lend())
                             .map_err(|error| TestCaseError::fail(error.to_string()))?;

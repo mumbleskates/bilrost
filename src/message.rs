@@ -14,18 +14,16 @@ use crate::{DecodeError, EncodeError};
 #[inline]
 pub(crate) fn merge<T: RawMessage, B: Buf + ?Sized>(
     value: &mut T,
-    buf: Capped<B>,
+    mut buf: Capped<B>,
     ctx: DecodeContext,
 ) -> Result<(), DecodeError> {
     let tr = &mut TagReader::new();
     let mut last_tag = None::<u32>;
-    for res in buf.consume(|buf| {
+    while buf.has_remaining()? {
         let (tag, wire_type) = tr.decode_key(buf.lend())?;
         let duplicated = last_tag == Some(tag);
         last_tag = Some(tag);
-        value.raw_decode_field(tag, wire_type, duplicated, buf.lend(), ctx.clone())
-    }) {
-        res?;
+        value.raw_decode_field(tag, wire_type, duplicated, buf.lend(), ctx.clone())?;
     }
     Ok(())
 }
@@ -35,19 +33,23 @@ pub(crate) fn merge<T: RawMessage, B: Buf + ?Sized>(
 #[inline]
 pub(crate) fn merge_distinguished<T: RawDistinguishedMessage, B: Buf + ?Sized>(
     value: &mut T,
-    buf: Capped<B>,
+    mut buf: Capped<B>,
     ctx: DecodeContext,
 ) -> Result<Canonicity, DecodeError> {
     let tr = &mut TagReader::new();
     let mut last_tag = None::<u32>;
     let mut canon = Canonicity::Canonical;
-    for res in buf.consume(|buf| {
+    while buf.has_remaining()? {
         let (tag, wire_type) = tr.decode_key(buf.lend())?;
         let duplicated = last_tag == Some(tag);
         last_tag = Some(tag);
-        value.raw_decode_field_distinguished(tag, wire_type, duplicated, buf.lend(), ctx.clone())
-    }) {
-        canon.update(res?);
+        canon.update(value.raw_decode_field_distinguished(
+            tag,
+            wire_type,
+            duplicated,
+            buf.lend(),
+            ctx.clone(),
+        )?);
     }
     Ok(canon)
 }

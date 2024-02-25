@@ -15,7 +15,7 @@ pub struct Unpacked<E = General>(E);
 /// with a "repeated" field key (a key with a tag delta of zero).
 #[inline(always)]
 fn peek_repeated_field<B: Buf + ?Sized>(buf: &mut Capped<B>) -> Option<WireType> {
-    if !buf.has_remaining() {
+    if buf.remaining_before_cap() == 0 {
         return None;
     }
     // Peek the first byte of the next field's key.

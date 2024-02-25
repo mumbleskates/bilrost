@@ -68,21 +68,18 @@ where
         mut buf: Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
-        let capped = buf.take_length_delimited()?;
+        let mut capped = buf.take_length_delimited()?;
         if combined_fixed_size(KE::WIRE_TYPE, VE::WIRE_TYPE).map_or(false, |fixed_size| {
             capped.remaining_before_cap() % fixed_size != 0
         }) {
             return Err(DecodeError::new(Truncated));
         }
-        for item in capped.consume(|buf| {
+        while capped.has_remaining()? {
             let mut new_key = K::new_for_overwrite();
             let mut new_val = V::new_for_overwrite();
-            KE::decode_value(&mut new_key, buf.lend(), ctx.clone())?;
-            VE::decode_value(&mut new_val, buf.lend(), ctx.clone())?;
-            Ok((new_key, new_val))
-        }) {
-            let (key, val) = item?;
-            value.insert(key, val)?;
+            KE::decode_value(&mut new_key, capped.lend(), ctx.clone())?;
+            VE::decode_value(&mut new_val, capped.lend(), ctx.clone())?;
+            value.insert(new_key, new_val)?;
         }
         Ok(())
     }
@@ -102,8 +99,8 @@ where
         allow_empty: bool,
         ctx: DecodeContext,
     ) -> Result<Canonicity, DecodeError> {
-        let capped = buf.take_length_delimited()?;
-        if !allow_empty && !capped.has_remaining() {
+        let mut capped = buf.take_length_delimited()?;
+        if !allow_empty && capped.remaining_before_cap() == 0 {
             return Ok(Canonicity::NotCanonical);
         }
         if combined_fixed_size(KE::WIRE_TYPE, VE::WIRE_TYPE).map_or(false, |fixed_size| {
@@ -112,19 +109,22 @@ where
             return Err(DecodeError::new(Truncated));
         }
         let mut canon = Canonicity::Canonical;
-        for res in capped.consume(|buf| {
+        while capped.has_remaining()? {
             let mut new_key = K::new_for_overwrite();
             let mut new_val = V::new_for_overwrite();
-            let item_canon = min(
-                KE::decode_value_distinguished(&mut new_key, buf.lend(), true, ctx.clone())?,
-                VE::decode_value_distinguished(&mut new_val, buf.lend(), true, ctx.clone())?,
-            );
-            Ok(min(
-                item_canon,
-                value.insert_distinguished(new_key, new_val)?,
-            ))
-        }) {
-            canon.update(res?);
+            canon.update(KE::decode_value_distinguished(
+                &mut new_key,
+                capped.lend(),
+                true,
+                ctx.clone(),
+            )?);
+            canon.update(VE::decode_value_distinguished(
+                &mut new_val,
+                capped.lend(),
+                true,
+                ctx.clone(),
+            )?);
+            canon.update(value.insert_distinguished(new_key, new_val)?);
         }
         Ok(canon)
     }
