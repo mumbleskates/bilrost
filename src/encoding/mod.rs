@@ -586,16 +586,21 @@ pub trait DistinguishedEncoder<T>: Encoder<T> {
     ) -> Result<Canonicity, DecodeError>;
 }
 
+/// Indicator of the "canonicity" of a decoded value or a decoding process that was performed.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 #[repr(u8)]
 #[must_use]
 pub enum Canonicity {
+    /// The decoded data was not represented in its canonical form.
     NotCanonical,
+    /// All known fields were represented canonically, but some unknown fields were present.
     HasExtensions,
+    /// The decoded data was fully canonical.
     Canonical,
 }
 
 impl Canonicity {
+    /// Update this value to the lowest (least-canonical) state.
     #[inline(always)]
     pub fn update(&mut self, other: Self) {
         *self = min(*self, other);
