@@ -1,5 +1,5 @@
 #![no_std]
-#![doc(html_root_url = "https://docs.rs/bilrost/0.1003.0")]
+#![doc(html_root_url = "https://docs.rs/bilrost/0.1003.1")]
 #![doc = include_str!("../README.md")]
 
 extern crate alloc;
