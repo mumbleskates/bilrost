@@ -61,6 +61,10 @@ is designed to be easily used by hand.
 
 [ghchangelog]: https://github.com/mumbleskates/bilrost/blob/bilrost/CHANGELOG.md
 
+*This readme is the result of a lot of work, and we want it to be good! If
+anything is unclear or could be improved, please feel free to submit issues or
+pull requests!*
+
 ## Conceptual overview
 
 Bilrost is an encoding scheme for converting in-memory data structs into plain
