@@ -77,16 +77,18 @@ where
         }) {
             return Err(DecodeError::new(Truncated));
         }
-        capped
-            .consume(|buf| {
-                let mut new_val = T::new_for_overwrite();
-                // Pass allow_empty=true: nested values may be empty
-                Ok(min(
-                    E::decode_value_distinguished(&mut new_val, buf.lend(), true, ctx.clone())?,
-                    value.insert_distinguished(new_val)?,
-                ))
-            })
-            .collect()
+        let mut canon = Canonicity::Canonical;
+        for res in capped.consume(|buf| {
+            let mut new_val = T::new_for_overwrite();
+            // Pass allow_empty=true: nested values may be empty
+            Ok(min(
+                E::decode_value_distinguished(&mut new_val, buf.lend(), true, ctx.clone())?,
+                value.insert_distinguished(new_val)?,
+            ))
+        }) {
+            canon.update(res?);
+        }
+        Ok(canon)
     }
 }
 

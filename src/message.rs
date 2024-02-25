@@ -19,13 +19,15 @@ pub(crate) fn merge<T: RawMessage, B: Buf + ?Sized>(
 ) -> Result<(), DecodeError> {
     let tr = &mut TagReader::new();
     let mut last_tag = None::<u32>;
-    buf.consume(|buf| {
+    for res in buf.consume(|buf| {
         let (tag, wire_type) = tr.decode_key(buf.lend())?;
         let duplicated = last_tag == Some(tag);
         last_tag = Some(tag);
         value.raw_decode_field(tag, wire_type, duplicated, buf.lend(), ctx.clone())
-    })
-    .collect()
+    }) {
+        res?;
+    }
+    Ok(())
 }
 
 /// Merges fields from the given buffer, to its cap, into the given `DistinguishedTaggedDecodable`
@@ -38,13 +40,16 @@ pub(crate) fn merge_distinguished<T: RawDistinguishedMessage, B: Buf + ?Sized>(
 ) -> Result<Canonicity, DecodeError> {
     let tr = &mut TagReader::new();
     let mut last_tag = None::<u32>;
-    buf.consume(|buf| {
+    let mut canon = Canonicity::Canonical;
+    for res in buf.consume(|buf| {
         let (tag, wire_type) = tr.decode_key(buf.lend())?;
         let duplicated = last_tag == Some(tag);
         last_tag = Some(tag);
         value.raw_decode_field_distinguished(tag, wire_type, duplicated, buf.lend(), ctx.clone())
-    })
-    .collect()
+    }) {
+        canon.update(res?);
+    }
+    Ok(canon)
 }
 
 /// An enhanced trait for Bilrost messages that promise a distinguished representation.

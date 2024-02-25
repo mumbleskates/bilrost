@@ -456,7 +456,7 @@ impl<'a, B: 'a + Buf + ?Sized> Capped<'a, B> {
     /// Reads a length delimiter from the beginning of the wrapped buffer, then returns a subsidiary
     /// Capped instance for the delineated bytes if it does not overrun the underlying buffer or
     /// this instance's cap.
-    #[inline]
+    #[inline(always)]
     pub fn take_length_delimited(&mut self) -> Result<Capped<B>, DecodeError> {
         let len = decode_length_delimiter(&mut *self.buf)?;
         let remaining = self.buf.remaining();
@@ -631,12 +631,14 @@ pub enum Canonicity {
 }
 
 impl Canonicity {
+    #[inline(always)]
     pub fn update(&mut self, other: Self) {
         *self = min(*self, other);
     }
 }
 
 impl FromIterator<Canonicity> for Canonicity {
+    #[inline(always)]
     fn from_iter<T: IntoIterator<Item = Canonicity>>(iter: T) -> Self {
         iter.into_iter().min().unwrap_or(Canonicity::Canonical)
     }
@@ -1139,11 +1141,14 @@ pub trait Wiretyped<T> {
 pub trait ValueEncoder<T>: Wiretyped<T> {
     /// Encodes the given value unconditionally. This is guaranteed to emit data to the buffer.
     fn encode_value<B: BufMut + ?Sized>(value: &T, buf: &mut B);
+    
     // TODO(widders): change to (or augment with) build-in-reverse-then-emit-forward and
     //  emit-reversed
     /// Returns the number of bytes the given value would be encoded as.
     fn value_encoded_len(value: &T) -> usize;
+    
     /// Returns the number of total bytes to encode all the values in the given container.
+    #[inline]
     fn many_values_encoded_len<I>(values: I) -> usize
     where
         I: ExactSizeIterator,
@@ -1155,6 +1160,7 @@ pub trait ValueEncoder<T>: Wiretyped<T> {
             |fixed_size| fixed_size * len, // Shortcut when values have a fixed size
         )
     }
+    
     /// Decodes a field assuming the encoder's wire type directly from the buffer.
     fn decode_value<B: Buf + ?Sized>(
         value: &mut T,

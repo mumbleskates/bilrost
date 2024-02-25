@@ -74,18 +74,17 @@ where
         }) {
             return Err(DecodeError::new(Truncated));
         }
-        capped
-            .consume(|buf| {
-                let mut new_key = K::new_for_overwrite();
-                let mut new_val = V::new_for_overwrite();
-                KE::decode_value(&mut new_key, buf.lend(), ctx.clone())?;
-                VE::decode_value(&mut new_val, buf.lend(), ctx.clone())?;
-                Ok((new_key, new_val))
-            })
-            .try_for_each(|item| {
-                let (key, val) = item?;
-                Ok(value.insert(key, val)?)
-            })
+        for item in capped.consume(|buf| {
+            let mut new_key = K::new_for_overwrite();
+            let mut new_val = V::new_for_overwrite();
+            KE::decode_value(&mut new_key, buf.lend(), ctx.clone())?;
+            VE::decode_value(&mut new_val, buf.lend(), ctx.clone())?;
+            Ok((new_key, new_val))
+        }) {
+            let (key, val) = item?;
+            value.insert(key, val)?;
+        }
+        Ok(())
     }
 }
 
@@ -112,20 +111,22 @@ where
         }) {
             return Err(DecodeError::new(Truncated));
         }
-        capped
-            .consume(|buf| {
-                let mut new_key = K::new_for_overwrite();
-                let mut new_val = V::new_for_overwrite();
-                let item_canon = min(
-                    KE::decode_value_distinguished(&mut new_key, buf.lend(), true, ctx.clone())?,
-                    VE::decode_value_distinguished(&mut new_val, buf.lend(), true, ctx.clone())?,
-                );
-                Ok(min(
-                    item_canon,
-                    value.insert_distinguished(new_key, new_val)?,
-                ))
-            })
-            .collect()
+        let mut canon = Canonicity::Canonical;
+        for res in capped.consume(|buf| {
+            let mut new_key = K::new_for_overwrite();
+            let mut new_val = V::new_for_overwrite();
+            let item_canon = min(
+                KE::decode_value_distinguished(&mut new_key, buf.lend(), true, ctx.clone())?,
+                VE::decode_value_distinguished(&mut new_val, buf.lend(), true, ctx.clone())?,
+            );
+            Ok(min(
+                item_canon,
+                value.insert_distinguished(new_key, new_val)?,
+            ))
+        }) {
+            canon.update(res?);
+        }
+        Ok(canon)
     }
 }
 
