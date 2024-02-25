@@ -10,7 +10,7 @@
 
 ### Cleanups
 
-## 0.1003.0
+## v0.1003.0
 
 ### Breaking changes
 
