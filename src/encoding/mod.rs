@@ -609,6 +609,8 @@ impl FromIterator<Canonicity> for Canonicity {
     }
 }
 
+/// Trait for values and results bearing canonicity information (represented by the `Canonicity`
+/// enum).
 pub trait WithCanonicity {
     /// The type of the value without any canonicity information.
     type Value;
