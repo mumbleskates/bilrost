@@ -5,15 +5,15 @@
 
 # *BILROST!*
 
-Bilrost is a binary encoding format designed for storing and transmitting
-structured data, such as in file formats or network protocols. The encoding is
-binary, and unsuitable for reading directly by humans; however, it does have
-other other useful properties and advantages. This crate, `bilrost`, is its
-first implementation and its first instantiation. Bilrost (as a specification)
-strives to provide a superset of the capabilities of protocol buffers while
-reducing some of the surface area for mistakes and surprises; `bilrost` (the
-implementing library) strives to provide access to all of those capabilities
-with maximum convenience.
+Bilrost is an encoding format designed for storing and transmitting structured
+data, such as in file formats or network protocols. The encoding is binary, and
+unsuitable for reading directly by humans; however, it does have other other
+useful properties and advantages. This crate, `bilrost`, is its first
+implementation and its first instantiation. Bilrost (as a specification) strives
+to provide a superset of the capabilities of protocol buffers while reducing
+some of the surface area for mistakes and surprises; `bilrost` (the implementing
+library) strives to provide access to all of those capabilities with maximum
+convenience.
 
 Bilrost at the encoding level is based upon [Protocol Buffers][pb] (protobuf)
 and shares many of its traits, but is incompatible. It is in some ways simpler
