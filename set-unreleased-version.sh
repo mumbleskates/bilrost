@@ -17,7 +17,7 @@ VERSION="$1"
 
 # Prepend a new section to the changelog
 cat <(
-  echo "## ${VERSION}"
+  echo "## v${VERSION}"
   echo ""
   echo "### Breaking changes"
   echo ""

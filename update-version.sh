@@ -45,5 +45,5 @@ sed -i -E "s/^${BILROST_CRATE_MATCHER} = \{ version = \"${VERSION_MATCHER}\"/\1 
   "${DIR}/bilrost-types/Cargo.toml"
 
 # Update first line of CHANGELOG.md
-sed -i -E "1 s/^## ${VERSION_MATCHER}$/## ${VERSION}/" \
+sed -i -E "1 s/^## v${VERSION_MATCHER}$/## v${VERSION}/" \
   "${DIR}/CHANGELOG.md"

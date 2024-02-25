@@ -1,4 +1,4 @@
-## 0.1004.0-dev
+## v0.1004.0-dev
 
 ### Breaking changes
 
@@ -29,7 +29,7 @@
 
 * The readme is feature-complete!
 
-## 0.1002.1
+## v0.1002.1
 
 ### Fixes
 
@@ -37,7 +37,7 @@
   `RequireCanonicity::allow_extensions` no longer swap the meaning of
   `Canonical` and `NotCanonical`.
 
-## 0.1002.0
+## v0.1002.0
 
 ### Breaking changes
 
