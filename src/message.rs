@@ -54,12 +54,7 @@ pub(crate) fn merge_distinguished<T: RawDistinguishedMessage, B: Buf + ?Sized>(
     Ok(canon)
 }
 
-/// An enhanced trait for Bilrost messages that promise a distinguished representation.
-/// Implementation of this trait comes with the following promises:
-///
-///  1. The message will always encode to the same bytes as any other message with an equal value
-///  2. A message equal to that value will only ever decode without error and with
-///    `Canonicity::Canonical` from that exact sequence of bytes, not from any other.
+/// A Bilrost message. Provides basic encoding and decoding functionality for message types.
 pub trait Message: EmptyState {
     /// Encodes the message to a buffer.
     ///
@@ -154,7 +149,12 @@ pub trait Message: EmptyState {
     fn replace_from_capped_dyn(&mut self, buf: Capped<dyn Buf>) -> Result<(), DecodeError>;
 }
 
-/// Object-safe trait for distinguished message types.
+/// An enhanced trait for Bilrost messages that promise a distinguished representation.
+/// Implementation of this trait comes with the following promises:
+///
+///  1. The message will always encode to the same bytes as any other message with an equal value.
+///  2. A message equal to that value will only ever decode canonically and without error from that
+///     exact sequence of bytes, not from any other.
 pub trait DistinguishedMessage: Message {
     /// Decodes an instance of the message from a buffer in distinguished mode.
     ///
