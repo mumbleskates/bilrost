@@ -1,4 +1,4 @@
-## 0.1003.0-dev
+## 0.1003.0
 
 ### Breaking changes
 
