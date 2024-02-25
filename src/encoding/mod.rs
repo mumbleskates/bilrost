@@ -1,8 +1,7 @@
-use core::cmp::{min, Eq, PartialEq};
+use core::cmp::{min, Eq, Ordering, PartialEq};
 use core::default::Default;
 use core::fmt::Debug;
 use core::ops::{Deref, DerefMut};
-use std::cmp::Ordering;
 
 use bytes::buf::Take;
 use bytes::{Buf, BufMut};
@@ -1107,12 +1106,12 @@ pub trait Wiretyped<T> {
 pub trait ValueEncoder<T>: Wiretyped<T> {
     /// Encodes the given value unconditionally. This is guaranteed to emit data to the buffer.
     fn encode_value<B: BufMut + ?Sized>(value: &T, buf: &mut B);
-    
+
     // TODO(widders): change to (or augment with) build-in-reverse-then-emit-forward and
     //  emit-reversed
     /// Returns the number of bytes the given value would be encoded as.
     fn value_encoded_len(value: &T) -> usize;
-    
+
     /// Returns the number of total bytes to encode all the values in the given container.
     #[inline]
     fn many_values_encoded_len<I>(values: I) -> usize
@@ -1126,7 +1125,7 @@ pub trait ValueEncoder<T>: Wiretyped<T> {
             |fixed_size| fixed_size * len, // Shortcut when values have a fixed size
         )
     }
-    
+
     /// Decodes a field assuming the encoder's wire type directly from the buffer.
     fn decode_value<B: Buf + ?Sized>(
         value: &mut T,
