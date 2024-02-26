@@ -2192,9 +2192,9 @@ mod derived_message_tests {
         #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
         struct Bar(Foo);
 
-        assert_eq!(u32::from(Foo::A), 0);
-        assert_eq!(u32::from(Foo::Z), u32::MAX);
-        assert_eq!(Foo::try_from(u32::MAX), Ok(Foo::Z));
+        assert_eq!(Foo::A.to_number(), 0);
+        assert_eq!(Foo::Z.to_number(), u32::MAX);
+        assert_eq!(Foo::try_from_number(u32::MAX), Ok(Foo::Z));
         assert_eq!(Foo::Z as u8, 255);
         assert::decodes_distinguished([], Bar(Foo::A));
         assert::decodes_non_canonically([(1, OV::u32(0))], Bar(Foo::A), NotCanonical);

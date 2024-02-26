@@ -62,6 +62,18 @@ impl<T> EmptyState for Option<T> {
     }
 }
 
+/// Proxy trait for enumeration types conversions to and from `u32`
+pub trait Enumeration: Eq + Sized {
+    /// Gets the numeric value of the enumeration.
+    fn to_number(&self) -> u32;
+
+    /// Tries to convert from the given number to the enumeration type.
+    fn try_from_number(n: u32) -> Result<Self, u32>;
+
+    /// Returns `true` if the given number represents a variant of the enumeration.
+    fn is_valid(n: u32) -> bool;
+}
+
 /// Trait for containers that store multiple items such as `Vec`, `BTreeSet`, and `HashSet`
 pub trait Collection: EmptyState {
     type Item;

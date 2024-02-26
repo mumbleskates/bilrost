@@ -25,7 +25,8 @@ mod value_traits;
 mod varint;
 
 pub use value_traits::{
-    Collection, DistinguishedCollection, DistinguishedMapping, EmptyState, Mapping, NewForOverwrite,
+    Collection, DistinguishedCollection, DistinguishedMapping, EmptyState, Enumeration, Mapping,
+    NewForOverwrite,
 };
 
 /// Fixed-size encoder. Encodes integers in fixed-size format.
@@ -1442,33 +1443,33 @@ pub trait EnumerationHelper<FieldType> {
 
 impl<T> EnumerationHelper<u32> for T
 where
-    T: Into<u32> + TryFrom<u32, Error = u32>,
+    T: Enumeration,
 {
     type Input = T;
     type Output = Result<T, u32>;
 
     fn help_set(enum_val: Self) -> u32 {
-        enum_val.into()
+        enum_val.to_number()
     }
 
     fn help_get(field_val: u32) -> Result<T, u32> {
-        T::try_from(field_val)
+        T::try_from_number(field_val)
     }
 }
 
 impl<T> EnumerationHelper<Option<u32>> for T
 where
-    T: Into<u32> + TryFrom<u32, Error = u32>,
+    T: Enumeration,
 {
     type Input = Option<T>;
     type Output = Option<Result<T, u32>>;
 
     fn help_set(enum_val: Option<T>) -> Option<u32> {
-        enum_val.map(Into::into)
+        enum_val.map(|e| e.to_number())
     }
 
     fn help_get(field_val: Option<u32>) -> Option<Result<T, u32>> {
-        field_val.map(TryFrom::try_from)
+        field_val.map(Enumeration::try_from_number)
     }
 }
 

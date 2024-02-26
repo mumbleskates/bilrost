@@ -756,8 +756,6 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
         .iter()
         .map(|(variant, value)| quote!(#value => #ident::#variant));
 
-    let is_valid_doc = format!("Returns `true` if `value` is a variant of `{}`.", ident);
-
     // When the type has a zero-valued variant, we implement `EmptyState`. When it doesn't, we
     // need an alternate way to create a value to be overwritten, so we impl `NewForOverwrite`
     // directly.
@@ -804,34 +802,30 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
     };
 
     let expanded = quote! {
-        impl #impl_generics #ident #ty_generics #where_clause {
-            #[doc=#is_valid_doc]
-            pub fn is_valid(value: u32) -> bool {
-                #[forbid(unreachable_patterns)]
-                match value {
-                    #(#is_valid,)*
-                    _ => false,
-                }
-            }
-        }
-
-        impl #impl_generics ::core::convert::From<#ident #ty_generics> for u32 #where_clause {
-            fn from(value: #ident) -> u32 {
-                match value {
+        impl #impl_generics ::bilrost::Enumeration for #ident #ty_generics #where_clause {
+            #[inline]
+            fn to_number(&self) -> u32 {
+                match self {
                     #(#to_u32,)*
                 }
             }
-        }
 
-        impl #impl_generics ::core::convert::TryFrom<u32> for #ident #ty_generics #where_clause {
-            type Error = u32;
-
-            fn try_from(value: u32) -> ::core::result::Result<#ident, u32> {
+            #[inline]
+            fn try_from_number(value: u32) -> ::core::result::Result<#ident, u32> {
                 #[forbid(unreachable_patterns)]
                 ::core::result::Result::Ok(match value {
                     #(#try_from,)*
                     _ => ::core::result::Result::Err(value)?,
                 })
+            }
+
+            #[inline]
+            fn is_valid(__n: u32) -> bool {
+                #[forbid(unreachable_patterns)]
+                match __n {
+                    #(#is_valid,)*
+                    _ => false,
+                }
             }
         }
 
@@ -845,32 +839,32 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
         impl #impl_generics ::bilrost::encoding::ValueEncoder<::bilrost::encoding::General>
         for #ident #ty_generics #where_clause {
             #[inline]
-            fn encode_value<B: ::bilrost::bytes::BufMut + ?Sized>(value: &#ident, buf: &mut B) {
-                ::bilrost::encoding::encode_varint(u32::from(value.clone()) as u64, buf);
+            fn encode_value<__B: ::bilrost::bytes::BufMut + ?Sized>(value: &Self, buf: &mut __B) {
+                ::bilrost::encoding::encode_varint(
+                    ::bilrost::Enumeration::to_number(value) as u64,
+                    buf,
+                );
             }
 
             #[inline]
-            fn value_encoded_len(value: &#ident #ty_generics) -> usize {
-                ::bilrost::encoding::encoded_len_varint(u32::from(value.clone()) as u64)
+            fn value_encoded_len(value: &Self) -> usize {
+                ::bilrost::encoding::encoded_len_varint(
+                    ::bilrost::encoding::Enumeration::to_number(value) as u64
+                )
             }
 
             #[inline]
-            fn decode_value<B: ::bilrost::bytes::Buf + ?Sized>(
-                value: &mut #ident #ty_generics,
-                mut buf: ::bilrost::encoding::Capped<B>,
+            fn decode_value<__B: ::bilrost::bytes::Buf + ?Sized>(
+                value: &mut Self,
+                mut buf: ::bilrost::encoding::Capped<__B>,
                 _ctx: ::bilrost::encoding::DecodeContext,
             ) -> Result<(), ::bilrost::DecodeError> {
-                if let ::core::result::Result::Ok(int_value) =
-                    <u32 as ::core::convert::TryFrom<_>>::try_from(buf.decode_varint()?)
-                {
-                    if let ::core::result::Result::Ok(converted) =
-                        <#ident #ty_generics as ::core::convert::TryFrom<_>>::try_from(int_value)
-                    {
-                        *value = converted;
-                        return Ok(());
-                    }
-                }
-                Err(::bilrost::DecodeError::new(::bilrost::DecodeErrorKind::OutOfDomainValue))
+                let decoded = buf.decode_varint()?;
+                let in_range = u32::try_from(decoded)
+                    .map_err(|_| ::bilrost::DecodeErrorKind::OutOfDomainValue)?;
+                *value = <Self as ::bilrost::Enumeration>::try_from_number(in_range)
+                    .map_err(|_| ::bilrost::DecodeErrorKind::OutOfDomainValue)?;
+                Ok(())
             }
         }
 
@@ -878,9 +872,9 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
         ::bilrost::encoding::DistinguishedValueEncoder<::bilrost::encoding::General>
         for #ident #ty_generics #where_clause {
             #[inline]
-            fn decode_value_distinguished<B: ::bilrost::bytes::Buf + ?Sized>(
-                value: &mut #ident,
-                buf: ::bilrost::encoding::Capped<B>,
+            fn decode_value_distinguished<__B: ::bilrost::bytes::Buf + ?Sized>(
+                value: &mut Self,
+                buf: ::bilrost::encoding::Capped<__B>,
                 allow_empty: bool,
                 ctx: ::bilrost::encoding::DecodeContext,
             ) -> Result<::bilrost::Canonicity, ::bilrost::DecodeError> {
