@@ -837,13 +837,13 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
 
         #creation_impl
 
-        impl #impl_generics ::bilrost::encoding::Wiretyped<#ident #ty_generics>
-        for ::bilrost::encoding::General #where_clause {
+        impl #impl_generics ::bilrost::encoding::Wiretyped<::bilrost::encoding::General>
+        for #ident #ty_generics #where_clause {
             const WIRE_TYPE: ::bilrost::encoding::WireType = ::bilrost::encoding::WireType::Varint;
         }
 
-        impl #impl_generics ::bilrost::encoding::ValueEncoder<#ident #ty_generics>
-        for ::bilrost::encoding::General #where_clause {
+        impl #impl_generics ::bilrost::encoding::ValueEncoder<::bilrost::encoding::General>
+        for #ident #ty_generics #where_clause {
             #[inline]
             fn encode_value<B: ::bilrost::bytes::BufMut + ?Sized>(value: &#ident, buf: &mut B) {
                 ::bilrost::encoding::encode_varint(u32::from(value.clone()) as u64, buf);
@@ -874,8 +874,9 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
             }
         }
 
-        impl #impl_generics ::bilrost::encoding::DistinguishedValueEncoder<#ident #ty_generics>
-        for ::bilrost::encoding::General #where_clause {
+        impl #impl_generics
+        ::bilrost::encoding::DistinguishedValueEncoder<::bilrost::encoding::General>
+        for #ident #ty_generics #where_clause {
             #[inline]
             fn decode_value_distinguished<B: ::bilrost::bytes::Buf + ?Sized>(
                 value: &mut #ident,
@@ -883,7 +884,11 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
                 allow_empty: bool,
                 ctx: ::bilrost::encoding::DecodeContext,
             ) -> Result<::bilrost::Canonicity, ::bilrost::DecodeError> {
-                <Self as ::bilrost::encoding::ValueEncoder<#ident>>::decode_value(value, buf, ctx)?;
+                ::bilrost::encoding::ValueEncoder::<::bilrost::encoding::General>::decode_value(
+                    value,
+                    buf,
+                    ctx,
+                )?;
                 #check_empty
                 Ok(::bilrost::Canonicity::Canonical)
             }

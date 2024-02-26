@@ -137,7 +137,7 @@ impl Field {
         let ty = &self.ty;
         if self.in_oneof {
             quote! {
-                <#encoder as ::bilrost::encoding::FieldEncoder<#ty>>::encode_field(
+                <#ty as ::bilrost::encoding::FieldEncoder<#encoder>>::encode_field(
                     #tag,
                     &#ident,
                     buf,
@@ -146,7 +146,7 @@ impl Field {
             }
         } else {
             quote! {
-                <#encoder as ::bilrost::encoding::Encoder<#ty>>::encode(#tag, &#ident, buf, tw);
+                <#ty as ::bilrost::encoding::Encoder<#encoder>>::encode(#tag, &#ident, buf, tw);
             }
         }
     }
@@ -158,7 +158,7 @@ impl Field {
         let ty = &self.ty;
         if self.in_oneof {
             quote!(
-                <#encoder as ::bilrost::encoding::FieldEncoder<#ty>>::decode_field(
+                <#ty as ::bilrost::encoding::FieldEncoder<#encoder>>::decode_field(
                     wire_type,
                     #ident,
                     buf,
@@ -167,7 +167,7 @@ impl Field {
             )
         } else {
             quote!(
-                <#encoder as ::bilrost::encoding::Encoder<#ty>>::decode(
+                <#ty as ::bilrost::encoding::Encoder<#encoder>>::decode(
                     wire_type,
                     duplicated,
                     #ident,
@@ -186,7 +186,7 @@ impl Field {
         if self.in_oneof {
             quote!(
                 <
-                    #encoder as ::bilrost::encoding::DistinguishedFieldEncoder<#ty>
+                    #ty as ::bilrost::encoding::DistinguishedFieldEncoder<#encoder>
                 >::decode_field_distinguished(
                     wire_type,
                     #ident,
@@ -197,7 +197,7 @@ impl Field {
             )
         } else {
             quote!(
-                <#encoder as ::bilrost::encoding::DistinguishedEncoder<#ty>>::decode_distinguished(
+                <#ty as ::bilrost::encoding::DistinguishedEncoder<#encoder>>::decode_distinguished(
                     wire_type,
                     duplicated,
                     #ident,
@@ -216,7 +216,7 @@ impl Field {
         let ty = &self.ty;
         if self.in_oneof {
             quote! {
-                <#encoder as ::bilrost::encoding::FieldEncoder<#ty>>::field_encoded_len(
+                <#ty as ::bilrost::encoding::FieldEncoder<#encoder>>::field_encoded_len(
                     #tag,
                     &#ident,
                     tm,
@@ -224,7 +224,7 @@ impl Field {
             }
         } else {
             quote! {
-                <#encoder as ::bilrost::encoding::Encoder<#ty>>::encoded_len(#tag, &#ident, tm)
+                <#ty as ::bilrost::encoding::Encoder<#encoder>>::encoded_len(#tag, &#ident, tm)
             }
         }
     }
@@ -238,12 +238,12 @@ impl Field {
         let encoder = &self.encoder;
         if self.in_oneof {
             vec![
-                quote!(#encoder: ::bilrost::encoding::ValueEncoder<#ty>),
+                quote!(#ty: ::bilrost::encoding::ValueEncoder<#encoder>),
                 quote!(#ty: ::bilrost::encoding::NewForOverwrite),
             ]
         } else {
             vec![
-                quote!(#encoder: ::bilrost::encoding::Encoder<#ty>),
+                quote!(#ty: ::bilrost::encoding::Encoder<#encoder>),
                 quote!(#ty: ::bilrost::encoding::EmptyState),
             ]
         }
@@ -258,13 +258,13 @@ impl Field {
         let encoder = &self.encoder;
         if self.in_oneof {
             vec![
-                quote!(#encoder: ::bilrost::encoding::DistinguishedValueEncoder<#ty>),
+                quote!(#ty: ::bilrost::encoding::DistinguishedValueEncoder<#encoder>),
                 quote!(#ty: ::bilrost::encoding::NewForOverwrite),
                 quote!(#ty: ::core::cmp::Eq),
             ]
         } else {
             vec![
-                quote!(#encoder: ::bilrost::encoding::DistinguishedEncoder<#ty>),
+                quote!(#ty: ::bilrost::encoding::DistinguishedEncoder<#encoder>),
                 quote!(#ty: ::bilrost::encoding::EmptyState),
             ]
         }
