@@ -17,9 +17,8 @@ mod derived_message_tests {
 
     use bilrost::encoding::opaque::{OpaqueMessage, OpaqueValue as OV};
     use bilrost::encoding::{
-        encode_varint, Collection, DistinguishedEncoder, DistinguishedOneof,
-        DistinguishedValueEncoder, EmptyState, Encoder, General, Mapping, Oneof, Packed,
-        ValueEncoder,
+        self, encode_varint, Collection, DistinguishedOneof, EmptyState, Fixed, General, Mapping,
+        Oneof, Packed,
     };
     use bilrost::Canonicity::{HasExtensions, NotCanonical};
     use bilrost::DecodeErrorKind::{
@@ -1098,9 +1097,12 @@ mod derived_message_tests {
 
         fn check_fixed_truncation<T>(val: OV)
         where
-            T: Debug + Eq + EmptyState,
-            bilrost::encoding::Fixed:
-                DistinguishedEncoder<T> + ValueEncoder<T> + DistinguishedValueEncoder<T>,
+            T: Debug
+                + Eq
+                + EmptyState
+                + encoding::DistinguishedEncoder<Fixed>
+                + encoding::DistinguishedValueEncoder<Fixed>
+                + encoding::ValueEncoder<Fixed>,
         {
             let mut direct = [(1, val.clone())].into_opaque_message().encode_to_vec();
             let mut in_oneof = [(2, val.clone())].into_opaque_message().encode_to_vec();
@@ -1158,13 +1160,15 @@ mod derived_message_tests {
 
     fn parsing_string_type<'a, T>()
     where
-        T: 'a + Debug + Eq + From<&'a str> + EmptyState,
-        General: DistinguishedEncoder<T>,
+        T: 'a + Debug + Eq + From<&'a str> + EmptyState + encoding::DistinguishedEncoder<General>,
     {
         #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
         struct Foo<T>(T);
 
-        assert::decodes_distinguished([(1, OV::string("hello world"))], Foo("hello world".into()));
+        assert::decodes_distinguished(
+            [(1, OV::string("hello world"))],
+            Foo::<T>("hello world".into()),
+        );
         let mut invalid_strings = Vec::<Vec<u8>>::from([
             b"bad byte: \xff can't appear in utf-8".as_slice().into(),
             b"non-canonical representation \xc0\x80 of nul byte"
@@ -1470,8 +1474,7 @@ mod derived_message_tests {
 
     fn truncated_bool_string_map<T>()
     where
-        T: Debug + EmptyState + Mapping<Key = bool, Value = String>,
-        General: Encoder<T>,
+        T: Debug + EmptyState + Mapping<Key = bool, Value = String> + encoding::Encoder<General>,
     {
         #[derive(Debug, PartialEq, Message)]
         struct Foo<T>(T, String);
@@ -1495,8 +1498,7 @@ mod derived_message_tests {
 
     fn truncated_string_int_map<T>()
     where
-        T: Debug + EmptyState + Mapping<Key = String, Value = u64>,
-        General: Encoder<T>,
+        T: Debug + EmptyState + Mapping<Key = String, Value = u64> + encoding::Encoder<General>,
     {
         #[derive(Debug, PartialEq, Message)]
         struct Foo<T>(T, String);
@@ -1875,9 +1877,11 @@ mod derived_message_tests {
 
     fn truncated_packed_string<T>()
     where
-        T: Debug + EmptyState + Collection<Item = String>,
-        General: Encoder<T>,
-        Packed: Encoder<T>,
+        T: Debug
+            + EmptyState
+            + Collection<Item = String>
+            + encoding::Encoder<General>
+            + encoding::Encoder<Packed>,
     {
         #[derive(Debug, PartialEq, Message)]
         struct Foo<T>(#[bilrost(encoder(packed))] T, String);
@@ -1898,8 +1902,7 @@ mod derived_message_tests {
 
     fn truncated_packed_int<T>()
     where
-        T: Debug + EmptyState + Collection<Item = u64>,
-        General: Encoder<T>,
+        T: Debug + EmptyState + Collection<Item = u64> + encoding::Encoder<General>,
     {
         #[derive(Debug, PartialEq, Message)]
         struct Foo<T>(T, String);

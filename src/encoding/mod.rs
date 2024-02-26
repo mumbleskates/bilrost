@@ -2004,7 +2004,7 @@ mod test {
 
     fn present_empty_not_canon<T, E>()
     where
-        T: EmptyState + Eq + DistinguishedValueEncoder<E> + ValueEncoder<E>,
+        T: EmptyState + Eq + DistinguishedEncoder<E> + ValueEncoder<E>,
     {
         let mut encoded = <Vec<u8>>::new();
         Encoder::<E>::encode(123, &Some(T::empty()), &mut encoded, &mut TagWriter::new());
@@ -2012,21 +2012,23 @@ mod test {
         let mut capped = Capped::new(&mut buf);
         let (tag, wire_type) = TagReader::new().decode_key(capped.lend()).unwrap();
         assert_eq!(tag, 123);
+        let mut decoded = T::new_for_overwrite();
         assert_eq!(
-            <Option<T> as DistinguishedEncoder<E>>::decode_distinguished(
+            DistinguishedEncoder::<E>::decode_distinguished(
                 wire_type,
                 false,
-                &mut None,
+                &mut decoded,
                 capped,
                 DecodeContext::default(),
             )
             .expect("decoding a plain field with an encoded defaulted value should succeed"),
             Canonicity::NotCanonical
         );
+        assert!(decoded.is_empty());
     }
 
     #[test]
-    fn test_present_and_defaulted() {
+    fn test_present_and_empty() {
         // Any value that's present not in an `Option` that is not omitted must err when decoded in
         // distinguished mode
         present_empty_not_canon::<u32, General>();
