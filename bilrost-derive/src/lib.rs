@@ -17,9 +17,9 @@ use itertools::Itertools;
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, ToTokens};
 use syn::{
-    parse2, parse_str, Attribute, Data, DataEnum, DataStruct, DeriveInput, Expr, Fields,
-    FieldsNamed, FieldsUnnamed, Ident, ImplGenerics, Index, Meta, MetaList, MetaNameValue,
-    TypeGenerics, Variant, WhereClause,
+    parse2, Attribute, Data, DataEnum, DataStruct, DeriveInput, Expr, Fields, FieldsNamed,
+    FieldsUnnamed, Ident, ImplGenerics, Index, Meta, MetaList, MetaNameValue, TypeGenerics,
+    Variant, WhereClause,
 };
 
 use self::field::{bilrost_attrs, Field};
@@ -586,12 +586,9 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         }
     };
 
-    let impl_wrapper_const_ident = parse_str::<Ident>(
-        &("__BILROST_DERIVED_IMPL_MESSAGE_FOR_".to_owned() + &ident.to_string()),
-    )?;
     let aliases = encoder_alias_header();
     let expanded = quote! {
-        const #impl_wrapper_const_ident: () = {
+        const _: () = {
             #aliases
 
             #expanded
@@ -683,12 +680,9 @@ fn try_distinguished_message(input: TokenStream) -> Result<TokenStream, Error> {
         }
     };
 
-    let impl_wrapper_const_ident = parse_str::<Ident>(
-        &("__BILROST_DERIVED_IMPL_DISTINGUISHED_MESSAGE_FOR_".to_owned() + &ident.to_string()),
-    )?;
     let aliases = encoder_alias_header();
     let expanded = quote! {
-        const #impl_wrapper_const_ident: () = {
+        const _: () = {
             #aliases
 
             #expanded
@@ -1059,8 +1053,6 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         quote!(#ident::#variant_ident #with_value => #encoded_len)
     });
 
-    let impl_wrapper_const_ident =
-        parse_str::<Ident>(&("__BILROST_DERIVED_IMPL_ONEOF_FOR_".to_owned() + &ident.to_string()))?;
     let aliases = encoder_alias_header();
     let expanded = if let Some(empty_ident) = empty_variant {
         let current_tag = fields.iter().map(|(variant_ident, field)| {
@@ -1095,7 +1087,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         });
 
         quote! {
-            const #impl_wrapper_const_ident: () = {
+            const _: () = {
                 #aliases
 
                 impl #impl_generics ::bilrost::encoding::Oneof
@@ -1201,7 +1193,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         });
 
         quote! {
-            const #impl_wrapper_const_ident: () = {
+            const _: () = {
                 #aliases
 
                 impl #impl_generics ::bilrost::encoding::NonEmptyOneof
@@ -1375,12 +1367,9 @@ fn try_distinguished_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         }
     };
 
-    let impl_wrapper_const_ident = parse_str::<Ident>(
-        &("__BILROST_DERIVED_IMPL_DISTINGUISHED_ONEOF_FOR_".to_owned() + &ident.to_string()),
-    )?;
     let aliases = encoder_alias_header();
     let expanded = quote! {
-        const #impl_wrapper_const_ident: () = {
+        const _: () = {
             #aliases
 
             #expanded
