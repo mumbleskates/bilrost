@@ -2,13 +2,24 @@
 
 ### Breaking changes
 
+* The "encoder" attribute for message & oneof fields is now "encoding". This
+  reads better and makes more sense, better to do it now.
+* Conversion to & from `u32` now uses the `Enumeration` trait rather than
+  `Into<u32>` and `TryFrom<u32>`.
+
 ### New features
+
+* There is now an `Enumeration` trait for converting to & from `u32` from
+  derived enumerations.
 
 ### Fixes
 
 * Fixed some incorrect documentation.
 
 ### Cleanups
+
+* Large refactor that changes the underlying `Encoder` traits from
+  `impl Encoder<Value> for Encoding` to `impl Encoder<Encoding> for Value`.
 
 ## v0.1003.1
 
