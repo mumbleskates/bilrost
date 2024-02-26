@@ -3,8 +3,8 @@ use bytes::{Buf, BufMut};
 use crate::encoding::value_traits::{DistinguishedMapping, Mapping};
 use crate::encoding::{
     encode_varint, encoded_len_varint, encoder_where_value_encoder, Canonicity, Capped,
-    DecodeContext, DecodeError, DistinguishedEncoder, DistinguishedValueEncoder, Encoder,
-    NewForOverwrite, TagMeasurer, TagWriter, ValueEncoder, WireType, Wiretyped,
+    DecodeContext, DecodeError, DistinguishedValueEncoder, Encoder, NewForOverwrite, TagMeasurer,
+    TagWriter, ValueEncoder, WireType, Wiretyped,
 };
 use crate::DecodeErrorKind::Truncated;
 

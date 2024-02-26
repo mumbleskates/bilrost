@@ -102,7 +102,7 @@ where
 {
     fn encode<B: BufMut + ?Sized>(tag: u32, value: &C, buf: &mut B, tw: &mut TagWriter) {
         for val in value.iter() {
-            <_ as FieldEncoder<E>>::encode_field(tag, val, buf, tw);
+            FieldEncoder::<E>::encode_field(tag, val, buf, tw);
         }
     }
 

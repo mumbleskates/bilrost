@@ -2,11 +2,10 @@ use alloc::vec::Vec;
 
 use bytes::{Buf, BufMut};
 
-use crate::encoding::value_traits::EmptyState;
+use crate::encoding::EmptyState;
 use crate::encoding::{
     delegate_encoding, encoder_where_value_encoder, Canonicity, Capped, DecodeContext,
-    DistinguishedEncoder, DistinguishedValueEncoder, Encoder, TagMeasurer, TagWriter, ValueEncoder,
-    WireType, Wiretyped,
+    DistinguishedValueEncoder, Encoder, TagMeasurer, TagWriter, ValueEncoder, WireType, Wiretyped,
 };
 use crate::DecodeError;
 use crate::DecodeErrorKind::Truncated;

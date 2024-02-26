@@ -1492,7 +1492,7 @@ macro_rules! delegate_encoding {
                 buf: &mut B,
                 tw: &mut $crate::encoding::TagWriter,
             ) {
-                <_ as $crate::encoding::Encoder<$to_ty>>::encode(tag, value, buf, tw)
+                $crate::encoding::Encoder::<$to_ty>::encode(tag, value, buf, tw)
             }
 
             #[inline]
@@ -1501,7 +1501,7 @@ macro_rules! delegate_encoding {
                 value: &$value_ty,
                 tm: &mut $crate::encoding::TagMeasurer,
             ) -> usize {
-                <_ as $crate::encoding::Encoder<$to_ty>>::encoded_len(tag, value, tm)
+                $crate::encoding::Encoder::<$to_ty>::encoded_len(tag, value, tm)
             }
 
             #[inline]
@@ -1512,7 +1512,7 @@ macro_rules! delegate_encoding {
                 buf: $crate::encoding::Capped<B>,
                 ctx: $crate::encoding::DecodeContext,
             ) -> Result<(), DecodeError> {
-                <_ as $crate::encoding::Encoder<$to_ty>>::decode(
+                $crate::encoding::Encoder::<$to_ty>::decode(
                     wire_type,
                     duplicated,
                     value,
@@ -1549,7 +1549,7 @@ macro_rules! delegate_encoding {
                 buf: $crate::encoding::Capped<B>,
                 ctx: $crate::encoding::DecodeContext,
             ) -> Result<$crate::Canonicity, $crate::DecodeError> {
-                <_ as $crate::encoding::DistinguishedEncoder<$to_ty>>::decode_distinguished(
+                $crate::encoding::DistinguishedEncoder::<$to_ty>::decode_distinguished(
                     wire_type,
                     duplicated,
                     value,
@@ -1585,12 +1585,12 @@ macro_rules! delegate_value_encoding {
         {
             #[inline]
             fn encode_value<B: $crate::bytes::BufMut + ?Sized>(value: &$value_ty, buf: &mut B) {
-                <_ as $crate::encoding::ValueEncoder<$to_ty>>::encode_value(value, buf)
+                $crate::encoding::ValueEncoder::<$to_ty>::encode_value(value, buf)
             }
 
             #[inline]
             fn value_encoded_len(value: &$value_ty) -> usize {
-                <_ as $crate::encoding::ValueEncoder<$to_ty>>::value_encoded_len(value)
+                $crate::encoding::ValueEncoder::<$to_ty>::value_encoded_len(value)
             }
 
             #[inline]
@@ -1599,7 +1599,7 @@ macro_rules! delegate_value_encoding {
                 I: ExactSizeIterator,
                 I::Item: core::ops::Deref<Target = $value_ty>,
             {
-                <_ as $crate::encoding::ValueEncoder<$to_ty>>::many_values_encoded_len(values)
+                $crate::encoding::ValueEncoder::<$to_ty>::many_values_encoded_len(values)
             }
 
             #[inline]
@@ -1608,7 +1608,7 @@ macro_rules! delegate_value_encoding {
                 buf: $crate::encoding::Capped<B>,
                 ctx: $crate::encoding::DecodeContext,
             ) -> Result<(), $crate::DecodeError> {
-                <_ as $crate::encoding::ValueEncoder<$to_ty>>::decode_value(value, buf, ctx)
+                $crate::encoding::ValueEncoder::<$to_ty>::decode_value(value, buf, ctx)
             }
         }
     };
@@ -1663,21 +1663,21 @@ macro_rules! encoder_where_value_encoder {
         /// Encodes plain values only when they are non-default.
         impl<T $(, $($generics)*)?> Encoder<$encoding> for T
         where
-            T: crate::encoding::value_traits::EmptyState + ValueEncoder<$encoding>,
+            T: $crate::encoding::EmptyState + ValueEncoder<$encoding>,
             $($($where_clause)*)?
         {
             #[inline]
             fn encode<B: BufMut + ?Sized>(tag: u32, value: &T, buf: &mut B, tw: &mut TagWriter) {
-                if !crate::encoding::value_traits::EmptyState::is_empty(value) {
-                    <_ as crate::encoding::FieldEncoder<$encoding >>::encode_field(
+                if !$crate::encoding::EmptyState::is_empty(value) {
+                    $crate::encoding::FieldEncoder::<$encoding>::encode_field(
                         tag, value, buf, tw);
                 }
             }
 
             #[inline]
             fn encoded_len(tag: u32, value: &T, tm: &mut TagMeasurer) -> usize {
-                if !crate::encoding::value_traits::EmptyState::is_empty(value) {
-                    <_ as crate::encoding::FieldEncoder<$encoding >>::field_encoded_len(
+                if !$crate::encoding::EmptyState::is_empty(value) {
+                    $crate::encoding::FieldEncoder::<$encoding>::field_encoded_len(
                         tag, value, tm)
                 } else {
                     0
@@ -1691,25 +1691,25 @@ macro_rules! encoder_where_value_encoder {
                 value: &mut T,
                 buf: Capped<B>,
                 ctx: DecodeContext,
-            ) -> Result<(), crate::DecodeError> {
+            ) -> Result<(), $crate::DecodeError> {
                 if duplicated {
                     return Err(
-                        crate::DecodeError::new(crate::DecodeErrorKind::UnexpectedlyRepeated)
+                        $crate::DecodeError::new($crate::DecodeErrorKind::UnexpectedlyRepeated)
                     );
                 }
-                <_ as crate::encoding::FieldEncoder<$encoding >>::decode_field(
+                $crate::encoding::FieldEncoder::<$encoding>::decode_field(
                     wire_type, value, buf, ctx)
             }
         }
 
         /// Distinguished encoding for plain values forbids encoding defaulted values. This includes
         /// directly-nested message types, which are not emitted when all their fields are default.
-        impl<T $(, $($generics)*)?> DistinguishedEncoder<$encoding> for T
+        impl<T $(, $($generics)*)?> $crate::encoding::DistinguishedEncoder<$encoding> for T
         where
             T: Eq
-                + crate::encoding::value_traits::EmptyState
-                + DistinguishedValueEncoder<$encoding>
-                + Encoder<$encoding>,
+                + $crate::encoding::EmptyState
+                + $crate::encoding::DistinguishedValueEncoder<$encoding>
+                + $crate::encoding::Encoder<$encoding>,
             $($($where_clause)*)?
         {
             #[inline]
@@ -1719,21 +1719,20 @@ macro_rules! encoder_where_value_encoder {
                 value: &mut T,
                 buf: Capped<B>,
                 ctx: DecodeContext,
-            ) -> Result<crate::Canonicity, crate::DecodeError> {
+            ) -> Result<$crate::Canonicity, $crate::DecodeError> {
                 if duplicated {
                     return Err(
-                        crate::DecodeError::new(crate::DecodeErrorKind::UnexpectedlyRepeated)
+                        $crate::DecodeError::new(crate::DecodeErrorKind::UnexpectedlyRepeated)
                     );
                 }
-                <
-                    _ as crate::encoding::DistinguishedFieldEncoder<$encoding>
-                >::decode_field_distinguished(
-                    wire_type,
-                    value,
-                    buf,
-                    false, // decoding a bare value, empty values are unacceptable
-                    ctx,
-                )
+                $crate::encoding::DistinguishedFieldEncoder::<$encoding>
+                    ::decode_field_distinguished(
+                        wire_type,
+                        value,
+                        buf,
+                        false, // decoding a bare value, empty values are unacceptable
+                        ctx,
+                    )
             }
         }
     };

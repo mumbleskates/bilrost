@@ -1,7 +1,7 @@
 use crate::encoding::{
     empty_state_via_default, encode_varint, encoded_len_varint, encoder_where_value_encoder, Buf,
-    BufMut, Canonicity, Capped, DecodeContext, DistinguishedEncoder, DistinguishedValueEncoder,
-    EmptyState, Encoder, TagMeasurer, TagWriter, ValueEncoder, WireType, Wiretyped,
+    BufMut, Canonicity, Capped, DecodeContext, DistinguishedValueEncoder, EmptyState, Encoder,
+    TagMeasurer, TagWriter, ValueEncoder, WireType, Wiretyped,
 };
 use crate::DecodeError;
 use crate::DecodeErrorKind::OutOfDomainValue;
