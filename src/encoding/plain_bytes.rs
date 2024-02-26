@@ -20,11 +20,11 @@ pub struct PlainBytes;
 
 encoder_where_value_encoder!(PlainBytes);
 
-impl Wiretyped<Vec<u8>> for PlainBytes {
+impl Wiretyped<PlainBytes> for Vec<u8> {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
 }
 
-impl ValueEncoder<Vec<u8>> for PlainBytes {
+impl ValueEncoder<PlainBytes> for Vec<u8> {
     fn encode_value<B: BufMut + ?Sized>(value: &Vec<u8>, buf: &mut B) {
         encode_varint(value.len() as u64, buf);
         buf.put_slice(value.as_slice());
@@ -47,14 +47,14 @@ impl ValueEncoder<Vec<u8>> for PlainBytes {
     }
 }
 
-impl DistinguishedValueEncoder<Vec<u8>> for PlainBytes {
+impl DistinguishedValueEncoder<PlainBytes> for Vec<u8> {
     fn decode_value_distinguished<B: Buf + ?Sized>(
         value: &mut Vec<u8>,
         buf: Capped<B>,
         allow_empty: bool,
         ctx: DecodeContext,
     ) -> Result<Canonicity, DecodeError> {
-        Self::decode_value(value, buf, ctx)?;
+        ValueEncoder::<PlainBytes>::decode_value(value, buf, ctx)?;
         Ok(if !allow_empty && value.is_empty() {
             Canonicity::NotCanonical
         } else {
@@ -81,11 +81,11 @@ mod vec_u8 {
     );
 }
 
-impl Wiretyped<Cow<'_, [u8]>> for PlainBytes {
+impl Wiretyped<PlainBytes> for Cow<'_, [u8]> {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
 }
 
-impl ValueEncoder<Cow<'_, [u8]>> for PlainBytes {
+impl ValueEncoder<PlainBytes> for Cow<'_, [u8]> {
     #[inline]
     fn encode_value<B: BufMut + ?Sized>(value: &Cow<[u8]>, buf: &mut B) {
         encode_varint(value.len() as u64, buf);
@@ -103,11 +103,11 @@ impl ValueEncoder<Cow<'_, [u8]>> for PlainBytes {
         buf: Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
-        Self::decode_value(value.to_mut(), buf, ctx)
+        ValueEncoder::<PlainBytes>::decode_value(value.to_mut(), buf, ctx)
     }
 }
 
-impl DistinguishedValueEncoder<Cow<'_, [u8]>> for PlainBytes {
+impl DistinguishedValueEncoder<PlainBytes> for Cow<'_, [u8]> {
     #[inline]
     fn decode_value_distinguished<B: Buf + ?Sized>(
         value: &mut Cow<[u8]>,
@@ -115,7 +115,12 @@ impl DistinguishedValueEncoder<Cow<'_, [u8]>> for PlainBytes {
         allow_empty: bool,
         ctx: DecodeContext,
     ) -> Result<Canonicity, DecodeError> {
-        Self::decode_value_distinguished(value.to_mut(), buf, allow_empty, ctx)
+        DistinguishedValueEncoder::<PlainBytes>::decode_value_distinguished(
+            value.to_mut(),
+            buf,
+            allow_empty,
+            ctx,
+        )
     }
 }
 
@@ -130,10 +135,6 @@ mod cow_bytes {
         Cow<[u8]>,
         WireType::LengthDelimited
     );
-}
-
-impl<const N: usize> Wiretyped<[u8; N]> for PlainBytes {
-    const WIRE_TYPE: WireType = WireType::LengthDelimited;
 }
 
 impl<const N: usize> EmptyState for [u8; N] {
@@ -153,7 +154,11 @@ impl<const N: usize> EmptyState for [u8; N] {
     }
 }
 
-impl<const N: usize> ValueEncoder<[u8; N]> for PlainBytes {
+impl<const N: usize> Wiretyped<PlainBytes> for [u8; N] {
+    const WIRE_TYPE: WireType = WireType::LengthDelimited;
+}
+
+impl<const N: usize> ValueEncoder<PlainBytes> for [u8; N] {
     fn encode_value<B: BufMut + ?Sized>(value: &[u8; N], mut buf: &mut B) {
         encode_varint(N as u64, buf);
         (&mut buf).put(value.as_slice())
@@ -185,7 +190,7 @@ impl<const N: usize> ValueEncoder<[u8; N]> for PlainBytes {
     }
 }
 
-impl<const N: usize> DistinguishedValueEncoder<[u8; N]> for PlainBytes {
+impl<const N: usize> DistinguishedValueEncoder<PlainBytes> for [u8; N] {
     fn decode_value_distinguished<B: Buf + ?Sized>(
         value: &mut [u8; N],
         buf: Capped<B>,

@@ -13,7 +13,7 @@ pub struct Map<KE, VE>(KE, VE);
 encoder_where_value_encoder!(Map<KE, VE>, with where clause (T: Mapping), with generics (KE, VE));
 
 /// Maps are always length delimited.
-impl<T, KE, VE> Wiretyped<T> for Map<KE, VE> {
+impl<T, KE, VE> Wiretyped<Map<KE, VE>> for T {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
 }
 
@@ -27,33 +27,38 @@ const fn combined_fixed_size(a: WireType, b: WireType) -> Option<usize> {
 fn map_encoded_length<M, KE, VE>(value: &M) -> usize
 where
     M: Mapping,
-    KE: ValueEncoder<M::Key>,
-    VE: ValueEncoder<M::Value>,
+    M::Key: ValueEncoder<KE>,
+    M::Value: ValueEncoder<VE>,
 {
-    combined_fixed_size(KE::WIRE_TYPE, VE::WIRE_TYPE).map_or_else(
+    combined_fixed_size(
+        <M::Key as Wiretyped<KE>>::WIRE_TYPE,
+        <M::Value as Wiretyped<VE>>::WIRE_TYPE,
+    )
+    .map_or_else(
         || {
             value
                 .iter()
-                .map(|(k, v)| KE::value_encoded_len(k) + VE::value_encoded_len(v))
+                .map(|(k, v)| {
+                    ValueEncoder::<KE>::value_encoded_len(k)
+                        + ValueEncoder::<VE>::value_encoded_len(v)
+                })
                 .sum()
         },
         |fixed_size| value.len() * fixed_size, // Both key and value are constant length; shortcut
     )
 }
 
-impl<M, K, V, KE, VE> ValueEncoder<M> for Map<KE, VE>
+impl<M, K, V, KE, VE> ValueEncoder<Map<KE, VE>> for M
 where
     M: Mapping<Key = K, Value = V>,
-    KE: ValueEncoder<K>,
-    VE: ValueEncoder<V>,
-    K: NewForOverwrite,
-    V: NewForOverwrite,
+    K: NewForOverwrite + ValueEncoder<KE>,
+    V: NewForOverwrite + ValueEncoder<VE>,
 {
     fn encode_value<B: BufMut + ?Sized>(value: &M, buf: &mut B) {
         encode_varint(map_encoded_length::<M, KE, VE>(value) as u64, buf);
         for (key, val) in value.iter() {
-            KE::encode_value(key, buf);
-            VE::encode_value(val, buf);
+            ValueEncoder::<KE>::encode_value(key, buf);
+            ValueEncoder::<VE>::encode_value(val, buf);
         }
     }
 
@@ -68,7 +73,11 @@ where
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         let mut capped = buf.take_length_delimited()?;
-        if combined_fixed_size(KE::WIRE_TYPE, VE::WIRE_TYPE).map_or(false, |fixed_size| {
+        if combined_fixed_size(
+            <M::Key as Wiretyped<KE>>::WIRE_TYPE,
+            <M::Value as Wiretyped<VE>>::WIRE_TYPE,
+        )
+        .map_or(false, |fixed_size| {
             capped.remaining_before_cap() % fixed_size != 0
         }) {
             return Err(DecodeError::new(Truncated));
@@ -76,21 +85,19 @@ where
         while capped.has_remaining()? {
             let mut new_key = K::new_for_overwrite();
             let mut new_val = V::new_for_overwrite();
-            KE::decode_value(&mut new_key, capped.lend(), ctx.clone())?;
-            VE::decode_value(&mut new_val, capped.lend(), ctx.clone())?;
+            ValueEncoder::<KE>::decode_value(&mut new_key, capped.lend(), ctx.clone())?;
+            ValueEncoder::<VE>::decode_value(&mut new_val, capped.lend(), ctx.clone())?;
             value.insert(new_key, new_val)?;
         }
         Ok(())
     }
 }
 
-impl<M, K, V, KE, VE> DistinguishedValueEncoder<M> for Map<KE, VE>
+impl<M, K, V, KE, VE> DistinguishedValueEncoder<Map<KE, VE>> for M
 where
     M: DistinguishedMapping<Key = K, Value = V> + Eq,
-    KE: DistinguishedValueEncoder<K>,
-    VE: DistinguishedValueEncoder<V>,
-    K: NewForOverwrite + Eq,
-    V: NewForOverwrite + Eq,
+    K: NewForOverwrite + Eq + DistinguishedValueEncoder<KE>,
+    V: NewForOverwrite + Eq + DistinguishedValueEncoder<VE>,
 {
     fn decode_value_distinguished<B: Buf + ?Sized>(
         value: &mut M,
@@ -102,7 +109,11 @@ where
         if !allow_empty && capped.remaining_before_cap() == 0 {
             return Ok(Canonicity::NotCanonical);
         }
-        if combined_fixed_size(KE::WIRE_TYPE, VE::WIRE_TYPE).map_or(false, |fixed_size| {
+        if combined_fixed_size(
+            <M::Key as Wiretyped<KE>>::WIRE_TYPE,
+            <M::Value as Wiretyped<VE>>::WIRE_TYPE,
+        )
+        .map_or(false, |fixed_size| {
             capped.remaining_before_cap() % fixed_size != 0
         }) {
             return Err(DecodeError::new(Truncated));
@@ -111,13 +122,13 @@ where
         while capped.has_remaining()? {
             let mut new_key = K::new_for_overwrite();
             let mut new_val = V::new_for_overwrite();
-            canon.update(KE::decode_value_distinguished(
+            canon.update(DistinguishedValueEncoder::<KE>::decode_value_distinguished(
                 &mut new_key,
                 capped.lend(),
                 true,
                 ctx.clone(),
             )?);
-            canon.update(VE::decode_value_distinguished(
+            canon.update(DistinguishedValueEncoder::<VE>::decode_value_distinguished(
                 &mut new_val,
                 capped.lend(),
                 true,

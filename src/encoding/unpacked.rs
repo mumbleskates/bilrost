@@ -4,7 +4,7 @@ use crate::encoding::value_traits::{Collection, DistinguishedCollection};
 use crate::encoding::{
     check_wire_type, Capped, DecodeContext, DistinguishedEncoder, DistinguishedValueEncoder,
     Encoder, FieldEncoder, General, NewForOverwrite, Packed, TagMeasurer, TagWriter, ValueEncoder,
-    WireType,
+    WireType, Wiretyped,
 };
 use crate::DecodeErrorKind::UnexpectedlyRepeated;
 use crate::{Canonicity, DecodeError};
@@ -40,18 +40,17 @@ pub(crate) fn decode<T, E>(
 ) -> Result<(), DecodeError>
 where
     T: Collection,
-    E: ValueEncoder<T::Item>,
-    T::Item: NewForOverwrite,
+    T::Item: NewForOverwrite + ValueEncoder<E>,
 {
-    check_wire_type(E::WIRE_TYPE, wire_type)?;
+    check_wire_type(<T::Item as Wiretyped<E>>::WIRE_TYPE, wire_type)?;
     loop {
         // Decode one item
         let mut new_item = T::Item::new_for_overwrite();
-        E::decode_value(&mut new_item, buf.lend(), ctx.clone())?;
+        ValueEncoder::<E>::decode_value(&mut new_item, buf.lend(), ctx.clone())?;
         collection.insert(new_item)?;
 
         if let Some(next_wire_type) = peek_repeated_field(&mut buf) {
-            check_wire_type(E::WIRE_TYPE, next_wire_type)?;
+            check_wire_type(<T::Item as Wiretyped<E>>::WIRE_TYPE, next_wire_type)?;
         } else {
             break;
         }
@@ -70,15 +69,14 @@ pub(crate) fn decode_distinguished<T, E>(
 ) -> Result<Canonicity, DecodeError>
 where
     T: DistinguishedCollection,
-    E: DistinguishedValueEncoder<T::Item>,
-    T::Item: NewForOverwrite + Eq,
+    T::Item: NewForOverwrite + Eq + DistinguishedValueEncoder<E>,
 {
-    check_wire_type(E::WIRE_TYPE, wire_type)?;
+    check_wire_type(<T::Item as Wiretyped<E>>::WIRE_TYPE, wire_type)?;
     let mut canon = Canonicity::Canonical;
     loop {
         // Decode one item
         let mut new_item = T::Item::new_for_overwrite();
-        canon.update(E::decode_value_distinguished(
+        canon.update(DistinguishedValueEncoder::<E>::decode_value_distinguished(
             &mut new_item,
             buf.lend(),
             true,
@@ -87,7 +85,7 @@ where
         canon.update(collection.insert_distinguished(new_item)?);
 
         if let Some(next_wire_type) = peek_repeated_field(&mut buf) {
-            check_wire_type(E::WIRE_TYPE, next_wire_type)?;
+            check_wire_type(<T::Item as Wiretyped<E>>::WIRE_TYPE, next_wire_type)?;
         } else {
             break;
         }
@@ -97,22 +95,22 @@ where
 
 /// Unpacked encodes vecs as repeated fields and in relaxed decoding will accept both packed
 /// and un-packed encodings.
-impl<C, T, E> Encoder<C> for Unpacked<E>
+impl<C, T, E> Encoder<Unpacked<E>> for C
 where
     C: Collection<Item = T>,
-    T: NewForOverwrite,
-    E: ValueEncoder<T>,
+    T: NewForOverwrite + ValueEncoder<E>,
 {
     fn encode<B: BufMut + ?Sized>(tag: u32, value: &C, buf: &mut B, tw: &mut TagWriter) {
         for val in value.iter() {
-            E::encode_field(tag, val, buf, tw);
+            <_ as FieldEncoder<E>>::encode_field(tag, val, buf, tw);
         }
     }
 
     fn encoded_len(tag: u32, value: &C, tm: &mut TagMeasurer) -> usize {
         if !value.is_empty() {
             // Each *additional* field encoded after the first needs only 1 byte for the field key.
-            tm.key_len(tag) + E::many_values_encoded_len(value.iter()) + value.len() - 1
+            tm.key_len(tag) + ValueEncoder::<E>::many_values_encoded_len(value.iter()) + value.len()
+                - 1
         } else {
             0
         }
@@ -128,10 +126,12 @@ where
         if duplicated {
             return Err(DecodeError::new(UnexpectedlyRepeated));
         }
-        if wire_type == WireType::LengthDelimited && E::WIRE_TYPE != WireType::LengthDelimited {
+        if wire_type == WireType::LengthDelimited
+            && <C::Item as Wiretyped<E>>::WIRE_TYPE != WireType::LengthDelimited
+        {
             // We've encountered a length-delimited field when we aren't expecting one; try decoding
             // it in packed format instead.
-            Packed::<E>::decode_value(value, buf, ctx)
+            ValueEncoder::<Packed<E>>::decode_value(value, buf, ctx)
         } else {
             // Otherwise, decode in unpacked mode.
             decode::<C, E>(wire_type, value, buf, ctx)
@@ -140,13 +140,10 @@ where
 }
 
 /// Distinguished encoding enforces only the repeated field representation is allowed.
-impl<C, T, E> DistinguishedEncoder<C> for Unpacked<E>
+impl<C, T, E> DistinguishedEncoder<Unpacked<E>> for C
 where
-    Self: Encoder<C>,
-    C: DistinguishedCollection<Item = T>,
-    E: DistinguishedValueEncoder<T>,
-    Packed<E>: ValueEncoder<C>,
-    T: NewForOverwrite + Eq,
+    Self: DistinguishedCollection<Item = T> + ValueEncoder<Packed<E>> + Encoder<Unpacked<E>>,
+    T: NewForOverwrite + Eq + DistinguishedValueEncoder<E>,
 {
     fn decode_distinguished<B: Buf + ?Sized>(
         wire_type: WireType,
@@ -158,11 +155,13 @@ where
         if duplicated {
             return Err(DecodeError::new(UnexpectedlyRepeated));
         }
-        if wire_type == WireType::LengthDelimited && E::WIRE_TYPE != WireType::LengthDelimited {
+        if wire_type == WireType::LengthDelimited
+            && <T as Wiretyped<E>>::WIRE_TYPE != WireType::LengthDelimited
+        {
             // We've encountered a length-delimited field when we aren't expecting one; try decoding
             // it in packed format instead.
             // The data is already known to be non-canonical; use expedient decoding
-            <Packed<E>>::decode_value(value, buf, ctx)?;
+            <C as ValueEncoder<Packed<E>>>::decode_value(value, buf, ctx)?;
             Ok(Canonicity::NotCanonical)
         } else {
             // Otherwise, decode in unpacked mode.

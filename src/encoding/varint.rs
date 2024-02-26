@@ -62,11 +62,11 @@ macro_rules! varint {
     ) => {
         empty_state_via_default!($ty);
 
-        impl Wiretyped<$ty> for Varint {
+        impl Wiretyped<Varint> for $ty {
             const WIRE_TYPE: WireType = WireType::Varint;
         }
 
-        impl ValueEncoder<$ty> for Varint {
+        impl ValueEncoder<Varint> for $ty {
             #[inline]
             fn encode_value<B: BufMut + ?Sized>($to_uint64_value: &$ty, buf: &mut B) {
                 encode_varint($to_uint64, buf);
@@ -89,7 +89,7 @@ macro_rules! varint {
             }
         }
 
-        impl DistinguishedValueEncoder<$ty> for Varint {
+        impl DistinguishedValueEncoder<Varint> for $ty {
             #[inline]
             fn decode_value_distinguished<B: Buf + ?Sized>(
                 value: &mut $ty,
@@ -97,7 +97,7 @@ macro_rules! varint {
                 allow_empty: bool,
                 ctx: DecodeContext,
             ) -> Result<Canonicity, DecodeError> {
-                Self::decode_value(value, buf, ctx)?;
+                ValueEncoder::<Varint>::decode_value(value, buf, ctx)?;
                 Ok(if !allow_empty && value.is_empty() {
                     Canonicity::NotCanonical
                 } else {

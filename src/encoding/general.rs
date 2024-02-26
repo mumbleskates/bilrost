@@ -107,11 +107,11 @@ impl EmptyState for String {
     }
 }
 
-impl Wiretyped<String> for General {
+impl Wiretyped<General> for String {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
 }
 
-impl ValueEncoder<String> for General {
+impl ValueEncoder<General> for String {
     fn encode_value<B: BufMut + ?Sized>(value: &String, buf: &mut B) {
         encode_varint(value.len() as u64, buf);
         buf.put_slice(value.as_bytes());
@@ -166,7 +166,7 @@ impl ValueEncoder<String> for General {
     }
 }
 
-impl DistinguishedValueEncoder<String> for General {
+impl DistinguishedValueEncoder<General> for String {
     fn decode_value_distinguished<B: Buf + ?Sized>(
         value: &mut String,
         buf: Capped<B>,
@@ -214,11 +214,11 @@ impl EmptyState for Cow<'_, str> {
     }
 }
 
-impl Wiretyped<Cow<'_, str>> for General {
+impl Wiretyped<General> for Cow<'_, str> {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
 }
 
-impl ValueEncoder<Cow<'_, str>> for General {
+impl ValueEncoder<General> for Cow<'_, str> {
     fn encode_value<B: BufMut + ?Sized>(value: &Cow<str>, buf: &mut B) {
         encode_varint(value.len() as u64, buf);
         buf.put_slice(value.as_bytes());
@@ -233,18 +233,23 @@ impl ValueEncoder<Cow<'_, str>> for General {
         buf: Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
-        Self::decode_value(value.to_mut(), buf, ctx)
+        ValueEncoder::<General>::decode_value(value.to_mut(), buf, ctx)
     }
 }
 
-impl DistinguishedValueEncoder<Cow<'_, str>> for General {
+impl DistinguishedValueEncoder<General> for Cow<'_, str> {
     fn decode_value_distinguished<B: Buf + ?Sized>(
         value: &mut Cow<str>,
         buf: Capped<B>,
         allow_empty: bool,
         ctx: DecodeContext,
     ) -> Result<Canonicity, DecodeError> {
-        Self::decode_value_distinguished(value.to_mut(), buf, allow_empty, ctx)
+        DistinguishedValueEncoder::<General>::decode_value_distinguished(
+            value.to_mut(),
+            buf,
+            allow_empty,
+            ctx,
+        )
     }
 }
 
@@ -275,12 +280,12 @@ impl EmptyState for bytestring::ByteString {
 }
 
 #[cfg(feature = "bytestring")]
-impl Wiretyped<bytestring::ByteString> for General {
+impl Wiretyped<General> for bytestring::ByteString {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
 }
 
 #[cfg(feature = "bytestring")]
-impl ValueEncoder<bytestring::ByteString> for General {
+impl ValueEncoder<General> for bytestring::ByteString {
     fn encode_value<B: BufMut + ?Sized>(value: &bytestring::ByteString, buf: &mut B) {
         encode_varint(value.len() as u64, buf);
         buf.put_slice(value.as_bytes());
@@ -304,7 +309,7 @@ impl ValueEncoder<bytestring::ByteString> for General {
 }
 
 #[cfg(feature = "bytestring")]
-impl DistinguishedValueEncoder<bytestring::ByteString> for General {
+impl DistinguishedValueEncoder<General> for bytestring::ByteString {
     fn decode_value_distinguished<B: Buf + ?Sized>(
         value: &mut bytestring::ByteString,
         buf: Capped<B>,
@@ -347,11 +352,11 @@ impl EmptyState for Bytes {
     }
 }
 
-impl Wiretyped<Bytes> for General {
+impl Wiretyped<General> for Bytes {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
 }
 
-impl ValueEncoder<Bytes> for General {
+impl ValueEncoder<General> for Bytes {
     fn encode_value<B: BufMut + ?Sized>(value: &Bytes, mut buf: &mut B) {
         encode_varint(value.len() as u64, buf);
         (&mut buf).put(value.clone()); // `put` needs Self to be sized, so we use the ref type
@@ -373,7 +378,7 @@ impl ValueEncoder<Bytes> for General {
     }
 }
 
-impl DistinguishedValueEncoder<Bytes> for General {
+impl DistinguishedValueEncoder<General> for Bytes {
     fn decode_value_distinguished<B: Buf + ?Sized>(
         value: &mut Bytes,
         buf: Capped<B>,
@@ -397,19 +402,19 @@ mod bytes_blob {
     check_type_test!(General, distinguished, from Vec<u8>, into Bytes, WireType::LengthDelimited);
 }
 
-impl Wiretyped<Blob> for General {
+impl Wiretyped<General> for Blob {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
 }
 
-impl ValueEncoder<Blob> for General {
+impl ValueEncoder<General> for Blob {
     #[inline]
     fn encode_value<B: BufMut + ?Sized>(value: &Blob, buf: &mut B) {
-        PlainBytes::encode_value(&**value, buf)
+        ValueEncoder::<PlainBytes>::encode_value(&**value, buf)
     }
 
     #[inline]
     fn value_encoded_len(value: &Blob) -> usize {
-        PlainBytes::value_encoded_len(&**value)
+        ValueEncoder::<PlainBytes>::value_encoded_len(&**value)
     }
 
     #[inline]
@@ -418,11 +423,11 @@ impl ValueEncoder<Blob> for General {
         buf: Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
-        PlainBytes::decode_value(&mut **value, buf, ctx)
+        ValueEncoder::<PlainBytes>::decode_value(&mut **value, buf, ctx)
     }
 }
 
-impl DistinguishedValueEncoder<Blob> for General {
+impl DistinguishedValueEncoder<General> for Blob {
     #[inline]
     fn decode_value_distinguished<B: Buf + ?Sized>(
         value: &mut Blob,
@@ -430,7 +435,12 @@ impl DistinguishedValueEncoder<Blob> for General {
         allow_empty: bool,
         ctx: DecodeContext,
     ) -> Result<Canonicity, DecodeError> {
-        PlainBytes::decode_value_distinguished(&mut **value, buf, allow_empty, ctx)
+        DistinguishedValueEncoder::<PlainBytes>::decode_value_distinguished(
+            &mut **value,
+            buf,
+            allow_empty,
+            ctx,
+        )
     }
 }
 
@@ -442,14 +452,14 @@ mod blob {
     check_type_test!(General, distinguished, Blob, WireType::LengthDelimited);
 }
 
-impl<T> Wiretyped<T> for General
+impl<T> Wiretyped<General> for T
 where
     T: RawMessage,
 {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
 }
 
-impl<T> ValueEncoder<T> for General
+impl<T> ValueEncoder<General> for T
 where
     T: RawMessage,
 {
@@ -473,7 +483,7 @@ where
     }
 }
 
-impl<T> DistinguishedValueEncoder<T> for General
+impl<T> DistinguishedValueEncoder<General> for T
 where
     T: RawDistinguishedMessage + Eq,
 {
