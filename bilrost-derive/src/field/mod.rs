@@ -241,9 +241,9 @@ fn named_attr<T: parse::Parse>(attr: &Meta, attr_name: &str) -> Result<Option<T>
         return Ok(None);
     }
     match attr {
-        // encoder(type tokens go here)
+        // encoding(type tokens go here)
         Meta::List(MetaList { tokens, .. }) => parse2(tokens.clone()),
-        // encoder = "type tokens go here"
+        // encoding = "type tokens go here"
         Meta::NameValue(MetaNameValue {
             value: Expr::Lit(expr),
             ..

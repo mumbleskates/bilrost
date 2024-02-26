@@ -439,7 +439,7 @@ Tags can also be explicitly specified. If a field's tag is the only attribute
 provided, the number of the tag can be provided with no ceremony as the only
 content of the "bilrost" attribute, like `#[bilrost(1)]`. If other attributes
 are included, the "tag" attribute must be specified by name; for example, like
-`#[bilrost(tag(1), encoder(fixed))]`. The "tag" attribute can also be spelled
+`#[bilrost(tag(1), encoding(fixed))]`. The "tag" attribute can also be spelled
 `tag = 1` or `tag = "1"`.
 
 We may skip tags which have been reserved, or where there are gaps between
@@ -509,7 +509,7 @@ use bilrost::{Message, Oneof};
 enum NameOrUUID {
     #[bilrost(2)]
     Name(String),
-    #[bilrost(tag(3), encoder(plainbytes))]
+    #[bilrost(tag(3), encoding(plainbytes))]
     UUID([u8; 16]),
 }
 
@@ -554,7 +554,7 @@ use bilrost::{Message, Oneof};
 enum NameOrUUID {
     #[bilrost(2)]
     Name(String),
-    #[bilrost(tag(3), encoder(plainbytes))]
+    #[bilrost(tag(3), encoding(plainbytes))]
     UUID {
         octets: [u8; 16],
     },
@@ -589,13 +589,13 @@ used and composed to choose how the field is represented.
 # use bilrost::Message;
 #[derive(Message)]
 struct Foo {
-    #[bilrost(encoder(general))]
+    #[bilrost(encoding(general))]
     name: String,
 }
 ```
 
 Encoder attributes can be specified two ways, either in the form shown above or
-as a string, like `#[bilrost(encoder = "general")]`. The value of this attribute
+as a string, like `#[bilrost(encoding = "general")]`. The value of this attribute
 specifies a type name, using normal Rust type syntax. The standard encoders are
 also available and can addressed explicitly; there is no practical reason to do
 this, but as a demonstration:
@@ -605,7 +605,7 @@ this, but as a demonstration:
 #[derive(Message)]
 struct Bar(
     // This is the same type as "general"
-    #[bilrost(encoder = "::bilrost::encoding::General")] String,
+    #[bilrost(encoding = "::bilrost::encoding::General")] String,
 );
 
 assert_eq!(
@@ -1338,7 +1338,7 @@ integer `0x04030201` (67305985) are identical.
 use bilrost::Message;
 
 #[derive(Message)]
-struct Foo<T>(#[bilrost(encoder(fixed))] T);
+struct Foo<T>(#[bilrost(encoding(fixed))] T);
 
 // Both of these messages encode as the bytes `b'\x06\x01\x02\x03\x04'`
 assert_eq!(

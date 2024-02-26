@@ -10,7 +10,7 @@ use super::{named_attr, set_bool, set_option, tag_attr, word_attr};
 pub struct Field {
     pub tag: u32,
     pub ty: Type,
-    pub encoder: Type,
+    pub encoding: Type,
     // TODO(widders): consider adding an "adapter" attribute that supports encoding values with the
     //  adapter applied to a reference; if the adapter is for example some newtype, this would allow
     //  encoding user A to implement e.g. `Collection` for third party B's container and then encode
@@ -61,7 +61,7 @@ impl Field {
         ident_within_variant: Option<Ident>,
     ) -> Result<Option<Field>, Error> {
         let mut tag = None;
-        let mut encoder = None;
+        let mut encoding = None;
         let mut enumeration_ty = None;
         let mut recurses = false;
         let mut ignore = false;
@@ -70,8 +70,8 @@ impl Field {
         for attr in attrs {
             if let Some(t) = tag_attr(attr)? {
                 set_option(&mut tag, t, "duplicate tag attributes")?;
-            } else if let Some(t) = named_attr(attr, "encoder")? {
-                set_option(&mut encoder, t, "duplicate encoder attributes")?;
+            } else if let Some(t) = named_attr(attr, "encoding")? {
+                set_option(&mut encoding, t, "duplicate encoding attributes")?;
             } else if let Some(t) = named_attr(attr, "enumeration")? {
                 set_option(&mut enumeration_ty, t, "duplicate enumeration attributes")?;
             } else if word_attr(attr, "recurses") {
@@ -91,7 +91,7 @@ impl Field {
         }
 
         if ignore {
-            if let (None, None, None, false) = (tag, encoder, enumeration_ty, recurses) {
+            if let (None, None, None, false) = (tag, encoding, enumeration_ty, recurses) {
                 return Ok(None);
             } else {
                 bail!("ignore attribute mixed with other attributes on the same field");
@@ -103,12 +103,12 @@ impl Field {
             None => bail!("missing tag attribute"),
         };
 
-        let encoder = encoder.unwrap_or(parse_str::<Type>("general")?);
+        let encoding = encoding.unwrap_or(parse_str::<Type>("general")?);
 
         Ok(Some(Field {
             tag,
             ty: ty.clone(),
-            encoder,
+            encoding,
             enumeration_ty,
             recurses,
             in_oneof,
@@ -133,7 +133,7 @@ impl Field {
     /// Returns a statement which encodes the field using buffer `buf` and tag writer `tw`.
     pub fn encode(&self, ident: TokenStream) -> TokenStream {
         let tag = self.tag;
-        let encoder = &self.encoder;
+        let encoder = &self.encoding;
         let ty = &self.ty;
         if self.in_oneof {
             quote! {
@@ -154,7 +154,7 @@ impl Field {
     /// Returns an expression which evaluates to the result of merging a decoded value into the
     /// field. The given ident must be an &mut that already refers to the destination.
     pub fn decode_expedient(&self, ident: TokenStream) -> TokenStream {
-        let encoder = &self.encoder;
+        let encoder = &self.encoding;
         let ty = &self.ty;
         if self.in_oneof {
             quote!(
@@ -181,7 +181,7 @@ impl Field {
     /// Returns an expression which evaluates to the result of decoding a value into the field in
     /// distinguished mode. The given ident must be an &mut that already refers to the destination.
     pub fn decode_distinguished(&self, ident: TokenStream) -> TokenStream {
-        let encoder = &self.encoder;
+        let encoder = &self.encoding;
         let ty = &self.ty;
         if self.in_oneof {
             quote!(
@@ -212,7 +212,7 @@ impl Field {
     /// must be the location name of the field value, not a reference.
     pub fn encoded_len(&self, ident: TokenStream) -> TokenStream {
         let tag = self.tag;
-        let encoder = &self.encoder;
+        let encoder = &self.encoding;
         let ty = &self.ty;
         if self.in_oneof {
             quote! {
@@ -235,7 +235,7 @@ impl Field {
             return vec![];
         }
         let ty = &self.ty;
-        let encoder = &self.encoder;
+        let encoder = &self.encoding;
         if self.in_oneof {
             vec![
                 quote!(#ty: ::bilrost::encoding::ValueEncoder<#encoder>),
@@ -255,7 +255,7 @@ impl Field {
             return vec![];
         }
         let ty = &self.ty;
-        let encoder = &self.encoder;
+        let encoder = &self.encoding;
         if self.in_oneof {
             vec![
                 quote!(#ty: ::bilrost::encoding::DistinguishedValueEncoder<#encoder>),

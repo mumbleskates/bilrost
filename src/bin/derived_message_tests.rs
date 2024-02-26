@@ -688,9 +688,9 @@ mod derived_message_tests {
 
         #[derive(Debug, PartialEq, Message)]
         struct Clearable<'a> {
-            #[bilrost(encoder(varint))]
+            #[bilrost(encoding(varint))]
             a: u8,
-            #[bilrost(encoder(varint))]
+            #[bilrost(encoding(varint))]
             b: i8,
             c: u16,
             d: i16,
@@ -703,7 +703,7 @@ mod derived_message_tests {
             k: f64,
             string: String,
             blob: Blob,
-            #[bilrost(encoder(plainbytes))]
+            #[bilrost(encoding(plainbytes))]
             byte_arr: [u8; 1],
             hmm: Hmm,
             nested: Nested,
@@ -718,9 +718,9 @@ mod derived_message_tests {
             bytes: Bytes,
             #[cfg(feature = "bytestring")]
             bytestring: ByteString,
-            #[bilrost(encoder(plainbytes))]
+            #[bilrost(encoding(plainbytes))]
             cow_bytes_borrowed: Cow<'a, [u8]>,
-            #[bilrost(encoder(plainbytes))]
+            #[bilrost(encoding(plainbytes))]
             cow_bytes_owned: Cow<'a, [u8]>,
             cow_str_borrowed: Cow<'a, str>,
             cow_str_owned: Cow<'a, str>,
@@ -842,8 +842,8 @@ mod derived_message_tests {
         #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
         struct Foo(
             bool,
-            #[bilrost(encoder(varint))] u8,
-            #[bilrost(encoder(varint))] i8,
+            #[bilrost(encoding(varint))] u8,
+            #[bilrost(encoding(varint))] i8,
             u16,
             i16,
             u32,
@@ -944,10 +944,10 @@ mod derived_message_tests {
     fn parsing_fixed_width_ints() {
         #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
         struct Foo(
-            #[bilrost(encoder(fixed))] u32,
-            #[bilrost(encoder(fixed))] i32,
-            #[bilrost(encoder(fixed))] u64,
-            #[bilrost(encoder(fixed))] i64,
+            #[bilrost(encoding(fixed))] u32,
+            #[bilrost(encoding(fixed))] i32,
+            #[bilrost(encoding(fixed))] u64,
+            #[bilrost(encoding(fixed))] i64,
         );
 
         assert::decodes_distinguished([], Foo::empty());
@@ -980,8 +980,8 @@ mod derived_message_tests {
 
         #[derive(Debug, Message)]
         struct Bar(
-            #[bilrost(encoder(fixed))] f32,
-            #[bilrost(encoder(fixed))] f64,
+            #[bilrost(encoding(fixed))] f32,
+            #[bilrost(encoding(fixed))] f64,
         );
 
         for wrong_size_value in &[[(1, OV::f64(1.0))], [(2, OV::f32(2.0))]] {
@@ -1034,8 +1034,8 @@ mod derived_message_tests {
 
         #[derive(Debug, PartialEq, Message)]
         struct Bar(
-            #[bilrost(encoder(fixed))] f32,
-            #[bilrost(encoder(fixed))] f64,
+            #[bilrost(encoding(fixed))] f32,
+            #[bilrost(encoding(fixed))] f64,
         );
 
         assert::encodes(Bar(0.0, 0.0), []);
@@ -1088,12 +1088,12 @@ mod derived_message_tests {
         #[derive(Debug, PartialEq, Eq, Oneof, DistinguishedOneof)]
         enum A<T> {
             Empty,
-            #[bilrost(tag(1), encoder(fixed))]
+            #[bilrost(tag(1), encoding(fixed))]
             One(T),
         }
 
         #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
-        struct Foo<T>(#[bilrost(oneof(1))] A<T>, #[bilrost(encoder(fixed))] T);
+        struct Foo<T>(#[bilrost(oneof(1))] A<T>, #[bilrost(encoding(fixed))] T);
 
         fn check_fixed_truncation<T>(val: OV)
         where
@@ -1235,7 +1235,7 @@ mod derived_message_tests {
     #[test]
     fn parsing_vec_blob() {
         #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
-        struct Foo(#[bilrost(encoder(plainbytes))] Vec<u8>);
+        struct Foo(#[bilrost(encoding(plainbytes))] Vec<u8>);
         assert::decodes_distinguished(
             [(1, OV::string("hello world"))],
             Foo(b"hello world"[..].into()),
@@ -1245,7 +1245,7 @@ mod derived_message_tests {
     #[test]
     fn parsing_cow_blob() {
         #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
-        struct Foo<'a>(#[bilrost(encoder(plainbytes))] Cow<'a, [u8]>);
+        struct Foo<'a>(#[bilrost(encoding(plainbytes))] Cow<'a, [u8]>);
         assert::decodes_distinguished(
             [(1, OV::string("hello world"))],
             Foo(b"hello world"[..].into()),
@@ -1265,7 +1265,7 @@ mod derived_message_tests {
     #[test]
     fn parsing_byte_arrays() {
         #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
-        struct Foo<const N: usize>(#[bilrost(encoder(plainbytes))] [u8; N]);
+        struct Foo<const N: usize>(#[bilrost(encoding(plainbytes))] [u8; N]);
 
         assert::decodes_distinguished([], Foo([]));
         assert::decodes_non_canonically([(1, OV::blob([]))], Foo([]), NotCanonical);
@@ -1282,7 +1282,7 @@ mod derived_message_tests {
 
         // Fixed-size wire types are implemented for appropriately sized u8 arrays
         #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
-        struct Bar<const N: usize>(#[bilrost(encoder(fixed))] [u8; N]);
+        struct Bar<const N: usize>(#[bilrost(encoding(fixed))] [u8; N]);
 
         static_assertions::assert_not_impl_any!(Bar<0>: Message, DistinguishedMessage);
         static_assertions::assert_not_impl_any!(Bar<2>: Message, DistinguishedMessage);
@@ -1316,9 +1316,9 @@ mod derived_message_tests {
     #[test]
     fn duplicated_packed_decoding() {
         #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
-        struct Foo(#[bilrost(encoder = "packed")] Vec<bool>);
+        struct Foo(#[bilrost(encoding = "packed")] Vec<bool>);
         #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
-        struct Bar(#[bilrost(encoder = "unpacked")] Vec<bool>);
+        struct Bar(#[bilrost(encoding = "unpacked")] Vec<bool>);
 
         assert::decodes_distinguished([(1, OV::packed([OV::bool(true)]))], Foo(vec![true]));
         assert::decodes_non_canonically(
@@ -1547,8 +1547,8 @@ mod derived_message_tests {
     fn decoding_vecs() {
         #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
         struct Foo<T>(
-            #[bilrost(encoder(packed))] T,
-            #[bilrost(encoder(unpacked))] T,
+            #[bilrost(encoding(packed))] T,
+            #[bilrost(encoding(unpacked))] T,
         );
 
         let values = [
@@ -1616,8 +1616,8 @@ mod derived_message_tests {
     fn decoding_vecs_with_swapped_packedness() {
         #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
         struct Oof<T>(
-            #[bilrost(encoder(unpacked))] T, // Fields have swapped packedness from `Foo` above
-            #[bilrost(encoder(packed))] T,
+            #[bilrost(encoding(unpacked))] T, // Fields have swapped packedness from `Foo` above
+            #[bilrost(encoding(packed))] T,
         );
 
         let values = [
@@ -1698,8 +1698,8 @@ mod derived_message_tests {
     fn decoding_sets() {
         #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
         struct Foo<T>(
-            #[bilrost(encoder(packed))] T,
-            #[bilrost(encoder(unpacked))] T,
+            #[bilrost(encoding(packed))] T,
+            #[bilrost(encoding(unpacked))] T,
         );
 
         let valid_set_items = [OV::string("bar"), OV::string("baz"), OV::string("foo")];
@@ -1799,8 +1799,8 @@ mod derived_message_tests {
     fn decoding_sets_with_swapped_packedness() {
         #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
         struct Oof<T>(
-            #[bilrost(encoder(unpacked))] T, // Fields have swapped packedness from `Foo` above
-            #[bilrost(encoder(packed))] T,
+            #[bilrost(encoding(unpacked))] T, // Fields have swapped packedness from `Foo` above
+            #[bilrost(encoding(packed))] T,
         );
 
         let valid_set_items = [OV::u32(1), OV::u32(2), OV::u32(3)];
@@ -1884,7 +1884,7 @@ mod derived_message_tests {
             + encoding::Encoder<Packed>,
     {
         #[derive(Debug, PartialEq, Message)]
-        struct Foo<T>(#[bilrost(encoder(packed))] T, String);
+        struct Foo<T>(#[bilrost(encoding(packed))] T, String);
 
         let OV::LengthDelimited(set_value) =
             OV::packed([OV::string("fooble"), OV::string("barbaz")])
@@ -2000,7 +2000,7 @@ mod derived_message_tests {
             A(String),
             #[bilrost(2)]
             B { named: u32 },
-            #[bilrost(tag = 3, encoder = "packed")]
+            #[bilrost(tag = 3, encoding = "packed")]
             C(Vec<bool>),
         }
         use Abc::*;
@@ -2045,7 +2045,7 @@ mod derived_message_tests {
             B {
                 named: u32,
             },
-            #[bilrost(tag = 3, encoder = "packed")]
+            #[bilrost(tag = 3, encoding = "packed")]
             C(Vec<bool>),
         }
         use Abc::*;

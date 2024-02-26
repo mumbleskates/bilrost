@@ -84,7 +84,7 @@ pub struct Duration {
     /// of one second or more, a non-zero value for the `nanos` field must be
     /// of the same sign as the `seconds` field. Must be from -999,999,999
     /// to +999,999,999 inclusive.
-    #[bilrost(tag = 2, encoder = "fixed")]
+    #[bilrost(tag = 2, encoding = "fixed")]
     pub nanos: i32,
 }
 
@@ -202,7 +202,7 @@ pub struct Timestamp {
     /// second values with fractions must still have non-negative nanos values
     /// that count forward in time. Must be from 0 to 999,999,999
     /// inclusive.
-    #[bilrost(tag = 2, encoder = "fixed")]
+    #[bilrost(tag = 2, encoding = "fixed")]
     pub nanos: i32,
 }
 
@@ -279,6 +279,6 @@ pub struct StructValue {
 #[derive(Clone, Debug, PartialEq, Message)]
 pub struct ListValue {
     /// Repeated field of dynamically typed values.
-    #[bilrost(tag = 1, encoder = "packed", recurses)]
+    #[bilrost(tag = 1, encoding = "packed", recurses)]
     pub values: Vec<Value>,
 }
