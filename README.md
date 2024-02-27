@@ -597,8 +597,8 @@ struct Foo {
 Encoding attributes can be specified two ways, either in the form shown above or
 as a string, like `#[bilrost(encoding = "general")]`. The value of this
 attribute specifies a type name, using normal Rust type syntax. The standard
-encodings are also available and can addressed explicitly; there is no practical
-reason to do this, but as a demonstration:
+encodings are also available and can be addressed explicitly; there is no
+practical reason to do this, but as a demonstration:
 
 ```rust,
 # use bilrost::Message;
