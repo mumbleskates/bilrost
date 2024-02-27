@@ -578,7 +578,7 @@ When a oneof enum type has the empty variant, it can only be included in a
 message directly; when it has none, it can only be included nested within an
 `Option`.
 
-#### Encoders
+#### Encodings
 
 `bilrost` message fields and oneof variants can be annotated with an "encoding"
 attribute that specifies which encoding type is used when encoding and decoding
@@ -594,7 +594,7 @@ struct Foo {
 }
 ```
 
-Encoder attributes can be specified two ways, either in the form shown above or
+Encoding attributes can be specified two ways, either in the form shown above or
 as a string, like `#[bilrost(encoding = "general")]`. The value of this
 attribute specifies a type name, using normal Rust type syntax. The standard
 encodings are also available and can addressed explicitly; there is no practical
@@ -845,7 +845,7 @@ methods.
 
 `bilrost` structs can encode fields with a wide variety of types:
 
-| Encoder              | Value type                                    | Encoded representation | Distinguished |
+| Encoding             | Value type                                    | Encoded representation | Distinguished |
 |----------------------|-----------------------------------------------|------------------------|---------------|
 | `general` & `fixed`  | [`f32`][prim]                                 | fixed-size 32 bits     | no            |
 | `general` & `fixed`  | [`u32`][prim], [`i32`][prim]                  | fixed-size 32 bits     | yes           |
@@ -878,7 +878,7 @@ is encoded.
 In addition to including them directly, these types can also be nested within
 several different containers:
 
-| Encoder       | Value type                              | Encoded representation                                                         | Re-nestable | Distinguished      |
+| Encoding      | Value type                              | Encoded representation                                                         | Re-nestable | Distinguished      |
 |---------------|-----------------------------------------|--------------------------------------------------------------------------------|-------------|--------------------|
 | any encoding  | [`Option<T>`][opt]                      | identical; at least some bytes are always encoded if `Some`, nothing if `None` | no          | when `T` is        |
 | `unpacked<E>` | [`Vec<T>`][vec], [`BTreeSet<T>`][btset] | the same as encoding `E`, one field per value                                  | no          | when `T` is        |
