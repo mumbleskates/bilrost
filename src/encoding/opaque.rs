@@ -1,4 +1,7 @@
+use alloc::borrow::{Cow, ToOwned};
+use alloc::string::String;
 use alloc::vec::Vec;
+use core::mem;
 use core::ops::{Deref, DerefMut};
 
 use btreemultimap::BTreeMultiMap;
@@ -13,16 +16,16 @@ use crate::{Canonicity, DecodeError, Message, RawDistinguishedMessage, RawMessag
 
 /// Represents an opaque bilrost field value. Can represent any valid encoded value.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum OpaqueValue {
+pub enum OpaqueValue<'a> {
     Varint(u64),
-    LengthDelimited(Vec<u8>),
+    LengthDelimited(Cow<'a, [u8]>),
     ThirtyTwoBit([u8; 4]),
     SixtyFourBit([u8; 8]),
 }
 
 use OpaqueValue::*;
 
-impl OpaqueValue {
+impl<'a> OpaqueValue<'a> {
     pub fn u64(value: u64) -> Self {
         Varint(value)
     }
@@ -83,24 +86,32 @@ impl OpaqueValue {
         ThirtyTwoBit(value.to_le_bytes())
     }
 
-    pub fn string<T: AsRef<str>>(value: T) -> Self {
-        LengthDelimited(value.as_ref().as_bytes().into())
+    pub fn str(value: &'a str) -> Self {
+        LengthDelimited(Cow::Borrowed(value.as_bytes()))
     }
 
-    pub fn blob<B: Into<Vec<u8>>>(value: B) -> Self {
-        LengthDelimited(value.into())
+    pub fn string<S: Into<String>>(value: S) -> Self {
+        LengthDelimited(Cow::Owned(value.into().into_bytes()))
+    }
+
+    pub fn byte_slice(value: &'a [u8]) -> Self {
+        LengthDelimited(Cow::Borrowed(value))
+    }
+
+    pub fn bytes<B: Into<Vec<u8>>>(value: B) -> Self {
+        LengthDelimited(Cow::Owned(value.into()))
     }
 
     pub fn message<M: Message>(value: &M) -> Self {
-        LengthDelimited(value.encode_to_vec())
+        LengthDelimited(Cow::Owned(value.encode_to_vec()))
     }
 
-    pub fn packed<T: IntoIterator<Item = OpaqueValue>>(items: T) -> Self {
+    pub fn packed<'b, T: IntoIterator<Item = OpaqueValue<'b>>>(items: T) -> Self {
         let mut value = Vec::new();
         for item in items {
             item.encode_value(&mut value);
         }
-        LengthDelimited(value)
+        LengthDelimited(Cow::Owned(value))
     }
 
     fn wire_type(&self) -> WireType {
@@ -119,7 +130,7 @@ impl OpaqueValue {
             }
             LengthDelimited(val) => {
                 encode_varint(val.len() as u64, buf);
-                (&mut buf).put(val.as_slice());
+                (&mut buf).put(val.as_ref());
             }
             ThirtyTwoBit(val) => {
                 (&mut buf).put(val.as_slice());
@@ -153,7 +164,7 @@ impl OpaqueValue {
             WireType::LengthDelimited => {
                 let mut val = Vec::new();
                 val.put(buf.take_length_delimited()?.take_all());
-                LengthDelimited(val)
+                LengthDelimited(Cow::Owned(val))
             }
             WireType::ThirtyTwoBit => {
                 if buf.remaining_before_cap() < 4 {
@@ -173,6 +184,27 @@ impl OpaqueValue {
             }
         })
     }
+
+    /// Get a copy of this value with borrowed or re-borrowed data.
+    pub fn borrow(&self) -> OpaqueValue {
+        match self {
+            Varint(value) => Varint(*value),
+            LengthDelimited(value) => LengthDelimited(Cow::Borrowed(value.as_ref())),
+            ThirtyTwoBit(value) => ThirtyTwoBit(*value),
+            SixtyFourBit(value) => SixtyFourBit(*value),
+        }
+    }
+
+    /// Converts this value to a fully owned deep copy.
+    pub fn convert_to_owned(self) -> OpaqueValue<'static> {
+        match self {
+            Varint(value) => Varint(value),
+            LengthDelimited(Cow::Owned(value)) => LengthDelimited(Cow::Owned(value)),
+            LengthDelimited(Cow::Borrowed(value)) => LengthDelimited(Cow::Owned(value.to_owned())),
+            ThirtyTwoBit(value) => ThirtyTwoBit(value),
+            SixtyFourBit(value) => SixtyFourBit(value),
+        }
+    }
 }
 
 /// Represents a bilrost field, with its tag and value. `OpaqueMessage` can encode and decode *any*
@@ -183,35 +215,53 @@ impl OpaqueValue {
 /// At present this is still an unstable API, mostly used for internals and testing. Trait
 /// implementations and APIs of `OpaqueMessage` and `OpaqueValue` are subject to change.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct OpaqueMessage(BTreeMultiMap<u32, OpaqueValue>);
+pub struct OpaqueMessage<'a>(BTreeMultiMap<u32, OpaqueValue<'a>>);
 
-impl OpaqueMessage {
+impl OpaqueMessage<'_> {
     pub fn new() -> Self {
         Self::default()
     }
+
+    /// Produces a full copy of the message with all data (re-)borrowed.
+    pub fn borrowed(&self) -> OpaqueMessage {
+        self.iter().map(|(k, v)| (*k, v.borrow())).collect()
+    }
+
+    /// Converts this message to a fully owned deep copy.
+    pub fn convert_to_owned(mut self) -> OpaqueMessage<'static> {
+        for (_, value) in self.iter_mut() {
+            let LengthDelimited(Cow::Borrowed(borrowed)) = value else {
+                continue;
+            };
+            let owned_value = borrowed.to_owned();
+            *value = LengthDelimited(Cow::Owned(owned_value));
+        }
+        // SAFETY: we've converted every `Cow` in the structure to `Owned` in-place
+        unsafe { mem::transmute(self) }
+    }
 }
 
-impl Deref for OpaqueMessage {
-    type Target = BTreeMultiMap<u32, OpaqueValue>;
+impl<'a> Deref for OpaqueMessage<'a> {
+    type Target = BTreeMultiMap<u32, OpaqueValue<'a>>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl DerefMut for OpaqueMessage {
+impl<'a> DerefMut for OpaqueMessage<'a> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
 }
 
-pub struct OpaqueIterator {
-    iter: <BTreeMultiMap<u32, OpaqueValue> as IntoIterator>::IntoIter,
-    current: Option<(u32, <Vec<OpaqueValue> as IntoIterator>::IntoIter)>,
+pub struct OpaqueIterator<'a> {
+    iter: <BTreeMultiMap<u32, OpaqueValue<'a>> as IntoIterator>::IntoIter,
+    current: Option<(u32, <Vec<OpaqueValue<'a>> as IntoIterator>::IntoIter)>,
 }
 
-impl Iterator for OpaqueIterator {
-    type Item = (u32, OpaqueValue);
+impl<'a> Iterator for OpaqueIterator<'a> {
+    type Item = (u32, OpaqueValue<'a>);
 
     fn next(&mut self) -> Option<Self::Item> {
         let (tag, value_iter) = match self.current.as_mut() {
@@ -236,9 +286,9 @@ impl Iterator for OpaqueIterator {
     }
 }
 
-impl IntoIterator for OpaqueMessage {
-    type Item = <OpaqueIterator as Iterator>::Item;
-    type IntoIter = OpaqueIterator;
+impl<'a> IntoIterator for OpaqueMessage<'a> {
+    type Item = <OpaqueIterator<'a> as Iterator>::Item;
+    type IntoIter = OpaqueIterator<'a>;
     fn into_iter(self) -> Self::IntoIter {
         OpaqueIterator {
             iter: self.0.into_iter(),
@@ -247,22 +297,22 @@ impl IntoIterator for OpaqueMessage {
     }
 }
 
-impl<'a> IntoIterator for &'a OpaqueMessage {
-    type Item = <&'a BTreeMultiMap<u32, OpaqueValue> as IntoIterator>::Item;
-    type IntoIter = <&'a BTreeMultiMap<u32, OpaqueValue> as IntoIterator>::IntoIter;
+impl<'a, 'b> IntoIterator for &'b OpaqueMessage<'a> {
+    type Item = <&'b BTreeMultiMap<u32, OpaqueValue<'a>> as IntoIterator>::Item;
+    type IntoIter = <&'b BTreeMultiMap<u32, OpaqueValue<'a>> as IntoIterator>::IntoIter;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
     }
 }
 
-impl FromIterator<(u32, OpaqueValue)> for OpaqueMessage {
-    fn from_iter<T: IntoIterator<Item = (u32, OpaqueValue)>>(iter: T) -> Self {
+impl<'a> FromIterator<(u32, OpaqueValue<'a>)> for OpaqueMessage<'a> {
+    fn from_iter<T: IntoIterator<Item = (u32, OpaqueValue<'a>)>>(iter: T) -> Self {
         Self(iter.into_iter().collect())
     }
 }
 
-impl EmptyState for OpaqueMessage {
+impl EmptyState for OpaqueMessage<'_> {
     #[inline]
     fn empty() -> Self {
         Self::new()
@@ -279,7 +329,7 @@ impl EmptyState for OpaqueMessage {
     }
 }
 
-impl RawMessage for OpaqueMessage {
+impl RawMessage for OpaqueMessage<'_> {
     const __ASSERTIONS: () = ();
 
     fn raw_encode<B: BufMut + ?Sized>(&self, buf: &mut B) {
@@ -312,7 +362,7 @@ impl RawMessage for OpaqueMessage {
     }
 }
 
-impl RawDistinguishedMessage for OpaqueMessage {
+impl RawDistinguishedMessage for OpaqueMessage<'_> {
     fn raw_decode_field_distinguished<B: Buf + ?Sized>(
         &mut self,
         tag: u32,
