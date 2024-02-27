@@ -74,7 +74,7 @@ but it is encoded quite simply. It supports integral and floating point numbers,
 strings and byte strings, nested messages, and [recursively](
 #writing-recursive-messages) nested messages. All of the above are supported as
 optional values, repeated values, sets of unique values, and key/value mappings
-where sensible. With appropriate choices of encoders (which determine the
+where sensible. With appropriate choices of encodings (which determine the
 representation), most of these constructs can be nested almost arbitrarily.
 
 Encoded Bilrost data does not include the names of its fields; they are instead
@@ -580,9 +580,9 @@ message directly; when it has none, it can only be included nested within an
 
 #### Encoders
 
-`bilrost` message fields and oneof variants can be annotated with an "encoder"
-attribute that specifies which encoder is responsible for encoding and decoding
-that field's value. `bilrost` provides several standard encoders which can be
+`bilrost` message fields and oneof variants can be annotated with an "encoding"
+attribute that specifies which encoding type is used when encoding and decoding
+that field's value. `bilrost` provides several standard encodings which can be
 used and composed to choose how the field is represented.
 
 ```rust,
@@ -595,10 +595,10 @@ struct Foo {
 ```
 
 Encoder attributes can be specified two ways, either in the form shown above or
-as a string, like `#[bilrost(encoding = "general")]`. The value of this attribute
-specifies a type name, using normal Rust type syntax. The standard encoders are
-also available and can addressed explicitly; there is no practical reason to do
-this, but as a demonstration:
+as a string, like `#[bilrost(encoding = "general")]`. The value of this
+attribute specifies a type name, using normal Rust type syntax. The standard
+encodings are also available and can addressed explicitly; there is no practical
+reason to do this, but as a demonstration:
 
 ```rust,
 # use bilrost::Message;
@@ -614,11 +614,11 @@ assert_eq!(
 );
 ```
 
-Where these encoders' type names are evaluated the standard encoders are made
+Where these encodings' type names are evaluated the standard encodings are made
 available as aliases, all-lower-cased to ensure that these aliases are unlikely
 to collide with other type names that are in scope. These standard aliases are:
 
-* `general`: the default encoder, suitable for most field types. Delegates
+* `general`: the default encoding, suitable for most field types. Delegates
   encoding of collections (vecs and sets) to `unpacked<general>` and mapping
   types to `map<general, general>`.
 * `varint`: primitive numeric types and bool, encodes as varint.
@@ -629,15 +629,15 @@ to collide with other type names that are in scope. These standard aliases are:
   and `Vec<Cow<[u8]>>` to `unpacked<plainbytes>`
 * `unpacked` (`unpacked<E = general>`): : encodes collections with their values
   unpacked as zero or more normally encoded fields, one per value. The fields
-  are encoded with the parametrized encoder `E`, which defaults to `general`
+  are encoded with the parametrized encoding `E`, which defaults to `general`
 * `packed` (`packed<E = general>`): encodes collections with their values packed
   into a single length-delimited value. The values are encoded with the
-  parametrized encoder `E`, which defaults to `general`
+  parametrized encoding `E`, which defaults to `general`
 * `map<KE, VE>`: encodes mappings with their keys (encoded with parametrized
-  encoder `KE`) and values (encoded with `VE`) packed alternating into a single
+  encoding `KE`) and values (encoded with `VE`) packed alternating into a single
   length-delimited value.
 
-It's possible that more standard encoders may be added in the future, but they
+It's possible that more standard encodings may be added in the future, but they
 will be similarly lower-cased.
 
 #### Other attributes
@@ -880,8 +880,8 @@ several different containers:
 
 | Encoder       | Value type                              | Encoded representation                                                         | Re-nestable | Distinguished      |
 |---------------|-----------------------------------------|--------------------------------------------------------------------------------|-------------|--------------------|
-| any encoder   | [`Option<T>`][opt]                      | identical; at least some bytes are always encoded if `Some`, nothing if `None` | no          | when `T` is        |
-| `unpacked<E>` | [`Vec<T>`][vec], [`BTreeSet<T>`][btset] | the same as encoder `E`, one field per value                                   | no          | when `T` is        |
+| any encoding  | [`Option<T>`][opt]                      | identical; at least some bytes are always encoded if `Some`, nothing if `None` | no          | when `T` is        |
+| `unpacked<E>` | [`Vec<T>`][vec], [`BTreeSet<T>`][btset] | the same as encoding `E`, one field per value                                  | no          | when `T` is        |
 | `unpacked`    | *                                       | (the same as `unpacked<general>`)                                              | no          | *                  |
 | `packed<E>`   | [`Vec<T>`][vec], [`BTreeSet<T>`][btset] | always length-delimited, successively encoded with `E`                         | yes         | when `T` is        |
 | `packed`      | *                                       | (the same as `packed<general>`)                                                | yes         | *                  |
@@ -891,15 +891,15 @@ several different containers:
 
 Many alternative types are also available for both scalar values and containers!
 
-| Value type   | Alternative                               | Supporting encoder | Distinguished | Feature to enable |
-|--------------|-------------------------------------------|--------------------|---------------|-------------------|
-| `Vec<u8>`    | `Blob`[^blob]                             | `general`          | yes           | (none)            |
-| `Vec<u8>`    | [`Cow<[u8]>`][cow]                        | `plainbytes`       | yes           | (none)            |
-| `Vec<u8>`    | [`bytes::Bytes`][bytes][^bzcopy]          | `general`          | yes           | (none)            |
-| `Vec<u8>`    | [`[u8; N]`][prim][^plainbytearr]          | `plainbytes`       | yes           | (none)            |
-| `u32`, `u64` | [`[u8; 4]`][prim], [`[u8; 8]`][prim]      | `fixed`            | yes           | (none)            |
-| `String`     | [`Cow<str>`][cow]                         | `general`          | yes           | (none)            |
-| `String`     | [`bytestring::ByteString`][bstr][^bzcopy] | `general`          | yes           | "bytestring"      |
+| Value type   | Alternative                               | Supporting encoding | Distinguished | Feature to enable |
+|--------------|-------------------------------------------|---------------------|---------------|-------------------|
+| `Vec<u8>`    | `Blob`[^blob]                             | `general`           | yes           | (none)            |
+| `Vec<u8>`    | [`Cow<[u8]>`][cow]                        | `plainbytes`        | yes           | (none)            |
+| `Vec<u8>`    | [`bytes::Bytes`][bytes][^bzcopy]          | `general`           | yes           | (none)            |
+| `Vec<u8>`    | [`[u8; N]`][prim][^plainbytearr]          | `plainbytes`        | yes           | (none)            |
+| `u32`, `u64` | [`[u8; 4]`][prim], [`[u8; 8]`][prim]      | `fixed`             | yes           | (none)            |
+| `String`     | [`Cow<str>`][cow]                         | `general`           | yes           | (none)            |
+| `String`     | [`bytestring::ByteString`][bstr][^bzcopy] | `general`           | yes           | "bytestring"      |
 
 [^bzcopy]: When decoding from a `bytes::Bytes` object, both `bytes::Bytes` and
 `bytes::ByteString` have a zero-copy optimization and will reference the decoded
@@ -911,8 +911,9 @@ length of data; other lengths are considered invalid values.
 
 [^blob]: `bilrost::Blob` is a transparent wrapper for `Vec<u8>` in that is a
 drop-in replacement in most situations and is supported by the default `general`
-encoder for maximum ease of use. If nothing but `Vec<u8>` will do,
-the `plainbytes` encoder will still encode a plain `Vec<u8>` as its bytes value.
+encoding for maximum ease of use. If nothing but `Vec<u8>` will do,
+the `plainbytes` encoding will still encode a plain `Vec<u8>` as its bytes
+value.
 
 | Container type | Alternative                                     | Distinguished | Feature to enable |
 |----------------|-------------------------------------------------|---------------|-------------------|
@@ -1043,14 +1044,14 @@ Old message data will always decode to an equivalent/corresponding value, and
 those corresponding values will re-encode from the new widened struct into the
 same representation.
 
-| Change                                                                                | Corresponding values                | Backwards compatibility breaks when...                         |
-|---------------------------------------------------------------------------------------|-------------------------------------|----------------------------------------------------------------|
-| `bool` --> `u8` --> `u16` --> `u32` --> `u64`, all with `general` or `varint` encoder | `true`/`false` becomes 1/0          | value is out of range of the narrower type                     |
-| `bool` --> `i8` --> `i16` --> `i32` --> `i64`, all with `general` or `varint` encoder | `true`/`false` becomes -1/0         | value is out of range of the narrower type                     |
-| `String` --> `Vec<u8>`                                                                | string becomes its UTF-8 data       | value contains invalid UTF-8                                   |
-| `[u8; N]` with `general` encoder --> `Vec<u8>`                                        | no change                           | data is a different length than the array                      |
-| `T` --> `Option<T>`                                                                   | default value of `T` becomes `None` | `Some(default)` is encoded, then decoded in distinguished mode |
-| `Option<T>` --> `Vec<T>` (with `unpacked` encoding)                                   | maybe-contained value is identical  | multiple values are in the `Vec`                               |
+| Change                                                                                 | Corresponding values                | Backwards compatibility breaks when...                         |
+|----------------------------------------------------------------------------------------|-------------------------------------|----------------------------------------------------------------|
+| `bool` --> `u8` --> `u16` --> `u32` --> `u64`, all with `general` or `varint` encoding | `true`/`false` becomes 1/0          | value is out of range of the narrower type                     |
+| `bool` --> `i8` --> `i16` --> `i32` --> `i64`, all with `general` or `varint` encoding | `true`/`false` becomes -1/0         | value is out of range of the narrower type                     |
+| `String` --> `Vec<u8>`                                                                 | string becomes its UTF-8 data       | value contains invalid UTF-8                                   |
+| `[u8; N]` with `general` encoding --> `Vec<u8>`                                        | no change                           | data is a different length than the array                      |
+| `T` --> `Option<T>`                                                                    | default value of `T` becomes `None` | `Some(default)` is encoded, then decoded in distinguished mode |
+| `Option<T>` --> `Vec<T>` (with `unpacked` encoding)                                    | maybe-contained value is identical  | multiple values are in the `Vec`                               |
 
 `Vec<T>` and other list- and set-like collections that contain repeated values
 can also be changed between `unpacked` and `packed` encoding, as long as the
@@ -1528,7 +1529,7 @@ of key changes.
   something Protobuf has declined to enforce or guarantee for decades and
   probably won't begin any time soon.
 
-  Compliant Protobuf encoders allow several interesting operations by not
+  Compliant Protobuf implementations allow several interesting operations by not
   guaranteeing or enforcing field order:
     * Unknown fields can be preserved as entirely opaque runs of bytes and
       concatenated to a message
@@ -1695,10 +1696,10 @@ complications with trying to serialize Bilrost messages with Serde:
 
 - Bilrost fields bear a numbered tag, and currently there appears to be no
   mechanism suitable for this in `serde`.
-- Bilrost fields are also associated with a specific encoder, such as `general`
-  or `fixed`, which may alter their encoding. Purely trait-based dispatch will
-  work poorly for this, especially when the values become nested within other
-  data structures like maps and `Vec` and encoders may begin to look
+- Bilrost fields are also associated with a specific encoding, such as `general`
+  or `fixed`, which may alter their representation. Purely trait-based dispatch
+  will work poorly for this, especially when the values become nested within
+  other data structures like maps and `Vec` and encodings may begin to look
   like `map<plainbytes, packed<fixed>>`.
 - Bilrost messages must encode their fields in tag order, which may (in the case
   of `oneof` fields) vary depending on their value, and it's not clear how or if
