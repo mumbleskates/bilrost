@@ -256,7 +256,7 @@ where
     fn encode<B: BufMut + ?Sized>(&self, buf: &mut B) -> Result<(), EncodeError> {
         let required = self.encoded_len();
         let remaining = buf.remaining_mut();
-        if required > buf.remaining_mut() {
+        if required > remaining {
             return Err(EncodeError::new(required, remaining));
         }
 
