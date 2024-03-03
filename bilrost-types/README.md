@@ -3,10 +3,13 @@
 
 # `bilrost-types`
 
-Bilrost definitions of analogs to Protocol Buffers well known types. See
-the [Protobuf reference][1] for more information about well known types.
+Extra provided types for the [`bilrost`][b] library, providing analogs to some
+of the Protocol Buffers well known types. See the [Protobuf reference][pb] for
+more information about well known types.
 
-[1]: https://developers.google.com/protocol-buffers/docs/reference/google.protobuf
+[b]: https://crates.io/crates/bilrost
+
+[pb]: https://developers.google.com/protocol-buffers/docs/reference/google.protobuf
 
 ## License
 

@@ -3,9 +3,12 @@
 
 # bilrost-derive
 
-`bilrost-derive` handles generating encoding and decoding implementations for
-Rust types annotated with `bilrost` annotation. For the most part, users of
-`bilrost` shouldn't need to interact with `bilrost-derive` directly.
+`bilrost-derive` is part of the [`bilrost`][b] library. It handles generating
+encoding and decoding implementations for Rust types with `bilrost` annotations.
+For the most part, users of `bilrost` shouldn't need to interact with
+`bilrost-derive` directly, and should instead use the re-exports.
+
+[b]: https://crates.io/crates/bilrost
 
 ## License
 
