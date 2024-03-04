@@ -1326,7 +1326,8 @@ order, and must have a [two's complement][twos] representation.
 [twos]: https://en.wikipedia.org/wiki/Two%27s_complement
 
 Floating point numbers must be encoded in little-endian byte order, and must
-have [IEEE 754 binary32/binary64][ieee754] standard representation.
+have [IEEE 754 binary32/binary64][ieee754] standard representation. Floating
+point numbers are encoded as four- and eight-byte fixed-width values.
 
 Arrays, plain byte strings, and collections must be encoded in order, with their
 lowest-indexed (first) bytes or items encoded first. For example, the
@@ -1410,10 +1411,13 @@ in the encoding, the message is not canonical. (In the case of an optional
 field, `Some(0)` is not considered empty, and is distinct from the always-empty
 value `None`; this is the purpose of optional fields.)
 
-Also in distinguished mode, if fields whose tags are not specified are
-encountered the encoding can no longer be considered canonical.
+Also in distinguished mode, if fields whose tags are not in the message's schema
+are encountered the encoding can no longer be considered canonical.
 
 #### Empty values
+
+The type of each field of a Bilrost message has an "empty" value, which is never
+represented as encoded data on the wire.
 
 | Type                                                  | Empty value                        |
 |-------------------------------------------------------|------------------------------------|
@@ -1426,6 +1430,10 @@ encountered the encoding can no longer be considered canonical.
 | `Message`                                             | each field of the message is empty |
 | `Oneof`                                               | `None` or the empty variant        |
 | any optional value (`Option<T>`)                      | `None`                             |
+
+The empty byte string is always a valid and canonical encoding of any Bilrost
+message type, and represents the value of the message in which every field has
+its empty value.
 
 #### Canonical ordering
 
@@ -1449,9 +1457,9 @@ For supported non-message types, the following orderings are standardized:
 [^u8bytes]: Bytes are considered to be unsigned. The least-valued byte is the
 nul byte `0x00`, and the greatest is `0xff`.
 
-This standardization corresponds to the existing definitions of `Ord` in the
-Rust language for booleans, integers, strings, arrays/slices, ordered sets, and
-ordered maps.
+This standardization corresponds to the existing definitions of [`Ord`][ord] in
+the Rust language for booleans, integers, strings, arrays/slices, ordered sets,
+and ordered maps.
 
 ## `bilrost` vs. `prost`
 
