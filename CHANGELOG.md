@@ -6,6 +6,9 @@
   reads better and makes more sense, better to do it now.
 * Conversion to & from `u32` now uses the `Enumeration` trait rather than
   `Into<u32>` and `TryFrom<u32>`.
+* The "opaque" types, `bilrost::encoding::opaque::{OpaqueMessage, OpaqueValue}`
+  now use `Cow` under the hood instead of `Vec`, allowing them to hold borrowed
+  data rather than only owned.
 
 ### New features
 
@@ -19,7 +22,9 @@
 ### Cleanups
 
 * Large refactor that changes the underlying `Encoder` traits from
-  `impl Encoder<Value> for Encoding` to `impl Encoder<Encoding> for Value`.
+  `impl Encoder<Value> for Encoding` to `impl Encoder<Encoding> for Value`. This
+  avoids issues with a new "non_local_definitions" lint which fires when trait
+  implementations are derived for a function-local type.
 
 ## v0.1003.1
 
