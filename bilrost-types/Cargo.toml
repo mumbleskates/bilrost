@@ -1,6 +1,6 @@
 [package]
 name = "bilrost-types"
-version = "0.1004.0"
+version = "0.1005.0-dev"
 authors = [
     "Dan Burkert <dan@danburkert.com>",
     "Lucio Franco <luciofranco14@gmail.com",
@@ -24,10 +24,10 @@ serde_json = ["dep:serde_json"]
 std = ["bilrost/std"]
 
 [dependencies]
-bilrost = { version = "0.1004.0", path = "..", default-features = false, features = ["derive"] }
+bilrost = { version = "0.1005.0-dev", path = "..", default-features = false, features = ["derive"] }
 serde_json = { version = "1", default-features = false, features = ["alloc", "float_roundtrip"], optional = true }
 
 [dev-dependencies]
-bilrost = { version = "0.1004.0", path = "..", default-features = false, features = ["derive", "opaque"] }
+bilrost = { version = "0.1005.0-dev", path = "..", default-features = false, features = ["derive", "opaque"] }
 itertools = { version = ">=0.10, <0.13", default-features = false, features = ["use_alloc"] }
 proptest = "1"
