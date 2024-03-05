@@ -2,12 +2,8 @@ use alloc::borrow::Cow;
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::string::String;
 use alloc::vec::Vec;
-#[cfg(feature = "std")]
-use core::hash::Hash;
 use core::mem;
 use core::str;
-#[cfg(feature = "std")]
-use std::collections::{HashMap, HashSet};
 
 use bytes::{Buf, BufMut, Bytes};
 
@@ -55,11 +51,11 @@ delegate_value_encoding!(delegate from (General) to (Map<General, General>)
     with generics (K, V));
 #[cfg(feature = "std")]
 delegate_encoding!(delegate from (General) to (Unpacked<General>)
-    for type (HashSet<T>) with generics (T));
+    for type (std::collections::HashSet<T>) with generics (T));
 #[cfg(feature = "std")]
 delegate_value_encoding!(delegate from (General) to (Map<General, General>)
-    for type (HashMap<K, V>)
-    with where clause (K: Eq + Hash)
+    for type (std::collections::HashMap<K, V>)
+    with where clause (K: Eq + core::hash::Hash)
     with generics (K, V));
 #[cfg(feature = "hashbrown")]
 delegate_encoding!(delegate from (General) to (Unpacked<General>)
@@ -67,7 +63,7 @@ delegate_encoding!(delegate from (General) to (Unpacked<General>)
 #[cfg(feature = "hashbrown")]
 delegate_value_encoding!(delegate from (General) to (Map<General, General>)
     for type (hashbrown::HashMap<K, V>)
-    with where clause (K: Eq + Hash)
+    with where clause (K: Eq + core::hash::Hash)
     with generics (K, V));
 
 // General encodes bool and integers as varints.
