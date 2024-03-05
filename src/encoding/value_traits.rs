@@ -3,8 +3,6 @@ use alloc::collections::{btree_map, btree_set, BTreeMap, BTreeSet};
 use alloc::vec::Vec;
 use core::cmp::Ordering::{Equal, Greater, Less};
 #[cfg(feature = "std")]
-use core::hash::Hash;
-#[cfg(feature = "std")]
 use std::collections::{hash_map, hash_set, HashMap, HashSet};
 
 use crate::DecodeErrorKind::UnexpectedlyRepeated;
@@ -564,7 +562,7 @@ impl<T> EmptyState for HashSet<T> {
 #[cfg(feature = "std")]
 impl<T> Collection for HashSet<T>
 where
-    T: Eq + Hash,
+    T: Eq + core::hash::Hash,
 {
     type Item = T;
     type RefIter<'a> = hash_set::Iter<'a, T>
@@ -612,7 +610,7 @@ impl<T> EmptyState for hashbrown::HashSet<T> {
 #[cfg(feature = "hashbrown")]
 impl<T> Collection for hashbrown::HashSet<T>
 where
-    T: Eq + Hash,
+    T: Eq + core::hash::Hash,
 {
     type Item = T;
     type RefIter<'a> = hashbrown::hash_set::Iter<'a, T>
@@ -749,7 +747,7 @@ impl<K, V> EmptyState for HashMap<K, V> {
 #[cfg(feature = "std")]
 impl<K, V> Mapping for HashMap<K, V>
 where
-    K: Eq + Hash,
+    K: Eq + core::hash::Hash,
 {
     type Key = K;
     type Value = V;
@@ -801,7 +799,7 @@ impl<K, V> EmptyState for hashbrown::HashMap<K, V> {
 #[cfg(feature = "hashbrown")]
 impl<K, V> Mapping for hashbrown::HashMap<K, V>
 where
-    K: Eq + Hash,
+    K: Eq + core::hash::Hash,
 {
     type Key = K;
     type Value = V;
