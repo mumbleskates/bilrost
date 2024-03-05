@@ -1196,7 +1196,7 @@ mod derived_message_tests {
         invalid_strings.push(surrogate_pair);
 
         for invalid_string in invalid_strings {
-            assert::never_decodes::<Foo<T>>([(1, OV::byte_slice(&*invalid_string))], InvalidValue);
+            assert::never_decodes::<Foo<T>>([(1, OV::byte_slice(&invalid_string))], InvalidValue);
         }
     }
 
