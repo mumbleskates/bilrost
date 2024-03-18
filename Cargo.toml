@@ -37,17 +37,29 @@ bench = false
 
 [features]
 default = ["derive", "detailed-errors", "std"]
-bytestring = ["dep:bytestring"]
 derive = ["dep:bilrost-derive"]
 detailed-errors = ["dep:thin-vec"]
 extended-diagnostics = ["dep:const_panic"]
-hashbrown = ["dep:hashbrown"]
 no-recursion-limit = []
 opaque = ["dep:btreemultimap"]
-smallvec = ["dep:smallvec"]
 std = []
+
+third-party-type-support = [
+    "bytestring",
+    "hashbrown",
+    "smallvec",
+    "thin-vec",
+    "tinyvec",
+]
 thin-vec = ["dep:thin-vec"]
-tinyvec = ["dep:tinyvec"]
+
+full-test-suite = [
+    "derive",
+    "detailed-errors",
+    "extended-diagnostics",
+    "opaque",
+    "third-party-type-support",
+]
 
 [dependencies]
 bilrost-derive = { version = "0.1005.0-dev", path = "bilrost-derive", optional = true }
@@ -69,6 +81,7 @@ static_assertions = "1"
 
 [profile.bench]
 debug = true
+lto = "fat"
 
 [[bench]]
 name = "varint"

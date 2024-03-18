@@ -21,17 +21,20 @@ lint:
   stage: test
   script:
     - rustup component add clippy rustfmt
-    - cargo clippy --all --all-targets --all-features
+    - cargo clippy --all --all-targets --features full-test-suite
+    - cargo clippy --all --all-targets --features full-test-suite --no-default-features
     - cargo clippy --all --all-targets --no-default-features
     - cargo fmt --all --check
 
 test:
   stage: test
   script:
-    - cargo test --workspace --all-targets --all-features
-    - cargo test --workspace --doc
+    - cargo test --workspace --all-targets --features full-test-suite
+    - cargo test --workspace --doc         --features full-test-suite
+    - cargo test --workspace --all-targets --features full-test-suite --no-default-features
+    - cargo test --workspace --doc         --features full-test-suite --no-default-features
     - cargo test --workspace --all-targets --no-default-features
-    - cargo test --workspace --doc --no-default-features
+    - cargo test --workspace --doc         --no-default-features
 
 test-msrv:
   image: rust:1.65
@@ -39,7 +42,9 @@ test-msrv:
   before_script:
     - ./downgrade-for-msrv.sh
   script:
-    - cargo test --workspace --all-targets --all-features
-    - cargo test --workspace --doc
+    - cargo test --workspace --all-targets --features full-test-suite
+    - cargo test --workspace --doc         --features full-test-suite
+    - cargo test --workspace --all-targets --features full-test-suite --no-default-features
+    - cargo test --workspace --doc         --features full-test-suite --no-default-features
     - cargo test --workspace --all-targets --no-default-features
-    - cargo test --workspace --doc --no-default-features
+    - cargo test --workspace --doc         --no-default-features

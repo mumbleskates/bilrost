@@ -6,11 +6,12 @@ jobs:
   rustfmt:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy, rustfmt
-      - run: cargo clippy --all --all-targets --all-features
+      - run: cargo clippy --all --all-targets --features full-test-suite
+      - run: cargo clippy --all --all-targets --features full-test-suite --no-default-features
       - run: cargo clippy --all --all-targets --no-default-features
       - run: cargo fmt --all --check
 
@@ -35,12 +36,16 @@ jobs:
       - name: msrv pinning
         run: if [[ "stable" != "${{ matrix.toolchain }}" ]]; then ./downgrade-for-msrv.sh ; fi
       - name: test
-        run: cargo test --workspace --all-targets --all-features
+        run: cargo test --workspace --all-targets --features full-test-suite
       - name: test no-default-features
+        run: cargo test --workspace --all-targets --features full-test-suite --no-default-features
+      - name: test minimal features
         run: cargo test --workspace --all-targets --no-default-features
       - name: test doc
-        run: cargo test --workspace --doc
+        run: cargo test --workspace --doc --features full-test-suite
       - name: test doc no-default-features
+        run: cargo test --workspace --doc --features full-test-suite --no-default-features
+      - name: test doc minimal features
         run: cargo test --workspace --doc --no-default-features
 
   kani:
@@ -75,6 +80,6 @@ jobs:
         with:
           crate: cargo-no-std-check
       - name: bilrost cargo-no-std-check
-        run: cargo no-std-check --manifest-path Cargo.toml --no-default-features
+        run: cargo no-std-check --manifest-path Cargo.toml --features full-test-suite --no-default-features
       - name: bilrost-types cargo-no-std-check
-        run: cargo no-std-check --manifest-path bilrost-types/Cargo.toml --no-default-features
+        run: cargo no-std-check --manifest-path bilrost-types/Cargo.toml --features full-test-suite --no-default-features
