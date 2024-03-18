@@ -1,9 +1,10 @@
 use anyhow::{bail, Error};
 use proc_macro2::{Ident, Span, TokenStream};
 use quote::quote;
-use syn::{parse_str, Index, Meta, Type};
+use syn::{Index, Meta, parse_str, Type};
 
-use super::{named_attr, set_bool, set_option, tag_attr, word_attr};
+use crate::attrs::{named_attr, tag_attr, word_attr};
+use crate::field::{set_bool, set_option};
 
 /// A scalar protobuf field.
 #[derive(Clone)]

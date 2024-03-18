@@ -4,6 +4,13 @@
 
 ### New features
 
+* New `reserved_tags` attribute on messages to prevent tags from being used,
+  even by accident.
+* Both the new `reserved_tags` and the old `oneof` attributes can now specify
+  inclusive ranges of tag numbers instead of only single tags. For now, in
+  `oneof` this is limited to 100 tags per range because more than that is just
+  too many.
+
 ### Fixes
 
 ### Cleanups

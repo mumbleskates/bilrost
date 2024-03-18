@@ -226,7 +226,7 @@ impl Timestamp {
 #[derive(Clone, Debug, PartialEq, Message)]
 pub struct Value {
     /// The kind of value. None represents JSON `null`.
-    #[bilrost(oneof(1, 2, 3, 4, 5, 6, 7))]
+    #[bilrost(oneof(1-7))]
     pub kind: value::Kind,
 }
 

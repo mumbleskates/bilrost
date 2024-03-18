@@ -432,6 +432,9 @@ We can now import and use its traits and derive macros. The main three are:
 
 #### Deriving `Message`
 
+The `Message` trait can be derived to allow encoding just about any struct as a
+Bilrost message, as long as its fields' types are supported.
+
 If not otherwise specified, fields are tagged sequentially in the order they
 are specified in the struct, starting with `1`.
 
@@ -528,11 +531,18 @@ struct Widget {
 
 When the oneof is included in a message, it has to be declared with the "oneof"
 attribute, providing a comma-separated list of all its field tags. (This
-attribute can also be spelled like `oneof = "2, 3"`.) It isn't possible for the
-derive macro to know what those tag numbers are when it runs because it can't
-have access to the definitions of the field's type, but the list of tags
-declared in this attribute and the list of tags that the oneof actually has are
-statically checked for equality at compile time.
+attribute can also be spelled like `oneof = "2, 3"`.)[^tagranges] It isn't
+possible for the derive macro to know what those tag numbers are when it runs
+because it can't have access to the definitions of the field's type, but the
+list of tags declared in this attribute and the list of tags that the oneof
+actually has are statically checked for equality at compile time.
+
+[^tagranges]: The way the full list of tags is specified within the `oneof`
+attribute and the `reserved_tags` attribute is the same: the whole list is comma
+separated, and each item may be either a single tag number or an inclusive range
+from minimum to maximum separated with a dash (like `1-5`). For both
+`reserved_tags` and `oneof`, the following are all exactly equivalent:
+`1, 2, 3, 4, 5`; `1-5`; `4, 5, 1-3`
 
 The field tags in the oneof must be unique, both within the oneof itself and
 within any message containing it. Oneof variants can only contain types that
@@ -642,15 +652,31 @@ will be similarly lower-cased.
 
 #### Other attributes
 
-There are a few other attributes available inside the "bilrost" attribute for
-fields:
+There are a few other attributes available inside the "bilrost" attribute:
+
+##### Reserving tags
+
+* **"reserved_tags"**: When placed on the message itself, this declares that the
+  given tags and tag ranges[^tagranges] are not used in the field. This has no
+  effect other than as a compile-time guard; if a field uses a tag that was
+  declared to be reserved the compilation will err.
+
+```rust,compile_fail
+# use bilrost::Message;
+#[derive(Message)]
+#[bilrost(reserved_tags(2, 6-10, 25))]
+struct Foo {
+    #[bilrost(tag(5), encoding(general))]
+    name: String,
+    age: int64, // Oops! Uses tag 6! Compile error
+}
+```
 
 ##### Ignoring fields
 
-* **"ignore"**: must be alone, with no tag or other attribute. This causes the
-  field
-  to be ignored by the generated message implementation. If any fields in a
-  message are ignored, it must implement `Default` to implement `Message`, so
+* **"ignore"**: Must be alone, with no tag or other attribute. This causes the
+  field to be ignored by the generated message implementation. If any fields in
+  a message are ignored, it must implement `Default` to implement `Message`, so
   there is a value for those fields to take on when they are created from
   encoded data.
 
@@ -659,7 +685,7 @@ fields:
 
 ##### Helper methods
 
-* **"enumeration"**: if a field is of type `u32` or `Option<u32>`, this causes
+* **"enumeration"**: If a field is of type `u32` or `Option<u32>`, this causes
   the message type to have helper methods named after the type that get and set
   its value as the enumeration type specified by this attribute.
 

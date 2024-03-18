@@ -9,6 +9,7 @@
 //! [bilrost]: https://docs.rs/bilrost
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::iter;
 use std::mem::take;
 use std::ops::Deref;
 
@@ -22,8 +23,10 @@ use syn::{
     Variant, WhereClause,
 };
 
-use self::field::{bilrost_attrs, Field};
+use crate::attrs::{tag_list_attr, TagList};
+use crate::field::{bilrost_attrs, set_option, Field};
 
+mod attrs;
 mod field;
 
 /// Helper type to ensure a value is used at runtime.
@@ -89,8 +92,6 @@ enum FieldChunk {
     // A set of fields that must be sorted before emitting
     SortGroup(Vec<SortGroupPart>),
 }
-
-use crate::field::set_option;
 use FieldChunk::*;
 
 struct PreprocessedMessage<'a> {
@@ -112,6 +113,28 @@ fn preprocess_message(input: &DeriveInput) -> Result<PreprocessedMessage, Error>
         Data::Enum(..) => bail!("Message can not be derived for an enum"),
         Data::Union(..) => bail!("Message can not be derived for a union"),
     };
+
+    let mut reserved_tags: Option<TagList> = None;
+    let mut unknown_attrs = Vec::new();
+    for attr in bilrost_attrs(input.attrs.clone())? {
+        if let Some(tags) = tag_list_attr("reserved_tags", None, &attr)? {
+            set_option(
+                &mut reserved_tags,
+                tags,
+                "duplicate reserved_tags attributes",
+            )?;
+        } else {
+            unknown_attrs.push(attr);
+        }
+    }
+
+    if !unknown_attrs.is_empty() {
+        bail!(
+            "unknown attribute(s) for message: {}",
+            quote!(#(#unknown_attrs),*)
+        )
+    }
+    let reserved_tags = reserved_tags.unwrap_or_default();
 
     let fields: Vec<syn::Field> = match variant_data {
         DataStruct {
@@ -161,6 +184,17 @@ fn preprocess_message(input: &DeriveInput) -> Result<PreprocessedMessage, Error>
         })
         .collect::<Result<Vec<_>, _>>()?;
 
+    // Index all fields by their tag(s) and check them against the forbidden tag ranges
+    let all_tags: BTreeMap<u32, &TokenStream> = unsorted_fields
+        .iter()
+        .flat_map(|(ident, field)| field.tags().into_iter().zip(iter::repeat(ident)))
+        .collect();
+    for reserved_range in reserved_tags.iter_tag_ranges() {
+        if let Some((forbidden_tag, field_ident)) = all_tags.range(reserved_range).next() {
+            bail!("message {ident} field {field_ident} has reserved tag {forbidden_tag}");
+        }
+    }
+
     if let Some((duplicate_tag, _)) = unsorted_fields
         .iter()
         .flat_map(|(_, field)| field.tags())
@@ -168,7 +202,7 @@ fn preprocess_message(input: &DeriveInput) -> Result<PreprocessedMessage, Error>
         .tuple_windows()
         .find(|(a, b)| a == b)
     {
-        bail!("message {} has duplicate tag {}", ident, duplicate_tag)
+        bail!("message {ident} has duplicate tag {duplicate_tag}")
     };
 
     let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
@@ -349,8 +383,6 @@ fn append_distinguished_encoder_wheres<T>(
 
 fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     let input: DeriveInput = parse2(input)?;
-
-    // TODO(widders): allow explicit custom default with an attr; perhaps only for a single field?
 
     let PreprocessedMessage {
         ident,
@@ -1399,6 +1431,88 @@ mod test {
         assert_eq!(
             output.expect_err("duplicate tags not detected").to_string(),
             "message Invalid has duplicate tag 1"
+        );
+
+        let output = try_message(quote! {
+            struct Invalid {
+                #[bilrost(tag = "2")]
+                a: bool,
+                #[bilrost(oneof(1-3))]
+                b: Option<super::Whatever>,
+            }
+        });
+        assert_eq!(
+            output.expect_err("duplicate tags not detected").to_string(),
+            "message Invalid has duplicate tag 2"
+        );
+
+        let output = try_message(quote! {
+            struct Invalid {
+                #[bilrost(tag = "10")]
+                a: bool,
+                #[bilrost(oneof = "5-10")]
+                b: Option<super::Whatever>,
+            }
+        });
+        assert_eq!(
+            output.expect_err("duplicate tags not detected").to_string(),
+            "message Invalid has duplicate tag 10"
+        );
+
+        // Tags that don't collide with ranges are fine
+        _ = try_message(quote! {
+            struct Valid {
+                #[bilrost(tag = "4")]
+                a: bool,
+                #[bilrost(oneof(5-10, 1-3))]
+                b: Option<super::Whatever>,
+            }
+        })
+        .unwrap();
+    }
+
+    #[test]
+    fn test_rejects_reserved_message_fields() {
+        let output = try_message(quote! {
+            #[bilrost(reserved_tags(1, 100))]
+            struct Invalid {
+                #[bilrost(tag = "1")]
+                a: bool,
+                #[bilrost(oneof(3-5))]
+                b: Option<super::Whatever>,
+            }
+        });
+        assert_eq!(
+            output.expect_err("reserved tags not detected").to_string(),
+            "message Invalid field a has reserved tag 1"
+        );
+
+        let output = try_message(quote! {
+            #[bilrost(reserved_tags(4, 55))]
+            struct Invalid {
+                #[bilrost(tag = "1")]
+                a: bool,
+                #[bilrost(oneof(3-5))]
+                b: Option<super::Whatever>,
+            }
+        });
+        assert_eq!(
+            output.expect_err("reserved tags not detected").to_string(),
+            "message Invalid field b has reserved tag 4"
+        );
+    }
+
+    #[test]
+    fn test_rejects_oversize_oneof_tag_ranges() {
+        let output = try_message(quote! {
+            struct Invalid {
+                #[bilrost(oneof(1-100))]
+                a: SomeOneof,
+            }
+        });
+        assert_eq!(
+            format!("{:#}", output.expect_err("oversized tag range not detected")),
+            "invalid message field Invalid.a: too-large tag range 1-100; use smaller ranges"
         );
     }
 

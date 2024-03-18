@@ -1,17 +1,13 @@
-mod oneof;
-mod value;
-
-use std::any::type_name;
 use std::fmt;
 
-use anyhow::{anyhow, bail, Error};
+use anyhow::{bail, Error};
 use proc_macro2::{Ident, TokenStream};
 use quote::{quote, ToTokens};
 use syn::punctuated::Punctuated;
-use syn::{
-    parse, parse2, parse_str, Attribute, Expr, Lit, LitInt, Meta, MetaList, MetaNameValue, Token,
-    Type,
-};
+use syn::{parse2, Attribute, LitInt, Meta, Token, Type};
+
+mod oneof;
+mod value;
 
 #[derive(Clone)]
 pub enum Field {
@@ -212,62 +208,5 @@ pub fn set_bool(b: &mut bool, message: &str) -> Result<(), Error> {
     } else {
         *b = true;
         Ok(())
-    }
-}
-
-fn tag_attr(attr: &Meta) -> Result<Option<u32>, Error> {
-    if !attr.path().is_ident("tag") {
-        return Ok(None);
-    }
-    match attr {
-        // tag(1)
-        Meta::List(meta_list) => Ok(Some(meta_list.parse_args::<LitInt>()?.base10_parse()?)),
-        Meta::NameValue(MetaNameValue {
-            value: Expr::Lit(expr),
-            ..
-        }) => match &expr.lit {
-            // tag = "1"
-            Lit::Str(lit) => lit.value().parse::<u32>().map_err(Error::from).map(Some),
-            // tag = 1
-            Lit::Int(lit) => Ok(Some(lit.base10_parse()?)),
-            _ => bail!("invalid tag attribute: {}", quote!(#attr)),
-        },
-        _ => bail!("invalid tag attribute: {}", quote!(#attr)),
-    }
-}
-
-fn named_attr<T: parse::Parse>(attr: &Meta, attr_name: &str) -> Result<Option<T>, Error> {
-    if !attr.path().is_ident(attr_name) {
-        return Ok(None);
-    }
-    match attr {
-        // encoding(type tokens go here)
-        Meta::List(MetaList { tokens, .. }) => parse2(tokens.clone()),
-        // encoding = "type tokens go here"
-        Meta::NameValue(MetaNameValue {
-            value: Expr::Lit(expr),
-            ..
-        }) => match &expr.lit {
-            Lit::Str(lit) => parse_str::<T>(&lit.value()),
-            _ => bail!("invalid {attr_name} attribute: {}", quote!(#attr)),
-        },
-        _ => bail!("invalid {attr_name} attribute: {}", quote!(#attr)),
-    }
-    .map(Some)
-    .map_err(|_| {
-        anyhow!(
-            "invalid {attr_name} attribute does not look like a(n) {}: {}",
-            type_name::<T>(),
-            quote!(#attr),
-        )
-    })
-}
-
-/// Checks if an attribute matches a word.
-fn word_attr(attr: &Meta, key: &str) -> bool {
-    if let Meta::Path(ref path) = *attr {
-        path.is_ident(key)
-    } else {
-        false
     }
 }
