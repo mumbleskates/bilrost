@@ -1,7 +1,7 @@
 use anyhow::{bail, Error};
 use proc_macro2::{Ident, Span, TokenStream};
 use quote::quote;
-use syn::{Index, Meta, parse_str, Type};
+use syn::{parse_str, Index, Meta, Type};
 
 use crate::attrs::{named_attr, tag_attr, word_attr};
 use crate::field::{set_bool, set_option};

@@ -1511,7 +1511,10 @@ mod test {
             }
         });
         assert_eq!(
-            format!("{:#}", output.expect_err("oversized tag range not detected")),
+            format!(
+                "{:#}",
+                output.expect_err("oversized tag range not detected")
+            ),
             "invalid message field Invalid.a: too-large tag range 1-100; use smaller ranges"
         );
     }
