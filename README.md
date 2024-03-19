@@ -88,7 +88,7 @@ are added or removed over time the fields that remain in common will still be
 mutually intelligible between the two versions of the schema. In this way,
 Bilrost is very similar to [protobuf][pb]. See also:
 [Design philosophy](#design-philosophy), [Comparisons to other encodings](
-#comparisons-to-other-encodings).
+#comparisons-to-other-encodings), and the [Encoding specification](#encoding-specification).
 
 Bilrost also has the ability to encode and decode data that is guaranteed to be
 canonically represented: see the section on [distinguished decoding](
