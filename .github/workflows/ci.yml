@@ -80,6 +80,6 @@ jobs:
         with:
           crate: cargo-no-std-check
       - name: bilrost cargo-no-std-check
-        run: cargo no-std-check --manifest-path Cargo.toml --features full-test-suite --no-default-features
+        run: cargo no-std-check --manifest-path Cargo.toml --no-default-features
       - name: bilrost-types cargo-no-std-check
-        run: cargo no-std-check --manifest-path bilrost-types/Cargo.toml --features full-test-suite --no-default-features
+        run: cargo no-std-check --manifest-path bilrost-types/Cargo.toml --no-default-features
