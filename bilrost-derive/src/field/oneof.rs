@@ -1,3 +1,6 @@
+use alloc::vec;
+use alloc::vec::Vec;
+
 use anyhow::{bail, Error};
 use proc_macro2::TokenStream;
 use quote::quote;

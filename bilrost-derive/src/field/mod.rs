@@ -1,4 +1,8 @@
-use std::fmt;
+use alloc::fmt::Debug;
+use alloc::format;
+use alloc::string::{String, ToString};
+use alloc::vec;
+use alloc::vec::Vec;
 
 use anyhow::{bail, Error};
 use proc_macro2::{Ident, TokenStream};
@@ -193,7 +197,7 @@ pub(crate) fn bilrost_attrs(attrs: Vec<Attribute>) -> Result<Vec<Meta>, Error> {
 
 pub fn set_option<T>(option: &mut Option<T>, value: T, message: &str) -> Result<(), Error>
 where
-    T: fmt::Debug,
+    T: Debug,
 {
     if let Some(existing) = option {
         bail!("{}: {:?} and {:?}", message, existing, value);

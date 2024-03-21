@@ -1,6 +1,7 @@
 #![doc(html_root_url = "https://docs.rs/bilrost-derive/0.1005.0-dev")]
 // The `quote!` macro requires deep recursion.
 #![recursion_limit = "4096"]
+#![no_std]
 
 //! This crate contains the derive macro implementations for the
 //! [`bilrost`][bilrost] crate; see the documentation in that crate for usage and
@@ -8,10 +9,16 @@
 //!
 //! [bilrost]: https://docs.rs/bilrost
 
-use std::collections::{BTreeMap, BTreeSet};
-use std::iter;
-use std::mem::take;
-use std::ops::Deref;
+extern crate alloc;
+
+use alloc::collections::{BTreeMap, BTreeSet};
+use alloc::string::ToString;
+use alloc::vec::Vec;
+use alloc::vec;
+use alloc::format;
+use core::iter;
+use core::mem::take;
+use core::ops::Deref;
 
 use anyhow::{anyhow, bail, Error};
 use itertools::Itertools;
@@ -1415,8 +1422,12 @@ pub fn distinguished_oneof(input: proc_macro::TokenStream) -> proc_macro::TokenS
 
 #[cfg(test)]
 mod test {
-    use crate::{try_enumeration, try_message, try_oneof};
+    use alloc::format;
+    use alloc::string::ToString;
+    
     use quote::quote;
+
+    use crate::{try_enumeration, try_message, try_oneof};
 
     #[test]
     fn test_rejects_colliding_message_fields() {

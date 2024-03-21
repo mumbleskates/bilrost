@@ -81,5 +81,7 @@ jobs:
           crate: cargo-no-std-check
       - name: bilrost cargo-no-std-check
         run: cargo no-std-check --manifest-path Cargo.toml --no-default-features
+      - name: bilrost-derive cargo-no-std-check
+        run: cargo no-std-check --manifest-path bilrost-derive/Cargo.toml --no-default-features
       - name: bilrost-types cargo-no-std-check
         run: cargo no-std-check --manifest-path bilrost-types/Cargo.toml --no-default-features

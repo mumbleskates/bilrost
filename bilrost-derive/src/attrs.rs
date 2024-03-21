@@ -1,5 +1,6 @@
-use std::any::type_name;
-use std::ops::RangeInclusive;
+use alloc::vec::Vec;
+use core::any::type_name;
+use core::ops::RangeInclusive;
 
 use anyhow::{anyhow, bail, Error};
 use itertools::Itertools;
