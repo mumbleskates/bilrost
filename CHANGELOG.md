@@ -10,7 +10,9 @@
   inclusive ranges of tag numbers instead of only single tags. For now, in
   `oneof` this is limited to 100 tags per range because more than that is just
   too many.
-* `bilrost-derive`, which contains the derive macros, is now `no_std`.
+* `bilrost-derive`, which contains the derive macros, is now `no_std`. This
+  doesn't really change what it's capable of at all but it does make it easier
+  to prove it doesn't accidentally preclude using `std`.
 
 ### Fixes
 
