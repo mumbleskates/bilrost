@@ -12,10 +12,10 @@
 extern crate alloc;
 
 use alloc::collections::{BTreeMap, BTreeSet};
-use alloc::string::ToString;
-use alloc::vec::Vec;
-use alloc::vec;
 use alloc::format;
+use alloc::string::ToString;
+use alloc::vec;
+use alloc::vec::Vec;
 use core::iter;
 use core::mem::take;
 use core::ops::Deref;
@@ -1424,7 +1424,7 @@ pub fn distinguished_oneof(input: proc_macro::TokenStream) -> proc_macro::TokenS
 mod test {
     use alloc::format;
     use alloc::string::ToString;
-    
+
     use quote::quote;
 
     use crate::{try_enumeration, try_message, try_oneof};
