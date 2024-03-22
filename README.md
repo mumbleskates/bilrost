@@ -730,71 +730,6 @@ encoding requires `Eq` be implemented for each field, oneof, and message type;
 the trait is not used directly, but is trivial to derive for any compatible
 type.
 
-<details><summary>Example</summary>
-
-```rust,
-use bilrost::{
-    DistinguishedMessage, DistinguishedOneof, Message, Oneof,
-    WithCanonicity,
-};
-use bytes::Bytes;
-use std::collections::BTreeMap;
-
-#[derive(Debug, PartialEq, Eq, Oneof, DistinguishedOneof)]
-enum PubKeyMaterial {
-    Empty,
-    #[bilrost(1)]
-    Rsa(Bytes),
-    #[bilrost(2)]
-    ED25519(Bytes),
-}
-
-use PubKeyMaterial::*;
-
-#[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
-struct PubKey {
-    #[bilrost(oneof(1, 2))]
-    key: PubKeyMaterial,
-    #[bilrost(3)]
-    expiry: i64, // See also: `bilrost_types::Timestamp`
-}
-
-#[derive(Debug, Default, PartialEq, Eq, Message, DistinguishedMessage)]
-struct PubKeyRegistry {
-    keys_by_owner: BTreeMap<String, PubKey>,
-}
-
-let mut registry = PubKeyRegistry::default();
-registry.keys_by_owner.insert(
-    "Alice".to_string(),
-    PubKey {
-        key: ED25519(Bytes::from_static(b"not a secret")),
-        expiry: 1600999999,
-    },
-);
-registry.keys_by_owner.insert(
-    "Bob".to_string(),
-    PubKey {
-        key: Rsa(Bytes::from_static(b"pkey")),
-        expiry: 1500000001,
-    },
-);
-let encoded = registry.encode_to_vec();
-assert_eq!(
-    encoded,
-    b"\x05\x2c\
-      \x05Alice\x14\x09\x0cnot a secret\x04\xfe\xc7\xe9\xf5\x0a\
-      \x03Bob\x0c\x05\x04pkey\x08\x82\xbb\xc0\x95\x0a"
-        .as_slice()
-);
-let decoded = PubKeyRegistry::decode_distinguished(encoded.as_slice())
-    .canonical() // Check that the decoded data was canonical
-    .unwrap();
-assert_eq!(registry, decoded);
-```
-
-</details>
-
 ### Encoding and decoding messages
 
 There are a variety of methods and associated functions available for encoding
@@ -866,6 +801,103 @@ use `encode(..)` rather than `encode_dyn(..)`, and likewise for any other
 "`_dyn`" method. Likewise, `replace_from_slice(..)` is equivalent to
 `replace_from(..)`, just object safe; the same goes for other "`_slice`"
 methods.
+
+### Encoding and decoding example
+
+```rust,
+use bilrost::{
+    DistinguishedMessage, DistinguishedOneof, Message, Oneof,
+    WithCanonicity,
+};
+use bytes::Bytes;
+use std::collections::BTreeMap;
+
+#[derive(Debug, PartialEq, Eq, Oneof, DistinguishedOneof)]
+enum PubKeyMaterial {
+    Empty,
+    #[bilrost(1)]
+    Rsa(Bytes),
+    #[bilrost(2)]
+    ED25519(Bytes),
+}
+
+use PubKeyMaterial::*;
+
+#[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+struct PubKey {
+    #[bilrost(oneof(1, 2))]
+    key: PubKeyMaterial,
+    #[bilrost(3)]
+    expiry: i64, // See also: `bilrost_types::Timestamp`
+}
+
+#[derive(Debug, Default, PartialEq, Eq, Message, DistinguishedMessage)]
+struct PubKeyRegistry {
+    keys_by_owner: BTreeMap<String, PubKey>,
+}
+
+let mut registry = PubKeyRegistry::default();
+registry.keys_by_owner.insert(
+    "Alice".to_string(),
+    PubKey {
+        key: ED25519(Bytes::from_static(b"not a secret")),
+        expiry: 1600999999,
+    },
+);
+registry.keys_by_owner.insert(
+    "Bob".to_string(),
+    PubKey {
+        key: Rsa(Bytes::from_static(b"pkey")),
+        expiry: 1500000001,
+    },
+);
+let encoded = registry.encode_to_vec();
+
+// The binary of this encoded message breaks down as follows:
+//
+// (The first and only field, containing a map from String to PubKey)
+// 05 - field key: tag 0+1 = 1, wire type 1 = length-delimited
+//   2c - length: 44 bytes
+//     (The key of the first map item, a String value)
+//     05 - length: 5 bytes
+//       "Alice"
+//     (The value of the first map item, a PubKey message)
+//     14 - length: 20 bytes
+//       (The "ED25519" variant of the PubKeyMaterial oneof)
+//       09 - field key: tag 0+2 = 2, wire type 1 = length-delimited
+//         (A String value)
+//         0c - length: 12 bytes
+//           "not a secret"
+//       (The "expiry" field of the PubKey message, an i64)
+//       04 - field key: tag 2+1 = 3, wire type 0 = varint
+//         fec7e9f50a - varint 3201999998, which is +1600999999 in zig-zag
+//     (The key of the second map item, a string value)
+//     03 - length: 3 bytes
+//       "Bob"
+//     (The value of the second map item, another PubKey message)
+//     0c - length: 12 bytes
+//       (The "RSA" variant of the PubKeyMaterial oneof)
+//       05 - field key: tag 0+1 = 1, wire type 1 = length-delimited
+//         (A String value)
+//         04 - length: 4 bytes
+//           "pkey"
+//       (The "expiry" field of the PubKey message, an i64)
+//       08 - field key: tag 1+2 = 3, wire type 0 = varint
+//         82bbc0950a - varint 3000000002, which is +1500000001 in zig-zag
+
+assert_eq!(
+    encoded,
+    b"\x05\x2c\
+      \x05Alice\x14\x09\x0cnot a secret\x04\xfe\xc7\xe9\xf5\x0a\
+      \x03Bob\x0c\x05\x04pkey\x08\x82\xbb\xc0\x95\x0a"
+        .as_slice()
+);
+
+let decoded = PubKeyRegistry::decode_distinguished(encoded.as_slice())
+    .canonical() // Check that the decoded data was canonical
+    .unwrap();
+assert_eq!(registry, decoded);
+```
 
 ### Supported message field types
 
