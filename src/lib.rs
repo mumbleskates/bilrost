@@ -1,5 +1,7 @@
 #![doc = include_str!("../README.md")]
-#![doc(html_logo_url = "https://raw.githubusercontent.com/mumbleskates/bilrost/bilrost/logo/bilrost256.jpg")]
+#![doc(
+    html_logo_url = "https://raw.githubusercontent.com/mumbleskates/bilrost/bilrost/logo/bilrost256.jpg"
+)]
 #![doc(html_root_url = "https://docs.rs/bilrost/0.1005.1")]
 #![no_std]
 
