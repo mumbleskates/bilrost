@@ -29,7 +29,8 @@
 ### Fixes
 
 * Rectify an ambiguous usage of `PartialEq` that could potentially cause
-  compilation failures when supported types in the program support equality.
+  compilation failures when supported types in the program support cross-type
+  equality.
 * `bilrost-derive`: simplify some codegen to remove a needless `let mut` in
   derived decoding implementations.
 
