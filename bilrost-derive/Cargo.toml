@@ -21,7 +21,7 @@ proc-macro = true
 
 [dependencies]
 eyre = "0.6.12"
-itertools = { version = "0.13", default-features = false, features = ["use_alloc"] }
+itertools = { version = "0.14", default-features = false, features = ["use_alloc"] }
 proc-macro2 = "1"
 quote = "1"
 syn = { version = "2", features = ["extra-traits", "full"] }
