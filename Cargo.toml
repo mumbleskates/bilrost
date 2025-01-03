@@ -57,14 +57,14 @@ pprof = { version = ">=0.13,<0.15", features = ["flamegraph"], optional = true }
 [dev-dependencies]
 arbitrary = "1.4"
 bilrost = { path = ".", default-features = false, features = ["derive"] } # always enable proc-macro use for integration tests
-chrono = { version = ">=0", default-features = false, features = ["arbitrary", "std"] } # "arbitrary" and "std" are both required for proptests
+chrono = { version = ">=0.4.34", default-features = false, features = ["arbitrary", "std"] } # "arbitrary" and "std" are both required for proptests
 criterion = { version = "0.5", default-features = false }
 hashbrown = { version = ">=0.15.2", default-features = false, features = ["default-hasher"] }
 itertools = { version = "0.13", default-features = false, features = ["use_alloc"] }
 proptest = "1"
 rand = "0.8"
 static_assertions = "1"
-time = { version = ">=0", default-features = false, features = ["rand"] }
+time = { version = ">=0.3.0", default-features = false, features = ["rand"] }
 
 [features]
 default = ["auto-optimize", "derive", "detailed-errors", "std"]
