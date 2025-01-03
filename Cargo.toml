@@ -60,7 +60,7 @@ bilrost = { path = ".", default-features = false, features = ["derive"] } # alwa
 chrono = { version = ">=0", default-features = false, features = ["arbitrary", "std"] } # "arbitrary" and "std" are both required for proptests
 criterion = { version = "0.5", default-features = false }
 hashbrown = { version = ">=0.15.2", default-features = false, features = ["default-hasher"] }
-itertools = { version = "0.13", default-features = false, features = ["use_alloc"] }
+itertools = { version = "0.14", default-features = false, features = ["use_alloc"] }
 proptest = "1"
 rand = "0.8"
 static_assertions = "1"
