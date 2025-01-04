@@ -4,6 +4,8 @@
 
 ### New features
 
+* Added `From<Vec<u8>>` and `From<Box<[u8]>>` impls for `ReverseBuffer`.
+
 ### Fixes
 
 ### Cleanups
@@ -16,7 +18,7 @@
   * `Oneof` traits now encode and decode slightly differently and the traits
     bearing an empty state now have special responsibility for guarding against
     value duplication and recording error locations.
-  * Distinguished encoding traits now use a different context type,.
+  * Distinguished encoding traits now use a different context type,
     `RestrictedDecodeContext`, which restricts the minimum tolerated canonicity
     and allows for early exits and detailed errors about the location of
     non-canonical data problems.
