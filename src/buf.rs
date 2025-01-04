@@ -6,7 +6,7 @@ use core::iter;
 use core::marker::PhantomData;
 use core::mem::{self, transmute, MaybeUninit};
 use core::ptr;
-
+use std::iter::Rev;
 use bytes::Buf;
 
 // Flag for platform-specific optimization that avoids large slowdowns on some architectures.
@@ -663,6 +663,27 @@ impl Buf for ReverseBuffer {
 impl From<ReverseBuffer> for Vec<u8> {
     fn from(value: ReverseBuffer) -> Self {
         value.into_vec()
+    }
+}
+
+impl From<Box<[u8]>> for ReverseBuffer {
+    fn from(value: Box<[u8]>) -> Self {
+        let capacity = value.len();
+        Self {
+            // SAFETY: we are actually marking the data as LESS initialized, in a transparent
+            // representation. This is trivial to do and completely safe, but there's no safe method
+            // available to call that does this for you itemwise when it's in a Box like this.
+            chunks: vec![unsafe { transmute::<Box<[u8]>, Box<[MaybeUninit<u8>]>>(value) }],
+            front: 0, // front chunk is full
+            capacity,
+            ..Self::new()
+        }
+    }
+}
+
+impl From<Vec<u8>> for ReverseBuffer {
+    fn from(value: Vec<u8>) -> Self {
+        Self::from(value.into_boxed_slice())
     }
 }
 
