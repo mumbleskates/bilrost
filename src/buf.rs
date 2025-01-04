@@ -6,7 +6,6 @@ use core::iter;
 use core::marker::PhantomData;
 use core::mem::{self, transmute, MaybeUninit};
 use core::ptr;
-use std::iter::Rev;
 use bytes::Buf;
 
 // Flag for platform-specific optimization that avoids large slowdowns on some architectures.
