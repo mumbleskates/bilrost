@@ -763,13 +763,21 @@ impl Buf for ReverseBufferReader<'_> {
     }
 }
 
-pub trait BorrowBuf<'b>: Buf {
-    fn borrow_chunk(&self) -> &'b [u8];
+pub trait BorrowBuf<'a>: Buf {
+    fn borrow_chunk(&self) -> &'a [u8];
 }
 
-impl<'b> BorrowBuf<'b> for &'b [u8] {
-    fn borrow_chunk(&self) -> &'b [u8] {
+impl<'a> BorrowBuf<'a> for &'a [u8] {
+    fn borrow_chunk(&self) -> &'a [u8] {
         self
+    }
+}
+
+impl<'a, B> BorrowBuf<'a> for &'_ mut B
+where B: BorrowBuf<'a>
+{
+    fn borrow_chunk(&self) -> &'a [u8] {
+        (**self).borrow_chunk()
     }
 }
 
