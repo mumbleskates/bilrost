@@ -925,9 +925,10 @@ pub trait Encoder<E> {
     fn encoded_len(tag: u32, value: &Self, tm: &mut impl TagMeasurer) -> usize;
 }
 
+// The core trait for decoding bilrost data. Data must always be copied from the buffer.
 pub trait Decoder<E>: Encoder<E> {
-    /// Decodes a field with the given wire type; the field's key should have already been consumed
-    /// from the buffer.
+    /// Decodes a field's value with the given wire type; the field's key should have already been
+    /// consumed from the buffer.
     fn decode<B: Buf + ?Sized>(
         wire_type: WireType,
         duplicated: bool,
@@ -1473,8 +1474,8 @@ pub trait Wiretyped<E> {
     const WIRE_TYPE: WireType;
 }
 
-/// Trait for encoding implementations for raw values that always encode to a single value. Used as
-/// the basis for all the other plain, optional, and repeated encodings.
+/// The core trait for encoding implementations for raw values that always encode to a single value.
+/// This is the basis for all the other plain, optional, and repeated encodings.
 pub trait ValueEncoder<E>: Wiretyped<E> {
     /// Encodes the given value unconditionally. This is guaranteed to emit data to the buffer.
     fn encode_value<B: BufMut + ?Sized>(value: &Self, buf: &mut B);
@@ -1500,6 +1501,8 @@ pub trait ValueEncoder<E>: Wiretyped<E> {
     }
 }
 
+/// The core trait for decoding single values in expedient mode. Data is always copies when it is
+/// read from the buffer.
 pub trait ValueDecoder<E>: ValueEncoder<E> {
     /// Decodes a field assuming the encoder's wire type directly from the buffer.
     fn decode_value<B: Buf + ?Sized>(
@@ -1509,6 +1512,8 @@ pub trait ValueDecoder<E>: ValueEncoder<E> {
     ) -> Result<(), DecodeError>;
 }
 
+/// The core trait for decoding single values in distinguished mode. Data is always copies when it
+/// is read from the buffer.
 pub trait DistinguishedValueDecoder<E>: ValueEncoder<E>
 where
     Self: Eq,
@@ -1548,6 +1553,8 @@ pub trait FieldEncoder<E> {
     fn field_encoded_len(tag: u32, value: &Self, tm: &mut impl TagMeasurer) -> usize;
 }
 
+/// Affiliated helper trait for ValueDecoder that provides obligate implementations for handling
+/// field keys and wire types.
 pub trait FieldDecoder<E>: FieldEncoder<E> {
     /// Decodes a field directly from the buffer, also checking the wire type.
     fn decode_field<B: Buf + ?Sized>(
