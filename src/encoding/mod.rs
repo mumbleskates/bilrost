@@ -908,7 +908,7 @@ pub fn skip_field<B: Buf + ?Sized>(
     Ok(())
 }
 
-/// The core trait for encoding and decoding bilrost data.
+/// The core trait for encoding bilrost data.
 pub trait Encoder<E> {
     /// Encodes the a field with the given tag and value.
     fn encode<B: BufMut + ?Sized>(tag: u32, value: &Self, buf: &mut B, tw: &mut TagWriter);
@@ -923,7 +923,9 @@ pub trait Encoder<E> {
 
     /// Returns the encoded length of the field, including the key.
     fn encoded_len(tag: u32, value: &Self, tm: &mut impl TagMeasurer) -> usize;
+}
 
+pub trait Decoder<E>: Encoder<E> {
     /// Decodes a field with the given wire type; the field's key should have already been consumed
     /// from the buffer.
     fn decode<B: Buf + ?Sized>(
@@ -938,7 +940,7 @@ pub trait Encoder<E> {
 /// Extension trait for canonical encoding and decoding. Distinguished decoding is available via
 /// this trait, and any type that implements this trait is guaranteed to always emit canonical data
 /// via `Encoder`.
-pub trait DistinguishedEncoder<E>: Encoder<E> {
+pub trait DistinguishedDecoder<E>: Decoder<E> {
     /// Decodes a field for the value, returning a value indicating how canonical the encoding was.
     fn decode_distinguished<B: Buf + ?Sized>(
         wire_type: WireType,
@@ -1488,7 +1490,7 @@ pub trait ValueEncoder<E>: Wiretyped<E> {
     fn many_values_encoded_len<I>(values: I) -> usize
     where
         I: ExactSizeIterator,
-        I::Item: Deref<Target = Self>,
+        I::Item: Deref<Target=Self>,
     {
         let len = values.len();
         Self::WIRE_TYPE.fixed_size().map_or_else(
@@ -1496,7 +1498,9 @@ pub trait ValueEncoder<E>: Wiretyped<E> {
             |fixed_size| fixed_size * len, // Shortcut when values have a fixed size
         )
     }
+}
 
+pub trait ValueDecoder<E>: ValueEncoder<E> {
     /// Decodes a field assuming the encoder's wire type directly from the buffer.
     fn decode_value<B: Buf + ?Sized>(
         value: &mut Self,
@@ -1505,7 +1509,7 @@ pub trait ValueEncoder<E>: Wiretyped<E> {
     ) -> Result<(), DecodeError>;
 }
 
-pub trait DistinguishedValueEncoder<E>: Wiretyped<E>
+pub trait DistinguishedValueDecoder<E>: ValueEncoder<E>
 where
     Self: Eq,
 {
@@ -1531,6 +1535,7 @@ where
 pub trait FieldEncoder<E> {
     /// Encodes exactly one field with the given tag and value into the buffer.
     fn encode_field<B: BufMut + ?Sized>(tag: u32, value: &Self, buf: &mut B, tw: &mut TagWriter);
+
     /// Prepends exactly one field with the given tag and value into the buffer.
     fn prepend_field<B: ReverseBuf + ?Sized>(
         tag: u32,
@@ -1538,8 +1543,12 @@ pub trait FieldEncoder<E> {
         buf: &mut B,
         tw: &mut TagRevWriter,
     );
+
     /// Returns the encoded length of the field including its key.
     fn field_encoded_len(tag: u32, value: &Self, tm: &mut impl TagMeasurer) -> usize;
+}
+
+pub trait FieldDecoder<E>: FieldEncoder<E> {
     /// Decodes a field directly from the buffer, also checking the wire type.
     fn decode_field<B: Buf + ?Sized>(
         wire_type: WireType,
@@ -1574,6 +1583,7 @@ where
     fn field_encoded_len(tag: u32, value: &Self, tm: &mut impl TagMeasurer) -> usize {
         tm.key_len(tag) + Self::value_encoded_len(value)
     }
+}
 
     #[inline]
     fn decode_field<B: Buf + ?Sized>(
@@ -1589,7 +1599,7 @@ where
 
 /// Affiliated helper trait for DistinguishedValueEncoder that provides obligate implementations for
 /// handling field keys and wire types.
-pub trait DistinguishedFieldEncoder<E> {
+pub trait DistinguishedFieldDecoder<E> {
     /// Decodes a field directly from the buffer, also checking the wire type.
     fn decode_field_distinguished<const ALLOW_EMPTY: bool>(
         wire_type: WireType,
@@ -1599,9 +1609,9 @@ pub trait DistinguishedFieldEncoder<E> {
     ) -> Result<Canonicity, DecodeError>;
 }
 
-impl<T, E> DistinguishedFieldEncoder<E> for T
+impl<T, E> DistinguishedFieldDecoder<E> for T
 where
-    Self: DistinguishedValueEncoder<E> + EmptyState,
+    Self: DistinguishedValueDecoder<E> + EmptyState,
 {
     #[inline(always)]
     fn decode_field_distinguished<const ALLOW_EMPTY: bool>(
@@ -1651,6 +1661,9 @@ where
         }
     }
 
+impl<T, E> FieldDecoder<E> for T
+where Self: ValueDecoder<E>,
+{
     #[inline]
     fn encoded_len(tag: u32, value: &Self, tm: &mut impl TagMeasurer) -> usize {
         if let Some(value) = value {
@@ -1671,7 +1684,7 @@ where
         if duplicated {
             return Err(DecodeError::new(UnexpectedlyRepeated));
         }
-        <T as FieldEncoder<E>>::decode_field(
+        <T as FieldDecoder<E>>::decode_field(
             wire_type,
             value.get_or_insert_with(T::for_overwrite),
             buf,
@@ -1682,10 +1695,10 @@ where
 
 /// Distinguished decoding for Option<T> is only different in that it calls the distinguished
 /// decoding codepath.
-impl<T, E> DistinguishedEncoder<E> for Option<T>
+impl<T, E> DistinguishedDecoder<E> for Option<T>
 where
-    Self: Encoder<E>,
-    T: DistinguishedValueEncoder<E> + ForOverwrite + Eq,
+    Self: Decoder<E>,
+    T: DistinguishedValueDecoder<E> + ForOverwrite + Eq,
 {
     #[inline]
     fn decode_distinguished<B: Buf + ?Sized>(
@@ -1765,6 +1778,9 @@ where
 {
     const FIELD_TAGS: &'static [u32] = <T as Oneof>::FIELD_TAGS;
 
+impl<T, E> Decoder<E> for Option<T>
+where T: ForOverwrite + ValueDecoder<E>,
+{
     #[inline]
     fn oneof_encode<B: BufMut + ?Sized>(&self, buf: &mut B, tw: &mut TagWriter) {
         Oneof::oneof_encode(&**self, buf, tw)
@@ -1902,6 +1918,7 @@ where
             0
         }
     }
+}
 
     #[inline]
     fn oneof_current_tag(&self) -> Option<u32> {
@@ -3266,7 +3283,7 @@ mod test {
     ) {
         let mut out = T::for_overwrite();
         assert_eq!(
-            <T as DistinguishedEncoder<E>>::decode_distinguished(
+            <T as DistinguishedDecoder<E>>::decode_distinguished(
                 wire_type,
                 false,
                 &mut out,
