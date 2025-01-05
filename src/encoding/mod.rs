@@ -1757,6 +1757,7 @@ where
 ///
 /// Other than that: Both empty and non-empty oneofs can be `Box`ed, as there are also wrapper impls
 /// to cover that.
+// TODO(widders): split decoding trait
 pub trait Oneof: EmptyState {
     const FIELD_TAGS: &'static [u32];
 

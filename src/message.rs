@@ -895,6 +895,7 @@ where
 
 /// Trait to be implemented by messages, which have knowledge of their fields' tags and encoding.
 /// The methods of this trait are meant to only be used by the `Message` implementation.
+// TODO(widders): split decoding trait
 pub trait RawMessage: EmptyState {
     const __ASSERTIONS: ();
 
