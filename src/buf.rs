@@ -1,12 +1,12 @@
 use alloc::boxed::Box;
 use alloc::vec;
 use alloc::vec::Vec;
+use bytes::Buf;
 use core::cmp::{max, min};
 use core::iter;
 use core::marker::PhantomData;
 use core::mem::{self, transmute, MaybeUninit};
 use core::ptr;
-use bytes::Buf;
 
 // Flag for platform-specific optimization that avoids large slowdowns on some architectures.
 const ENABLE_SELF_COPY_OPTIMIZATION: bool = cfg!(any(

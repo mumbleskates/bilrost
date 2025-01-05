@@ -7,8 +7,8 @@ pub(crate) mod time_proxies {
     };
     use crate::encoding::value_traits::empty_state_via_default;
     use crate::encoding::{
-        Capped, DecodeContext, DistinguishedValueEncoder, Fixed, General, RestrictedDecodeContext,
-        ValueEncoder, WireType, Wiretyped,
+        Capped, DecodeContext, DistinguishedValueDecoder, Fixed, General, RestrictedDecodeContext,
+        ValueDecoder, ValueEncoder, WireType, Wiretyped,
     };
     use crate::DecodeErrorKind::InvalidValue;
     use crate::{Canonicity, DecodeError};
@@ -47,7 +47,9 @@ pub(crate) mod time_proxies {
                 2: Fixed => nanos: &value.nanos,
             })
         }
+    }
 
+    impl ValueDecoder<General> for TimeDeltaProxy {
         fn decode_value<B: Buf + ?Sized>(
             value: &mut Self,
             mut buf: Capped<B>,
@@ -65,7 +67,7 @@ pub(crate) mod time_proxies {
         }
     }
 
-    impl DistinguishedValueEncoder<General> for TimeDeltaProxy {
+    impl DistinguishedValueDecoder<General> for TimeDeltaProxy {
         const CHECKS_EMPTY: bool = true;
 
         fn decode_value_distinguished<const ALLOW_EMPTY: bool>(

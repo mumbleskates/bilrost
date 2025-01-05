@@ -1,8 +1,8 @@
 use crate::buf::ReverseBuf;
 use crate::encoding::{
     encode_varint, encoded_len_varint, encoder_where_value_encoder, prepend_varint, Buf, BufMut,
-    Canonicity, Capped, DecodeContext, DistinguishedValueEncoder, Encoder, RestrictedDecodeContext,
-    ValueEncoder, WireType, Wiretyped,
+    Canonicity, Capped, DecodeContext, DistinguishedValueDecoder, RestrictedDecodeContext,
+    ValueDecoder, ValueEncoder, WireType, Wiretyped,
 };
 use crate::DecodeError;
 use crate::DecodeErrorKind::OutOfDomainValue;
@@ -80,7 +80,9 @@ macro_rules! varint {
             fn value_encoded_len($to_uint64_value: &$ty) -> usize {
                 encoded_len_varint($to_uint64)
             }
+        }
 
+        impl ValueDecoder<Varint> for $ty {
             #[inline(always)]
             fn decode_value<B: Buf + ?Sized>(
                 __value: &mut $ty,
@@ -93,7 +95,7 @@ macro_rules! varint {
             }
         }
 
-        impl DistinguishedValueEncoder<Varint> for $ty {
+        impl DistinguishedValueDecoder<Varint> for $ty {
             const CHECKS_EMPTY: bool = false;
 
             #[inline]
@@ -102,7 +104,7 @@ macro_rules! varint {
                 buf: Capped<impl Buf + ?Sized>,
                 ctx: RestrictedDecodeContext,
             ) -> Result<Canonicity, DecodeError> {
-                ValueEncoder::<Varint>::decode_value(value, buf, ctx.into_expedient())?;
+                ValueDecoder::<Varint>::decode_value(value, buf, ctx.into_expedient())?;
                 Ok(Canonicity::Canonical)
             }
         }

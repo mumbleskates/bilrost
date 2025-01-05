@@ -1490,7 +1490,7 @@ pub trait ValueEncoder<E>: Wiretyped<E> {
     fn many_values_encoded_len<I>(values: I) -> usize
     where
         I: ExactSizeIterator,
-        I::Item: Deref<Target=Self>,
+        I::Item: Deref<Target = Self>,
     {
         let len = values.len();
         Self::WIRE_TYPE.fixed_size().map_or_else(
@@ -1585,6 +1585,10 @@ where
     }
 }
 
+impl<T, E> FieldDecoder<E> for T
+where
+    Self: ValueDecoder<E>,
+{
     #[inline]
     fn decode_field<B: Buf + ?Sized>(
         wire_type: WireType,
@@ -1597,7 +1601,7 @@ where
     }
 }
 
-/// Affiliated helper trait for DistinguishedValueEncoder that provides obligate implementations for
+/// Affiliated helper trait for DistinguishedValueDecoder that provides obligate implementations for
 /// handling field keys and wire types.
 pub trait DistinguishedFieldDecoder<E> {
     /// Decodes a field directly from the buffer, also checking the wire type.
@@ -1661,9 +1665,6 @@ where
         }
     }
 
-impl<T, E> FieldDecoder<E> for T
-where Self: ValueDecoder<E>,
-{
     #[inline]
     fn encoded_len(tag: u32, value: &Self, tm: &mut impl TagMeasurer) -> usize {
         if let Some(value) = value {
@@ -1672,7 +1673,12 @@ where Self: ValueDecoder<E>,
             0
         }
     }
+}
 
+impl<T, E> Decoder<E> for Option<T>
+where
+    T: ForOverwrite + ValueDecoder<E>,
+{
     #[inline]
     fn decode<B: Buf + ?Sized>(
         wire_type: WireType,
@@ -1778,9 +1784,6 @@ where
 {
     const FIELD_TAGS: &'static [u32] = <T as Oneof>::FIELD_TAGS;
 
-impl<T, E> Decoder<E> for Option<T>
-where T: ForOverwrite + ValueDecoder<E>,
-{
     #[inline]
     fn oneof_encode<B: BufMut + ?Sized>(&self, buf: &mut B, tw: &mut TagWriter) {
         Oneof::oneof_encode(&**self, buf, tw)
@@ -1918,7 +1921,6 @@ where
             0
         }
     }
-}
 
     #[inline]
     fn oneof_current_tag(&self) -> Option<u32> {
@@ -2129,7 +2131,13 @@ macro_rules! delegate_encoding {
             ) -> usize {
                 $crate::encoding::Encoder::<$to_ty>::encoded_len(tag, value, tm)
             }
+        }
 
+        impl$(<$($value_generics)*>)? $crate::encoding::Decoder<$from_ty> for $value_ty
+        where
+            Self: $crate::encoding::Decoder<$to_ty>,
+            $($($where_clause)*)?
+        {
             #[inline(always)]
             fn decode<B: $crate::bytes::Buf + ?Sized>(
                 wire_type: $crate::encoding::WireType,
@@ -2138,7 +2146,7 @@ macro_rules! delegate_encoding {
                 buf: $crate::encoding::Capped<B>,
                 ctx: $crate::encoding::DecodeContext,
             ) -> Result<(), $crate::DecodeError> {
-                $crate::encoding::Encoder::<$to_ty>::decode(
+                $crate::encoding::Decoder::<$to_ty>::decode(
                     wire_type,
                     duplicated,
                     value,
@@ -2160,10 +2168,10 @@ macro_rules! delegate_encoding {
             $(with generics ($($value_generics)*))?
         );
 
-        impl$(<$($value_generics)*>)? $crate::encoding::DistinguishedEncoder<$from_ty>
+        impl$(<$($value_generics)*>)? $crate::encoding::DistinguishedDecoder<$from_ty>
         for $value_ty
         where
-            Self: $crate::encoding::DistinguishedEncoder<$to_ty>
+            Self: $crate::encoding::DistinguishedDecoder<$to_ty>
                 + $crate::encoding::Encoder<$to_ty>,
             $($($where_clause)*)?
         {
@@ -2175,7 +2183,7 @@ macro_rules! delegate_encoding {
                 buf: $crate::encoding::Capped<B>,
                 ctx: $crate::encoding::RestrictedDecodeContext,
             ) -> Result<$crate::Canonicity, $crate::DecodeError> {
-                $crate::encoding::DistinguishedEncoder::<$to_ty>::decode_distinguished(
+                $crate::encoding::DistinguishedDecoder::<$to_ty>::decode_distinguished(
                     wire_type,
                     duplicated,
                     value,
@@ -2235,14 +2243,20 @@ macro_rules! delegate_value_encoding {
             {
                 $crate::encoding::ValueEncoder::<$to_ty>::many_values_encoded_len(values)
             }
+        }
 
+        impl$(<$($value_generics)*>)? $crate::encoding::ValueDecoder<$from_ty> for $value_ty
+        where
+            Self: $crate::encoding::ValueDecoder<$to_ty>,
+            $($($where_clause)+ ,)?
+        {
             #[inline(always)]
             fn decode_value<__B: $crate::bytes::Buf + ?Sized>(
                 value: &mut $value_ty,
                 buf: $crate::encoding::Capped<__B>,
                 ctx: $crate::encoding::DecodeContext,
             ) -> Result<(), $crate::DecodeError> {
-                $crate::encoding::ValueEncoder::<$to_ty>::decode_value(value, buf, ctx)
+                $crate::encoding::ValueDecoder::<$to_ty>::decode_value(value, buf, ctx)
             }
         }
     };
@@ -2259,15 +2273,15 @@ macro_rules! delegate_value_encoding {
             $(with generics ($($value_generics)*))?
         );
 
-        impl$(<$($value_generics)*>)? $crate::encoding::DistinguishedValueEncoder<$from_ty>
+        impl$(<$($value_generics)*>)? $crate::encoding::DistinguishedValueDecoder<$from_ty>
         for $value_ty
         where
-            Self: $crate::encoding::DistinguishedValueEncoder<$to_ty>,
+            Self: $crate::encoding::DistinguishedValueDecoder<$to_ty>,
             $($($expedient_where)+ ,)?
             $($($distinguished_where)+ ,)?
         {
             const CHECKS_EMPTY: bool =
-                <$value_ty as $crate::encoding::DistinguishedValueEncoder<$to_ty>>::CHECKS_EMPTY;
+                <$value_ty as $crate::encoding::DistinguishedValueDecoder<$to_ty>>::CHECKS_EMPTY;
 
             #[inline(always)]
             fn decode_value_distinguished<const ALLOW_EMPTY: bool>(
@@ -2275,7 +2289,7 @@ macro_rules! delegate_value_encoding {
                 buf: $crate::encoding::Capped<impl $crate::bytes::Buf + ?Sized>,
                 ctx: $crate::encoding::RestrictedDecodeContext,
             ) -> Result<$crate::Canonicity, $crate::DecodeError> {
-                $crate::encoding::DistinguishedValueEncoder::<$to_ty>::
+                $crate::encoding::DistinguishedValueDecoder::<$to_ty>::
                     decode_value_distinguished::<ALLOW_EMPTY>
                 (
                     value,
@@ -2298,9 +2312,9 @@ macro_rules! encoder_where_value_encoder {
         $(, with generics ($($generics:tt)*))?
     ) => {
         /// Encodes plain values only when they are non-default.
-        impl<T $(, $($generics)*)?> Encoder<$encoding> for T
+        impl<T $(, $($generics)*)?> $crate::encoding::Encoder<$encoding> for T
         where
-            T: $crate::encoding::EmptyState + ValueEncoder<$encoding>,
+            T: $crate::encoding::EmptyState + $crate::encoding::ValueEncoder<$encoding>,
             $($($where_clause)*)?
         {
             #[inline(always)]
@@ -2342,7 +2356,14 @@ macro_rules! encoder_where_value_encoder {
                     0
                 }
             }
+        }
 
+        /// Decodes plain values only when they are non-default.
+        impl<T $(, $($generics)*)?> $crate::encoding::Decoder<$encoding> for T
+        where
+            T: $crate::encoding::Encoder<$encoding> + $crate::encoding::ValueDecoder<$encoding>,
+            $($($where_clause)*)?
+        {
             #[inline(always)]
             fn decode<B: Buf + ?Sized>(
                 wire_type: WireType,
@@ -2356,19 +2377,19 @@ macro_rules! encoder_where_value_encoder {
                         $crate::DecodeError::new($crate::DecodeErrorKind::UnexpectedlyRepeated)
                     );
                 }
-                $crate::encoding::FieldEncoder::<$encoding>::decode_field(
+                $crate::encoding::FieldDecoder::<$encoding>::decode_field(
                     wire_type, value, buf, ctx)
             }
         }
 
         /// Distinguished encoding for plain values forbids encoding defaulted values. This includes
         /// directly-nested message types, which are not emitted when all their fields are default.
-        impl<T $(, $($generics)*)?> $crate::encoding::DistinguishedEncoder<$encoding> for T
+        impl<T $(, $($generics)*)?> $crate::encoding::DistinguishedDecoder<$encoding> for T
         where
             T: Eq
                 + $crate::encoding::EmptyState
-                + $crate::encoding::DistinguishedValueEncoder<$encoding>
-                + $crate::encoding::Encoder<$encoding>,
+                + $crate::encoding::DistinguishedValueDecoder<$encoding>
+                + $crate::encoding::Decoder<$encoding>,
             $($($where_clause)*)?
         {
             #[inline(always)]
@@ -2385,7 +2406,7 @@ macro_rules! encoder_where_value_encoder {
                     );
                 }
                 // decoding a bare value, empty values are unacceptable
-                $crate::encoding::DistinguishedFieldEncoder::<$encoding>
+                $crate::encoding::DistinguishedFieldDecoder::<$encoding>
                     ::decode_field_distinguished::<false>(
                         wire_type,
                         value,
@@ -2694,7 +2715,7 @@ mod test {
     check_type!(expedient, Encoder, DecodeContext::default(), decode);
     check_type!(
         distinguished,
-        DistinguishedEncoder,
+        DistinguishedDecoder,
         RestrictedDecodeContext::new(Canonicity::Canonical),
         decode_distinguished
     );
@@ -2782,7 +2803,7 @@ mod test {
 
     fn present_empty_not_canon<T, E>()
     where
-        T: EmptyState + Eq + DistinguishedEncoder<E> + ValueEncoder<E>,
+        T: EmptyState + Eq + DistinguishedDecoder<E> + ValueEncoder<E>,
     {
         let mut encoded = <Vec<u8>>::new();
         Encoder::<E>::encode(123, &Some(T::empty()), &mut encoded, &mut TagWriter::new());
@@ -2792,7 +2813,7 @@ mod test {
         assert_eq!(tag, 123);
         let mut decoded = T::for_overwrite();
         assert_eq!(
-            DistinguishedEncoder::<E>::decode_distinguished(
+            DistinguishedDecoder::<E>::decode_distinguished(
                 wire_type,
                 false,
                 &mut decoded,
@@ -2935,7 +2956,7 @@ mod test {
         buf.extend([1; 12]);
 
         let mut parsed = Vec::<u64>::new();
-        let res = ValueEncoder::<Packed<Fixed>>::decode_value(
+        let res = ValueDecoder::<Packed<Fixed>>::decode_value(
             &mut parsed,
             Capped::new(&mut buf.as_slice()),
             DecodeContext::default(),
@@ -2945,7 +2966,7 @@ mod test {
                 .kind(),
             Truncated
         );
-        let res = DistinguishedValueEncoder::<Packed<Fixed>>::decode_value_distinguished::<true>(
+        let res = DistinguishedValueDecoder::<Packed<Fixed>>::decode_value_distinguished::<true>(
             &mut parsed,
             Capped::new(&mut buf.as_slice()),
             RestrictedDecodeContext::new(Canonicity::NotCanonical),
@@ -2965,7 +2986,7 @@ mod test {
         buf.extend([1; 17]);
 
         let mut parsed = Vec::<u32>::new();
-        let res = ValueEncoder::<Packed<Fixed>>::decode_value(
+        let res = ValueDecoder::<Packed<Fixed>>::decode_value(
             &mut parsed,
             Capped::new(&mut buf.as_slice()),
             DecodeContext::default(),
@@ -2975,7 +2996,7 @@ mod test {
                 .kind(),
             Truncated
         );
-        let res = DistinguishedValueEncoder::<Packed<Fixed>>::decode_value_distinguished::<true>(
+        let res = DistinguishedValueDecoder::<Packed<Fixed>>::decode_value_distinguished::<true>(
             &mut parsed,
             Capped::new(&mut buf.as_slice()),
             RestrictedDecodeContext::new(Canonicity::NotCanonical),
@@ -2998,7 +3019,7 @@ mod test {
 
         // The entries for this map always consume 12 bytes each.
         let mut parsed = BTreeMap::<u32, u64>::new();
-        let res = ValueEncoder::<Map<Fixed, Fixed>>::decode_value(
+        let res = ValueDecoder::<Map<Fixed, Fixed>>::decode_value(
             &mut parsed,
             Capped::new(&mut buf.as_slice()),
             DecodeContext::default(),
@@ -3008,7 +3029,7 @@ mod test {
                 .kind(),
             Truncated
         );
-        let res = DistinguishedValueEncoder::<Map<Fixed, Fixed>>::decode_value_distinguished::<true>(
+        let res = DistinguishedValueDecoder::<Map<Fixed, Fixed>>::decode_value_distinguished::<true>(
             &mut parsed,
             Capped::new(&mut buf.as_slice()),
             RestrictedDecodeContext::new(Canonicity::NotCanonical),
@@ -3025,7 +3046,7 @@ mod test {
         let mut s = String::new();
         let buf = b"\x02\x80\x80";
 
-        let r = ValueEncoder::<General>::decode_value(
+        let r = ValueDecoder::<General>::decode_value(
             &mut s,
             Capped::new(&mut buf.as_slice()),
             DecodeContext::default(),
@@ -3267,7 +3288,7 @@ mod test {
     fn check_rejects_wrong_wire_type<T: ForOverwrite + Encoder<E>, E>(wire_type: WireType) {
         let mut out = T::for_overwrite();
         assert_eq!(
-            <T as Encoder<E>>::decode(
+            <T as Decoder<E>>::decode(
                 wire_type,
                 false,
                 &mut out,
@@ -3278,7 +3299,7 @@ mod test {
         );
     }
 
-    fn check_rejects_wrong_wire_type_distinguished<T: ForOverwrite + DistinguishedEncoder<E>, E>(
+    fn check_rejects_wrong_wire_type_distinguished<T: ForOverwrite + DistinguishedDecoder<E>, E>(
         wire_type: WireType,
     ) {
         let mut out = T::for_overwrite();
@@ -3349,7 +3370,7 @@ mod test {
             let mut buf = Vec::<u8>::new();
             ValueEncoder::<General>::encode_value(&value, &mut buf);
             let mut out = 0u64;
-            prop_assert!(ValueEncoder::<General>::decode_value(
+            prop_assert!(ValueDecoder::<General>::decode_value(
                 &mut out,
                 Capped::new(&mut &*buf),
                 DecodeContext::default(),
@@ -3362,7 +3383,7 @@ mod test {
             let mut buf = Vec::<u8>::new();
             ValueEncoder::<General>::encode_value(&value, &mut buf);
             let mut out = 0i64;
-            prop_assert!(ValueEncoder::<General>::decode_value(
+            prop_assert!(ValueDecoder::<General>::decode_value(
                 &mut out,
                 Capped::new(&mut &*buf),
                 DecodeContext::default(),
@@ -3376,7 +3397,7 @@ mod test {
             let mut buf = Vec::<u8>::new();
             ValueEncoder::<General>::encode_value(&value, &mut buf);
             let mut out = 0u32;
-            prop_assert!(ValueEncoder::<General>::decode_value(
+            prop_assert!(ValueDecoder::<General>::decode_value(
                 &mut out,
                 Capped::new(&mut &*buf),
                 DecodeContext::default(),
@@ -3390,7 +3411,7 @@ mod test {
             let mut buf = Vec::<u8>::new();
             ValueEncoder::<General>::encode_value(&value, &mut buf);
             let mut out = 0i32;
-            prop_assert!(ValueEncoder::<General>::decode_value(
+            prop_assert!(ValueDecoder::<General>::decode_value(
                 &mut out,
                 Capped::new(&mut &*buf),
                 DecodeContext::default(),
@@ -3404,7 +3425,7 @@ mod test {
             ValueEncoder::<General>::encode_value(&value, &mut buf);
             let mut out = 0u32;
             prop_assert_eq!(
-                ValueEncoder::<General>::decode_value(
+                ValueDecoder::<General>::decode_value(
                     &mut out,
                     Capped::new(&mut &*buf),
                     DecodeContext::default(),
@@ -3423,7 +3444,7 @@ mod test {
                 ValueEncoder::<General>::encode_value(&value, &mut buf);
                 let mut out = 0i32;
                 prop_assert_eq!(
-                    ValueEncoder::<General>::decode_value(
+                    ValueDecoder::<General>::decode_value(
                         &mut out,
                         Capped::new(&mut &*buf),
                         DecodeContext::default(),
@@ -3439,7 +3460,7 @@ mod test {
             ValueEncoder::<General>::encode_value(&value, &mut buf);
             let mut out = 0u16;
             prop_assert_eq!(
-                ValueEncoder::<General>::decode_value(
+                ValueDecoder::<General>::decode_value(
                     &mut out,
                     Capped::new(&mut &*buf),
                     DecodeContext::default(),
@@ -3458,7 +3479,7 @@ mod test {
                 ValueEncoder::<General>::encode_value(&value, &mut buf);
                 let mut out = 0i16;
                 prop_assert_eq!(
-                    ValueEncoder::<General>::decode_value(
+                    ValueDecoder::<General>::decode_value(
                         &mut out,
                         Capped::new(&mut &*buf),
                         DecodeContext::default(),
@@ -3474,7 +3495,7 @@ mod test {
             ValueEncoder::<Varint>::encode_value(&value, &mut buf);
             let mut out = 0u8;
             prop_assert_eq!(
-                ValueEncoder::<Varint>::decode_value(
+                ValueDecoder::<Varint>::decode_value(
                     &mut out,
                     Capped::new(&mut &*buf),
                     DecodeContext::default(),
@@ -3493,7 +3514,7 @@ mod test {
                 ValueEncoder::<Varint>::encode_value(&value, &mut buf);
                 let mut out = 0i8;
                 prop_assert_eq!(
-                    ValueEncoder::<Varint>::decode_value(
+                    ValueDecoder::<Varint>::decode_value(
                         &mut out,
                         Capped::new(&mut &*buf),
                         DecodeContext::default(),
@@ -3509,7 +3530,7 @@ mod test {
             encode_varint(varint, &mut buf);
             let mut out = false;
             prop_assert_eq!(
-                ValueEncoder::<General>::decode_value(
+                ValueDecoder::<General>::decode_value(
                     &mut out,
                     Capped::new(&mut &*buf),
                     DecodeContext::default(),

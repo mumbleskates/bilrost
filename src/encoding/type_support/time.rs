@@ -390,7 +390,7 @@ mod utcoffset {
     use super::helpers::with_random_values;
     use crate::encoding::test::{check_type_empty, distinguished, expedient};
     use crate::encoding::{
-        Capped, DecodeContext, DistinguishedValueEncoder, EmptyState, ForOverwrite, General,
+        Capped, DecodeContext, DistinguishedValueDecoder, EmptyState, ForOverwrite, General,
         RestrictedDecodeContext, ValueEncoder, WireType,
     };
     use crate::Canonicity::NotCanonical;
@@ -436,7 +436,7 @@ mod utcoffset {
                 Err(DecodeError::new(InvalidValue))
             );
             assert_eq!(
-                DistinguishedValueEncoder::<General>::decode_value_distinguished::<true>(
+                DistinguishedValueDecoder::<General>::decode_value_distinguished::<true>(
                     &mut utc_off,
                     Capped::new(&mut buf.as_slice()),
                     RestrictedDecodeContext::new(NotCanonical),

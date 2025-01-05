@@ -218,7 +218,7 @@ impl Field {
         if self.in_oneof {
             quote!(
                 // Allow empty values: oneof field values are nested
-                <#ty as ::bilrost::encoding::DistinguishedFieldEncoder<#encoder>>
+                <#ty as ::bilrost::encoding::DistinguishedFieldDecoder<#encoder>>
                     ::decode_field_distinguished::<true>(
                         wire_type,
                         #ident,
@@ -228,7 +228,7 @@ impl Field {
             )
         } else {
             quote!(
-                <#ty as ::bilrost::encoding::DistinguishedEncoder<#encoder>>::decode_distinguished(
+                <#ty as ::bilrost::encoding::DistinguishedDecoder<#encoder>>::decode_distinguished(
                     wire_type,
                     duplicated,
                     #ident,
@@ -289,12 +289,12 @@ impl Field {
         let encoder = &self.encoding;
         if self.in_oneof {
             vec![
-                quote!(#ty: ::bilrost::encoding::DistinguishedValueEncoder<#encoder>),
+                quote!(#ty: ::bilrost::encoding::DistinguishedValueDecoder<#encoder>),
                 quote!(#ty: ::bilrost::encoding::EmptyState),
             ]
         } else {
             vec![
-                quote!(#ty: ::bilrost::encoding::DistinguishedEncoder<#encoder>),
+                quote!(#ty: ::bilrost::encoding::DistinguishedDecoder<#encoder>),
                 quote!(#ty: ::bilrost::encoding::EmptyState),
             ]
         }

@@ -1179,7 +1179,7 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
         }
 
         impl #impl_generics
-        ::bilrost::encoding::DistinguishedValueEncoder<::bilrost::encoding::General>
+        ::bilrost::encoding::DistinguishedValueDecoder<::bilrost::encoding::General>
         for #ident #ty_generics #where_clause {
             const CHECKS_EMPTY: bool = false;
 

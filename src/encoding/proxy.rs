@@ -1,7 +1,7 @@
 use crate::buf::ReverseBuf;
 use crate::encoding::{
-    Capped, DecodeContext, DistinguishedValueEncoder, RestrictedDecodeContext, ValueEncoder,
-    WireType, Wiretyped,
+    Capped, DecodeContext, DistinguishedValueDecoder, RestrictedDecodeContext, ValueDecoder,
+    ValueEncoder, WireType, Wiretyped,
 };
 use crate::{Canonicity, DecodeError, DecodeErrorKind};
 use bytes::{Buf, BufMut};
@@ -81,7 +81,13 @@ where
             values.map(|item| WrapDeref(item.encode_proxy())),
         )
     }
+}
 
+impl<T, E> ValueDecoder<Proxied<E>> for T
+where
+    T: Proxiable,
+    T::Proxy: ValueDecoder<E>,
+{
     #[inline]
     fn decode_value<B: Buf + ?Sized>(
         value: &mut Self,
@@ -89,15 +95,15 @@ where
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         let mut proxy = T::new_proxy();
-        ValueEncoder::<E>::decode_value(&mut proxy, buf, ctx)?;
+        ValueDecoder::<E>::decode_value(&mut proxy, buf, ctx)?;
         Ok(value.decode_proxy(proxy)?)
     }
 }
 
-impl<T, E> DistinguishedValueEncoder<Proxied<E>> for T
+impl<T, E> DistinguishedValueDecoder<Proxied<E>> for T
 where
     T: DistinguishedProxiable + Eq,
-    T::Proxy: DistinguishedValueEncoder<E>,
+    T::Proxy: DistinguishedValueDecoder<E>,
 {
     const CHECKS_EMPTY: bool = T::Proxy::CHECKS_EMPTY;
 
@@ -107,7 +113,7 @@ where
         ctx: RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
         let mut proxy = T::new_proxy();
-        let mut canon = DistinguishedValueEncoder::<E>::decode_value_distinguished::<ALLOW_EMPTY>(
+        let mut canon = DistinguishedValueDecoder::<E>::decode_value_distinguished::<ALLOW_EMPTY>(
             &mut proxy, buf, ctx,
         )?;
         canon.update(value.decode_proxy_distinguished(proxy)?);

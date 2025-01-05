@@ -5,9 +5,9 @@ use crate::encoding::value_traits::{
     Collection, DistinguishedCollection, EmptyState, ForOverwrite,
 };
 use crate::encoding::{
-    check_wire_type, peek_repeated_field, Capped, DecodeContext, DistinguishedEncoder,
-    DistinguishedValueEncoder, Encoder, FieldEncoder, General, Packed, RestrictedDecodeContext,
-    TagMeasurer, TagRevWriter, TagWriter, ValueEncoder, WireType, Wiretyped,
+    check_wire_type, peek_repeated_field, Capped, DecodeContext, Decoder, DistinguishedDecoder,
+    DistinguishedValueDecoder, Encoder, FieldEncoder, General, Packed, RestrictedDecodeContext,
+    TagMeasurer, TagRevWriter, TagWriter, ValueDecoder, ValueEncoder, WireType, Wiretyped,
 };
 use crate::DecodeErrorKind::{InvalidValue, UnexpectedlyRepeated};
 use crate::{Canonicity, DecodeError};
@@ -25,13 +25,13 @@ pub(crate) fn decode<T, E>(
 ) -> Result<(), DecodeError>
 where
     T: Collection,
-    T::Item: ForOverwrite + ValueEncoder<E>,
+    T::Item: ForOverwrite + ValueDecoder<E>,
 {
     check_wire_type(<T::Item as Wiretyped<E>>::WIRE_TYPE, wire_type)?;
     loop {
         // Decode one item
         let mut new_item = T::Item::for_overwrite();
-        ValueEncoder::<E>::decode_value(&mut new_item, buf.lend(), ctx.clone())?;
+        ValueDecoder::<E>::decode_value(&mut new_item, buf.lend(), ctx.clone())?;
         collection.insert(new_item)?;
 
         if let Some(next_wire_type) = peek_repeated_field(&mut buf) {
@@ -53,14 +53,14 @@ fn decode_array_either_repr<T, const N: usize, E>(
     ctx: DecodeContext,
 ) -> Result<(), DecodeError>
 where
-    T: ValueEncoder<E>,
+    T: ValueDecoder<E>,
 {
     if wire_type == WireType::LengthDelimited
         && <T as Wiretyped<E>>::WIRE_TYPE != WireType::LengthDelimited
     {
         // We've encountered a length-delimited field when we aren't expecting one; try decoding
         // it in packed format instead.
-        ValueEncoder::<Packed<E>>::decode_value(arr, buf, ctx)
+        ValueDecoder::<Packed<E>>::decode_value(arr, buf, ctx)
     } else {
         // Otherwise, decode in unpacked mode.
         decode_array_unpacked_only(wire_type, arr, buf, ctx)
@@ -77,7 +77,7 @@ pub(crate) fn decode_array_unpacked_only<T, const N: usize, E>(
     ctx: DecodeContext,
 ) -> Result<(), DecodeError>
 where
-    T: ValueEncoder<E>,
+    T: ValueDecoder<E>,
 {
     check_wire_type(<T as Wiretyped<E>>::WIRE_TYPE, wire_type)?;
     for (i, dest) in arr.iter_mut().enumerate() {
@@ -92,7 +92,7 @@ where
             }
         }
         // Decode one item
-        ValueEncoder::<E>::decode_value(dest, buf.lend(), ctx.clone())?;
+        ValueDecoder::<E>::decode_value(dest, buf.lend(), ctx.clone())?;
     }
     if peek_repeated_field(&mut buf).is_some() {
         // Too many value fields
@@ -113,7 +113,7 @@ pub(crate) fn decode_distinguished<T, E>(
 ) -> Result<Canonicity, DecodeError>
 where
     T: DistinguishedCollection,
-    T::Item: ForOverwrite + Eq + DistinguishedValueEncoder<E>,
+    T::Item: ForOverwrite + Eq + DistinguishedValueDecoder<E>,
 {
     check_wire_type(<T::Item as Wiretyped<E>>::WIRE_TYPE, wire_type)?;
     let canon = &mut Canonicity::Canonical;
@@ -123,7 +123,7 @@ where
         // Decoded field values are nested within the collection; empty values are OK
         ctx.update(
             canon,
-            DistinguishedValueEncoder::<E>::decode_value_distinguished::<true>(
+            DistinguishedValueDecoder::<E>::decode_value_distinguished::<true>(
                 &mut new_item,
                 buf.lend(),
                 ctx.clone(),
@@ -150,7 +150,7 @@ fn decode_distinguished_array_either_repr<T, const N: usize, E>(
     ctx: RestrictedDecodeContext,
 ) -> Result<Canonicity, DecodeError>
 where
-    T: Eq + ValueEncoder<E> + DistinguishedValueEncoder<E>,
+    T: Eq + ValueDecoder<E> + DistinguishedValueDecoder<E>,
 {
     if wire_type == WireType::LengthDelimited
         && <T as Wiretyped<E>>::WIRE_TYPE != WireType::LengthDelimited
@@ -159,7 +159,7 @@ where
         // it in packed format instead.
         // The data is already known to be non-canonical; use expedient decoding
         _ = ctx.check(Canonicity::NotCanonical)?;
-        ValueEncoder::<Packed<E>>::decode_value(arr, buf, ctx.into_expedient())?;
+        ValueDecoder::<Packed<E>>::decode_value(arr, buf, ctx.into_expedient())?;
         Ok(Canonicity::NotCanonical)
     } else {
         // Otherwise, decode in unpacked mode.
@@ -177,7 +177,7 @@ fn decode_distinguished_array_unpacked_only<T, const N: usize, E>(
     ctx: RestrictedDecodeContext,
 ) -> Result<Canonicity, DecodeError>
 where
-    T: Eq + DistinguishedValueEncoder<E>,
+    T: Eq + DistinguishedValueDecoder<E>,
 {
     check_wire_type(<T as Wiretyped<E>>::WIRE_TYPE, wire_type)?;
     let canon = &mut Canonicity::Canonical;
@@ -195,7 +195,7 @@ where
         // Decode one item. Empty values are allowed
         ctx.update(
             canon,
-            DistinguishedValueEncoder::<E>::decode_value_distinguished::<true>(
+            DistinguishedValueDecoder::<E>::decode_value_distinguished::<true>(
                 dest,
                 buf.lend(),
                 ctx.clone(),
@@ -246,7 +246,13 @@ where
             0
         }
     }
+}
 
+impl<C, T, E> Decoder<Unpacked<E>> for C
+where
+    C: Collection<Item = T>,
+    T: ForOverwrite + ValueDecoder<E>,
+{
     #[inline]
     fn decode<B: Buf + ?Sized>(
         wire_type: WireType,
@@ -263,7 +269,7 @@ where
         {
             // We've encountered a length-delimited field when we aren't expecting one; try decoding
             // it in packed format instead.
-            ValueEncoder::<Packed<E>>::decode_value(value, buf, ctx)
+            ValueDecoder::<Packed<E>>::decode_value(value, buf, ctx)
         } else {
             // Otherwise, decode in unpacked mode.
             decode::<C, E>(wire_type, value, buf, ctx)
@@ -272,10 +278,10 @@ where
 }
 
 /// Distinguished encoding enforces only the repeated field representation is allowed.
-impl<C, T, E> DistinguishedEncoder<Unpacked<E>> for C
+impl<C, T, E> DistinguishedDecoder<Unpacked<E>> for C
 where
-    Self: DistinguishedCollection<Item = T> + ValueEncoder<Packed<E>> + Encoder<Unpacked<E>>,
-    T: ForOverwrite + Eq + DistinguishedValueEncoder<E>,
+    Self: DistinguishedCollection<Item = T> + ValueDecoder<Packed<E>> + Decoder<Unpacked<E>>,
+    T: ForOverwrite + Eq + DistinguishedValueDecoder<E>,
 {
     #[inline]
     fn decode_distinguished<B: Buf + ?Sized>(
@@ -295,7 +301,7 @@ where
             // it in packed format instead.
             // The data is already known to be non-canonical; use expedient decoding
             _ = ctx.check(Canonicity::NotCanonical)?;
-            <C as ValueEncoder<Packed<E>>>::decode_value(value, buf, ctx.into_expedient())?;
+            <C as ValueDecoder<Packed<E>>>::decode_value(value, buf, ctx.into_expedient())?;
             Ok(Canonicity::NotCanonical)
         } else {
             // Otherwise, decode in unpacked mode.
@@ -342,7 +348,12 @@ where
             0
         }
     }
+}
 
+impl<T, const N: usize, E> Decoder<Unpacked<E>> for [T; N]
+where
+    T: EmptyState + ValueDecoder<E>,
+{
     #[inline]
     fn decode<B: Buf + ?Sized>(
         wire_type: WireType,
@@ -359,9 +370,9 @@ where
 }
 
 /// Distinguished encoding considers only the repeated field representation to be canonical.
-impl<T, const N: usize, E> DistinguishedEncoder<Unpacked<E>> for [T; N]
+impl<T, const N: usize, E> DistinguishedDecoder<Unpacked<E>> for [T; N]
 where
-    T: Eq + EmptyState + DistinguishedValueEncoder<E> + ValueEncoder<E>,
+    T: Eq + EmptyState + DistinguishedValueDecoder<E> + ValueDecoder<E>,
 {
     #[inline]
     fn decode_distinguished<B: Buf + ?Sized>(
@@ -425,7 +436,12 @@ where
             0
         }
     }
+}
 
+impl<T, const N: usize, E> Decoder<Unpacked<E>> for Option<[T; N]>
+where
+    T: ForOverwrite + ValueDecoder<E>,
+{
     #[inline]
     fn decode<B: Buf + ?Sized>(
         wire_type: WireType,
@@ -448,9 +464,9 @@ where
 
 /// Distinguished encoding enforces only the repeated field representation is considered to be
 /// canonical.
-impl<T, const N: usize, E> DistinguishedEncoder<Unpacked<E>> for Option<[T; N]>
+impl<T, const N: usize, E> DistinguishedDecoder<Unpacked<E>> for Option<[T; N]>
 where
-    T: Eq + ForOverwrite + DistinguishedValueEncoder<E> + ValueEncoder<E>,
+    T: Eq + ForOverwrite + DistinguishedValueDecoder<E> + ValueDecoder<E>,
 {
     #[inline]
     fn decode_distinguished<B: Buf + ?Sized>(

@@ -4,8 +4,8 @@ use crate::buf::ReverseBuf;
 use crate::encoding::value_traits::{DistinguishedMapping, Mapping};
 use crate::encoding::{
     encode_varint, encoded_len_varint, encoder_where_value_encoder, prepend_varint, Canonicity,
-    Capped, DecodeContext, DecodeError, DistinguishedValueEncoder, Encoder, ForOverwrite,
-    RestrictedDecodeContext, ValueEncoder, WireType, Wiretyped,
+    Capped, DecodeContext, DecodeError, DistinguishedValueDecoder, ForOverwrite,
+    RestrictedDecodeContext, ValueDecoder, ValueEncoder, WireType, Wiretyped,
 };
 use crate::DecodeErrorKind::Truncated;
 
@@ -76,7 +76,14 @@ where
         let inner_len = map_encoded_length::<M, KE, VE>(value);
         encoded_len_varint(inner_len as u64) + inner_len
     }
+}
 
+impl<M, K, V, KE, VE> ValueDecoder<Map<KE, VE>> for M
+where
+    M: Mapping<Key = K, Value = V>,
+    K: ForOverwrite + ValueDecoder<KE>,
+    V: ForOverwrite + ValueDecoder<VE>,
+{
     fn decode_value<B: Buf + ?Sized>(
         value: &mut M,
         mut buf: Capped<B>,
@@ -97,19 +104,19 @@ where
         while capped.has_remaining()? {
             let mut new_key = K::for_overwrite();
             let mut new_val = V::for_overwrite();
-            ValueEncoder::<KE>::decode_value(&mut new_key, capped.lend(), ctx.clone())?;
-            ValueEncoder::<VE>::decode_value(&mut new_val, capped.lend(), ctx.clone())?;
+            ValueDecoder::<KE>::decode_value(&mut new_key, capped.lend(), ctx.clone())?;
+            ValueDecoder::<VE>::decode_value(&mut new_val, capped.lend(), ctx.clone())?;
             value.insert(new_key, new_val)?;
         }
         Ok(())
     }
 }
 
-impl<M, K, V, KE, VE> DistinguishedValueEncoder<Map<KE, VE>> for M
+impl<M, K, V, KE, VE> DistinguishedValueDecoder<Map<KE, VE>> for M
 where
     M: DistinguishedMapping<Key = K, Value = V> + Eq,
-    K: ForOverwrite + Eq + DistinguishedValueEncoder<KE>,
-    V: ForOverwrite + Eq + DistinguishedValueEncoder<VE>,
+    K: ForOverwrite + Eq + DistinguishedValueDecoder<KE>,
+    V: ForOverwrite + Eq + DistinguishedValueDecoder<VE>,
 {
     const CHECKS_EMPTY: bool = false;
 
@@ -136,7 +143,7 @@ where
             let mut new_val = V::for_overwrite();
             ctx.update(
                 canon,
-                DistinguishedValueEncoder::<KE>::decode_value_distinguished::<true>(
+                DistinguishedValueDecoder::<KE>::decode_value_distinguished::<true>(
                     &mut new_key,
                     capped.lend(),
                     ctx.clone(),
@@ -144,7 +151,7 @@ where
             )?;
             ctx.update(
                 canon,
-                DistinguishedValueEncoder::<VE>::decode_value_distinguished::<true>(
+                DistinguishedValueDecoder::<VE>::decode_value_distinguished::<true>(
                     &mut new_val,
                     capped.lend(),
                     ctx.clone(),

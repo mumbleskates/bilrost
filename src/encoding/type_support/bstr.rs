@@ -1,8 +1,8 @@
 use crate::buf::ReverseBuf;
 use crate::encoding::value_traits::for_overwrite_via_default;
 use crate::encoding::{
-    Capped, DecodeContext, DistinguishedValueEncoder, EmptyState, General, PlainBytes,
-    RestrictedDecodeContext, ValueEncoder, WireType, Wiretyped,
+    Capped, DecodeContext, DistinguishedValueDecoder, EmptyState, General, PlainBytes,
+    RestrictedDecodeContext, ValueDecoder, ValueEncoder, WireType, Wiretyped,
 };
 use crate::{Canonicity, DecodeError};
 use alloc::vec::Vec;
@@ -41,19 +41,21 @@ impl ValueEncoder<General> for bstr::BString {
     fn value_encoded_len(value: &bstr::BString) -> usize {
         ValueEncoder::<PlainBytes>::value_encoded_len(&**value)
     }
+}
 
+impl ValueDecoder<General> for bstr::BString {
     #[inline(always)]
     fn decode_value<B: Buf + ?Sized>(
         value: &mut bstr::BString,
         buf: Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
-        ValueEncoder::<PlainBytes>::decode_value(&mut **value, buf, ctx)
+        ValueDecoder::<PlainBytes>::decode_value(&mut **value, buf, ctx)
     }
 }
 
-impl DistinguishedValueEncoder<General> for bstr::BString {
-    const CHECKS_EMPTY: bool = <Vec<u8> as DistinguishedValueEncoder<PlainBytes>>::CHECKS_EMPTY;
+impl DistinguishedValueDecoder<General> for bstr::BString {
+    const CHECKS_EMPTY: bool = <Vec<u8> as DistinguishedValueDecoder<PlainBytes>>::CHECKS_EMPTY;
 
     #[inline(always)]
     fn decode_value_distinguished<const ALLOW_EMPTY: bool>(
@@ -61,7 +63,7 @@ impl DistinguishedValueEncoder<General> for bstr::BString {
         buf: Capped<impl Buf + ?Sized>,
         ctx: RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
-        DistinguishedValueEncoder::<PlainBytes>::decode_value_distinguished::<ALLOW_EMPTY>(
+        DistinguishedValueDecoder::<PlainBytes>::decode_value_distinguished::<ALLOW_EMPTY>(
             &mut **value,
             buf,
             ctx,

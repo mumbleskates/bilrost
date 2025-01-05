@@ -11,8 +11,8 @@ use crate::buf::ReverseBuf;
 use crate::encoding::{
     delegate_encoding, delegate_value_encoding, encode_varint, encoded_len_varint,
     encoder_where_value_encoder, prepend_varint, Canonicity, Capped, DecodeContext, DecodeError,
-    DistinguishedProxiable, DistinguishedValueEncoder, Encoder, Fixed, Map, Packed, PlainBytes,
-    Proxiable, Proxied, RestrictedDecodeContext, Unpacked, ValueEncoder, Varint, WireType,
+    DistinguishedProxiable, DistinguishedValueDecoder, Fixed, Map, Packed, PlainBytes, Proxiable,
+    Proxied, RestrictedDecodeContext, Unpacked, ValueDecoder, ValueEncoder, Varint, WireType,
     Wiretyped,
 };
 use crate::message::{merge, merge_distinguished, RawDistinguishedMessage, RawMessage};
@@ -84,7 +84,9 @@ impl ValueEncoder<General> for String {
     fn value_encoded_len(value: &String) -> usize {
         encoded_len_varint(value.len() as u64) + value.len()
     }
+}
 
+impl ValueDecoder<General> for String {
     #[inline]
     fn decode_value<B: Buf + ?Sized>(
         value: &mut String,
@@ -131,7 +133,7 @@ impl ValueEncoder<General> for String {
     }
 }
 
-impl DistinguishedValueEncoder<General> for String {
+impl DistinguishedValueDecoder<General> for String {
     const CHECKS_EMPTY: bool = false;
 
     #[inline]
@@ -174,19 +176,21 @@ impl ValueEncoder<General> for Cow<'_, str> {
     fn value_encoded_len(value: &Cow<str>) -> usize {
         encoded_len_varint(value.len() as u64) + value.len()
     }
+}
 
+impl ValueDecoder<General> for Cow<'_, str> {
     #[inline]
     fn decode_value<B: Buf + ?Sized>(
         value: &mut Cow<str>,
         buf: Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
-        ValueEncoder::<General>::decode_value(value.to_mut(), buf, ctx)
+        ValueDecoder::<General>::decode_value(value.to_mut(), buf, ctx)
     }
 }
 
-impl DistinguishedValueEncoder<General> for Cow<'_, str> {
-    const CHECKS_EMPTY: bool = <String as DistinguishedValueEncoder<General>>::CHECKS_EMPTY;
+impl DistinguishedValueDecoder<General> for Cow<'_, str> {
+    const CHECKS_EMPTY: bool = <String as DistinguishedValueDecoder<General>>::CHECKS_EMPTY;
 
     #[inline]
     fn decode_value_distinguished<const ALLOW_EMPTY: bool>(
@@ -194,7 +198,7 @@ impl DistinguishedValueEncoder<General> for Cow<'_, str> {
         buf: Capped<impl Buf + ?Sized>,
         ctx: RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
-        DistinguishedValueEncoder::<General>::decode_value_distinguished::<ALLOW_EMPTY>(
+        DistinguishedValueDecoder::<General>::decode_value_distinguished::<ALLOW_EMPTY>(
             value.to_mut(),
             buf,
             ctx,
@@ -231,7 +235,9 @@ impl ValueEncoder<General> for Bytes {
     fn value_encoded_len(value: &Bytes) -> usize {
         encoded_len_varint(value.len() as u64) + value.len()
     }
+}
 
+impl ValueDecoder<General> for Bytes {
     #[inline]
     fn decode_value<B: Buf + ?Sized>(
         value: &mut Bytes,
@@ -245,7 +251,7 @@ impl ValueEncoder<General> for Bytes {
     }
 }
 
-impl DistinguishedValueEncoder<General> for Bytes {
+impl DistinguishedValueDecoder<General> for Bytes {
     const CHECKS_EMPTY: bool = false;
 
     #[inline]
@@ -287,19 +293,21 @@ impl ValueEncoder<General> for Blob {
     fn value_encoded_len(value: &Blob) -> usize {
         ValueEncoder::<PlainBytes>::value_encoded_len(&**value)
     }
+}
 
+impl ValueDecoder<General> for Blob {
     #[inline]
     fn decode_value<B: Buf + ?Sized>(
         value: &mut Blob,
         buf: Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
-        ValueEncoder::<PlainBytes>::decode_value(&mut **value, buf, ctx)
+        ValueDecoder::<PlainBytes>::decode_value(&mut **value, buf, ctx)
     }
 }
 
-impl DistinguishedValueEncoder<General> for Blob {
-    const CHECKS_EMPTY: bool = <Vec<u8> as DistinguishedValueEncoder<PlainBytes>>::CHECKS_EMPTY;
+impl DistinguishedValueDecoder<General> for Blob {
+    const CHECKS_EMPTY: bool = <Vec<u8> as DistinguishedValueDecoder<PlainBytes>>::CHECKS_EMPTY;
 
     #[inline]
     fn decode_value_distinguished<const ALLOW_EMPTY: bool>(
@@ -307,7 +315,7 @@ impl DistinguishedValueEncoder<General> for Blob {
         buf: Capped<impl Buf + ?Sized>,
         ctx: RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
-        DistinguishedValueEncoder::<PlainBytes>::decode_value_distinguished::<ALLOW_EMPTY>(
+        DistinguishedValueDecoder::<PlainBytes>::decode_value_distinguished::<ALLOW_EMPTY>(
             &mut **value,
             buf,
             ctx,
@@ -409,7 +417,12 @@ where
         let inner_len = value.raw_encoded_len();
         encoded_len_varint(inner_len as u64) + inner_len
     }
+}
 
+impl<T> ValueDecoder<General> for T
+where
+    T: RawMessage,
+{
     #[inline]
     fn decode_value<B: Buf + ?Sized>(
         value: &mut T,
@@ -421,7 +434,7 @@ where
     }
 }
 
-impl<T> DistinguishedValueEncoder<General> for T
+impl<T> DistinguishedValueDecoder<General> for T
 where
     T: RawDistinguishedMessage + Eq,
 {

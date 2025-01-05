@@ -20,9 +20,9 @@ use bytes::{Buf, BufMut};
 use crate::buf::ReverseBuf;
 use crate::encoding::{
     delegate_value_encoding, encode_varint, encoded_len_varint, encoder_where_value_encoder,
-    prepend_varint, skip_field, Canonicity, Capped, DecodeContext, DistinguishedEncoder,
-    DistinguishedValueEncoder, EmptyState, Encoder, General, RestrictedDecodeContext, TagReader,
-    TagRevWriter, TagWriter, TrivialTagMeasurer, ValueEncoder, WireType, Wiretyped,
+    prepend_varint, skip_field, Canonicity, Capped, DecodeContext, Decoder, DistinguishedDecoder,
+    DistinguishedValueDecoder, EmptyState, Encoder, General, RestrictedDecodeContext, TagReader,
+    TagRevWriter, TagWriter, TrivialTagMeasurer, ValueDecoder, ValueEncoder, WireType, Wiretyped,
 };
 use crate::DecodeError;
 
@@ -84,7 +84,12 @@ macro_rules! impl_tuple {
                 let message_len = 0usize $(+ $letters::encoded_len($numbers, &value.$numbers, tm))*;
                 encoded_len_varint(message_len as u64) + message_len
             }
+        }
 
+        impl<$($letters,)* $($encodings,)*> ValueDecoder<($($encodings,)*)> for ($($letters,)*)
+        where
+            $($letters: EmptyState + Decoder<$encodings>,)*
+        {
             #[inline]
             fn decode_value<__B: Buf + ?Sized>(
                 value: &mut Self,
@@ -121,11 +126,11 @@ macro_rules! impl_tuple {
             }
         }
 
-        impl<$($letters,)* $($encodings,)*> DistinguishedValueEncoder<($($encodings,)*)>
+        impl<$($letters,)* $($encodings,)*> DistinguishedValueDecoder<($($encodings,)*)>
         for ($($letters,)*)
         where
             Self: Eq,
-            $($letters: Eq + EmptyState + DistinguishedEncoder<$encodings>,)*
+            $($letters: Eq + EmptyState + DistinguishedDecoder<$encodings>,)*
         {
             const CHECKS_EMPTY: bool = true; // Message types are always zero-length when empty
 

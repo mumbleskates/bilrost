@@ -5,7 +5,8 @@ use bytes::{Buf, BufMut};
 use crate::buf::ReverseBuf;
 use crate::encoding::{
     delegate_encoding, encoder_where_value_encoder, Canonicity, Capped, DecodeContext,
-    DistinguishedValueEncoder, Encoder, RestrictedDecodeContext, ValueEncoder, WireType, Wiretyped,
+    DistinguishedValueDecoder, RestrictedDecodeContext, ValueDecoder, ValueEncoder, WireType,
+    Wiretyped,
 };
 use crate::DecodeError;
 use crate::DecodeErrorKind::Truncated;
@@ -45,7 +46,9 @@ macro_rules! fixed_width_common {
             fn value_encoded_len(_value: &$ty) -> usize {
                 WireType::$wire_type.fixed_size().unwrap()
             }
+        }
 
+        impl ValueDecoder<Fixed> for $ty {
             #[inline(always)]
             fn decode_value<B: Buf + ?Sized>(
                 value: &mut $ty,
@@ -73,7 +76,7 @@ macro_rules! fixed_width_int {
     ) => {
         fixed_width_common!($ty, $wire_type, $put, $prepend, $get);
 
-        impl DistinguishedValueEncoder<Fixed> for $ty {
+        impl DistinguishedValueDecoder<Fixed> for $ty {
             const CHECKS_EMPTY: bool = false;
 
             #[inline(always)]
@@ -82,7 +85,7 @@ macro_rules! fixed_width_int {
                 buf: Capped<impl Buf + ?Sized>,
                 ctx: RestrictedDecodeContext,
             ) -> Result<Canonicity, DecodeError> {
-                ValueEncoder::<Fixed>::decode_value(value, buf, ctx.into_expedient())?;
+                ValueDecoder::<Fixed>::decode_value(value, buf, ctx.into_expedient())?;
                 Ok(Canonicity::Canonical)
             }
         }
@@ -152,7 +155,9 @@ macro_rules! fixed_width_array {
             fn value_encoded_len(_value: &[u8; $N]) -> usize {
                 $N
             }
+        }
 
+        impl ValueDecoder<Fixed> for [u8; $N] {
             #[inline(always)]
             fn decode_value<B: Buf + ?Sized>(
                 value: &mut [u8; $N],
@@ -167,7 +172,7 @@ macro_rules! fixed_width_array {
             }
         }
 
-        impl DistinguishedValueEncoder<Fixed> for [u8; $N] {
+        impl DistinguishedValueDecoder<Fixed> for [u8; $N] {
             const CHECKS_EMPTY: bool = false;
 
             #[inline(always)]
@@ -176,7 +181,7 @@ macro_rules! fixed_width_array {
                 buf: Capped<impl Buf + ?Sized>,
                 ctx: RestrictedDecodeContext,
             ) -> Result<Canonicity, DecodeError> {
-                ValueEncoder::<Fixed>::decode_value(value, buf, ctx.into_expedient())?;
+                ValueDecoder::<Fixed>::decode_value(value, buf, ctx.into_expedient())?;
                 Ok(Canonicity::Canonical)
             }
         }

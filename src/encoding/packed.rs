@@ -6,9 +6,9 @@ use crate::encoding::value_traits::{
 };
 use crate::encoding::{
     encode_varint, encoded_len_varint, prepend_varint, unpacked, Canonicity, Capped, DecodeContext,
-    DecodeError, DistinguishedEncoder, DistinguishedValueEncoder, Encoder, FieldEncoder, General,
-    RestrictedDecodeContext, TagMeasurer, TagRevWriter, TagWriter, ValueEncoder, WireType,
-    Wiretyped,
+    DecodeError, Decoder, DistinguishedDecoder, DistinguishedValueDecoder, Encoder, FieldEncoder,
+    General, RestrictedDecodeContext, TagMeasurer, TagRevWriter, TagWriter, ValueDecoder,
+    ValueEncoder, WireType, Wiretyped,
 };
 use crate::DecodeErrorKind::{InvalidValue, Truncated, UnexpectedlyRepeated};
 
@@ -51,7 +51,13 @@ where
             .checked_add(inner_len)
             .unwrap()
     }
+}
 
+impl<C, T, E> ValueDecoder<Packed<E>> for C
+where
+    C: Collection<Item = T>,
+    T: ForOverwrite + ValueDecoder<E>,
+{
     #[inline]
     fn decode_value<B: Buf + ?Sized>(
         value: &mut C,
@@ -69,17 +75,17 @@ where
         }
         while capped.has_remaining()? {
             let mut new_val = T::for_overwrite();
-            ValueEncoder::<E>::decode_value(&mut new_val, capped.lend(), ctx.clone())?;
+            ValueDecoder::<E>::decode_value(&mut new_val, capped.lend(), ctx.clone())?;
             value.insert(new_val)?;
         }
         Ok(())
     }
 }
 
-impl<C, T, E> DistinguishedValueEncoder<Packed<E>> for C
+impl<C, T, E> DistinguishedValueDecoder<Packed<E>> for C
 where
     C: DistinguishedCollection<Item = T> + Eq,
-    T: ForOverwrite + Eq + DistinguishedValueEncoder<E>,
+    T: ForOverwrite + Eq + DistinguishedValueDecoder<E>,
 {
     const CHECKS_EMPTY: bool = false;
 
@@ -103,7 +109,7 @@ where
             let mut new_val = T::for_overwrite();
             ctx.update(
                 canon,
-                DistinguishedValueEncoder::<E>::decode_value_distinguished::<true>(
+                DistinguishedValueDecoder::<E>::decode_value_distinguished::<true>(
                     &mut new_val,
                     capped.lend(),
                     ctx.clone(),
@@ -148,7 +154,13 @@ where
             0
         }
     }
+}
 
+impl<C, T, E> Decoder<Packed<E>> for C
+where
+    C: Collection<Item = T> + ValueDecoder<Packed<E>>,
+    T: ForOverwrite + ValueDecoder<E>,
+{
     #[inline]
     fn decode<B: Buf + ?Sized>(
         wire_type: WireType,
@@ -170,10 +182,10 @@ where
     }
 }
 
-impl<C, T, E> DistinguishedEncoder<Packed<E>> for C
+impl<C, T, E> DistinguishedDecoder<Packed<E>> for C
 where
-    C: DistinguishedCollection<Item = T> + DistinguishedValueEncoder<Packed<E>>,
-    T: ForOverwrite + Eq + ValueEncoder<E>,
+    C: DistinguishedCollection<Item = T> + DistinguishedValueDecoder<Packed<E>>,
+    T: ForOverwrite + Eq + ValueDecoder<E>,
 {
     #[inline]
     fn decode_distinguished<B: Buf + ?Sized>(
@@ -189,7 +201,7 @@ where
         if wire_type == WireType::LengthDelimited {
             // We've encountered the expected length-delimited type: decode it in packed format.
             // Set ALLOW_EMPTY to false: empty collections are not canonical
-            let canon = DistinguishedValueEncoder::<Packed<E>>::decode_value_distinguished::<false>(
+            let canon = DistinguishedValueDecoder::<Packed<E>>::decode_value_distinguished::<false>(
                 value,
                 buf,
                 ctx.clone(),
@@ -239,7 +251,12 @@ where
             .checked_add(inner_len)
             .unwrap()
     }
+}
 
+impl<T, const N: usize, E> ValueDecoder<Packed<E>> for [T; N]
+where
+    T: ValueDecoder<E>,
+{
     #[inline]
     fn decode_value<B: Buf + ?Sized>(
         value: &mut [T; N],
@@ -262,7 +279,7 @@ where
                 // Not enough values
                 return Err(DecodeError::new(InvalidValue));
             }
-            ValueEncoder::<E>::decode_value(dest, capped.lend(), ctx.clone())?;
+            ValueDecoder::<E>::decode_value(dest, capped.lend(), ctx.clone())?;
         }
 
         // If the value's size was already checked, we don't need to check again
@@ -275,9 +292,9 @@ where
     }
 }
 
-impl<T, const N: usize, E> DistinguishedValueEncoder<Packed<E>> for [T; N]
+impl<T, const N: usize, E> DistinguishedValueDecoder<Packed<E>> for [T; N]
 where
-    T: DistinguishedValueEncoder<E>,
+    T: DistinguishedValueDecoder<E>,
 {
     const CHECKS_EMPTY: bool = false;
 
@@ -307,7 +324,7 @@ where
             ctx.update(
                 canon,
                 // Empty values are allowed because they are nested
-                DistinguishedValueEncoder::<E>::decode_value_distinguished::<true>(
+                DistinguishedValueDecoder::<E>::decode_value_distinguished::<true>(
                     dest,
                     capped.lend(),
                     ctx.clone(),
@@ -356,7 +373,12 @@ where
             0
         }
     }
+}
 
+impl<T, const N: usize, E> Decoder<Packed<E>> for [T; N]
+where
+    T: EmptyState + ValueDecoder<E>,
+{
     #[inline]
     fn decode<B: Buf + ?Sized>(
         wire_type: WireType,
@@ -378,9 +400,9 @@ where
     }
 }
 
-impl<T, const N: usize, E> DistinguishedEncoder<Packed<E>> for [T; N]
+impl<T, const N: usize, E> DistinguishedDecoder<Packed<E>> for [T; N]
 where
-    T: Eq + EmptyState + DistinguishedValueEncoder<E> + ValueEncoder<E>,
+    T: Eq + EmptyState + DistinguishedValueDecoder<E> + ValueDecoder<E>,
 {
     #[inline]
     fn decode_distinguished<B: Buf + ?Sized>(
@@ -396,7 +418,7 @@ where
         if wire_type == WireType::LengthDelimited {
             // We've encountered the expected length-delimited type: decode it in packed format.
             // Set ALLOW_EMPTY to false: empty collections are not canonical
-            let canon = DistinguishedValueEncoder::<Packed<E>>::decode_value_distinguished::<false>(
+            let canon = DistinguishedValueDecoder::<Packed<E>>::decode_value_distinguished::<false>(
                 value,
                 buf,
                 ctx.clone(),

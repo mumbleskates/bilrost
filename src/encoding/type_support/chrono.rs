@@ -447,7 +447,7 @@ delegate_value_encoding!(delegate from (General) to (Proxied<(Varint, Varint, Va
 #[cfg(test)]
 mod utc {
     use crate::encoding::{
-        Capped, DecodeContext, DistinguishedValueEncoder, ForOverwrite, General,
+        Capped, DecodeContext, DistinguishedValueDecoder, ForOverwrite, General,
         RestrictedDecodeContext, ValueEncoder,
     };
     use crate::Canonicity::{Canonical, NotCanonical};
@@ -472,7 +472,7 @@ mod utc {
                 Ok(())
             );
             assert_eq!(
-                DistinguishedValueEncoder::<General>::decode_value_distinguished::<true>(
+                DistinguishedValueDecoder::<General>::decode_value_distinguished::<true>(
                     &mut utc,
                     Capped::new(&mut buf.as_slice()),
                     RestrictedDecodeContext::new(NotCanonical),
@@ -495,7 +495,7 @@ mod utc {
                 Err(DecodeError::new(OutOfDomainValue))
             );
             assert_eq!(
-                DistinguishedValueEncoder::<General>::decode_value_distinguished::<true>(
+                DistinguishedValueDecoder::<General>::decode_value_distinguished::<true>(
                     &mut utc,
                     Capped::new(&mut buf.as_slice()),
                     RestrictedDecodeContext::new(NotCanonical),
@@ -585,7 +585,7 @@ mod fixedoffset {
     use crate::encoding::test::{check_type_empty, check_type_test, distinguished, expedient};
     use crate::encoding::value_traits::ForOverwrite;
     use crate::encoding::{
-        Capped, DecodeContext, DistinguishedValueEncoder, EmptyState, General,
+        Capped, DecodeContext, DistinguishedValueDecoder, EmptyState, General,
         RestrictedDecodeContext, ValueEncoder, WireType,
     };
     use crate::Canonicity::NotCanonical;
@@ -657,7 +657,7 @@ mod fixedoffset {
                 Err(DecodeError::new(OutOfDomainValue))
             );
             assert_eq!(
-                DistinguishedValueEncoder::<General>::decode_value_distinguished::<true>(
+                DistinguishedValueDecoder::<General>::decode_value_distinguished::<true>(
                     &mut fixed,
                     Capped::new(&mut buf.as_slice()),
                     RestrictedDecodeContext::new(NotCanonical),
@@ -683,7 +683,7 @@ mod fixedoffset {
                 Err(DecodeError::new(InvalidValue))
             );
             assert_eq!(
-                DistinguishedValueEncoder::<General>::decode_value_distinguished::<true>(
+                DistinguishedValueDecoder::<General>::decode_value_distinguished::<true>(
                     &mut fixed,
                     Capped::new(&mut buf.as_slice()),
                     RestrictedDecodeContext::new(NotCanonical),

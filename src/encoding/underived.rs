@@ -79,7 +79,7 @@ macro_rules! underived_decode {
         $ctx:ident
     ) => {
         {
-            use crate::encoding::{skip_field, Encoder, TagReader};
+            use crate::encoding::{skip_field, Decoder, TagReader};
             let mut buf = $buf.take_length_delimited()?;
             let ctx = $ctx;
             ctx.limit_reached()?;
@@ -92,7 +92,7 @@ macro_rules! underived_decode {
                 last_tag = Some(tag);
                 match tag {
                     $($tag => {
-                        Encoder::<$encoder>::decode(
+                        Decoder::<$encoder>::decode(
                             wire_type,
                             duplicated,
                             $target,
@@ -124,7 +124,7 @@ macro_rules! underived_decode_distinguished {
         $ctx:ident
     ) => {
         {
-            use crate::encoding::{skip_field, Canonicity, DistinguishedEncoder, TagReader};
+            use crate::encoding::{skip_field, Canonicity, DistinguishedDecoder, TagReader};
             let mut buf = $buf.take_length_delimited()?;
             let ctx = $ctx;
             if !ALLOW_EMPTY && buf.remaining_before_cap() == 0 {
@@ -143,7 +143,7 @@ macro_rules! underived_decode_distinguished {
                         $($tag => {
                             ctx.update(
                                 canon,
-                                DistinguishedEncoder::<$encoder>::decode_distinguished(
+                                DistinguishedDecoder::<$encoder>::decode_distinguished(
                                     wire_type,
                                     duplicated,
                                     $target,

@@ -1304,8 +1304,8 @@ fn truncated_fixed() {
         T: Debug
             + Eq
             + EmptyState
-            + encoding::DistinguishedEncoder<Fixed>
-            + encoding::DistinguishedValueEncoder<Fixed>
+            + encoding::DistinguishedDecoder<Fixed>
+            + encoding::DistinguishedValueDecoder<Fixed>
             + encoding::ValueEncoder<Fixed>,
     {
         let mut direct = [(2, val.clone())].into_opaque_message().encode_to_vec();
@@ -1362,7 +1362,7 @@ fn bytes_for_surrogate(surrogate_codepoint: u32) -> [u8; 3] {
 
 fn parsing_string_type<'a, T>()
 where
-    T: 'a + Debug + Eq + From<&'a str> + EmptyState + encoding::DistinguishedEncoder<General>,
+    T: 'a + Debug + Eq + From<&'a str> + EmptyState + encoding::DistinguishedDecoder<General>,
 {
     #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
     struct Foo<T>(T);

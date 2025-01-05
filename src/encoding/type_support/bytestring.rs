@@ -2,8 +2,8 @@ use crate::buf::ReverseBuf;
 use crate::encoding::value_traits::for_overwrite_via_default;
 use crate::encoding::{
     encode_varint, encoded_len_varint, prepend_varint, Capped, DecodeContext,
-    DistinguishedValueEncoder, EmptyState, General, RestrictedDecodeContext, ValueEncoder,
-    WireType, Wiretyped,
+    DistinguishedValueDecoder, EmptyState, General, RestrictedDecodeContext, ValueDecoder,
+    ValueEncoder, WireType, Wiretyped,
 };
 use crate::DecodeErrorKind::InvalidValue;
 use crate::{Canonicity, DecodeError};
@@ -44,7 +44,9 @@ impl ValueEncoder<General> for bytestring::ByteString {
     fn value_encoded_len(value: &bytestring::ByteString) -> usize {
         encoded_len_varint(value.len() as u64) + value.len()
     }
+}
 
+impl ValueDecoder<General> for bytestring::ByteString {
     #[inline]
     fn decode_value<B: Buf + ?Sized>(
         value: &mut bytestring::ByteString,
@@ -59,7 +61,7 @@ impl ValueEncoder<General> for bytestring::ByteString {
     }
 }
 
-impl DistinguishedValueEncoder<General> for bytestring::ByteString {
+impl DistinguishedValueDecoder<General> for bytestring::ByteString {
     const CHECKS_EMPTY: bool = false;
 
     #[inline]
