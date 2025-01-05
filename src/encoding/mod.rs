@@ -1,4 +1,4 @@
-use crate::buf::ReverseBuf;
+use crate::buf::{BorrowBuf, ReverseBuf};
 use crate::DecodeErrorKind::{
     ConflictingFields, InvalidVarint, NotCanonical, Oversize, TagOverflowed, Truncated,
     UnexpectedlyRepeated, UnknownField, WrongWireType,
@@ -909,50 +909,6 @@ pub fn skip_field<B: Buf + ?Sized>(
     Ok(())
 }
 
-/// The core trait for encoding bilrost data.
-pub trait Encoder<E> {
-    /// Encodes the a field with the given tag and value.
-    fn encode<B: BufMut + ?Sized>(tag: u32, value: &Self, buf: &mut B, tw: &mut TagWriter);
-
-    /// Prepends the encoding of the field with the given tag and value.
-    fn prepend_encode<B: ReverseBuf + ?Sized>(
-        tag: u32,
-        value: &Self,
-        buf: &mut B,
-        tw: &mut TagRevWriter,
-    );
-
-    /// Returns the encoded length of the field, including the key.
-    fn encoded_len(tag: u32, value: &Self, tm: &mut impl TagMeasurer) -> usize;
-}
-
-// The core trait for decoding bilrost data. Data must always be copied from the buffer.
-pub trait Decoder<E>: Encoder<E> {
-    /// Decodes a field's value with the given wire type; the field's key should have already been
-    /// consumed from the buffer.
-    fn decode<B: Buf + ?Sized>(
-        wire_type: WireType,
-        duplicated: bool,
-        value: &mut Self,
-        buf: Capped<B>,
-        ctx: DecodeContext,
-    ) -> Result<(), DecodeError>;
-}
-
-/// Extension trait for canonical encoding and decoding. Distinguished decoding is available via
-/// this trait, and any type that implements this trait is guaranteed to always emit canonical data
-/// via `Encoder`.
-pub trait DistinguishedDecoder<E>: Decoder<E> {
-    /// Decodes a field for the value, returning a value indicating how canonical the encoding was.
-    fn decode_distinguished<B: Buf + ?Sized>(
-        wire_type: WireType,
-        duplicated: bool,
-        value: &mut Self,
-        buf: Capped<B>,
-        ctx: RestrictedDecodeContext,
-    ) -> Result<Canonicity, DecodeError>;
-}
-
 /// Indicator of the "canonicity" of a decoded value or a decoding process that was performed.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 #[repr(u8)]
@@ -1465,6 +1421,110 @@ mod with_canonicity {
     }
 }
 
+/// Marker trait indicating that a type always decodes to its owned form. When implemented, borrowed
+/// decoding will delegate to the owned Decoder implementation for the Decoder and ValueDecoder
+/// traits.
+pub trait AlwaysOwned {}
+
+/// The core trait for encoding bilrost data.
+pub trait Encoder<E> {
+    /// Encodes the a field with the given tag and value.
+    fn encode<B: BufMut + ?Sized>(tag: u32, value: &Self, buf: &mut B, tw: &mut TagWriter);
+
+    /// Prepends the encoding of the field with the given tag and value.
+    fn prepend_encode<B: ReverseBuf + ?Sized>(
+        tag: u32,
+        value: &Self,
+        buf: &mut B,
+        tw: &mut TagRevWriter,
+    );
+
+    /// Returns the encoded length of the field, including the key.
+    fn encoded_len(tag: u32, value: &Self, tm: &mut impl TagMeasurer) -> usize;
+}
+
+// The core trait for decoding bilrost data. Data must always be copied from the buffer.
+pub trait Decoder<E>: Encoder<E> {
+    /// Decodes a field's value with the given wire type; the field's key should have already been
+    /// consumed from the buffer.
+    fn decode<B: Buf + ?Sized>(
+        wire_type: WireType,
+        duplicated: bool,
+        value: &mut Self,
+        buf: Capped<B>,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError>;
+}
+
+/// Extension trait for canonical encoding and decoding. Distinguished decoding is available via
+/// this trait, and any type that implements this trait is guaranteed to always emit canonical data
+/// via `Encoder`.
+pub trait DistinguishedDecoder<E>: Decoder<E> {
+    /// Decodes a field for the value, returning a value indicating how canonical the encoding was.
+    fn decode_distinguished<B: Buf + ?Sized>(
+        wire_type: WireType,
+        duplicated: bool,
+        value: &mut Self,
+        buf: Capped<B>,
+        ctx: RestrictedDecodeContext,
+    ) -> Result<Canonicity, DecodeError>;
+}
+
+pub trait BorrowDecoder<'a, E>: Encoder<E> {
+    fn borrow_decode<B: BorrowBuf<'a> + ?Sized>(
+        wire_type: WireType,
+        duplicated: bool,
+        value: &mut Self,
+        buf: Capped<B>,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError>;
+}
+
+pub trait DistinguishedBorrowDecoder<'a, E>: Decoder<E> {
+    /// Decodes a field for the value, returning a value indicating how canonical the encoding was.
+    fn borrow_decode_distinguished<B: BorrowBuf<'a> + ?Sized>(
+        wire_type: WireType,
+        duplicated: bool,
+        value: &mut Self,
+        buf: Capped<B>,
+        ctx: RestrictedDecodeContext,
+    ) -> Result<Canonicity, DecodeError>;
+}
+
+impl<'a, T, E> BorrowDecoder<'a, E> for T
+where
+    T: AlwaysOwned + Decoder<E>,
+{
+    #[inline]
+    fn borrow_decode<B: BorrowBuf<'a> + ?Sized>(
+        wire_type: WireType,
+        duplicated: bool,
+        value: &mut Self,
+        buf: Capped<B>,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError> {
+        Decoder::<E>::decode(wire_type, duplicated, value, buf, ctx)
+    }
+}
+
+impl<'a, T, E> DistinguishedBorrowDecoder<'a, E> for T
+where
+    T: AlwaysOwned + DistinguishedDecoder<E>,
+{
+    #[inline]
+    fn borrow_decode_distinguished<B: BorrowBuf<'a> + ?Sized>(
+        wire_type: WireType,
+        duplicated: bool,
+        value: &mut Self,
+        buf: Capped<B>,
+        ctx: RestrictedDecodeContext,
+    ) -> Result<Canonicity, DecodeError> {
+        DistinguishedDecoder::<E>::decode_distinguished(wire_type, duplicated, value, buf, ctx)
+    }
+}
+
+// TODO(widders): actually yeah, rephrase everything to call it "relaxed" decoding not "expedient",
+//  this was a much better term to use
 /// Encoders' wire-type is relied upon by both relaxed and distinguished encoders, but it is written
 /// to be a separate trait so that distinguished encoders don't necessarily implement relaxed
 /// decoding. This isn't important in general; it's very unlikely anything would implement
@@ -1536,6 +1596,66 @@ where
     ) -> Result<Canonicity, DecodeError>;
 }
 
+pub trait BorrowValueDecoder<'a, E>: ValueEncoder<E> {
+    /// Decodes a field assuming the encoder's wire type directly from the buffer.
+    fn borrow_decode_value<B: BorrowBuf<'a> + ?Sized>(
+        value: &mut Self,
+        buf: Capped<B>,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError>;
+}
+
+pub trait DistinguishedBorrowValueDecoder<'a, E>: ValueEncoder<E>
+where
+    Self: Eq,
+{
+    /// Indicates whether the `ALLOW_EMPTY` argument in `decode_value_distinguished` has any effect.
+    /// Some decoder implementations can more cheaply determine whether they were empty during
+    /// decoding, and will return `NotCanonical` if `ALLOW_EMPTY` was false; for these
+    /// implementations, `CHECKS_EMPTY` should be set to `true`. When `CHECKS_EMPTY` is `false`, the
+    /// caller must invoke `EmptyState::is_empty` after the call if empty states are non-canonical.
+    const CHECKS_EMPTY: bool;
+
+    /// Decodes a field assuming the encoder's wire type directly from the buffer, also performing
+    /// any additional validation required to guarantee that the value would be re-encoded into the
+    /// exact same bytes.
+    fn borrow_decode_value_distinguished<const ALLOW_EMPTY: bool>(
+        value: &mut Self,
+        buf: Capped<impl BorrowBuf<'a> + ?Sized>,
+        ctx: RestrictedDecodeContext,
+    ) -> Result<Canonicity, DecodeError>;
+}
+
+impl<'a, E, T> BorrowValueDecoder<'a, E> for T
+where
+    T: AlwaysOwned + ValueDecoder<E>,
+{
+    #[inline]
+    fn borrow_decode_value<B: BorrowBuf<'a> + ?Sized>(
+        value: &mut Self,
+        buf: Capped<B>,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError> {
+        ValueDecoder::<E>::decode_value(value, buf, ctx)
+    }
+}
+
+impl<'a, E, T> DistinguishedBorrowValueDecoder<'a, E> for T
+where
+    T: AlwaysOwned + DistinguishedValueDecoder<E>,
+{
+    const CHECKS_EMPTY: bool = T::CHECKS_EMPTY;
+
+    #[inline]
+    fn borrow_decode_value_distinguished<const ALLOW_EMPTY: bool>(
+        value: &mut Self,
+        buf: Capped<impl BorrowBuf<'a> + ?Sized>,
+        ctx: RestrictedDecodeContext,
+    ) -> Result<Canonicity, DecodeError> {
+        DistinguishedValueDecoder::<E>::decode_value_distinguished::<ALLOW_EMPTY>(value, buf, ctx)
+    }
+}
+
 /// Affiliated helper trait for ValueEncoder that provides obligate implementations for handling
 /// field keys and wire types.
 pub trait FieldEncoder<E> {
@@ -1564,6 +1684,38 @@ pub trait FieldDecoder<E>: FieldEncoder<E> {
         buf: Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError>;
+}
+
+/// Affiliated helper trait for DistinguishedValueDecoder that provides obligate implementations for
+/// handling field keys and wire types.
+pub trait DistinguishedFieldDecoder<E> {
+    /// Decodes a field directly from the buffer, also checking the wire type.
+    fn decode_field_distinguished<const ALLOW_EMPTY: bool>(
+        wire_type: WireType,
+        value: &mut Self,
+        buf: Capped<impl Buf + ?Sized>,
+        ctx: RestrictedDecodeContext,
+    ) -> Result<Canonicity, DecodeError>;
+}
+
+pub trait FieldBorrowDecoder<'a, E>: FieldEncoder<E> {
+    /// Decodes a field directly from the buffer, also checking the wire type.
+    fn borrow_decode_field<B: BorrowBuf<'a> + ?Sized>(
+        wire_type: WireType,
+        value: &mut Self,
+        buf: Capped<B>,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError>;
+}
+
+pub trait DistinguishedFieldBorrowDecoder<'a, E> {
+    /// Decodes a field directly from the buffer, also checking the wire type.
+    fn borrow_decode_field_distinguished<const ALLOW_EMPTY: bool>(
+        wire_type: WireType,
+        value: &mut Self,
+        buf: Capped<impl BorrowBuf<'a> + ?Sized>,
+        ctx: RestrictedDecodeContext,
+    ) -> Result<Canonicity, DecodeError>;
 }
 
 impl<T, E> FieldEncoder<E> for T
@@ -1609,18 +1761,6 @@ where
     }
 }
 
-/// Affiliated helper trait for DistinguishedValueDecoder that provides obligate implementations for
-/// handling field keys and wire types.
-pub trait DistinguishedFieldDecoder<E> {
-    /// Decodes a field directly from the buffer, also checking the wire type.
-    fn decode_field_distinguished<const ALLOW_EMPTY: bool>(
-        wire_type: WireType,
-        value: &mut Self,
-        buf: Capped<impl Buf + ?Sized>,
-        ctx: RestrictedDecodeContext,
-    ) -> Result<Canonicity, DecodeError>;
-}
-
 impl<T, E> DistinguishedFieldDecoder<E> for T
 where
     Self: DistinguishedValueDecoder<E> + EmptyState,
@@ -1634,6 +1774,44 @@ where
     ) -> Result<Canonicity, DecodeError> {
         check_wire_type(Self::WIRE_TYPE, wire_type)?;
         let canon = Self::decode_value_distinguished::<ALLOW_EMPTY>(value, buf, ctx.clone())?;
+        ctx.check(if !T::CHECKS_EMPTY && !ALLOW_EMPTY && value.is_empty() {
+            Canonicity::NotCanonical
+        } else {
+            canon
+        })
+    }
+}
+
+impl<'a, T, E> FieldBorrowDecoder<'a, E> for T
+where
+    Self: BorrowValueDecoder<'a, E>,
+{
+    #[inline]
+    fn borrow_decode_field<B: BorrowBuf<'a> + ?Sized>(
+        wire_type: WireType,
+        value: &mut Self,
+        buf: Capped<B>,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError> {
+        check_wire_type(Self::WIRE_TYPE, wire_type)?;
+        Self::borrow_decode_value(value, buf, ctx)
+    }
+}
+
+impl<'a, T, E> DistinguishedFieldBorrowDecoder<'a, E> for T
+where
+    Self: DistinguishedBorrowValueDecoder<'a, E> + EmptyState,
+{
+    #[inline(always)]
+    fn borrow_decode_field_distinguished<const ALLOW_EMPTY: bool>(
+        wire_type: WireType,
+        value: &mut T,
+        buf: Capped<impl BorrowBuf<'a> + ?Sized>,
+        ctx: RestrictedDecodeContext,
+    ) -> Result<Canonicity, DecodeError> {
+        check_wire_type(Self::WIRE_TYPE, wire_type)?;
+        let canon =
+            Self::borrow_decode_value_distinguished::<ALLOW_EMPTY>(value, buf, ctx.clone())?;
         ctx.check(if !T::CHECKS_EMPTY && !ALLOW_EMPTY && value.is_empty() {
             Canonicity::NotCanonical
         } else {
