@@ -2498,14 +2498,14 @@ mod test {
     }
 
     macro_rules! check_type {
-        ($kind:ident, $encoder_trait:ident, $context:expr, $decode:ident) => {
+        ($kind:ident, $decoder_trait:ident, $context:expr, $decode:ident) => {
             pub mod $kind {
                 use super::*;
                 use crate::buf::ReverseBuffer;
 
                 pub fn check_type<T, E>(value: T, tag: u32, wire_type: WireType) -> TestCaseResult
                 where
-                    T: Debug + ForOverwrite + PartialEq + $encoder_trait<E>,
+                    T: Debug + ForOverwrite + PartialEq + $decoder_trait<E>,
                 {
                     let expected_len =
                         <T as Encoder<E>>::encoded_len(tag, &value, &mut RuntimeTagMeasurer::new());
@@ -2576,7 +2576,7 @@ mod test {
                         check_legal_remaining(tag, wire_type, buf.remaining())?;
 
                         let mut roundtrip_value = T::for_overwrite();
-                        _ = <T as $encoder_trait<E>>::$decode(
+                        _ = <T as $decoder_trait<E>>::$decode(
                             wire_type,
                             false,
                             &mut roundtrip_value,
@@ -2603,7 +2603,7 @@ mod test {
                     wire_type: WireType,
                 ) -> TestCaseResult
                 where
-                    T: Debug + ForOverwrite + PartialEq + $encoder_trait<E>,
+                    T: Debug + ForOverwrite + PartialEq + $decoder_trait<E>,
                 {
                     let expected_len = <T as Encoder<E>>::encoded_len(
                         tag,
@@ -2677,7 +2677,7 @@ mod test {
                             decoded_wire_type
                         );
 
-                        _ = <T as $encoder_trait<E>>::$decode(
+                        _ = <T as $decoder_trait<E>>::$decode(
                             wire_type,
                             false,
                             &mut roundtrip_value,
@@ -2712,7 +2712,7 @@ mod test {
             pub(crate) const VALUE: bool = true;
         }
     }
-    check_type!(expedient, Encoder, DecodeContext::default(), decode);
+    check_type!(expedient, Decoder, DecodeContext::default(), decode);
     check_type!(
         distinguished,
         DistinguishedDecoder,
@@ -3285,7 +3285,7 @@ mod test {
         );
     }
 
-    fn check_rejects_wrong_wire_type<T: ForOverwrite + Encoder<E>, E>(wire_type: WireType) {
+    fn check_rejects_wrong_wire_type<T: ForOverwrite + Decoder<E>, E>(wire_type: WireType) {
         let mut out = T::for_overwrite();
         assert_eq!(
             <T as Decoder<E>>::decode(

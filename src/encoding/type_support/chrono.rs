@@ -448,7 +448,7 @@ delegate_value_encoding!(delegate from (General) to (Proxied<(Varint, Varint, Va
 mod utc {
     use crate::encoding::{
         Capped, DecodeContext, DistinguishedValueDecoder, ForOverwrite, General,
-        RestrictedDecodeContext, ValueEncoder,
+        RestrictedDecodeContext, ValueDecoder, ValueEncoder,
     };
     use crate::Canonicity::{Canonical, NotCanonical};
     use crate::DecodeError;
@@ -464,7 +464,7 @@ mod utc {
             ValueEncoder::<General>::encode_value(&zero_offset, &mut buf);
             let mut utc = Utc::for_overwrite();
             assert_eq!(
-                ValueEncoder::<General>::decode_value(
+                ValueDecoder::<General>::decode_value(
                     &mut utc,
                     Capped::new(&mut buf.as_slice()),
                     DecodeContext::default(),
@@ -487,7 +487,7 @@ mod utc {
             ValueEncoder::<General>::encode_value(&nonzero_offset, &mut buf);
             let mut utc = Utc::for_overwrite();
             assert_eq!(
-                ValueEncoder::<General>::decode_value(
+                ValueDecoder::<General>::decode_value(
                     &mut utc,
                     Capped::new(&mut buf.as_slice()),
                     DecodeContext::default(),
@@ -586,7 +586,7 @@ mod fixedoffset {
     use crate::encoding::value_traits::ForOverwrite;
     use crate::encoding::{
         Capped, DecodeContext, DistinguishedValueDecoder, EmptyState, General,
-        RestrictedDecodeContext, ValueEncoder, WireType,
+        RestrictedDecodeContext, ValueDecoder, ValueEncoder, WireType,
     };
     use crate::Canonicity::NotCanonical;
     use crate::DecodeError;
@@ -649,7 +649,7 @@ mod fixedoffset {
             ValueEncoder::<General>::encode_value(&out_of_range, &mut buf);
             let mut fixed = FixedOffset::for_overwrite();
             assert_eq!(
-                ValueEncoder::<General>::decode_value(
+                ValueDecoder::<General>::decode_value(
                     &mut fixed,
                     Capped::new(&mut buf.as_slice()),
                     DecodeContext::default(),
@@ -675,7 +675,7 @@ mod fixedoffset {
             ValueEncoder::<General>::encode_value(&out_of_range, &mut buf);
             let mut fixed = FixedOffset::for_overwrite();
             assert_eq!(
-                ValueEncoder::<General>::decode_value(
+                ValueDecoder::<General>::decode_value(
                     &mut fixed,
                     Capped::new(&mut buf.as_slice()),
                     DecodeContext::default(),

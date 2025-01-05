@@ -391,7 +391,7 @@ mod utcoffset {
     use crate::encoding::test::{check_type_empty, distinguished, expedient};
     use crate::encoding::{
         Capped, DecodeContext, DistinguishedValueDecoder, EmptyState, ForOverwrite, General,
-        RestrictedDecodeContext, ValueEncoder, WireType,
+        RestrictedDecodeContext, ValueDecoder, ValueEncoder, WireType,
     };
     use crate::Canonicity::NotCanonical;
     use crate::DecodeError;
@@ -428,7 +428,7 @@ mod utcoffset {
             ValueEncoder::<General>::encode_value(&out_of_range, &mut buf);
             let mut utc_off = UtcOffset::for_overwrite();
             assert_eq!(
-                ValueEncoder::<General>::decode_value(
+                ValueDecoder::<General>::decode_value(
                     &mut utc_off,
                     Capped::new(&mut buf.as_slice()),
                     DecodeContext::default(),
