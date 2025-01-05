@@ -857,6 +857,7 @@ impl<B: Buf + ?Sized> DerefMut for Capped<'_, B> {
         self.buf
     }
 }
+
 /// Returns `Some` if there are more bytes in the buffer and the next data in the buffer begins
 /// with a "repeated" field key (a key with a tag delta of zero). If the repeated field key is found
 /// it is consumed; if it does not exist, the buffer is unchanged.
