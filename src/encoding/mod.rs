@@ -22,7 +22,6 @@ mod packed;
 mod plain_bytes;
 mod proxy;
 mod tuple;
-
 mod type_support;
 mod underived;
 mod unpacked;
