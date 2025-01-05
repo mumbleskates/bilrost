@@ -2,6 +2,10 @@
 
 ### Breaking changes
 
+* The (unstable) internal encoding traits continue to evolve, this time to split
+  expedient decoding functionality out of encoding traits and into an
+  independent trait.
+
 ### New features
 
 * Added `From<Vec<u8>>` and `From<Box<[u8]>>` impls for `ReverseBuffer`.
