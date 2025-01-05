@@ -1162,7 +1162,10 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
                     ::bilrost::encoding::Enumeration::to_number(value) as u64
                 )
             }
+        }
 
+        impl #impl_generics ::bilrost::encoding::ValueDecoder<::bilrost::encoding::General>
+        for #ident #ty_generics #where_clause {
             #[inline]
             fn decode_value<__B: ::bilrost::bytes::Buf + ?Sized>(
                 value: &mut Self,
@@ -1189,7 +1192,7 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
                 buf: ::bilrost::encoding::Capped<impl ::bilrost::bytes::Buf + ?Sized>,
                 ctx: ::bilrost::encoding::RestrictedDecodeContext,
             ) -> Result<::bilrost::Canonicity, ::bilrost::DecodeError> {
-                ::bilrost::encoding::ValueEncoder::<::bilrost::encoding::General>::decode_value(
+                ::bilrost::encoding::ValueDecoder::<::bilrost::encoding::General>::decode_value(
                     value,
                     buf,
                     ctx.into_expedient(),

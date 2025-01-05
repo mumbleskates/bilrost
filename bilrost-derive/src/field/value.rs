@@ -190,7 +190,7 @@ impl Field {
         let ty = &self.ty;
         if self.in_oneof {
             quote!(
-                <#ty as ::bilrost::encoding::FieldEncoder<#encoder>>::decode_field(
+                <#ty as ::bilrost::encoding::FieldDecoder<#encoder>>::decode_field(
                     wire_type,
                     #ident,
                     buf,
@@ -199,7 +199,7 @@ impl Field {
             )
         } else {
             quote!(
-                <#ty as ::bilrost::encoding::Encoder<#encoder>>::decode(
+                <#ty as ::bilrost::encoding::Decoder<#encoder>>::decode(
                     wire_type,
                     duplicated,
                     #ident,
@@ -269,12 +269,12 @@ impl Field {
         let encoder = &self.encoding;
         if self.in_oneof {
             vec![
-                quote!(#ty: ::bilrost::encoding::ValueEncoder<#encoder>),
+                quote!(#ty: ::bilrost::encoding::ValueDecoder<#encoder>),
                 quote!(#ty: ::bilrost::encoding::ForOverwrite),
             ]
         } else {
             vec![
-                quote!(#ty: ::bilrost::encoding::Encoder<#encoder>),
+                quote!(#ty: ::bilrost::encoding::Decoder<#encoder>),
                 quote!(#ty: ::bilrost::encoding::EmptyState),
             ]
         }
