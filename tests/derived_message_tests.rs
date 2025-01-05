@@ -1306,7 +1306,7 @@ fn truncated_fixed() {
             + EmptyState
             + encoding::DistinguishedDecoder<Fixed>
             + encoding::DistinguishedValueDecoder<Fixed>
-            + encoding::ValueEncoder<Fixed>,
+            + encoding::ValueDecoder<Fixed>,
     {
         let mut direct = [(2, val.clone())].into_opaque_message().encode_to_vec();
         let mut in_oneof = [(1, val.clone())].into_opaque_message().encode_to_vec();
@@ -1806,7 +1806,7 @@ fn custom_hashers_hashbrown() {
 
 fn truncated_bool_string_map<T>()
 where
-    T: Debug + EmptyState + Mapping<Key = bool, Value = String> + encoding::Encoder<General>,
+    T: Debug + EmptyState + Mapping<Key = bool, Value = String> + encoding::Decoder<General>,
 {
     #[derive(Debug, PartialEq, Message)]
     struct Foo<T>(T, String);
@@ -1831,7 +1831,7 @@ where
 
 fn truncated_string_int_map<T>()
 where
-    T: Debug + EmptyState + Mapping<Key = String, Value = u64> + encoding::Encoder<General>,
+    T: Debug + EmptyState + Mapping<Key = String, Value = u64> + encoding::Decoder<General>,
 {
     #[derive(Debug, PartialEq, Message)]
     struct Foo<T>(T, String);
@@ -2696,7 +2696,7 @@ where
 
 fn truncated_packed_int<T>()
 where
-    T: Debug + EmptyState + Collection<Item = u64> + encoding::Encoder<General>,
+    T: Debug + EmptyState + Collection<Item = u64> + encoding::Decoder<General>,
 {
     #[derive(Debug, PartialEq, Message)]
     struct Foo<T>(T, String);
