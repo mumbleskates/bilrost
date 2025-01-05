@@ -763,6 +763,16 @@ impl Buf for ReverseBufferReader<'_> {
     }
 }
 
+pub trait BorrowBuf<'b>: Buf {
+    fn borrow_chunk(&self) -> &'b [u8];
+}
+
+impl<'b> BorrowBuf<'b> for &'b [u8] {
+    fn borrow_chunk(&self) -> &'b [u8] {
+        self
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::{ReverseBuf, ReverseBuffer};
