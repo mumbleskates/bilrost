@@ -31,7 +31,7 @@ use syn::{
 };
 
 use crate::attrs::{tag_list_attr, TagList};
-use crate::field::{bilrost_attrs, set_option, Field};
+use crate::field::{bilrost_attrs, set_option, Field, WhereFor};
 
 mod attrs;
 mod field;
@@ -374,13 +374,14 @@ fn append_expedient_encoder_wheres<T>(
     where_clause: Option<&WhereClause>,
     self_where: Option<TokenStream>,
     fields: &[(T, Field)],
+    field_purpose: WhereFor,
 ) -> TokenStream {
     impl_append_wheres(
         where_clause,
         self_where,
         fields
             .iter()
-            .flat_map(|(_, field)| field.expedient_where_terms()),
+            .flat_map(|(_, field)| field.expedient_where_terms(field_purpose)),
     )
 }
 
@@ -388,13 +389,14 @@ fn append_distinguished_encoder_wheres<T>(
     where_clause: Option<&WhereClause>,
     self_where: Option<TokenStream>,
     fields: &[(T, Field)],
+    field_purpose: WhereFor,
 ) -> TokenStream {
     impl_append_wheres(
         where_clause,
         self_where,
         fields
             .iter()
-            .flat_map(|(_, field)| field.distinguished_where_terms()),
+            .flat_map(|(_, field)| field.distinguished_where_terms(field_purpose)),
     )
 }
 
@@ -819,7 +821,7 @@ fn message_via_oneof(input: DeriveInput) -> Result<TokenStream, Error> {
                 __B: ::bilrost::bytes::Buf + ?Sized,
             {
                 if <Self as ::bilrost::encoding::Oneof>::FIELD_TAGS.contains(&tag) {
-                    <Self as ::bilrost::encoding::Oneof>::oneof_decode_field(
+                    <Self as ::bilrost::encoding::OneofDecode>::oneof_decode_field(
                         self,
                         tag,
                         wire_type,
@@ -961,7 +963,7 @@ fn distinguished_message_via_oneof(input: DeriveInput) -> Result<TokenStream, Er
     let where_clause = impl_append_wheres(
         where_clause,
         Some(quote!(
-            Self: ::bilrost::encoding::DistinguishedOneof + ::core::cmp::Eq
+            Self: ::bilrost::encoding::DistinguishedOneofDecode + ::core::cmp::Eq
         )),
         None,
     );
@@ -983,7 +985,9 @@ fn distinguished_message_via_oneof(input: DeriveInput) -> Result<TokenStream, Er
                 __B: ::bilrost::bytes::Buf + ?Sized,
             {
                 if <Self as ::bilrost::encoding::Oneof>::FIELD_TAGS.contains(&tag) {
-                    <Self as ::bilrost::encoding::DistinguishedOneof>::oneof_decode_field_distinguished(
+                    <Self as ::bilrost::encoding::DistinguishedOneofDecode>::
+                        oneof_decode_field_distinguished
+                    (
                         self,
                         tag,
                         wire_type,
@@ -1399,6 +1403,8 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         .collect();
 
     let appropriate_oneof_trait;
+    // TODO(widders): owned & borrowed decodes
+    let appropriate_oneof_decode_trait;
     let decode_field_self_arg;
     let decode_field_return_ty;
     let current_tag_ty;
@@ -1408,6 +1414,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
 
     if let Some(empty_ident) = &empty_variant {
         appropriate_oneof_trait = quote!(Oneof);
+        appropriate_oneof_decode_trait = quote!(OneofDecode);
         decode_field_self_arg = Some(quote!(value: &mut Self,));
         decode_field_return_ty = quote!(());
         some = Some(quote!(::core::option::Option::Some));
@@ -1450,6 +1457,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         });
     } else {
         appropriate_oneof_trait = quote!(NonEmptyOneof);
+        appropriate_oneof_decode_trait = quote!(NonEmptyOneofDecode);
         decode_field_self_arg = None;
         decode_field_return_ty = quote!(Self);
         some = None;
@@ -1581,7 +1589,11 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
                     _ => ("", ""),
                 }
             }
-
+        }
+        
+        impl #impl_generics ::bilrost::encoding::#appropriate_oneof_decode_trait
+        for #ident #ty_generics #where_clause
+        {
             fn oneof_decode_field<__B: ::bilrost::bytes::Buf + ?Sized>(
                 #decode_field_self_arg
                 tag: u32,
@@ -1688,7 +1700,7 @@ fn try_distinguished_oneof(input: TokenStream) -> Result<TokenStream, Error> {
     let some; // oneofs that have empty states return Option<u32> from `oneof_current_tag`
     let full_where_clause;
     if empty_variant.is_some() {
-        appropriate_oneof_trait = quote!(DistinguishedOneof);
+        appropriate_oneof_trait = quote!(DistinguishedOneofDecode);
         expedient_oneof_trait = quote!(Oneof);
         decode_field_self_arg = Some(quote!(value: &mut Self,));
         decode_field_return_ty = quote!(::bilrost::Canonicity);
@@ -1699,7 +1711,7 @@ fn try_distinguished_oneof(input: TokenStream) -> Result<TokenStream, Error> {
             &fields,
         );
     } else {
-        appropriate_oneof_trait = quote!(NonEmptyDistinguishedOneof);
+        appropriate_oneof_trait = quote!(NonEmptyDistinguishedOneofDecode);
         expedient_oneof_trait = quote!(NonEmptyOneof);
         decode_field_self_arg = None;
         decode_field_return_ty = quote!((Self, ::bilrost::Canonicity));

@@ -1954,7 +1954,9 @@ pub trait Oneof: EmptyState {
     /// Returns the diagnostic name of the variant with the given tag. The first returned value is
     /// the name of the oneof enum, and the second is the name of the field.
     fn oneof_variant_name(tag: u32) -> (&'static str, &'static str);
+}
 
+pub trait OneofDecode: Oneof {
     /// Decodes from the given buffer.
     fn oneof_decode_field<B: Buf + ?Sized>(
         value: &mut Self,
@@ -1995,7 +1997,10 @@ where
     fn oneof_variant_name(tag: u32) -> (&'static str, &'static str) {
         T::oneof_variant_name(tag)
     }
+}
 
+impl<T> OneofDecode for Box<T>
+where T: OneofDecode {
     #[inline]
     fn oneof_decode_field<B: Buf + ?Sized>(
         value: &mut Self,
@@ -2004,13 +2009,13 @@ where
         buf: Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
-        Oneof::oneof_decode_field(&mut **value, tag, wire_type, buf, ctx)
+        OneofDecode::oneof_decode_field(&mut **value, tag, wire_type, buf, ctx)
     }
 }
 
 /// Underlying trait for a oneof that has no inherent "empty" variant, opting instead to be wrapped
 /// in an `Option`.
-pub trait NonEmptyOneof: Sized {
+pub trait NonEmptyOneof {
     const FIELD_TAGS: &'static [u32];
 
     /// Encodes the fields of the oneof into the given buffer.
@@ -2028,7 +2033,9 @@ pub trait NonEmptyOneof: Sized {
     /// Returns the diagnostic name of the variant with the given tag. The first returned value is
     /// the name of the oneof enum, and the second is the name of the field.
     fn oneof_variant_name(tag: u32) -> (&'static str, &'static str);
+}
 
+pub trait NonEmptyOneofDecode: NonEmptyOneof + Sized {
     /// Decodes from the given buffer.
     fn oneof_decode_field<B: Buf + ?Sized>(
         tag: u32,
@@ -2068,7 +2075,10 @@ where
     fn oneof_variant_name(tag: u32) -> (&'static str, &'static str) {
         T::oneof_variant_name(tag)
     }
+}
 
+impl<T> NonEmptyOneofDecode for Box<T>
+where T: NonEmptyOneofDecode {
     #[inline]
     fn oneof_decode_field<B: Buf + ?Sized>(
         tag: u32,
@@ -2118,7 +2128,10 @@ where
     fn oneof_variant_name(tag: u32) -> (&'static str, &'static str) {
         T::oneof_variant_name(tag)
     }
+}
 
+impl<T> OneofDecode for Option<T>
+where T: NonEmptyOneofDecode {
     #[inline]
     fn oneof_decode_field<B: Buf + ?Sized>(
         value: &mut Self,
@@ -2146,7 +2159,7 @@ where
 
 /// Trait to be implemented by (or more commonly derived for) oneofs, which have knowledge of their
 /// variants' tags and encoding.
-pub trait DistinguishedOneof: Oneof {
+pub trait DistinguishedOneofDecode: Oneof {
     /// Decodes from the given buffer in distinguished mode.
     fn oneof_decode_field_distinguished<B: Buf + ?Sized>(
         value: &mut Self,
@@ -2157,9 +2170,9 @@ pub trait DistinguishedOneof: Oneof {
     ) -> Result<Canonicity, DecodeError>;
 }
 
-impl<T> DistinguishedOneof for Box<T>
+impl<T> DistinguishedOneofDecode for Box<T>
 where
-    T: DistinguishedOneof,
+    T: DistinguishedOneofDecode,
 {
     #[inline]
     fn oneof_decode_field_distinguished<B: Buf + ?Sized>(
@@ -2169,13 +2182,13 @@ where
         buf: Capped<B>,
         ctx: RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
-        DistinguishedOneof::oneof_decode_field_distinguished(&mut **value, tag, wire_type, buf, ctx)
+        DistinguishedOneofDecode::oneof_decode_field_distinguished(&mut **value, tag, wire_type, buf, ctx)
     }
 }
 
 /// Underlying trait for a oneof that has no inherent "empty" variant, opting instead to be wrapped
 /// in an `Option`.
-pub trait NonEmptyDistinguishedOneof: Sized {
+pub trait NonEmptyDistinguishedOneofDecode: Sized {
     /// Decodes from the given buffer.
     fn oneof_decode_field_distinguished<B: Buf + ?Sized>(
         tag: u32,
@@ -2185,9 +2198,9 @@ pub trait NonEmptyDistinguishedOneof: Sized {
     ) -> Result<(Self, Canonicity), DecodeError>;
 }
 
-impl<T> NonEmptyDistinguishedOneof for Box<T>
+impl<T> NonEmptyDistinguishedOneofDecode for Box<T>
 where
-    T: NonEmptyDistinguishedOneof,
+    T: NonEmptyDistinguishedOneofDecode,
 {
     #[inline]
     fn oneof_decode_field_distinguished<B: Buf + ?Sized>(
@@ -2196,14 +2209,14 @@ where
         buf: Capped<B>,
         ctx: RestrictedDecodeContext,
     ) -> Result<(Self, Canonicity), DecodeError> {
-        NonEmptyDistinguishedOneof::oneof_decode_field_distinguished(tag, wire_type, buf, ctx)
+        NonEmptyDistinguishedOneofDecode::oneof_decode_field_distinguished(tag, wire_type, buf, ctx)
             .map(|(val, canon)| (Box::new(val), canon))
     }
 }
 
-impl<T> DistinguishedOneof for Option<T>
+impl<T> DistinguishedOneofDecode for Option<T>
 where
-    T: NonEmptyDistinguishedOneof + NonEmptyOneof,
+    T: NonEmptyDistinguishedOneofDecode + NonEmptyOneof,
     Self: Oneof,
 {
     #[inline]

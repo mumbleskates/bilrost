@@ -946,7 +946,7 @@ struct Tree {
 
 ### Distinguished derive macros
 
-There are two derivable companion traits, `DistinguishedMessage`
+There are two derivable companion derives, `DistinguishedMessage`
 and `DistinguishedOneof`, that implement the extended traits for distinguished
 decoding when possible. Both messages and oneofs must contain only fields that
 support distinguished decoding in order to support it themselves. Distinguished

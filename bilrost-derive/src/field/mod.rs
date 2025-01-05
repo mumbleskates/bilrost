@@ -21,6 +21,13 @@ pub enum Field {
     Oneof(oneof::Field),
 }
 
+#[derive(Copy, Clone)]
+pub enum WhereFor {
+    Encode,
+    DecodeOwned,
+    DecodeBorrowed,
+}
+
 impl Field {
     /// Creates a new `Field` from an iterator of field attributes.
     ///
@@ -70,19 +77,19 @@ impl Field {
     }
 
     /// Returns the where clause condition asserting that this field's encoder encodes its type.
-    pub fn expedient_where_terms(&self) -> Vec<TokenStream> {
+    pub fn expedient_where_terms(&self, purpose: WhereFor) -> Vec<TokenStream> {
         match self {
-            Field::Value(field) => field.expedient_where_terms(),
-            Field::Oneof(field) => field.expedient_where_terms(),
+            Field::Value(field) => field.expedient_where_terms(purpose),
+            Field::Oneof(field) => field.expedient_where_terms(purpose),
         }
     }
 
     /// Returns the where clause condition asserting that this field's encoder encodes its type in
     /// distinguished mode.
-    pub fn distinguished_where_terms(&self) -> Vec<TokenStream> {
+    pub fn distinguished_where_terms(&self, purpose: WhereFor) -> Vec<TokenStream> {
         match self {
-            Field::Value(field) => field.distinguished_where_terms(),
-            Field::Oneof(field) => field.distinguished_where_terms(),
+            Field::Value(field) => field.distinguished_where_terms(purpose),
+            Field::Oneof(field) => field.distinguished_where_terms(purpose),
         }
     }
 

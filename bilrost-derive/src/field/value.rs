@@ -9,7 +9,7 @@ use quote::quote;
 use syn::{parse_str, Index, Meta, Type};
 
 use crate::attrs::{named_attr, tag_attr, word_attr};
-use crate::field::{set_bool, set_option};
+use crate::field::{set_bool, set_option, WhereFor};
 
 /// A scalar protobuf field.
 #[derive(Clone)]
@@ -261,43 +261,73 @@ impl Field {
     }
 
     /// Returns the where clause constraint terms for the field's encoder.
-    pub fn expedient_where_terms(&self) -> Vec<TokenStream> {
+    pub fn expedient_where_terms(&self, purpose: WhereFor) -> Vec<TokenStream> {
         if self.recurses {
             return vec![];
         }
         let ty = &self.ty;
         let encoder = &self.encoding;
-        if self.in_oneof {
-            vec![
+        match (purpose, self.in_oneof) {
+            (WhereFor::Encode, true) => vec![
+                quote!(#ty: ::bilrost::encoding::ValueEncoder<#encoder>),
+                quote!(#ty: ::bilrost::encoding::ForOverwrite),
+            ],
+            (WhereFor::Encode, false) => vec![
+                quote!(#ty: ::bilrost::encoding::Encoder<#encoder>),
+                quote!(#ty: ::bilrost::encoding::EmptyState),
+            ],
+            (WhereFor::DecodeOwned, true) => vec![
                 quote!(#ty: ::bilrost::encoding::ValueDecoder<#encoder>),
                 quote!(#ty: ::bilrost::encoding::ForOverwrite),
-            ]
-        } else {
-            vec![
+            ],
+            (WhereFor::DecodeOwned, false) => vec![
                 quote!(#ty: ::bilrost::encoding::Decoder<#encoder>),
                 quote!(#ty: ::bilrost::encoding::EmptyState),
-            ]
+            ],
+            (WhereFor::DecodeBorrowed, true) => vec![
+                quote!(#ty: ::bilrost::encoding::BorrowValueDecoder<#encoder>),
+                quote!(#ty: ::bilrost::encoding::ForOverwrite),
+            ],
+            (WhereFor::DecodeBorrowed, false) => vec![
+                quote!(#ty: ::bilrost::encoding::BorrowDecoder<#encoder>),
+                quote!(#ty: ::bilrost::encoding::EmptyState),
+            ],
         }
     }
 
     /// Returns the where clause constraint terms for the field's encoder.
-    pub fn distinguished_where_terms(&self) -> Vec<TokenStream> {
+    ///
+    /// This always requires EmptyState instead of just ForOverwrite, because we must check whether
+    /// values are still empty after we've decoded them.
+    pub fn distinguished_where_terms(&self, purpose: WhereFor) -> Vec<TokenStream> {
         if self.recurses {
             return vec![];
         }
         let ty = &self.ty;
         let encoder = &self.encoding;
-        if self.in_oneof {
-            vec![
-                quote!(#ty: ::bilrost::encoding::DistinguishedValueDecoder<#encoder>),
-                quote!(#ty: ::bilrost::encoding::EmptyState),
-            ]
-        } else {
-            vec![
-                quote!(#ty: ::bilrost::encoding::DistinguishedDecoder<#encoder>),
-                quote!(#ty: ::bilrost::encoding::EmptyState),
-            ]
-        }
+        vec![
+            match (purpose, self.in_oneof) {
+                (WhereFor::Encode, true) => {
+                    quote!(#ty: ::bilrost::encoding::DistinguishedValueEncoder<#encoder>)
+                }
+                (WhereFor::Encode, false) => {
+                    quote!(#ty: ::bilrost::encoding::DistinguishedEncoder<#encoder>)
+                }
+                (WhereFor::DecodeOwned, true) => {
+                    quote!(#ty: ::bilrost::encoding::DistinguishedValueDecoder<#encoder>)
+                }
+                (WhereFor::DecodeOwned, false) => {
+                    quote!(#ty: ::bilrost::encoding::DistinguishedDecoder<#encoder>)
+                }
+                (WhereFor::DecodeBorrowed, true) => {
+                    quote!(#ty: ::bilrost::encoding::DistinguishedBorrowValueDecoder<#encoder>)
+                }
+                (WhereFor::DecodeBorrowed, false) => {
+                    quote!(#ty: ::bilrost::encoding::DistinguishedBorrowDecoder<#encoder>)
+                }
+            },
+            quote!(#ty: ::bilrost::encoding::EmptyState),
+        ]
     }
 
     /// Returns methods to embed in the message. `ident` must be the name of the field within the

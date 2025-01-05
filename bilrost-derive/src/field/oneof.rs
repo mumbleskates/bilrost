@@ -7,7 +7,7 @@ use quote::quote;
 use syn::{Meta, Type};
 
 use crate::attrs::tag_list_attr;
-use crate::field::set_option;
+use crate::field::{set_option, WhereFor};
 
 #[derive(Clone)]
 pub struct Field {
@@ -62,7 +62,7 @@ impl Field {
     /// Returns an expression which evaluates to the result of decoding the oneof field.
     pub fn decode_expedient(&self, ident: TokenStream) -> TokenStream {
         quote!(
-            ::bilrost::encoding::Oneof::oneof_decode_field(
+            ::bilrost::encoding::OneofDecode::oneof_decode_field(
                 #ident,
                 tag,
                 wire_type,
@@ -75,7 +75,7 @@ impl Field {
     /// Returns an expression which evaluates to the result of decoding the oneof field.
     pub fn decode_distinguished(&self, ident: TokenStream) -> TokenStream {
         quote!(
-            ::bilrost::encoding::DistinguishedOneof::oneof_decode_field_distinguished(
+            ::bilrost::encoding::DistinguishedOneofDecode::oneof_decode_field_distinguished(
                 #ident,
                 tag,
                 wire_type,
@@ -97,14 +97,26 @@ impl Field {
     }
 
     /// Returns the where clause constraint term for the field really implementing the oneof trait.
-    pub fn expedient_where_terms(&self) -> Vec<TokenStream> {
+    pub fn expedient_where_terms(&self, purpose: WhereFor) -> Vec<TokenStream> {
         let ty = &self.ty;
-        vec![quote!(#ty: ::bilrost::encoding::Oneof)]
+        match purpose {
+            WhereFor::Encode => vec![quote!(#ty: ::bilrost::encoding::Oneof)],
+            WhereFor::DecodeOwned => vec![quote!(#ty: ::bilrost::encoding::OneofDecode)],
+            WhereFor::DecodeBorrowed => vec![quote!(#ty: ::bilrost::encoding::OneofBorrowDecode)],
+        }
     }
 
     /// Returns the where clause constraint term for the field really implementing the oneof trait.
-    pub fn distinguished_where_terms(&self) -> Vec<TokenStream> {
+    pub fn distinguished_where_terms(&self, purpose: WhereFor) -> Vec<TokenStream> {
         let ty = &self.ty;
-        vec![quote!(#ty: ::bilrost::encoding::DistinguishedOneof)]
+        match purpose {
+            WhereFor::Encode => vec![quote!(#ty: ::bilrost::encoding::DistinguishedOneof)],
+            WhereFor::DecodeOwned => {
+                vec![quote!(#ty: ::bilrost::encoding::DistinguishedOneofDecode)]
+            }
+            WhereFor::DecodeBorrowed => {
+                vec![quote!(#ty: ::bilrost::encoding::DistinguishedOneofBorrowDecode)]
+            }
+        }
     }
 }
