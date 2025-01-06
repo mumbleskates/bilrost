@@ -1,4 +1,4 @@
-use crate::buf::{BorrowBuf, ReverseBuf};
+use crate::buf::ReverseBuf;
 use crate::DecodeErrorKind::{
     ConflictingFields, InvalidVarint, NotCanonical, Oversize, TagOverflowed, Truncated,
     UnexpectedlyRepeated, UnknownField, WrongWireType,
@@ -1471,22 +1471,22 @@ pub trait DistinguishedDecoder<E>: Decoder<E> {
 }
 
 pub trait BorrowDecoder<'a, E>: Encoder<E> {
-    fn borrow_decode<B: BorrowBuf<'a> + ?Sized>(
+    fn borrow_decode(
         wire_type: WireType,
         duplicated: bool,
         value: &mut Self,
-        buf: Capped<B>,
+        buf: Capped<&'a [u8]>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError>;
 }
 
 pub trait DistinguishedBorrowDecoder<'a, E>: Decoder<E> {
     /// Decodes a field for the value, returning a value indicating how canonical the encoding was.
-    fn borrow_decode_distinguished<B: BorrowBuf<'a> + ?Sized>(
+    fn borrow_decode_distinguished(
         wire_type: WireType,
         duplicated: bool,
         value: &mut Self,
-        buf: Capped<B>,
+        buf: Capped<&'a [u8]>,
         ctx: RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError>;
 }
@@ -1496,11 +1496,11 @@ where
     T: AlwaysOwned + Decoder<E>,
 {
     #[inline]
-    fn borrow_decode<B: BorrowBuf<'a> + ?Sized>(
+    fn borrow_decode(
         wire_type: WireType,
         duplicated: bool,
         value: &mut Self,
-        buf: Capped<B>,
+        buf: Capped<&'a [u8]>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         Decoder::<E>::decode(wire_type, duplicated, value, buf, ctx)
@@ -1512,11 +1512,11 @@ where
     T: AlwaysOwned + DistinguishedDecoder<E>,
 {
     #[inline]
-    fn borrow_decode_distinguished<B: BorrowBuf<'a> + ?Sized>(
+    fn borrow_decode_distinguished(
         wire_type: WireType,
         duplicated: bool,
         value: &mut Self,
-        buf: Capped<B>,
+        buf: Capped<&'a [u8]>,
         ctx: RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
         DistinguishedDecoder::<E>::decode_distinguished(wire_type, duplicated, value, buf, ctx)
@@ -1598,9 +1598,9 @@ where
 
 pub trait BorrowValueDecoder<'a, E>: ValueEncoder<E> {
     /// Decodes a field assuming the encoder's wire type directly from the buffer.
-    fn borrow_decode_value<B: BorrowBuf<'a> + ?Sized>(
+    fn borrow_decode_value(
         value: &mut Self,
-        buf: Capped<B>,
+        buf: Capped<&'a [u8]>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError>;
 }
@@ -1621,7 +1621,7 @@ where
     /// exact same bytes.
     fn borrow_decode_value_distinguished<const ALLOW_EMPTY: bool>(
         value: &mut Self,
-        buf: Capped<impl BorrowBuf<'a> + ?Sized>,
+        buf: Capped<&'a [u8]>,
         ctx: RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError>;
 }
@@ -1631,9 +1631,9 @@ where
     T: AlwaysOwned + ValueDecoder<E>,
 {
     #[inline]
-    fn borrow_decode_value<B: BorrowBuf<'a> + ?Sized>(
+    fn borrow_decode_value(
         value: &mut Self,
-        buf: Capped<B>,
+        buf: Capped<&'a [u8]>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         ValueDecoder::<E>::decode_value(value, buf, ctx)
@@ -1649,7 +1649,7 @@ where
     #[inline]
     fn borrow_decode_value_distinguished<const ALLOW_EMPTY: bool>(
         value: &mut Self,
-        buf: Capped<impl BorrowBuf<'a> + ?Sized>,
+        buf: Capped<&'a [u8]>,
         ctx: RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
         DistinguishedValueDecoder::<E>::decode_value_distinguished::<ALLOW_EMPTY>(value, buf, ctx)
@@ -1700,10 +1700,10 @@ pub trait DistinguishedFieldDecoder<E> {
 
 pub trait FieldBorrowDecoder<'a, E>: FieldEncoder<E> {
     /// Decodes a field directly from the buffer, also checking the wire type.
-    fn borrow_decode_field<B: BorrowBuf<'a> + ?Sized>(
+    fn borrow_decode_field(
         wire_type: WireType,
         value: &mut Self,
-        buf: Capped<B>,
+        buf: Capped<&'a [u8]>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError>;
 }
@@ -1713,7 +1713,7 @@ pub trait DistinguishedFieldBorrowDecoder<'a, E> {
     fn borrow_decode_field_distinguished<const ALLOW_EMPTY: bool>(
         wire_type: WireType,
         value: &mut Self,
-        buf: Capped<impl BorrowBuf<'a> + ?Sized>,
+        buf: Capped<&'a [u8]>,
         ctx: RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError>;
 }
@@ -1787,10 +1787,10 @@ where
     Self: BorrowValueDecoder<'a, E>,
 {
     #[inline]
-    fn borrow_decode_field<B: BorrowBuf<'a> + ?Sized>(
+    fn borrow_decode_field(
         wire_type: WireType,
         value: &mut Self,
-        buf: Capped<B>,
+        buf: Capped<&'a [u8]>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         check_wire_type(Self::WIRE_TYPE, wire_type)?;
@@ -1806,7 +1806,7 @@ where
     fn borrow_decode_field_distinguished<const ALLOW_EMPTY: bool>(
         wire_type: WireType,
         value: &mut T,
-        buf: Capped<impl BorrowBuf<'a> + ?Sized>,
+        buf: Capped<&'a [u8]>,
         ctx: RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
         check_wire_type(Self::WIRE_TYPE, wire_type)?;

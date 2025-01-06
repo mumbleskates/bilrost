@@ -763,23 +763,27 @@ impl Buf for ReverseBufferReader<'_> {
     }
 }
 
-pub trait BorrowBuf<'a>: Buf {
-    fn borrow_chunk(&self) -> &'a [u8];
-}
-
-impl<'a> BorrowBuf<'a> for &'a [u8] {
-    fn borrow_chunk(&self) -> &'a [u8] {
-        self
-    }
-}
-
-impl<'a, B> BorrowBuf<'a> for &'_ mut B
-where B: BorrowBuf<'a>
-{
-    fn borrow_chunk(&self) -> &'a [u8] {
-        (**self).borrow_chunk()
-    }
-}
+// TODO(widders): if and when we want to also implement borrowable encoding for non-contiguous
+//  borrowed bufs, we can bring this back. for now that feels like too much, as the only thing that
+//  would make use of this is Cow
+//
+// pub trait BorrowBuf<'a>: Buf {
+//     fn borrow_chunk(&self) -> &'a [u8];
+// }
+//
+// impl<'a> BorrowBuf<'a> for &'a [u8] {
+//     fn borrow_chunk(&self) -> &'a [u8] {
+//         self
+//     }
+// }
+//
+// impl<'a, B> BorrowBuf<'a> for &'_ mut B
+// where B: BorrowBuf<'a>
+// {
+//     fn borrow_chunk(&self) -> &'a [u8] {
+//         (**self).borrow_chunk()
+//     }
+// }
 
 #[cfg(test)]
 mod test {
