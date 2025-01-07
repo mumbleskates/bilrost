@@ -16,7 +16,7 @@ use crate::field::{
     WhereFor::{self, Decode, Encode},
 };
 
-/// A scalar protobuf field.
+/// A field in a bilrost message or oneof
 #[derive(Clone)]
 pub struct Field {
     pub tag: u32,
