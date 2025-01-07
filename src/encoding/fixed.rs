@@ -85,7 +85,7 @@ macro_rules! fixed_width_int {
                 buf: Capped<impl Buf + ?Sized>,
                 ctx: RestrictedDecodeContext,
             ) -> Result<Canonicity, DecodeError> {
-                ValueDecoder::<Fixed>::decode_value(value, buf, ctx.into_expedient())?;
+                ValueDecoder::<Fixed>::decode_value(value, buf, ctx.into_inner())?;
                 Ok(Canonicity::Canonical)
             }
         }
@@ -94,7 +94,7 @@ macro_rules! fixed_width_int {
         mod $test_name {
             use crate::encoding::Fixed;
 
-            crate::encoding::test::check_type_test!(Fixed, expedient, $ty, WireType::$wire_type);
+            crate::encoding::test::check_type_test!(Fixed, relaxed, $ty, WireType::$wire_type);
             crate::encoding::test::check_type_test!(
                 Fixed,
                 distinguished,
@@ -119,13 +119,13 @@ macro_rules! fixed_width_float {
         #[cfg(test)]
         mod $test_name {
             use crate::encoding::Fixed;
-            crate::encoding::test::check_type_test!(Fixed, expedient, $ty, WireType::$wire_type);
+            crate::encoding::test::check_type_test!(Fixed, relaxed, $ty, WireType::$wire_type);
 
             mod delegated_from_general {
                 use crate::encoding::General;
                 crate::encoding::test::check_type_test!(
                     General,
-                    expedient,
+                    relaxed,
                     $ty,
                     WireType::$wire_type
                 );
@@ -181,7 +181,7 @@ macro_rules! fixed_width_array {
                 buf: Capped<impl Buf + ?Sized>,
                 ctx: RestrictedDecodeContext,
             ) -> Result<Canonicity, DecodeError> {
-                ValueDecoder::<Fixed>::decode_value(value, buf, ctx.into_expedient())?;
+                ValueDecoder::<Fixed>::decode_value(value, buf, ctx.into_inner())?;
                 Ok(Canonicity::Canonical)
             }
         }
@@ -191,7 +191,7 @@ macro_rules! fixed_width_array {
             use crate::encoding::Fixed;
             crate::encoding::test::check_type_test!(
                 Fixed,
-                expedient,
+                relaxed,
                 [u8; $N],
                 WireType::$wire_type
             );

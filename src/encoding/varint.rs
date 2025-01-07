@@ -104,7 +104,7 @@ macro_rules! varint {
                 buf: Capped<impl Buf + ?Sized>,
                 ctx: RestrictedDecodeContext,
             ) -> Result<Canonicity, DecodeError> {
-                ValueDecoder::<Varint>::decode_value(value, buf, ctx.into_expedient())?;
+                ValueDecoder::<Varint>::decode_value(value, buf, ctx.into_inner())?;
                 Ok(Canonicity::Canonical)
             }
         }
@@ -112,7 +112,7 @@ macro_rules! varint {
         #[cfg(test)]
         mod $name {
             use crate::encoding::Varint;
-            crate::encoding::test::check_type_test!(Varint, expedient, $ty, WireType::Varint);
+            crate::encoding::test::check_type_test!(Varint, relaxed, $ty, WireType::Varint);
             crate::encoding::test::check_type_test!(Varint, distinguished, $ty, WireType::Varint);
         }
     };

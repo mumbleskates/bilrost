@@ -181,7 +181,7 @@ pub trait Message: EmptyState {
 ///     exact sequence of bytes, not from any other.
 ///
 /// Distinguished decoding methods come in three flavors:
-/// * "distinguished" methods, which decode anything that expedient decoding will and return the
+/// * "distinguished" methods, which decode anything that relaxed decoding will and return the
 ///   value along with a `Canonicity`
 /// * "restricted" methods, which also require a minimum `Canonicity` and will early-exit decoding
 ///   and return an appropriate error if the canonicity violates that constraint:
@@ -467,7 +467,7 @@ pub trait DistinguishedMessage: Message {
 /// `RawMessage`.
 // TODO(widders): in the future, make it possible to decode with extension Message types for all
 //  fields not covered by the own type. The default extension can be `()`, which always skips in
-//  expedient mode and always errs in distinguished mode; the most permissive possible extension
+//  relaxed mode and always errs in distinguished mode; the most permissive possible extension
 //  would then be OpaqueMessage, which losslessly captures all unknown fields. A composing wrapper
 //  type that combines two message types in an overlay can be implemented. This will require an
 //  alternate encoding mode which emits field groups to be sorted in a stricter way, only grouping

@@ -79,7 +79,7 @@ delegate_value_encoding!(delegate from (General) to (Proxied<Packed<Varint>>)
 
 #[cfg(test)]
 mod naivedate {
-    use crate::encoding::test::{check_type_empty, check_type_test, distinguished, expedient};
+    use crate::encoding::test::{check_type_empty, check_type_test, distinguished, relaxed};
     use crate::encoding::{EmptyState, General, WireType};
     use alloc::vec::Vec;
     use chrono::NaiveDate;
@@ -98,7 +98,7 @@ mod naivedate {
     #[test]
     fn check_type() {
         for date in test_dates() {
-            expedient::check_type(date, 123, WireType::LengthDelimited).unwrap();
+            relaxed::check_type(date, 123, WireType::LengthDelimited).unwrap();
             distinguished::check_type(date, 123, WireType::LengthDelimited).unwrap();
         }
     }
@@ -110,7 +110,7 @@ mod naivedate {
         use super::*;
         check_type_test!(
             General,
-            expedient,
+            relaxed,
             from Vec<u8>,
             into NaiveDate,
             converter(b) {
@@ -190,7 +190,7 @@ delegate_value_encoding!(delegate from (General) to (Proxied<Packed<Varint>>)
 
 #[cfg(test)]
 mod naivetime {
-    use crate::encoding::test::{check_type_empty, check_type_test, distinguished, expedient};
+    use crate::encoding::test::{check_type_empty, check_type_test, distinguished, relaxed};
     use crate::encoding::{EmptyState, General, WireType};
     use alloc::vec::Vec;
     use chrono::NaiveTime;
@@ -209,7 +209,7 @@ mod naivetime {
     #[test]
     fn check_type() {
         for time in test_times() {
-            expedient::check_type(time, 123, WireType::LengthDelimited).unwrap();
+            relaxed::check_type(time, 123, WireType::LengthDelimited).unwrap();
             distinguished::check_type(time, 123, WireType::LengthDelimited).unwrap();
         }
     }
@@ -221,7 +221,7 @@ mod naivetime {
         use super::*;
         check_type_test!(
             General,
-            expedient,
+            relaxed,
             from Vec<u8>,
             into NaiveTime,
             converter(b) {
@@ -328,7 +328,7 @@ delegate_value_encoding!(delegate from (General) to (Proxied<Packed<Varint>>)
 mod naivedatetime {
     use super::naivedate::test_dates;
     use super::naivetime::test_times;
-    use crate::encoding::test::{check_type_empty, check_type_test, distinguished, expedient};
+    use crate::encoding::test::{check_type_empty, check_type_test, distinguished, relaxed};
     use crate::encoding::{EmptyState, General, WireType};
     use alloc::vec::Vec;
     use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
@@ -359,7 +359,7 @@ mod naivedatetime {
     #[test]
     fn check_type() {
         for datetime in test_datetimes() {
-            expedient::check_type(datetime, 123, WireType::LengthDelimited).unwrap();
+            relaxed::check_type(datetime, 123, WireType::LengthDelimited).unwrap();
             distinguished::check_type(datetime, 123, WireType::LengthDelimited).unwrap();
         }
     }
@@ -371,7 +371,7 @@ mod naivedatetime {
         use super::*;
         check_type_test!(
             General,
-            expedient,
+            relaxed,
             from Vec<u8>,
             into NaiveDateTime,
             converter(b) {
@@ -546,7 +546,7 @@ impl Proxiable for FixedOffset {
                 // offsets should always have the same sign for all three components; we don't want
                 // any two offsets to have the same total via different combinations.
                 //
-                // we enforce this even in expedient mode because dealing with time is already bad
+                // we enforce this even in relaxed mode because dealing with time is already bad
                 // enough.
                 let mut signums = [false; 3];
                 for component in [hours, mins, secs] {
@@ -582,7 +582,7 @@ delegate_value_encoding!(delegate from (General) to (Proxied<(Varint, Varint, Va
 
 #[cfg(test)]
 mod fixedoffset {
-    use crate::encoding::test::{check_type_empty, check_type_test, distinguished, expedient};
+    use crate::encoding::test::{check_type_empty, check_type_test, distinguished, relaxed};
     use crate::encoding::value_traits::ForOverwrite;
     use crate::encoding::{
         Capped, DecodeContext, DistinguishedValueDecoder, EmptyState, General,
@@ -607,7 +607,7 @@ mod fixedoffset {
     #[test]
     fn check_type() {
         for zone in test_zones() {
-            expedient::check_type(zone, 123, WireType::LengthDelimited).unwrap();
+            relaxed::check_type(zone, 123, WireType::LengthDelimited).unwrap();
             distinguished::check_type(zone, 123, WireType::LengthDelimited).unwrap();
         }
     }
@@ -619,7 +619,7 @@ mod fixedoffset {
         use super::*;
         check_type_test!(
             General,
-            expedient,
+            relaxed,
             from Vec<u8>,
             into FixedOffset,
             converter(b) {
@@ -758,14 +758,14 @@ where
 // of.
 delegate_value_encoding!(delegate from (General) to (Proxied<General>)
     for type (DateTime<Z>) including distinguished
-    with where clause for expedient (Z: TimeZone, Z::Offset: EmptyState)
+    with where clause for relaxed (Z: TimeZone, Z::Offset: EmptyState)
     with generics (Z));
 
 #[cfg(test)]
 mod datetime {
     use super::fixedoffset::test_zones;
     use super::naivedatetime::test_datetimes;
-    use crate::encoding::test::{check_type_empty, check_type_test, distinguished, expedient};
+    use crate::encoding::test::{check_type_empty, check_type_test, distinguished, relaxed};
     use crate::encoding::{General, WireType};
     use alloc::vec::Vec;
     use chrono::{DateTime, FixedOffset, Utc};
@@ -775,7 +775,7 @@ mod datetime {
     fn check_type() {
         for (naivedatetime, zone) in iproduct!(test_datetimes(), test_zones()) {
             let datetime = DateTime::<FixedOffset>::from_naive_utc_and_offset(naivedatetime, zone);
-            expedient::check_type(datetime, 123, WireType::LengthDelimited).unwrap();
+            relaxed::check_type(datetime, 123, WireType::LengthDelimited).unwrap();
             distinguished::check_type(datetime, 123, WireType::LengthDelimited).unwrap();
         }
     }
@@ -787,7 +787,7 @@ mod datetime {
         use super::*;
         check_type_test!(
             General,
-            expedient,
+            relaxed,
             from Vec<u8>,
             into DateTime<Utc>,
             converter(b) {
@@ -861,7 +861,7 @@ delegate_value_encoding!(delegate from (General) to (Proxied<General>)
 
 #[cfg(test)]
 mod timedelta {
-    use crate::encoding::test::{check_type_empty, distinguished, expedient};
+    use crate::encoding::test::{check_type_empty, distinguished, relaxed};
     use crate::encoding::{EmptyState, General, WireType};
     use chrono::TimeDelta;
     use proptest::prelude::*;
@@ -884,7 +884,7 @@ mod timedelta {
     #[test]
     fn check_type() {
         for td in test_timedeltas() {
-            expedient::check_type(td, 123, WireType::LengthDelimited).unwrap();
+            relaxed::check_type(td, 123, WireType::LengthDelimited).unwrap();
             distinguished::check_type(td, 123, WireType::LengthDelimited).unwrap();
         }
     }
@@ -916,13 +916,13 @@ mod timedelta {
     // *milliseconds* plus up to 999,999 nanoseconds, with a freely swappable sign.
     proptest! {
         #[test]
-        fn check_expedient(
+        fn check_relaxed(
             millis in 0..=i64::MAX,
             submilli_nanos in 0..=999_999u32,
             negative: bool,
             tag: u32,
         ) {
-            expedient::check_type::<TimeDelta, General>(
+            relaxed::check_type::<TimeDelta, General>(
                 milli_nanos_to_timedelta(millis, submilli_nanos, negative),
                 tag,
                 WireType::LengthDelimited,

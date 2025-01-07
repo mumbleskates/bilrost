@@ -157,9 +157,9 @@ where
     {
         // We've encountered a length-delimited field when we aren't expecting one; try decoding
         // it in packed format instead.
-        // The data is already known to be non-canonical; use expedient decoding
+        // The data is already known to be non-canonical; use relaxed decoding
         _ = ctx.check(Canonicity::NotCanonical)?;
-        ValueDecoder::<Packed<E>>::decode_value(arr, buf, ctx.into_expedient())?;
+        ValueDecoder::<Packed<E>>::decode_value(arr, buf, ctx.into_inner())?;
         Ok(Canonicity::NotCanonical)
     } else {
         // Otherwise, decode in unpacked mode.
@@ -210,7 +210,7 @@ where
     }
 }
 
-/// Unpacked encodes vecs as repeated fields and in expedient decoding mode will accept both packed
+/// Unpacked encodes vecs as repeated fields and in relaxed decoding mode will accept both packed
 /// and un-packed encodings.
 impl<C, T, E> Encoder<Unpacked<E>> for C
 where
@@ -299,9 +299,9 @@ where
         {
             // We've encountered a length-delimited field when we aren't expecting one; try decoding
             // it in packed format instead.
-            // The data is already known to be non-canonical; use expedient decoding
+            // The data is already known to be non-canonical; use relaxed decoding
             _ = ctx.check(Canonicity::NotCanonical)?;
-            <C as ValueDecoder<Packed<E>>>::decode_value(value, buf, ctx.into_expedient())?;
+            <C as ValueDecoder<Packed<E>>>::decode_value(value, buf, ctx.into_inner())?;
             Ok(Canonicity::NotCanonical)
         } else {
             // Otherwise, decode in unpacked mode.
@@ -310,7 +310,7 @@ where
     }
 }
 
-/// Unpacked encodes arrays as repeated fields if any of the values are non-empty, and in expedient
+/// Unpacked encodes arrays as repeated fields if any of the values are non-empty, and in relaxed
 /// decoding mode will accept both packed and un-packed encodings.
 impl<T, const N: usize, E> Encoder<Unpacked<E>> for [T; N]
 where
@@ -495,13 +495,13 @@ mod test {
 
     use proptest::proptest;
 
-    use crate::encoding::test::{distinguished, expedient};
+    use crate::encoding::test::{distinguished, relaxed};
     use crate::encoding::{Fixed, Unpacked, WireType};
 
     proptest! {
         #[test]
         fn varint(value: Vec<u64>, tag: u32) {
-            expedient::check_type_unpacked::<Vec<u64>, Unpacked>(
+            relaxed::check_type_unpacked::<Vec<u64>, Unpacked>(
                 value.clone(),
                 tag,
                 WireType::Varint,
@@ -511,7 +511,7 @@ mod test {
 
         #[test]
         fn length_delimited(value: Vec<String>, tag: u32) {
-            expedient::check_type_unpacked::<Vec<String>, Unpacked>(
+            relaxed::check_type_unpacked::<Vec<String>, Unpacked>(
                 value.clone(),
                 tag,
                 WireType::LengthDelimited,
@@ -525,7 +525,7 @@ mod test {
 
         #[test]
         fn fixed32(value: Vec<u32>, tag: u32) {
-            expedient::check_type_unpacked::<Vec<u32>, Unpacked<Fixed>>(
+            relaxed::check_type_unpacked::<Vec<u32>, Unpacked<Fixed>>(
                 value.clone(),
                 tag,
                 WireType::ThirtyTwoBit,
@@ -539,7 +539,7 @@ mod test {
 
         #[test]
         fn fixed64(value: Vec<u64>, tag: u32) {
-            expedient::check_type_unpacked::<Vec<u64>, Unpacked<Fixed>>(
+            relaxed::check_type_unpacked::<Vec<u64>, Unpacked<Fixed>>(
                 value.clone(),
                 tag,
                 WireType::SixtyFourBit,
@@ -553,7 +553,7 @@ mod test {
 
         #[test]
         fn varint_array(value: [u64; 2], tag: u32) {
-            expedient::check_type_unpacked::<[u64; 2], Unpacked>(
+            relaxed::check_type_unpacked::<[u64; 2], Unpacked>(
                 value,
                 tag,
                 WireType::Varint,
@@ -563,7 +563,7 @@ mod test {
 
         #[test]
         fn length_delimited_array(value: [String; 2], tag: u32) {
-            expedient::check_type_unpacked::<[String; 2], Unpacked>(
+            relaxed::check_type_unpacked::<[String; 2], Unpacked>(
                 value.clone(),
                 tag,
                 WireType::LengthDelimited,
@@ -577,7 +577,7 @@ mod test {
 
         #[test]
         fn fixed32_array(value: [u32; 2], tag: u32) {
-            expedient::check_type_unpacked::<[u32; 2], Unpacked<Fixed>>(
+            relaxed::check_type_unpacked::<[u32; 2], Unpacked<Fixed>>(
                 value,
                 tag,
                 WireType::ThirtyTwoBit,
@@ -591,7 +591,7 @@ mod test {
 
         #[test]
         fn fixed64_array(value: [u64; 2], tag: u32) {
-            expedient::check_type_unpacked::<[u64; 2], Unpacked<Fixed>>(
+            relaxed::check_type_unpacked::<[u64; 2], Unpacked<Fixed>>(
                 value,
                 tag,
                 WireType::SixtyFourBit,

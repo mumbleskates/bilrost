@@ -96,7 +96,7 @@ delegate_value_encoding!(delegate from (General) to (Proxied<Packed<Varint>>)
 #[cfg(test)]
 mod date {
     use super::helpers::with_random_values;
-    use crate::encoding::test::{check_type_empty, distinguished, expedient};
+    use crate::encoding::test::{check_type_empty, distinguished, relaxed};
     use crate::encoding::{EmptyState, WireType};
     use time::Date;
     use time::Month::{January, June};
@@ -115,7 +115,7 @@ mod date {
     #[test]
     fn check_type() {
         for date in with_random_values(test_dates()) {
-            expedient::check_type(date, 123, WireType::LengthDelimited).unwrap();
+            relaxed::check_type(date, 123, WireType::LengthDelimited).unwrap();
             distinguished::check_type(date, 123, WireType::LengthDelimited).unwrap();
         }
     }
@@ -194,7 +194,7 @@ delegate_value_encoding!(delegate from (General) to (Proxied<Packed<Varint>>)
 #[cfg(test)]
 mod time_ty {
     use super::helpers::with_random_values;
-    use crate::encoding::test::{check_type_empty, distinguished, expedient};
+    use crate::encoding::test::{check_type_empty, distinguished, relaxed};
     use crate::encoding::{EmptyState, WireType};
     use time::Time;
 
@@ -212,7 +212,7 @@ mod time_ty {
     #[test]
     fn check_type() {
         for date in with_random_values(test_times()) {
-            expedient::check_type(date, 123, WireType::LengthDelimited).unwrap();
+            relaxed::check_type(date, 123, WireType::LengthDelimited).unwrap();
             distinguished::check_type(date, 123, WireType::LengthDelimited).unwrap();
         }
     }
@@ -287,7 +287,7 @@ mod primitivedatetime {
     use super::date::test_dates;
     use super::helpers::with_random_values;
     use super::time_ty::test_times;
-    use crate::encoding::test::{check_type_empty, distinguished, expedient};
+    use crate::encoding::test::{check_type_empty, distinguished, relaxed};
     use crate::encoding::{EmptyState, WireType};
     use itertools::iproduct;
     use time::Month::{August, March};
@@ -315,7 +315,7 @@ mod primitivedatetime {
     #[test]
     fn check_type() {
         for datetime in with_random_values(test_datetimes()) {
-            expedient::check_type(datetime, 123, WireType::LengthDelimited).unwrap();
+            relaxed::check_type(datetime, 123, WireType::LengthDelimited).unwrap();
             distinguished::check_type(datetime, 123, WireType::LengthDelimited).unwrap();
         }
     }
@@ -357,7 +357,7 @@ impl Proxiable for UtcOffset {
         // offsets should always have the same sign for all three components; we don't want
         // any two offsets to have the same total via different combinations.
         //
-        // we enforce this even in expedient mode because dealing with time is already bad
+        // we enforce this even in relaxed mode because dealing with time is already bad
         // enough.
         let mut signums = [false; 3];
         for component in [hours, mins, secs] {
@@ -388,7 +388,7 @@ delegate_value_encoding!(delegate from (General) to (Proxied<(Varint, Varint, Va
 #[cfg(test)]
 mod utcoffset {
     use super::helpers::with_random_values;
-    use crate::encoding::test::{check_type_empty, distinguished, expedient};
+    use crate::encoding::test::{check_type_empty, distinguished, relaxed};
     use crate::encoding::{
         Capped, DecodeContext, DistinguishedValueDecoder, EmptyState, ForOverwrite, General,
         RestrictedDecodeContext, ValueDecoder, ValueEncoder, WireType,
@@ -412,7 +412,7 @@ mod utcoffset {
     #[test]
     fn check_type() {
         for zone in with_random_values(test_zones()) {
-            expedient::check_type(zone, 123, WireType::LengthDelimited).unwrap();
+            relaxed::check_type(zone, 123, WireType::LengthDelimited).unwrap();
             distinguished::check_type(zone, 123, WireType::LengthDelimited).unwrap();
         }
     }
@@ -510,7 +510,7 @@ mod offsetdatetime {
     use super::odt_compose;
     use super::primitivedatetime::test_datetimes;
     use super::utcoffset::test_zones;
-    use crate::encoding::test::{check_type_empty, distinguished, expedient};
+    use crate::encoding::test::{check_type_empty, distinguished, relaxed};
     use crate::encoding::WireType;
     use itertools::iproduct;
     use time::OffsetDateTime;
@@ -519,7 +519,7 @@ mod offsetdatetime {
     fn check_type() {
         for (datetime, zone) in with_random_values(iproduct!(test_datetimes(), test_zones())) {
             let odt = odt_compose(datetime, zone);
-            expedient::check_type(odt, 123, WireType::LengthDelimited).unwrap();
+            relaxed::check_type(odt, 123, WireType::LengthDelimited).unwrap();
             distinguished::check_type(odt, 123, WireType::LengthDelimited).unwrap();
         }
     }
@@ -572,7 +572,7 @@ delegate_value_encoding!(delegate from (General) to (Proxied<General>)
 #[cfg(test)]
 mod duration {
     use super::helpers::with_random_values;
-    use crate::encoding::test::{check_type_empty, distinguished, expedient};
+    use crate::encoding::test::{check_type_empty, distinguished, relaxed};
     use crate::encoding::{EmptyState, WireType};
     use time::Duration;
 
@@ -591,7 +591,7 @@ mod duration {
     #[test]
     fn check_type() {
         for duration in with_random_values(test_durations()) {
-            expedient::check_type(duration, 123, WireType::LengthDelimited).unwrap();
+            relaxed::check_type(duration, 123, WireType::LengthDelimited).unwrap();
             distinguished::check_type(duration, 123, WireType::LengthDelimited).unwrap();
         }
     }

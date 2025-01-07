@@ -486,8 +486,8 @@ impl RestrictedDecodeContext {
         self.context.limit_reached()
     }
 
-    /// Returns the inner non-restricted context for expedient decoding.
-    pub fn into_expedient(self) -> DecodeContext {
+    /// Returns the inner non-restricted context for relaxed decoding.
+    pub fn into_inner(self) -> DecodeContext {
         self.context
     }
 
@@ -956,7 +956,7 @@ pub trait WithCanonicity {
     ///
     /// If this method is always being used and canonicity information is always discarded,
     /// distinguished decoding may not be needed, and the program can be made more efficient by
-    /// simply using expedient decoding mode.
+    /// simply using relaxed decoding mode.
     fn value(self) -> Self::WithoutCanonicity;
 }
 
@@ -1523,14 +1523,12 @@ where
     }
 }
 
-// TODO(widders): actually yeah, rephrase everything to call it "relaxed" decoding not "expedient",
-//  this was a much better term to use
 /// Encoders' wire-type is relied upon by both relaxed and distinguished encoders, but it is written
-/// to be a separate trait so that distinguished encoders don't necessarily implement relaxed
+/// to be a separate trait so that distinguished decoders don't necessarily implement relaxed
 /// decoding. This isn't important in general; it's very unlikely anything would implement
-/// distinguished decoding without also implementing the corresponding expedient encoding, but
+/// distinguished decoding without also implementing the corresponding relaxed decoding, but
 /// this means that it can become a typo to use the relaxed decoding functions by accident when
-/// implementing the distinguished encoders, which could cause serious mishaps.
+/// implementing the distinguished decoders, which could cause serious mishaps.
 pub trait Wiretyped<E> {
     const WIRE_TYPE: WireType;
 }
@@ -1562,7 +1560,7 @@ pub trait ValueEncoder<E>: Wiretyped<E> {
     }
 }
 
-/// The core trait for decoding single values in expedient mode. Data is always copies when it is
+/// The core trait for decoding single values in relaxed mode. Data is always copies when it is
 /// read from the buffer.
 pub trait ValueDecoder<E>: ValueEncoder<E> {
     /// Decodes a field assuming the encoder's wire type directly from the buffer.
@@ -2463,13 +2461,13 @@ macro_rules! delegate_value_encoding {
 
     (
         delegate from ($from_ty:ty) to ($to_ty:ty) for type ($value_ty:ty) including distinguished
-        $(with where clause for expedient ($($expedient_where:tt)+))?
+        $(with where clause for relaxed ($($relaxed_where:tt)+))?
         $(with where clause for distinguished ($($distinguished_where:tt)+))?
         $(with generics ($($value_generics:tt)*))?
     ) => {
         delegate_value_encoding!(
             delegate from ($from_ty) to ($to_ty) for type ($value_ty)
-            $(with where clause ($($expedient_where)+))?
+            $(with where clause ($($relaxed_where)+))?
             $(with generics ($($value_generics)*))?
         );
 
@@ -2477,7 +2475,7 @@ macro_rules! delegate_value_encoding {
         for $value_ty
         where
             Self: $crate::encoding::DistinguishedValueDecoder<$to_ty>,
-            $($($expedient_where)+ ,)?
+            $($($relaxed_where)+ ,)?
             $($($distinguished_where)+ ,)?
         {
             const CHECKS_EMPTY: bool =
@@ -2504,7 +2502,7 @@ pub(crate) use delegate_value_encoding;
 
 /// Most kinds of encoder want to act as field encoders for bare values in any situation where they
 /// also implement value encoding. Only a couple encoders want to do anything fancy, like accepting
-/// alternate wire-types in expedient mode.
+/// alternate wire-types in relaxed mode; the rest want to use this to blanket those definitions.
 macro_rules! encoder_where_value_encoder {
     (
         $encoding:ty
@@ -2634,7 +2632,7 @@ mod test {
     use crate::Blob;
     use crate::DecodeErrorKind::OutOfDomainValue;
 
-    /// Generalized proptest macro. Kind must be either `expedient` or `distinguished`.
+    /// Generalized proptest macro. Kind must be either `relaxed` or `distinguished`.
     macro_rules! check_type_test {
         ($encoder:ty, $kind:ident, $ty:ty, $wire_type:expr) => {
             crate::encoding::test::check_type_test!($encoder, $kind, from $ty, into $ty,
@@ -2905,14 +2903,14 @@ mod test {
     // won't necessarily prepend-encode the exact same bytes that they forward-encode and we needn't
     // assert that they do.
     mod check_type_prepend_must_match_forward {
-        pub(crate) mod expedient {
+        pub(crate) mod relaxed {
             pub(crate) const VALUE: bool = false;
         }
         pub(crate) mod distinguished {
             pub(crate) const VALUE: bool = true;
         }
     }
-    check_type!(expedient, Decoder, DecodeContext::default(), decode);
+    check_type!(relaxed, Decoder, DecodeContext::default(), decode);
     check_type!(
         distinguished,
         DistinguishedDecoder,

@@ -172,7 +172,7 @@ mod test {
             use alloc::collections::BTreeMap;
             check_type_test!(
                 Map<General, General>,
-                expedient,
+                relaxed,
                 BTreeMap<u64, f32>,
                 WireType::LengthDelimited
             );
@@ -190,7 +190,7 @@ mod test {
             use alloc::collections::BTreeMap;
             check_type_test!(
                 Map<Fixed, Fixed>,
-                expedient,
+                relaxed,
                 BTreeMap<u64, f32>,
                 WireType::LengthDelimited
             );
@@ -208,7 +208,7 @@ mod test {
             use alloc::collections::BTreeMap;
             check_type_test!(
                 General,
-                expedient,
+                relaxed,
                 BTreeMap<bool, f32>,
                 WireType::LengthDelimited
             );

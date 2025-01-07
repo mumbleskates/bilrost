@@ -210,7 +210,7 @@ mod systemtime {
     use crate::encoding::test::{check_type_empty, check_type_test};
 
     check_type_empty!(SystemTime, via proxy);
-    check_type_test!(General, expedient, SystemTime, WireType::LengthDelimited);
+    check_type_test!(General, relaxed, SystemTime, WireType::LengthDelimited);
 }
 
 delegate_encoding!(delegate from (General) to (Unpacked<General>)
@@ -231,7 +231,7 @@ mod test {
             use std::collections::HashMap;
             check_type_test!(
                 Map<General, General>,
-                expedient,
+                relaxed,
                 HashMap<u64, f32>,
                 WireType::LengthDelimited
             );
@@ -243,7 +243,7 @@ mod test {
             use std::collections::HashMap;
             check_type_test!(
                 Map<Fixed, Fixed>,
-                expedient,
+                relaxed,
                 HashMap<u64, f32>,
                 WireType::LengthDelimited
             );
@@ -255,7 +255,7 @@ mod test {
             use std::collections::HashMap;
             check_type_test!(
                 General,
-                expedient,
+                relaxed,
                 HashMap<bool, u32>,
                 WireType::LengthDelimited
             );

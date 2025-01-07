@@ -70,7 +70,7 @@ impl DistinguishedValueDecoder<General> for bytestring::ByteString {
         buf: Capped<impl Buf + ?Sized>,
         ctx: RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
-        Self::decode_value(value, buf, ctx.into_expedient())?;
+        Self::decode_value(value, buf, ctx.into_inner())?;
         Ok(Canonicity::Canonical)
     }
 }
@@ -80,7 +80,7 @@ mod test {
     use super::General;
     use crate::encoding::test::check_type_test;
     use alloc::string::String;
-    check_type_test!(General, expedient, from String,
+    check_type_test!(General, relaxed, from String,
         into bytestring::ByteString, WireType::LengthDelimited);
     check_type_test!(General, distinguished, from String, into bytestring::ByteString,
         WireType::LengthDelimited);

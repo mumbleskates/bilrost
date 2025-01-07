@@ -35,7 +35,7 @@ delegate_encoding!(delegate from (General) to (Unpacked<General>)
     for type (BTreeSet<T>) including distinguished with generics (T));
 delegate_value_encoding!(delegate from (General) to (Map<General, General>)
     for type (BTreeMap<K, V>) including distinguished
-    with where clause for expedient (K: Ord)
+    with where clause for relaxed (K: Ord)
     with where clause for distinguished (V: Eq)
     with generics (K, V));
 
@@ -142,7 +142,7 @@ impl DistinguishedValueDecoder<General> for String {
         buf: Capped<impl Buf + ?Sized>,
         ctx: RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
-        Self::decode_value(value, buf, ctx.into_expedient())?;
+        Self::decode_value(value, buf, ctx.into_inner())?;
         Ok(Canonicity::Canonical)
     }
 }
@@ -151,7 +151,7 @@ impl DistinguishedValueDecoder<General> for String {
 mod string {
     use super::{General, String};
     use crate::encoding::test::check_type_test;
-    check_type_test!(General, expedient, String, WireType::LengthDelimited);
+    check_type_test!(General, relaxed, String, WireType::LengthDelimited);
     check_type_test!(General, distinguished, String, WireType::LengthDelimited);
 }
 
@@ -210,7 +210,7 @@ impl DistinguishedValueDecoder<General> for Cow<'_, str> {
 mod cow_string {
     use super::{Cow, General};
     use crate::encoding::test::check_type_test;
-    check_type_test!(General, expedient, Cow<str>, WireType::LengthDelimited);
+    check_type_test!(General, relaxed, Cow<str>, WireType::LengthDelimited);
     check_type_test!(General, distinguished, Cow<str>, WireType::LengthDelimited);
 }
 
@@ -260,7 +260,7 @@ impl DistinguishedValueDecoder<General> for Bytes {
         buf: Capped<impl Buf + ?Sized>,
         ctx: RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
-        Self::decode_value(value, buf, ctx.into_expedient())?;
+        Self::decode_value(value, buf, ctx.into_inner())?;
         Ok(Canonicity::Canonical)
     }
 }
@@ -269,7 +269,7 @@ impl DistinguishedValueDecoder<General> for Bytes {
 mod bytes_blob {
     use super::{Bytes, General, Vec};
     use crate::encoding::test::check_type_test;
-    check_type_test!(General, expedient, from Vec<u8>, into Bytes, WireType::LengthDelimited);
+    check_type_test!(General, relaxed, from Vec<u8>, into Bytes, WireType::LengthDelimited);
     check_type_test!(General, distinguished, from Vec<u8>, into Bytes, WireType::LengthDelimited);
 }
 
@@ -327,7 +327,7 @@ impl DistinguishedValueDecoder<General> for Blob {
 mod blob {
     use super::{Blob, General};
     use crate::encoding::test::check_type_test;
-    check_type_test!(General, expedient, Blob, WireType::LengthDelimited);
+    check_type_test!(General, relaxed, Blob, WireType::LengthDelimited);
     check_type_test!(General, distinguished, Blob, WireType::LengthDelimited);
 }
 
@@ -375,7 +375,7 @@ mod core_time {
     check_type_empty!(core::time::Duration, via proxy);
     check_type_test!(
         General,
-        expedient,
+        relaxed,
         core::time::Duration,
         WireType::LengthDelimited
     );

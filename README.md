@@ -136,9 +136,9 @@ assigned numbers agreed upon in advance by the message schema that specifies it.
 This can make the data much more compact than "schemaless" encodings like JSON,
 CBOR, etc., without sacrificing its extensibility: new fields can be added, and
 old fields removed, without necessarily breaking backwards compatibility with
-older versions of the encoding program. In the typical "expedient" decoding
-mode, any field not in the message schema is ignored when decoding, so if fields
-are added or removed over time the fields that remain in common will still be
+older versions of the encoding program. In the typical "relaxed" decoding mode,
+any field not in the message schema is ignored when decoding, so if fields are
+added or removed over time the fields that remain in common will still be
 mutually intelligible between the two versions of the schema. In this way,
 Bilrost is very similar to [protobuf][pb]. See also: [Design philosophy](
 #design-philosophy), [Comparisons to other encodings](
@@ -286,10 +286,9 @@ minimum expectation.
 
 [eq]: https://doc.rust-lang.org/std/cmp/trait.Eq.html
 
-Normal ("expedient") decoding may accept other byte strings as valid
-encodings of a given value, such as encodings that contain unknown fields or
-non-canonically encoded values[^noncanon]. Most of the time, this is what is
-desired.
+Normal ("relaxed") decoding may accept other byte strings as valid encodings of
+a given value, such as encodings that contain unknown fields or non-canonically
+encoded values[^noncanon]. Most of the time, this is what is desired.
 
 [^noncanon]: "Non-canonical" value encodings in Bilrost principally include
 fields that are represented in the encoding even though their value is

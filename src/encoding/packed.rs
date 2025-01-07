@@ -214,7 +214,7 @@ where
         } else {
             // Otherwise, try decoding it in the unpacked representation
             _ = ctx.check(Canonicity::NotCanonical)?;
-            unpacked::decode::<C, E>(wire_type, value, buf, ctx.into_expedient())?;
+            unpacked::decode::<C, E>(wire_type, value, buf, ctx.into_inner())?;
             Ok(Canonicity::NotCanonical)
         }
     }
@@ -439,7 +439,7 @@ where
                 wire_type,
                 value,
                 buf,
-                ctx.into_expedient(),
+                ctx.into_inner(),
             )?;
             Ok(Canonicity::NotCanonical)
         }

@@ -67,7 +67,7 @@ impl DistinguishedValueDecoder<PlainBytes> for Vec<u8> {
         buf: Capped<impl Buf + ?Sized>,
         ctx: RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
-        ValueDecoder::<PlainBytes>::decode_value(value, buf, ctx.into_expedient())?;
+        ValueDecoder::<PlainBytes>::decode_value(value, buf, ctx.into_inner())?;
         Ok(Canonicity::Canonical)
     }
 }
@@ -81,7 +81,7 @@ delegate_encoding!(delegate from (PlainBytes) to (crate::encoding::Unpacked<Plai
 mod vec_u8 {
     use super::{PlainBytes, Vec};
     use crate::encoding::test::check_type_test;
-    check_type_test!(PlainBytes, expedient, Vec<u8>, WireType::LengthDelimited);
+    check_type_test!(PlainBytes, relaxed, Vec<u8>, WireType::LengthDelimited);
     check_type_test!(
         PlainBytes,
         distinguished,
@@ -145,7 +145,7 @@ impl DistinguishedValueDecoder<PlainBytes> for Cow<'_, [u8]> {
 mod cow_bytes {
     use super::{Cow, PlainBytes};
     use crate::encoding::test::check_type_test;
-    check_type_test!(PlainBytes, expedient, Cow<[u8]>, WireType::LengthDelimited);
+    check_type_test!(PlainBytes, relaxed, Cow<[u8]>, WireType::LengthDelimited);
     check_type_test!(
         PlainBytes,
         distinguished,
@@ -209,7 +209,7 @@ impl<const N: usize> DistinguishedValueDecoder<PlainBytes> for [u8; N] {
         buf: Capped<impl Buf + ?Sized>,
         ctx: RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
-        ValueDecoder::<PlainBytes>::decode_value(value, buf, ctx.into_expedient())?;
+        ValueDecoder::<PlainBytes>::decode_value(value, buf, ctx.into_inner())?;
         Ok(Canonicity::Canonical)
     }
 }
@@ -219,7 +219,7 @@ mod u8_array {
     mod length_0 {
         use crate::encoding::test::check_type_test;
         use crate::encoding::PlainBytes;
-        check_type_test!(PlainBytes, expedient, [u8; 0], WireType::LengthDelimited);
+        check_type_test!(PlainBytes, relaxed, [u8; 0], WireType::LengthDelimited);
         check_type_test!(
             PlainBytes,
             distinguished,
@@ -231,7 +231,7 @@ mod u8_array {
     mod length_1 {
         use crate::encoding::test::check_type_test;
         use crate::encoding::PlainBytes;
-        check_type_test!(PlainBytes, expedient, [u8; 1], WireType::LengthDelimited);
+        check_type_test!(PlainBytes, relaxed, [u8; 1], WireType::LengthDelimited);
         check_type_test!(
             PlainBytes,
             distinguished,
@@ -243,7 +243,7 @@ mod u8_array {
     mod length_8 {
         use crate::encoding::test::check_type_test;
         use crate::encoding::PlainBytes;
-        check_type_test!(PlainBytes, expedient, [u8; 8], WireType::LengthDelimited);
+        check_type_test!(PlainBytes, relaxed, [u8; 8], WireType::LengthDelimited);
         check_type_test!(
             PlainBytes,
             distinguished,
@@ -255,7 +255,7 @@ mod u8_array {
     mod length_13 {
         use crate::encoding::test::check_type_test;
         use crate::encoding::PlainBytes;
-        check_type_test!(PlainBytes, expedient, [u8; 13], WireType::LengthDelimited);
+        check_type_test!(PlainBytes, relaxed, [u8; 13], WireType::LengthDelimited);
         check_type_test!(
             PlainBytes,
             distinguished,
@@ -325,7 +325,7 @@ macro_rules! plain_bytes_vec_impl {
                 ctx: $crate::encoding::RestrictedDecodeContext,
             ) -> Result<$crate::Canonicity, $crate::DecodeError> {
                 $crate::encoding::ValueDecoder::<$crate::encoding::PlainBytes>::decode_value(
-                    value, buf, ctx.into_expedient())?;
+                    value, buf, ctx.into_inner())?;
                 Ok($crate::Canonicity::Canonical)
             }
         }
@@ -341,7 +341,7 @@ pub(crate) mod test {
         ($ty:ty) => {
             $crate::encoding::test::check_type_test!(
                 $crate::encoding::PlainBytes,
-                expedient,
+                relaxed,
                 from ::alloc::vec::Vec<u8>,
                 into $ty,
                 converter(val) val.into_iter().collect(),
@@ -365,7 +365,7 @@ pub(crate) mod test {
                 #[test]
                 fn check(from in prop::collection::vec(any::<u8>(), 0..=$N), tag: u32) {
                     let into: $ty = from.into_iter().collect();
-                    $crate::encoding::test::expedient::
+                    $crate::encoding::test::relaxed::
                         check_type::<$ty, $crate::encoding::PlainBytes>
                     (
                         into.clone(),
@@ -386,7 +386,7 @@ pub(crate) mod test {
                     tag: u32,
                 ) {
                     let into: Option<$ty> = from.map(|val| val.into_iter().collect());
-                    $crate::encoding::test::expedient::
+                    $crate::encoding::test::relaxed::
                         check_type::<Option<$ty>, $crate::encoding::PlainBytes>
                     (
                         into.clone(),

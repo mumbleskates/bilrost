@@ -3,7 +3,7 @@
 ### Breaking changes
 
 * The (unstable) internal encoding traits continue to evolve, this time to split
-  expedient decoding functionality out of encoding traits and into an
+  relaxed decoding functionality out of encoding traits and into an
   independent trait.
 
 ### New features
@@ -13,6 +13,8 @@
 ### Fixes
 
 ### Cleanups
+
+* Changed internal and external phrasing from "expedient" encoding to "relaxed".
 
 ## v0.1011.0
 

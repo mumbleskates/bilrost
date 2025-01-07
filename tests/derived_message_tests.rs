@@ -150,7 +150,7 @@ mod assert {
         assert_eq!(canon, Canonical);
         let mut to_replace = M::empty();
         to_replace.replace_from(encoded.as_slice()).unwrap();
-        assert_eq!(&to_replace, &into, "doesn't match after expedient replace");
+        assert_eq!(&to_replace, &into, "doesn't match after relaxed replace");
         to_replace = M::empty();
         assert_eq!(
             to_replace.replace_distinguished_from(encoded.as_slice()),
@@ -295,7 +295,7 @@ mod assert {
         let encoded = from.into_opaque_message().encode_to_vec();
         assert_error(
             M::decode(encoded.as_slice())
-                .expect_err("unepectedly decoded in expedient mode without error"),
+                .expect_err("unepectedly decoded in relaxed mode without error"),
             err,
             err_path,
         );
@@ -303,7 +303,7 @@ mod assert {
         assert_error(
             to_replace
                 .replace_from(encoded.as_slice())
-                .expect_err("unexpectedly replaced in expedient mode without error"),
+                .expect_err("unexpectedly replaced in relaxed mode without error"),
             err,
             err_path,
         );
@@ -1229,7 +1229,7 @@ fn preserves_floating_point_special_values() {
         (0xffff_4321, 0x7fff_dead_beef_cafe)
     );
     // Zeros that are encoded anyway still decode without error, because we are
-    // necessarily in expedient mode (floats don't impl `Eq`)
+    // necessarily in relaxed mode (floats don't impl `Eq`)
     let decoded = Foo::from_opaque(&present_zeros);
     assert_eq!((decoded.0.to_bits(), decoded.1.to_bits()), (0, 0));
 
@@ -1261,7 +1261,7 @@ fn preserves_floating_point_special_values() {
         (0xffff_4321, 0x7fff_dead_beef_cafe)
     );
     // Zeros that are encoded anyway still decode without error, because we are
-    // necessarily in expedient mode (floats don't impl `Eq`)
+    // necessarily in relaxed mode (floats don't impl `Eq`)
     let decoded = Bar::from_opaque(&present_zeros);
     assert_eq!((decoded.0.to_bits(), decoded.1.to_bits()), (0, 0));
 }
@@ -2008,7 +2008,7 @@ fn decoding_vecs_with_swapped_packedness() {
         ),
     ];
 
-    // In expedient mode, packed sets will decode unpacked values and vice versa, but this is
+    // In relaxed mode, packed sets will decode unpacked values and vice versa, but this is
     // only detectable when the values are not length-delimited.
     for (ref packed, ref unpacked, expected) in values.map(|(items, expected)| {
         (
@@ -2170,7 +2170,7 @@ fn decoding_arrays_with_swapped_packedness_of_size<const N: usize>() {
     almost_empty[N - 1] = 5;
     let almost_empty = almost_empty;
 
-    // In expedient mode, packed arrays will decode unpacked values and vice versa, but this is
+    // In relaxed mode, packed arrays will decode unpacked values and vice versa, but this is
     // only detectable when the values are not length-delimited.
     assert::decodes_non_canonically(
         [(1, OV::packed(vec![OV::i32(5); N]))],
@@ -2591,7 +2591,7 @@ fn decoding_sets_with_swapped_packedness() {
     let (repeated_set_packed, repeated_set_unpacked) = &repeated;
     let expected_items = [1u32, 2, 3];
 
-    // In expedient mode, packed sets will decode unpacked values and vice versa, but this is
+    // In relaxed mode, packed sets will decode unpacked values and vice versa, but this is
     // only detectable when the values are not length-delimited.
     {
         use std::collections::BTreeSet;

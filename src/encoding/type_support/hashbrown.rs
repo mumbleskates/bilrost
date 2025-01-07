@@ -150,7 +150,7 @@ mod test {
             use hashbrown::HashMap;
             check_type_test!(
                 Map<General, General>,
-                expedient,
+                relaxed,
                 from BTreeMap<u64, f32>,
                 into HashMap<u64, f32>,
                 converter(value) {
@@ -167,7 +167,7 @@ mod test {
             use hashbrown::HashMap;
             check_type_test!(
                 Map<Fixed, Fixed>,
-                expedient,
+                relaxed,
                 from BTreeMap<u64, f32>,
                 into HashMap<u64, f32>,
                 converter(value) {
@@ -184,7 +184,7 @@ mod test {
             use hashbrown::HashMap;
             check_type_test!(
                 General,
-                expedient,
+                relaxed,
                 from BTreeMap<bool, u32>,
                 into HashMap<bool, u32>,
                 converter(value) {

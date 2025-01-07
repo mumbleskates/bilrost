@@ -201,7 +201,7 @@ macro_rules! impl_tuple {
 
                 check_type_test!(
                     General,
-                    expedient,
+                    relaxed,
                     from [T; $arity],
                     into ($($tees,)*),
                     converter(value) { super::super::array_to_tuple(value) },
@@ -223,7 +223,7 @@ macro_rules! impl_tuple {
 
                 check_type_test!(
                     ($($encodings,)*),
-                    expedient,
+                    relaxed,
                     from [T; $arity],
                     into ($($tees,)*),
                     converter(value) { super::super::array_to_tuple(value) },
@@ -245,7 +245,7 @@ macro_rules! impl_tuple {
 
                 check_type_test!(
                     ($($encodings,)*),
-                    expedient,
+                    relaxed,
                     from [T; $arity],
                     into ($($tees,)*),
                     converter(value) { super::super::array_to_tuple(value) },
@@ -259,7 +259,7 @@ macro_rules! impl_tuple {
 
                 check_type_test!(
                     ($($encodings,)*),
-                    expedient,
+                    relaxed,
                     from [T; $arity],
                     into ($($tees,)*),
                     converter(value) { super::super::array_to_tuple(value) },
