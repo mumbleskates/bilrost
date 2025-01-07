@@ -3057,6 +3057,21 @@ fn oneof_as_message_unqualified() {
     );
 }
 
+#[test]
+fn distinguished_oneof_with_nonempty_variant() {
+    #[derive(Debug, PartialEq, Eq, Enumeration)]
+    enum NonEmptyTy {
+        #[bilrost(5)]
+        Five,
+    }
+
+    #[derive(Debug, PartialEq, Eq, Oneof, DistinguishedOneof)]
+    enum DistinguishedEnum {
+        #[bilrost(1)]
+        A(NonEmptyTy),
+    }
+}
+
 // Enumeration tests
 
 #[test]

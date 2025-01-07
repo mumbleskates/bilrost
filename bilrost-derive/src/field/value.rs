@@ -209,14 +209,20 @@ impl Field {
                     )
                 ),
                 (Owned, Distinguished) => quote!(
-                    // Allow empty values: oneof field values are nested
-                    <#ty as ::bilrost::encoding::DistinguishedFieldDecoder<#encoding>>
-                        ::decode_field_distinguished::<true>(
-                            wire_type,
+                    ::bilrost::encoding::check_wire_type(
+                        <#ty as ::bilrost::encoding::Wiretyped<#encoding>>::WIRE_TYPE,
+                        wire_type,
+                    )
+                    .and_then(|()| {
+                        <#ty as ::bilrost::encoding::DistinguishedValueEncoder<#encoding>>::
+                            // Allow empty values: oneof field values are nested
+                            decode_value_distinguished::<true>
+                        (
                             #ident,
                             buf,
                             ctx.clone(),
                         )
+                    })
                 ),
                 // TODO(widders): borrowed
             }
