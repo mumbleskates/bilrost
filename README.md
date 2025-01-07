@@ -667,7 +667,7 @@ from minimum to maximum separated with a dash (like `1-5`). For both
 
 The field tags in the oneof must be unique, both within the oneof itself and
 within any message containing it. Oneof variants can only contain types that
-can be nested (so "unpacked" collections cannot be supported). Mechanically, a
+can be nested (so "unpacked" collections cannot be supported). On the wire, a
 oneof works exactly the same as if there were an `Option<T>` field for each of
 its variants, except at most one of them can be `Some`.
 
