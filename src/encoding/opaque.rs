@@ -10,12 +10,12 @@ use bytes::{Buf, BufMut};
 use crate::buf::ReverseBuf;
 use crate::encoding::{
     encode_varint, encoded_len_varint, prepend_varint, Capped, DecodeContext, EmptyState,
-    ForOverwrite, RestrictedDecodeContext, RuntimeTagMeasurer, TagMeasurer, TagRevWriter,
-    TagWriter, WireType,
+    ForOverwrite, RawDistinguishedMessageDecoder, RawMessage, RestrictedDecodeContext,
+    RuntimeTagMeasurer, TagMeasurer, TagRevWriter, TagWriter, WireType,
 };
 use crate::iter::FlatAdapter;
 use crate::DecodeErrorKind::Truncated;
-use crate::{Canonicity, DecodeError, Message, RawDistinguishedMessage, RawMessage};
+use crate::{Canonicity, DecodeError, Message};
 
 /// Represents an opaque bilrost field value. Can represent any valid encoded value.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -389,7 +389,7 @@ impl RawMessage for OpaqueMessage<'_> {
     }
 }
 
-impl RawDistinguishedMessage for OpaqueMessage<'_> {
+impl RawDistinguishedMessageDecoder for OpaqueMessage<'_> {
     fn raw_decode_field_distinguished<B: Buf + ?Sized>(
         &mut self,
         tag: u32,

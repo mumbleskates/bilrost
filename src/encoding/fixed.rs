@@ -189,12 +189,7 @@ macro_rules! fixed_width_array {
         #[cfg(test)]
         mod $test_name {
             use crate::encoding::Fixed;
-            crate::encoding::test::check_type_test!(
-                Fixed,
-                relaxed,
-                [u8; $N],
-                WireType::$wire_type
-            );
+            crate::encoding::test::check_type_test!(Fixed, relaxed, [u8; $N], WireType::$wire_type);
             crate::encoding::test::check_type_test!(
                 Fixed,
                 distinguished,

@@ -9,7 +9,12 @@ use quote::quote;
 use syn::{parse_str, Index, Meta, Type};
 
 use crate::attrs::{named_attr, tag_attr, word_attr};
-use crate::field::{set_bool, set_option, WhereFor};
+use crate::field::{
+    set_bool, set_option,
+    DecodeLifetime::{self, Borrowed, Owned},
+    DecodeMode::{self, Distinguished, Relaxed},
+    WhereFor::{self, Decode, Encode},
+};
 
 /// A scalar protobuf field.
 #[derive(Clone)]
@@ -185,57 +190,58 @@ impl Field {
 
     /// Returns an expression which evaluates to the result of merging a decoded value into the
     /// field. The given ident must be an &mut that already refers to the destination.
-    pub fn decode_expedient(&self, ident: TokenStream) -> TokenStream {
-        let encoder = &self.encoding;
+    pub fn decode(
+        &self,
+        ident: TokenStream,
+        lifetime: DecodeLifetime,
+        mode: DecodeMode,
+    ) -> TokenStream {
+        let encoding = &self.encoding;
         let ty = &self.ty;
         if self.in_oneof {
-            quote!(
-                <#ty as ::bilrost::encoding::FieldDecoder<#encoder>>::decode_field(
-                    wire_type,
-                    #ident,
-                    buf,
-                    ctx,
-                )
-            )
-        } else {
-            quote!(
-                <#ty as ::bilrost::encoding::Decoder<#encoder>>::decode(
-                    wire_type,
-                    duplicated,
-                    #ident,
-                    buf,
-                    ctx,
-                )
-            )
-        }
-    }
-
-    /// Returns an expression which evaluates to the result of decoding a value into the field in
-    /// distinguished mode. The given ident must be an &mut that already refers to the destination.
-    pub fn decode_distinguished(&self, ident: TokenStream) -> TokenStream {
-        let encoder = &self.encoding;
-        let ty = &self.ty;
-        if self.in_oneof {
-            quote!(
-                // Allow empty values: oneof field values are nested
-                <#ty as ::bilrost::encoding::DistinguishedFieldDecoder<#encoder>>
-                    ::decode_field_distinguished::<true>(
+            match (lifetime, mode) {
+                (Owned, Relaxed) => quote!(
+                    <#ty as ::bilrost::encoding::FieldDecoder<#encoding>>::decode_field(
                         wire_type,
+                        #ident,
+                        buf,
+                        ctx,
+                    )
+                ),
+                (Owned, Distinguished) => quote!(
+                    // Allow empty values: oneof field values are nested
+                    <#ty as ::bilrost::encoding::DistinguishedFieldDecoder<#encoding>>
+                        ::decode_field_distinguished::<true>(
+                            wire_type,
+                            #ident,
+                            buf,
+                            ctx.clone(),
+                        )
+                ),
+                // TODO(widders): borrowed
+            }
+        } else {
+            match (lifetime, mode) {
+                (Owned, Relaxed) => quote!(
+                    <#ty as ::bilrost::encoding::Decoder<#encoding>>::decode(
+                        wire_type,
+                        duplicated,
+                        #ident,
+                        buf,
+                        ctx,
+                    )
+                ),
+                (Owned, Distinguished) => quote!(
+                    <#ty as ::bilrost::encoding::DistinguishedDecoder<#encoding>>::decode_distinguished(
+                        wire_type,
+                        duplicated,
                         #ident,
                         buf,
                         ctx.clone(),
                     )
-            )
-        } else {
-            quote!(
-                <#ty as ::bilrost::encoding::DistinguishedDecoder<#encoder>>::decode_distinguished(
-                    wire_type,
-                    duplicated,
-                    #ident,
-                    buf,
-                    ctx.clone(),
-                )
-            )
+                ),
+                // TODO(widders): borrowed
+            }
         }
     }
 
@@ -261,73 +267,55 @@ impl Field {
     }
 
     /// Returns the where clause constraint terms for the field's encoder.
-    pub fn expedient_where_terms(&self, purpose: WhereFor) -> Vec<TokenStream> {
+    pub fn where_terms(&self, purpose: WhereFor) -> Vec<TokenStream> {
         if self.recurses {
             return vec![];
         }
         let ty = &self.ty;
-        let encoder = &self.encoding;
-        match (purpose, self.in_oneof) {
-            (WhereFor::Encode, true) => vec![
-                quote!(#ty: ::bilrost::encoding::ValueEncoder<#encoder>),
+        let encoding = &self.encoding;
+        if self.in_oneof {
+            vec![
+                match purpose {
+                    Encode => quote!(#ty: ::bilrost::encoding::ValueEncoder<#encoding>),
+                    Decode(Owned, Relaxed) => {
+                        quote!(#ty: ::bilrost::encoding::ValueDecoder<#encoding>)
+                    }
+                    Decode(Borrowed, Relaxed) => {
+                        quote!(#ty: ::bilrost::encoding::ValueBorrowDecoder<'__a, #encoding>)
+                    }
+                    Decode(Owned, Distinguished) => {
+                        quote!(#ty: ::bilrost::encoding::ValueBorrowDecoder<#encoding>)
+                    }
+                    Decode(Borrowed, Distinguished) => {
+                        quote!(#ty: ::bilrost::encoding::ValueBorrowDecoder<'__a, #encoding>)
+                    }
+                },
                 quote!(#ty: ::bilrost::encoding::ForOverwrite),
-            ],
-            (WhereFor::Encode, false) => vec![
-                quote!(#ty: ::bilrost::encoding::Encoder<#encoder>),
+            ]
+        } else {
+            vec![
+                match purpose {
+                    Encode => quote!(#ty: ::bilrost::encoding::Encoder<#encoding>),
+                    Decode(Owned, Relaxed) => {
+                        quote!(#ty: ::bilrost::encoding::Decoder<#encoding>)
+                    }
+                    Decode(Borrowed, Relaxed) => {
+                        quote!(#ty: ::bilrost::encoding::BorrowDecoder<'__a, #encoding>)
+                    }
+                    Decode(Owned, Distinguished) => {
+                        quote!(#ty: ::bilrost::encoding::DistinguishedDecoder<#encoding>)
+                    }
+                    Decode(Borrowed, Distinguished) => {
+                        quote!(
+                            #ty: ::bilrost::encoding::DistinguishedBorrowDecoder<'__a, #encoding>
+                        )
+                    }
+                },
+                // Distinguished decoding always requires EmptyState instead of just ForOverwrite
+                // because we must check whether values are still empty after we've decoded them.
                 quote!(#ty: ::bilrost::encoding::EmptyState),
-            ],
-            (WhereFor::DecodeOwned, true) => vec![
-                quote!(#ty: ::bilrost::encoding::ValueDecoder<#encoder>),
-                quote!(#ty: ::bilrost::encoding::ForOverwrite),
-            ],
-            (WhereFor::DecodeOwned, false) => vec![
-                quote!(#ty: ::bilrost::encoding::Decoder<#encoder>),
-                quote!(#ty: ::bilrost::encoding::EmptyState),
-            ],
-            (WhereFor::DecodeBorrowed, true) => vec![
-                quote!(#ty: ::bilrost::encoding::BorrowValueDecoder<#encoder>),
-                quote!(#ty: ::bilrost::encoding::ForOverwrite),
-            ],
-            (WhereFor::DecodeBorrowed, false) => vec![
-                quote!(#ty: ::bilrost::encoding::BorrowDecoder<#encoder>),
-                quote!(#ty: ::bilrost::encoding::EmptyState),
-            ],
+            ]
         }
-    }
-
-    /// Returns the where clause constraint terms for the field's encoder.
-    ///
-    /// This always requires EmptyState instead of just ForOverwrite, because we must check whether
-    /// values are still empty after we've decoded them.
-    pub fn distinguished_where_terms(&self, purpose: WhereFor) -> Vec<TokenStream> {
-        if self.recurses {
-            return vec![];
-        }
-        let ty = &self.ty;
-        let encoder = &self.encoding;
-        vec![
-            match (purpose, self.in_oneof) {
-                (WhereFor::Encode, true) => {
-                    quote!(#ty: ::bilrost::encoding::DistinguishedValueEncoder<#encoder>)
-                }
-                (WhereFor::Encode, false) => {
-                    quote!(#ty: ::bilrost::encoding::DistinguishedEncoder<#encoder>)
-                }
-                (WhereFor::DecodeOwned, true) => {
-                    quote!(#ty: ::bilrost::encoding::DistinguishedValueDecoder<#encoder>)
-                }
-                (WhereFor::DecodeOwned, false) => {
-                    quote!(#ty: ::bilrost::encoding::DistinguishedDecoder<#encoder>)
-                }
-                (WhereFor::DecodeBorrowed, true) => {
-                    quote!(#ty: ::bilrost::encoding::DistinguishedBorrowValueDecoder<#encoder>)
-                }
-                (WhereFor::DecodeBorrowed, false) => {
-                    quote!(#ty: ::bilrost::encoding::DistinguishedBorrowDecoder<#encoder>)
-                }
-            },
-            quote!(#ty: ::bilrost::encoding::EmptyState),
-        ]
     }
 
     /// Returns methods to embed in the message. `ident` must be the name of the field within the

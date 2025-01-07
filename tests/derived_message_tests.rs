@@ -12,8 +12,8 @@ use itertools::{repeat_n, Itertools};
 
 use bilrost::encoding::opaque::{OpaqueMessage, OpaqueValue as OV};
 use bilrost::encoding::{
-    self, encode_varint, Collection, DistinguishedOneofDecode, EmptyState, Fixed, General, Mapping,
-    Oneof, Packed, Varint,
+    self, encode_varint, Collection, DistinguishedOneofDecoder, EmptyState, Fixed, General,
+    Mapping, Oneof, Packed, Varint,
 };
 use bilrost::Canonicity::{HasExtensions, NotCanonical};
 use bilrost::DecodeErrorKind::{
@@ -400,10 +400,10 @@ fn derived_trait_bounds() {
         #[bilrost(2)]
         Two(T),
     }
-    static_assertions::assert_impl_all!(A<bool>: Oneof, DistinguishedOneofDecode);
+    static_assertions::assert_impl_all!(A<bool>: Oneof, DistinguishedOneofDecoder);
     static_assertions::assert_impl_all!(A<f32>: Oneof);
-    static_assertions::assert_not_impl_any!(A<f32>: DistinguishedOneofDecode);
-    static_assertions::assert_not_impl_any!(A<X>: Oneof, DistinguishedOneofDecode);
+    static_assertions::assert_not_impl_any!(A<f32>: DistinguishedOneofDecoder);
+    static_assertions::assert_not_impl_any!(A<X>: Oneof, DistinguishedOneofDecoder);
 
     #[allow(dead_code)]
     #[derive(PartialEq, Eq, Message, DistinguishedMessage)]
@@ -2782,7 +2782,7 @@ fn truncated_packed_collection() {
 fn oneof_field_decoding() {
     fn do_oneof_field_decoding<T>(expected_a: T, expected_b: T)
     where
-        T: Debug + Eq + DistinguishedOneofDecode,
+        T: Debug + Eq + DistinguishedOneofDecoder,
     {
         #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
         struct Foo<T>(#[bilrost(oneof = "1, 2")] T);
@@ -2870,7 +2870,7 @@ fn oneof_with_errors_inside() {
 
     fn do_test_oneof_with_errors_inside<OneofType>(child_field: &str)
     where
-        OneofType: Debug + Eq + DistinguishedOneofDecode,
+        OneofType: Debug + Eq + DistinguishedOneofDecoder,
     {
         #[derive(Clone, Debug, PartialEq, Eq, Message, DistinguishedMessage)]
         struct Foo<O> {
@@ -3034,7 +3034,9 @@ fn oneof_as_message() {
 #[test]
 fn oneof_as_message_unqualified() {
     #[allow(dead_code)]
-    #[derive(Debug, PartialEq, Eq, Oneof, DistinguishedOneof, /*Message,*/ DistinguishedMessage)]
+    #[derive(
+        Debug, PartialEq, Eq, Oneof, DistinguishedOneof, /*Message,*/ DistinguishedMessage,
+    )]
     enum Maybe<T> {
         Nothing,
         #[bilrost(1)]
@@ -3042,16 +3044,16 @@ fn oneof_as_message_unqualified() {
     }
 
     static_assertions::assert_impl_all!(
-        Maybe<i32>: Oneof, DistinguishedOneofDecode, Message, DistinguishedMessage
+        Maybe<i32>: Oneof, DistinguishedOneofDecoder, Message, DistinguishedMessage
     );
 
     static_assertions::assert_impl_all!(Maybe<f64>: Oneof, Message);
-    static_assertions::assert_not_impl_any!(Maybe<f64>: DistinguishedOneofDecode, DistinguishedMessage);
+    static_assertions::assert_not_impl_any!(Maybe<f64>: DistinguishedOneofDecoder, DistinguishedMessage);
 
     #[allow(dead_code)]
     struct NotEncodable;
     static_assertions::assert_not_impl_any!(
-        Maybe<NotEncodable>: Oneof, DistinguishedOneofDecode, Message, DistinguishedMessage
+        Maybe<NotEncodable>: Oneof, DistinguishedOneofDecoder, Message, DistinguishedMessage
     );
 }
 

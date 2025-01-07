@@ -26,12 +26,17 @@ use proc_macro2::{Span, TokenStream};
 use quote::{quote, ToTokens, TokenStreamExt};
 use syn::{
     parse2, Attribute, Data, DataEnum, DataStruct, DeriveInput, Expr, Fields, FieldsNamed,
-    FieldsUnnamed, Ident, ImplGenerics, Index, Meta, MetaList, MetaNameValue, Pat, TypeGenerics,
+    FieldsUnnamed, Generics, Ident, Index, Meta, MetaList, MetaNameValue, Pat, TypeGenerics,
     Variant, WhereClause,
 };
 
 use crate::attrs::{tag_list_attr, TagList};
-use crate::field::{bilrost_attrs, set_option, Field, WhereFor};
+use crate::field::{
+    bilrost_attrs, set_option,
+    DecodeMode::*,
+    Field,
+    WhereFor::{self, *},
+};
 
 mod attrs;
 mod field;
@@ -103,7 +108,7 @@ use FieldChunk::*;
 
 struct PreprocessedMessage<'a> {
     ident: Ident,
-    impl_generics: ImplGenerics<'a>,
+    impl_generics: &'a Generics,
     ty_generics: TypeGenerics<'a>,
     where_clause: Option<&'a WhereClause>,
     unsorted_fields: Vec<(TokenStream, Field)>,
@@ -220,11 +225,11 @@ fn preprocess_message(input: &DeriveInput) -> Result<PreprocessedMessage, Error>
         bail!("message {ident} has duplicate tag {duplicate_tag}")
     };
 
-    let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
+    let (_, ty_generics, where_clause) = input.generics.split_for_impl();
 
     Ok(PreprocessedMessage {
         ident,
-        impl_generics,
+        impl_generics: &input.generics,
         ty_generics,
         where_clause,
         unsorted_fields,
@@ -348,56 +353,49 @@ fn sort_fields(unsorted_fields: Vec<(TokenStream, Field)>) -> Vec<FieldChunk> {
     chunks
 }
 
-/// Combines an optional already-existing where clause with additional terms for each field's
-/// encoder to assert that it supports the field's type.
-fn impl_append_wheres(
+/// Appends a WhereClause and a provided optional where term(s) into a phrase that will always be a
+/// valid where clause if present.
+fn append_self_where(
     where_clause: Option<&WhereClause>,
     self_where: Option<TokenStream>,
-    field_wheres: impl IntoIterator<Item = TokenStream>,
-) -> TokenStream {
-    // dedup the where clauses by their String values
-    let encoder_wheres: BTreeMap<_, _> = field_wheres
-        .into_iter()
-        .map(|where_| (where_.to_string(), where_))
-        .collect();
-    let appended_wheres: Vec<_> = self_where.iter().chain(encoder_wheres.values()).collect();
-    if let Some(where_clause) = where_clause {
-        quote! { #where_clause #(, #appended_wheres)* }
-    } else if appended_wheres.is_empty() {
-        quote!() // no where clause terms
-    } else {
-        quote! { where #(#appended_wheres),*}
+) -> Option<TokenStream> {
+    match (where_clause, self_where) {
+        (Some(a), Some(b)) => Some(quote!(#a, #b)),
+        (Some(a), None) => Some(quote!(#a)),
+        (None, Some(b)) => Some(quote!(where #b)),
+        _ => None,
     }
 }
 
-fn append_expedient_encoder_wheres<T>(
+/// Combines an optional already-existing where clause with additional terms for each field's
+/// encoder to assert that it supports the field's type.
+fn append_wheres<T>(
     where_clause: Option<&WhereClause>,
     self_where: Option<TokenStream>,
     fields: &[(T, Field)],
     field_purpose: WhereFor,
-) -> TokenStream {
-    impl_append_wheres(
-        where_clause,
-        self_where,
-        fields
-            .iter()
-            .flat_map(|(_, field)| field.expedient_where_terms(field_purpose)),
-    )
+) -> Option<TokenStream> {
+    // dedup the where clauses by their String values
+    let encoder_wheres: BTreeMap<_, _> = fields
+        .iter()
+        .flat_map(|(_, field)| field.expedient_where_terms(field_purpose))
+        .map(|where_| (where_.to_string(), where_))
+        .collect();
+    let mut appended_wheres = encoder_wheres.values().peekable();
+    // append our encoder where terms to the existing where clause if there is one
+    if let Some(header) = append_self_where(where_clause, self_where) {
+        Some(quote! { #header #(, #appended_wheres)* })
+    } else if appended_wheres.peek().is_none() {
+        None
+    } else {
+        Some(quote! { where #(#appended_wheres),*})
+    }
 }
 
-fn append_distinguished_encoder_wheres<T>(
-    where_clause: Option<&WhereClause>,
-    self_where: Option<TokenStream>,
-    fields: &[(T, Field)],
-    field_purpose: WhereFor,
-) -> TokenStream {
-    impl_append_wheres(
-        where_clause,
-        self_where,
-        fields
-            .iter()
-            .flat_map(|(_, field)| field.distinguished_where_terms(field_purpose)),
-    )
+/// Adds the given identifier to the generics list
+fn append_generic(generics: &Generics, ident: TokenStream) -> TokenStream {
+    let params = generics.params.iter();
+    quote!(<#ident, #(#params)*>)
 }
 
 fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
@@ -417,16 +415,26 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         tag_range,
     } = preprocess_message(&input)?;
     let fields = sort_fields(unsorted_fields.clone());
-    let where_clause = append_expedient_encoder_wheres(
+    let self_where = if has_ignored_fields {
+        // When there are ignored fields, the whole message impl should be bounded by
+        // Self: Default
+        Some(quote!(Self: core::default::Default))
+    } else {
+        None
+    };
+    let encoder_where_clause =
+        append_wheres(where_clause, self_where.clone(), &unsorted_fields, Encode);
+    let owned_decoder_where_clause = append_wheres(
         where_clause,
-        if has_ignored_fields {
-            // When there are ignored fields, the whole message impl should be bounded by
-            // Self: Default
-            Some(quote!(Self: core::default::Default))
-        } else {
-            None
-        },
+        self_where.clone(),
         &unsorted_fields,
+        DecodeOwned(Relaxed),
+    );
+    let borrow_decoder_where_clause = append_wheres(
+        where_clause,
+        self_where.clone(),
+        &unsorted_fields,
+        DecodeBorrowed(Relaxed),
     );
 
     // If there can never be a tag delta larger than 31, field keys will never be more than 1 byte.
@@ -635,7 +643,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     } else {
         quote! {
             #[allow(dead_code)]
-            impl #impl_generics #ident #ty_generics #where_clause {
+            impl #impl_generics #ident #ty_generics #encoder_where_clause {
                 #(#methods)*
             }
         }
@@ -664,7 +672,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     // Even in rust 1.79 nightly, if the constant is never named anywhere the assertions won't
     // actually run.
     let expanded = quote! {
-        impl #impl_generics ::bilrost::RawMessage for #ident #ty_generics #where_clause {
+        impl #impl_generics ::bilrost::RawMessage for #ident #ty_generics #encoder_where_clause {
             const __ASSERTIONS: () = { #(#static_guards)* };
 
             #[allow(unused_variables)]
@@ -718,7 +726,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         }
 
         impl #impl_generics ::bilrost::encoding::ForOverwrite
-        for #ident #ty_generics #where_clause {
+        for #ident #ty_generics #borrow_decoder_where_clause {
             fn for_overwrite() -> Self {
                 Self {
                     #(#field_idents: ::bilrost::encoding::ForOverwrite::for_overwrite(),)*
@@ -728,7 +736,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         }
 
         impl #impl_generics ::bilrost::encoding::EmptyState
-        for #ident #ty_generics #where_clause {
+        for #ident #ty_generics #borrow_decoder_where_clause {
             fn is_empty(&self) -> bool {
                 true #(&& ::bilrost::encoding::EmptyState::is_empty(&self.#field_idents))*
             }
@@ -776,14 +784,19 @@ fn message_via_oneof(input: DeriveInput) -> Result<TokenStream, Error> {
         bail!("Message can only be derived for Oneof enums that have an empty variant.")
     }
 
-    let where_clause = impl_append_wheres(
+    let encoder_where_clause =
+        append_self_where(where_clause, Some(quote!(Self: ::bilrost::encoding::Oneof)));
+    let owned_decoder_where_clause = append_self_where(
         where_clause,
-        Some(quote!(Self: ::bilrost::encoding::Oneof)),
-        None,
+        Some(quote!(Self: ::bilrost::encoding::OneofDecoder)),
+    );
+    let borrow_decoder_where_clause = append_self_where(
+        where_clause,
+        Some(quote!(Self: ::bilrost::encoding::OneofBorrowDecoder)),
     );
 
     Ok(quote! {
-        impl #impl_generics ::bilrost::RawMessage for #ident #ty_generics #where_clause {
+        impl #impl_generics ::bilrost::RawMessage for #ident #ty_generics #encoder_where_clause {
             const __ASSERTIONS: () = ();
 
             #[inline(always)]
@@ -821,7 +834,7 @@ fn message_via_oneof(input: DeriveInput) -> Result<TokenStream, Error> {
                 __B: ::bilrost::bytes::Buf + ?Sized,
             {
                 if <Self as ::bilrost::encoding::Oneof>::FIELD_TAGS.contains(&tag) {
-                    <Self as ::bilrost::encoding::OneofDecode>::oneof_decode_field(
+                    <Self as ::bilrost::encoding::OneofDecoder>::oneof_decode_field(
                         self,
                         tag,
                         wire_type,
@@ -860,7 +873,7 @@ fn try_distinguished_message(input: TokenStream) -> Result<TokenStream, Error> {
         ident,
         impl_generics,
         ty_generics,
-        where_clause,
+        where_clause: where_clause_,
         unsorted_fields,
         has_ignored_fields,
         tag_range: _,
@@ -870,10 +883,17 @@ fn try_distinguished_message(input: TokenStream) -> Result<TokenStream, Error> {
         bail!("messages with ignored fields cannot be distinguished");
     }
 
-    let where_clause = append_distinguished_encoder_wheres(
-        where_clause,
+    let owned_decoder_where_clause = append_wheres(
+        where_clause_,
         Some(quote!(Self: ::core::cmp::Eq)),
         &unsorted_fields,
+        DecodeOwned(Distinguished),
+    );
+    let borrow_decoder_where_clause = append_wheres(
+        where_clause_,
+        Some(quote!(Self: ::core::cmp::Eq)),
+        &unsorted_fields,
+        DecodeBorrowed(Distinguished),
     );
 
     let decode = unsorted_fields.iter().map(|(field_ident, field)| {
@@ -904,7 +924,34 @@ fn try_distinguished_message(input: TokenStream) -> Result<TokenStream, Error> {
 
     let expanded = quote! {
         impl #impl_generics ::bilrost::RawDistinguishedMessage
-        for #ident #ty_generics #where_clause {
+        for #ident #ty_generics #owned_decoder_where_clause {
+            #[allow(unused_variables)]
+            fn raw_decode_field_distinguished<__B>(
+                &mut self,
+                tag: u32,
+                wire_type: ::bilrost::encoding::WireType,
+                duplicated: bool,
+                buf: ::bilrost::encoding::Capped<__B>,
+                ctx: ::bilrost::encoding::RestrictedDecodeContext,
+            ) -> ::core::result::Result<::bilrost::Canonicity, ::bilrost::DecodeError>
+            where
+                __B: ::bilrost::bytes::Buf + ?Sized,
+            {
+                #struct_name
+                let canon = &mut ::bilrost::Canonicity::Canonical;
+                match tag {
+                    #(#decode)*
+                    _ => {
+                        ctx.update(canon, ::bilrost::Canonicity::HasExtensions)?;
+                        ::bilrost::encoding::skip_field(wire_type, buf)?;
+                    }
+                }
+                ::core::result::Result::Ok(*canon)
+            }
+        }
+
+        impl #impl_generics ::bilrost::RawDistinguishedMessageBorrow<'a>
+        for #ident #ty_generics #owned_decoder_where_clause {
             #[allow(unused_variables)]
             fn raw_decode_field_distinguished<__B>(
                 &mut self,
@@ -948,7 +995,7 @@ fn distinguished_message_via_oneof(input: DeriveInput) -> Result<TokenStream, Er
         ident,
         impl_generics,
         ty_generics,
-        where_clause,
+        where_clause: where_clause_,
         fields: _,
         empty_variant,
     } = preprocess_oneof(&input)?;
@@ -960,17 +1007,22 @@ fn distinguished_message_via_oneof(input: DeriveInput) -> Result<TokenStream, Er
         )
     }
 
-    let where_clause = impl_append_wheres(
-        where_clause,
+    let owned_decoder_where_clause = append_self_where(
+        where_clause_,
         Some(quote!(
-            Self: ::bilrost::encoding::DistinguishedOneofDecode + ::core::cmp::Eq
+            Self: ::bilrost::encoding::DistinguishedOneofDecoder + ::core::cmp::Eq
         )),
-        None,
+    );
+    let borrow_decoder_where_clause = append_self_where(
+        where_clause_,
+        Some(quote!(
+            Self: ::bilrost::encoding::DistinguishedOneofBorrowDecoder + ::core::cmp::Eq
+        )),
     );
 
     Ok(quote! {
         impl #impl_generics ::bilrost::RawDistinguishedMessage for #ident #ty_generics
-        #where_clause
+        #owned_decoder_where_clause
         {
             #[inline(always)]
             fn raw_decode_field_distinguished<__B>(
@@ -985,7 +1037,7 @@ fn distinguished_message_via_oneof(input: DeriveInput) -> Result<TokenStream, Er
                 __B: ::bilrost::bytes::Buf + ?Sized,
             {
                 if <Self as ::bilrost::encoding::Oneof>::FIELD_TAGS.contains(&tag) {
-                    <Self as ::bilrost::encoding::DistinguishedOneofDecode>::
+                    <Self as ::bilrost::encoding::DistinguishedOneofDecoder>::
                         oneof_decode_field_distinguished
                     (
                         self,
@@ -1199,7 +1251,7 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
                 ::bilrost::encoding::ValueDecoder::<::bilrost::encoding::General>::decode_value(
                     value,
                     buf,
-                    ctx.into_expedient(),
+                    ctx.into_inner(),
                 )?;
                 ::core::result::Result::Ok(::bilrost::Canonicity::Canonical)
             }
@@ -1256,7 +1308,7 @@ fn variant_attr(attrs: &Vec<Attribute>) -> Result<Option<Expr>, Error> {
 
 struct PreprocessedOneof<'a> {
     ident: Ident,
-    impl_generics: ImplGenerics<'a>,
+    impl_generics: &'a Generics,
     ty_generics: TypeGenerics<'a>,
     where_clause: Option<&'a WhereClause>,
     fields: Vec<(Ident, Field)>,
@@ -1332,11 +1384,11 @@ fn preprocess_oneof(input: &DeriveInput) -> Result<PreprocessedOneof, Error> {
     }
 
     let generics = &input.generics;
-    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+    let (_, ty_generics, where_clause) = generics.split_for_impl();
 
     Ok(PreprocessedOneof {
         ident,
-        impl_generics,
+        impl_generics: &generics,
         ty_generics,
         where_clause,
         fields,
@@ -1414,7 +1466,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
 
     if let Some(empty_ident) = &empty_variant {
         appropriate_oneof_trait = quote!(Oneof);
-        appropriate_oneof_decode_trait = quote!(OneofDecode);
+        appropriate_oneof_decode_trait = quote!(OneofDecoder);
         decode_field_self_arg = Some(quote!(value: &mut Self,));
         decode_field_return_ty = quote!(());
         some = Some(quote!(::core::option::Option::Some));
@@ -1457,7 +1509,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         });
     } else {
         appropriate_oneof_trait = quote!(NonEmptyOneof);
-        appropriate_oneof_decode_trait = quote!(NonEmptyOneofDecode);
+        appropriate_oneof_decode_trait = quote!(NonEmptyOneofDecoder);
         decode_field_self_arg = None;
         decode_field_return_ty = quote!(Self);
         some = None;
@@ -1590,7 +1642,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
                 }
             }
         }
-        
+
         impl #impl_generics ::bilrost::encoding::#appropriate_oneof_decode_trait
         for #ident #ty_generics #where_clause
         {
@@ -1700,23 +1752,24 @@ fn try_distinguished_oneof(input: TokenStream) -> Result<TokenStream, Error> {
     let some; // oneofs that have empty states return Option<u32> from `oneof_current_tag`
     let full_where_clause;
     if empty_variant.is_some() {
-        appropriate_oneof_trait = quote!(DistinguishedOneofDecode);
+        appropriate_oneof_trait = quote!(DistinguishedOneofDecoder);
         expedient_oneof_trait = quote!(Oneof);
         decode_field_self_arg = Some(quote!(value: &mut Self,));
         decode_field_return_ty = quote!(::bilrost::Canonicity);
         some = Some(quote!(::core::option::Option::Some));
-        full_where_clause = append_distinguished_encoder_wheres(
+        full_where_clause = append_wheres(
             where_clause,
             Some(quote!(Self: ::bilrost::encoding::Oneof)),
             &fields,
+            DecodeOwned(Distinguished),
         );
     } else {
-        appropriate_oneof_trait = quote!(NonEmptyDistinguishedOneofDecode);
+        appropriate_oneof_trait = quote!(NonEmptyDistinguishedOneofDecoder);
         expedient_oneof_trait = quote!(NonEmptyOneof);
         decode_field_self_arg = None;
         decode_field_return_ty = quote!((Self, ::bilrost::Canonicity));
         some = None;
-        full_where_clause = append_distinguished_encoder_wheres(where_clause, None, &fields);
+        full_where_clause = append_wheres(where_clause, None, &fields, DecodeOwned(Distinguished));
     };
 
     let decode_arms = fields.iter().map(|(variant_ident, field)| DecoderForOneof {

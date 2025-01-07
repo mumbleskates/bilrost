@@ -1,10 +1,91 @@
+//! This is the module that defines the core encoding implementation for bilrost, including the
+//! traits that dispatch it.
+//!
+//! There are a whole product of traits for encoding and decoding in bilrost, based on the type of
+//! value and the capability.
+//!
+//! Values:
+//!
+//! * supported value that has an empty state (and can be a message field)
+//! * any supported value (may be nested)
+//! * (a helper trait that encodes/decodes fields for anything that implements value encoding)
+//! * oneof with no empty state of its own (must be nested in Option)
+//! * oneof with an empty state
+//! * message
+//!
+//! Capabilities:
+//!
+//! * encode
+//! * decode to owned value, relaxed mode
+//! * decode to owned value, distinguished mode
+//! * decode from borrowed slice, relaxed mode
+//! * decode from borrowed slice, distinguished mode
+//!
+//! ...And here are the names of the traits we define for all the above combinations:
+//!
+//! * Supported value with an empty state:
+//!     * `Encoder<E>`
+//!     * `Decoder<E>`
+//!     * `DistinguishedDecoder<E>`
+//!     * `BorrowDecoder<'a, E>`
+//!     * `DistinguishedBorrowDecoder<'a, E>`
+//! * Any supported value:
+//!     * `ValueEncoder<E>`
+//!     * `ValueDecoder<E>`
+//!     * `DistinguishedValueDecoder<E>`
+//!     * `ValueBorrowDecoder<'a, E>`
+//!     * `DistinguishedValueBorrowDecoder<'a, E>`
+//! * Oneof with no empty state:
+//!     * `NonEmptyOneof`
+//!     * `NonEmptyOneofDecoder`
+//!     * `NonEmptyDistinguishedOneofDecoder`
+//!     * `NonEmptyOneofBorrowDecoder<'a>`
+//!     * `NonEmptyDistinguishedOneofBorrowDecoder<'a>`
+//! * Oneof:
+//!     * `Oneof`
+//!     * `OneofDecoder`
+//!     * `DistinguishedOneofDecoder`
+//!     * `OneofBorrowDecoder<'a>`
+//!     * `DistinguishedOneofBorrowDecoder<'a>`
+//! * Message:
+//!     * `RawMessage`
+//!     * `RawMessageDecoder`
+//!     * `RawDistinguishedMessageDecoder`
+//!     * `RawMessageBorrowDecoder<'a>`
+//!     * `RawDistinguishedMessageBorrowDecoder<'a>`
+//!
+//! These traits and their main generic implementations are defined in this module and in its
+//! `message` and `oneof` sub-modules.
+//!
+//! Values themselves often have the trait of being
+//!
+//! The traits for values are parametrized by "encodings", marker structs which denote *how* the
+//! value is to be encoded, whose implementations are also defined in sub-modules here. These
+//! include:
+//!
+//! * `Fixed`, for fixed-width encodings of either 4 or 8 bytes
+//! * `General`, the default encoding
+//! * `Map<KE, VE>`, which encodes key/value mappings where the keys are encoded by the given
+//!   encodings KE and VE
+//! * `Packed<E>`, which encodes homogenous containers as a value packed in a single field with the
+//!   given encoding E
+//! * `PlainBytes`, which implements encodings for `[u8]`-like types
+//! * `Proxied<E>`, which encodes values with the given encoding E after translating them to and
+//!   from a proxy type using the Proxiable traits
+//! * `(T1, T2, ...)`, which implements encoding for tuples which have corresponding fields
+//! * `Unpacked<E>`, which encodes homogenous containers as zero or more values each encoded as
+//!   their own message field
+//! * `Varint`, which encodes all integers in the varint format (even u8 and i8)
+//!
+//! Type support for third party types and for many common aspects of core type implementations can
+//! be found in the `type_support` sub-module tree.
+
 use crate::buf::ReverseBuf;
 use crate::DecodeErrorKind::{
-    ConflictingFields, InvalidVarint, NotCanonical, Oversize, TagOverflowed, Truncated,
-    UnexpectedlyRepeated, UnknownField, WrongWireType,
+    InvalidVarint, NotCanonical, Oversize, TagOverflowed, Truncated, UnexpectedlyRepeated,
+    UnknownField, WrongWireType,
 };
 use crate::{decode_length_delimiter, DecodeError, DecodeErrorKind};
-use alloc::boxed::Box;
 use bytes::buf::Take;
 use bytes::{Buf, BufMut};
 use core::cmp::{min, Eq, Ordering, PartialEq};
@@ -16,6 +97,8 @@ mod fixed;
 mod general;
 mod local_proxy;
 mod map;
+pub(crate) mod message;
+mod oneof;
 /// Tools for opaque encoding and decoding of any valid bilrost data.
 pub mod opaque;
 mod packed;
@@ -28,6 +111,18 @@ mod unpacked;
 mod value_traits;
 mod varint;
 
+pub use message::{
+    RawDistinguishedMessageBorrowDecoder, RawDistinguishedMessageDecoder, RawMessage,
+    RawMessageBorrowDecoder, RawMessageDecoder,
+};
+pub use oneof::{
+    DistinguishedOneofBorrowDecoder, DistinguishedOneofDecoder, Oneof, OneofBorrowDecoder,
+    OneofDecoder,
+};
+pub use oneof::{
+    NonEmptyDistinguishedOneofBorrowDecoder, NonEmptyDistinguishedOneofDecoder, NonEmptyOneof,
+    NonEmptyOneofBorrowDecoder, NonEmptyOneofDecoder,
+};
 pub use value_traits::{
     Collection, DistinguishedCollection, DistinguishedMapping, EmptyState, Enumeration,
     ForOverwrite, Mapping,
@@ -1594,7 +1689,7 @@ where
     ) -> Result<Canonicity, DecodeError>;
 }
 
-pub trait BorrowValueDecoder<'a, E>: ValueEncoder<E> {
+pub trait ValueBorrowDecoder<'a, E>: ValueEncoder<E> {
     /// Decodes a field assuming the encoder's wire type directly from the buffer.
     fn borrow_decode_value(
         value: &mut Self,
@@ -1603,7 +1698,7 @@ pub trait BorrowValueDecoder<'a, E>: ValueEncoder<E> {
     ) -> Result<(), DecodeError>;
 }
 
-pub trait DistinguishedBorrowValueDecoder<'a, E>: ValueEncoder<E>
+pub trait DistinguishedValueBorrowDecoder<'a, E>: ValueEncoder<E>
 where
     Self: Eq,
 {
@@ -1624,7 +1719,7 @@ where
     ) -> Result<Canonicity, DecodeError>;
 }
 
-impl<'a, E, T> BorrowValueDecoder<'a, E> for T
+impl<'a, E, T> ValueBorrowDecoder<'a, E> for T
 where
     T: AlwaysOwned + ValueDecoder<E>,
 {
@@ -1638,7 +1733,7 @@ where
     }
 }
 
-impl<'a, E, T> DistinguishedBorrowValueDecoder<'a, E> for T
+impl<'a, E, T> DistinguishedValueBorrowDecoder<'a, E> for T
 where
     T: AlwaysOwned + DistinguishedValueDecoder<E>,
 {
@@ -1782,7 +1877,7 @@ where
 
 impl<'a, T, E> FieldBorrowDecoder<'a, E> for T
 where
-    Self: BorrowValueDecoder<'a, E>,
+    Self: ValueBorrowDecoder<'a, E>,
 {
     #[inline]
     fn borrow_decode_field(
@@ -1798,7 +1893,7 @@ where
 
 impl<'a, T, E> DistinguishedFieldBorrowDecoder<'a, E> for T
 where
-    Self: DistinguishedBorrowValueDecoder<'a, E> + EmptyState,
+    Self: DistinguishedValueBorrowDecoder<'a, E> + EmptyState,
 {
     #[inline(always)]
     fn borrow_decode_field_distinguished<const ALLOW_EMPTY: bool>(
@@ -1819,431 +1914,145 @@ where
 }
 
 /// Different value encoders may dispatch encoding their plain values slightly differently, but
-/// values wrapped in Option are always encoded the same.
+/// values wrapped in Option are always encoded & decoded the same.
 ///
 /// This would perhaps, in theory, need to be broken up if a value type whose values may be encoded
 /// with different wire-types could be implemented. However, this can never happen: It is
 /// essentially forbidden for any type to value-encode with differing wire types, because *value*
 /// decoding does not get to know the wire type; when values are encoded packed end to end the wire
 /// type for each is not stored.
-impl<T, E> Encoder<E> for Option<T>
-where
-    T: ForOverwrite + ValueEncoder<E>,
-{
-    #[inline]
-    fn encode<B: BufMut + ?Sized>(tag: u32, value: &Self, buf: &mut B, tw: &mut TagWriter) {
-        if let Some(value) = value {
-            <T as FieldEncoder<E>>::encode_field(tag, value, buf, tw);
+mod generic_optional {
+    use super::*;
+
+    impl<T, E> Encoder<E> for Option<T>
+    where
+        T: ForOverwrite + ValueEncoder<E>,
+    {
+        #[inline]
+        fn encode<B: BufMut + ?Sized>(tag: u32, value: &Self, buf: &mut B, tw: &mut TagWriter) {
+            if let Some(value) = value {
+                <T as FieldEncoder<E>>::encode_field(tag, value, buf, tw);
+            }
         }
-    }
 
-    #[inline]
-    fn prepend_encode<B: ReverseBuf + ?Sized>(
-        tag: u32,
-        value: &Self,
-        buf: &mut B,
-        tw: &mut TagRevWriter,
-    ) {
-        if let Some(value) = value {
-            <T as FieldEncoder<E>>::prepend_field(tag, value, buf, tw)
+        #[inline]
+        fn prepend_encode<B: ReverseBuf + ?Sized>(
+            tag: u32,
+            value: &Self,
+            buf: &mut B,
+            tw: &mut TagRevWriter,
+        ) {
+            if let Some(value) = value {
+                <T as FieldEncoder<E>>::prepend_field(tag, value, buf, tw)
+            }
         }
-    }
 
-    #[inline]
-    fn encoded_len(tag: u32, value: &Self, tm: &mut impl TagMeasurer) -> usize {
-        if let Some(value) = value {
-            <T as FieldEncoder<E>>::field_encoded_len(tag, value, tm)
-        } else {
-            0
-        }
-    }
-}
-
-impl<T, E> Decoder<E> for Option<T>
-where
-    T: ForOverwrite + ValueDecoder<E>,
-{
-    #[inline]
-    fn decode<B: Buf + ?Sized>(
-        wire_type: WireType,
-        duplicated: bool,
-        value: &mut Self,
-        buf: Capped<B>,
-        ctx: DecodeContext,
-    ) -> Result<(), DecodeError> {
-        if duplicated {
-            return Err(DecodeError::new(UnexpectedlyRepeated));
-        }
-        <T as FieldDecoder<E>>::decode_field(
-            wire_type,
-            value.get_or_insert_with(T::for_overwrite),
-            buf,
-            ctx,
-        )
-    }
-}
-
-/// Distinguished decoding for Option<T> is only different in that it calls the distinguished
-/// decoding codepath.
-impl<T, E> DistinguishedDecoder<E> for Option<T>
-where
-    Self: Decoder<E>,
-    T: DistinguishedValueDecoder<E> + ForOverwrite + Eq,
-{
-    #[inline]
-    fn decode_distinguished<B: Buf + ?Sized>(
-        wire_type: WireType,
-        duplicated: bool,
-        value: &mut Option<T>,
-        buf: Capped<B>,
-        ctx: RestrictedDecodeContext,
-    ) -> Result<Canonicity, DecodeError> {
-        if duplicated {
-            return Err(DecodeError::new(UnexpectedlyRepeated));
-        }
-        check_wire_type(T::WIRE_TYPE, wire_type)?;
-        T::decode_value_distinguished::<true>(value.get_or_insert_with(T::for_overwrite), buf, ctx)
-    }
-}
-
-/// Trait to be implemented by (or more commonly derived for) oneofs, which have knowledge of their
-/// variants' tags and encoding.
-///
-/// `Oneof` (and `DistinguishedOneof`) can be represented in messages because they have an "empty"
-/// state (typically a dedicated empty enum variant or Option::None). When `Oneof` is derived for an
-/// enum that does not have a unit variant, the trait that is actually derived is `NonEmptyOneof`,
-/// which has no empty states and must be wrapped in `Option` at some point to be used.
-///
-/// In addition to decoding into the variants of the oneof, implementations of the maybe-empty
-/// `Oneof` traits need to be able to return and attach useful details to the appropriate errors for
-/// collisions (when they decode a field but they already contain values) or when decoding a value
-/// for the oneof otherwise encounters an error. For this reason there are the following differences
-/// between `Oneof` and `NonEmptyOneof`:
-///
-/// * `Oneof::oneof_current_tag` returns `Option<u32>` instead of `u32`
-/// * `Oneof::oneof_decode_field` accepts a `value: &mut Self` argument, while `NonEmptyOneof` does
-///   not; the `Oneof` version of this function returns `Result<(), DecodeError>`, and the
-///   `NonEmptyOneof` version returns `Result<Self, DecodeError>` directly.
-/// * `Oneof::oneof_decode_field` is responsible for attaching error detail information when a
-///   decoding error occurs, while `NonEmptyOneof` does not need to do that.
-///
-/// There are implementations provided, like `impl<T> Oneof for Option<T> where T: NonEmptyOneof`
-/// for both `Oneof` and `DistinguishedOneof`. These implementations take care of the above
-/// contract boundary as well.
-///
-/// Other than that: Both empty and non-empty oneofs can be `Box`ed, as there are also wrapper impls
-/// to cover that.
-// TODO(widders): split decoding trait
-pub trait Oneof: EmptyState {
-    const FIELD_TAGS: &'static [u32];
-
-    /// Encodes the fields of the oneof into the given buffer.
-    fn oneof_encode<B: BufMut + ?Sized>(&self, buf: &mut B, tw: &mut TagWriter);
-
-    /// Prepends the fields of the oneof into the given buffer.
-    fn oneof_prepend<B: ReverseBuf + ?Sized>(&self, buf: &mut B, tw: &mut TagRevWriter);
-
-    /// Measures the number of bytes that would encode this oneof.
-    fn oneof_encoded_len(&self, tm: &mut impl TagMeasurer) -> usize;
-
-    /// Returns the current tag of the oneof, if any.
-    fn oneof_current_tag(&self) -> Option<u32>;
-
-    /// Returns the diagnostic name of the variant with the given tag. The first returned value is
-    /// the name of the oneof enum, and the second is the name of the field.
-    fn oneof_variant_name(tag: u32) -> (&'static str, &'static str);
-}
-
-pub trait OneofDecode: Oneof {
-    /// Decodes from the given buffer.
-    fn oneof_decode_field<B: Buf + ?Sized>(
-        value: &mut Self,
-        tag: u32,
-        wire_type: WireType,
-        buf: Capped<B>,
-        ctx: DecodeContext,
-    ) -> Result<(), DecodeError>;
-}
-
-impl<T> Oneof for Box<T>
-where
-    T: Oneof,
-{
-    const FIELD_TAGS: &'static [u32] = <T as Oneof>::FIELD_TAGS;
-
-    #[inline]
-    fn oneof_encode<B: BufMut + ?Sized>(&self, buf: &mut B, tw: &mut TagWriter) {
-        Oneof::oneof_encode(&**self, buf, tw)
-    }
-
-    #[inline]
-    fn oneof_prepend<B: ReverseBuf + ?Sized>(&self, buf: &mut B, tw: &mut TagRevWriter) {
-        Oneof::oneof_prepend(&**self, buf, tw)
-    }
-
-    #[inline]
-    fn oneof_encoded_len(&self, tm: &mut impl TagMeasurer) -> usize {
-        Oneof::oneof_encoded_len(&**self, tm)
-    }
-
-    #[inline]
-    fn oneof_current_tag(&self) -> Option<u32> {
-        Oneof::oneof_current_tag(&**self)
-    }
-
-    #[inline]
-    fn oneof_variant_name(tag: u32) -> (&'static str, &'static str) {
-        T::oneof_variant_name(tag)
-    }
-}
-
-impl<T> OneofDecode for Box<T>
-where T: OneofDecode {
-    #[inline]
-    fn oneof_decode_field<B: Buf + ?Sized>(
-        value: &mut Self,
-        tag: u32,
-        wire_type: WireType,
-        buf: Capped<B>,
-        ctx: DecodeContext,
-    ) -> Result<(), DecodeError> {
-        OneofDecode::oneof_decode_field(&mut **value, tag, wire_type, buf, ctx)
-    }
-}
-
-/// Underlying trait for a oneof that has no inherent "empty" variant, opting instead to be wrapped
-/// in an `Option`.
-pub trait NonEmptyOneof {
-    const FIELD_TAGS: &'static [u32];
-
-    /// Encodes the fields of the oneof into the given buffer.
-    fn oneof_encode<B: BufMut + ?Sized>(&self, buf: &mut B, tw: &mut TagWriter);
-
-    /// Prepends the fields of the oneof into the given buffer.
-    fn oneof_prepend<B: ReverseBuf + ?Sized>(&self, buf: &mut B, tw: &mut TagRevWriter);
-
-    /// Measures the number of bytes that would encode this oneof.
-    fn oneof_encoded_len(&self, tm: &mut impl TagMeasurer) -> usize;
-
-    /// Returns the current tag of the oneof.
-    fn oneof_current_tag(&self) -> u32;
-
-    /// Returns the diagnostic name of the variant with the given tag. The first returned value is
-    /// the name of the oneof enum, and the second is the name of the field.
-    fn oneof_variant_name(tag: u32) -> (&'static str, &'static str);
-}
-
-pub trait NonEmptyOneofDecode: NonEmptyOneof + Sized {
-    /// Decodes from the given buffer.
-    fn oneof_decode_field<B: Buf + ?Sized>(
-        tag: u32,
-        wire_type: WireType,
-        buf: Capped<B>,
-        ctx: DecodeContext,
-    ) -> Result<Self, DecodeError>;
-}
-
-impl<T> NonEmptyOneof for Box<T>
-where
-    T: NonEmptyOneof,
-{
-    const FIELD_TAGS: &'static [u32] = <T as NonEmptyOneof>::FIELD_TAGS;
-
-    #[inline]
-    fn oneof_encode<B: BufMut + ?Sized>(&self, buf: &mut B, tw: &mut TagWriter) {
-        NonEmptyOneof::oneof_encode(&**self, buf, tw)
-    }
-
-    #[inline]
-    fn oneof_prepend<B: ReverseBuf + ?Sized>(&self, buf: &mut B, tw: &mut TagRevWriter) {
-        NonEmptyOneof::oneof_prepend(&**self, buf, tw)
-    }
-
-    #[inline]
-    fn oneof_encoded_len(&self, tm: &mut impl TagMeasurer) -> usize {
-        NonEmptyOneof::oneof_encoded_len(&**self, tm)
-    }
-
-    #[inline]
-    fn oneof_current_tag(&self) -> u32 {
-        NonEmptyOneof::oneof_current_tag(&**self)
-    }
-
-    #[inline]
-    fn oneof_variant_name(tag: u32) -> (&'static str, &'static str) {
-        T::oneof_variant_name(tag)
-    }
-}
-
-impl<T> NonEmptyOneofDecode for Box<T>
-where T: NonEmptyOneofDecode {
-    #[inline]
-    fn oneof_decode_field<B: Buf + ?Sized>(
-        tag: u32,
-        wire_type: WireType,
-        buf: Capped<B>,
-        ctx: DecodeContext,
-    ) -> Result<Self, DecodeError> {
-        Ok(Box::new(T::oneof_decode_field(tag, wire_type, buf, ctx)?))
-    }
-}
-
-impl<T> Oneof for Option<T>
-where
-    T: NonEmptyOneof,
-{
-    const FIELD_TAGS: &'static [u32] = T::FIELD_TAGS;
-
-    #[inline]
-    fn oneof_encode<B: BufMut + ?Sized>(&self, buf: &mut B, tw: &mut TagWriter) {
-        if let Some(value) = self {
-            value.oneof_encode(buf, tw);
-        }
-    }
-
-    #[inline]
-    fn oneof_prepend<B: ReverseBuf + ?Sized>(&self, buf: &mut B, tw: &mut TagRevWriter) {
-        if let Some(value) = self {
-            value.oneof_prepend(buf, tw);
-        }
-    }
-
-    #[inline]
-    fn oneof_encoded_len(&self, tm: &mut impl TagMeasurer) -> usize {
-        if let Some(value) = self {
-            value.oneof_encoded_len(tm)
-        } else {
-            0
-        }
-    }
-
-    #[inline]
-    fn oneof_current_tag(&self) -> Option<u32> {
-        self.as_ref().map(NonEmptyOneof::oneof_current_tag)
-    }
-
-    #[inline]
-    fn oneof_variant_name(tag: u32) -> (&'static str, &'static str) {
-        T::oneof_variant_name(tag)
-    }
-}
-
-impl<T> OneofDecode for Option<T>
-where T: NonEmptyOneofDecode {
-    #[inline]
-    fn oneof_decode_field<B: Buf + ?Sized>(
-        value: &mut Self,
-        tag: u32,
-        wire_type: WireType,
-        buf: Capped<B>,
-        ctx: DecodeContext,
-    ) -> Result<(), DecodeError> {
-        if let Some(already) = value {
-            Err(DecodeError::new(if already.oneof_current_tag() == tag {
-                UnexpectedlyRepeated
+        #[inline]
+        fn encoded_len(tag: u32, value: &Self, tm: &mut impl TagMeasurer) -> usize {
+            if let Some(value) = value {
+                <T as FieldEncoder<E>>::field_encoded_len(tag, value, tm)
             } else {
-                ConflictingFields
-            }))
-        } else {
-            T::oneof_decode_field(tag, wire_type, buf, ctx).map(|decoded| *value = Some(decoded))
+                0
+            }
         }
-        .map_err(|mut err| {
-            let (msg, field) = T::oneof_variant_name(tag);
-            err.push(msg, field);
-            err
-        })
     }
-}
 
-/// Trait to be implemented by (or more commonly derived for) oneofs, which have knowledge of their
-/// variants' tags and encoding.
-pub trait DistinguishedOneofDecode: Oneof {
-    /// Decodes from the given buffer in distinguished mode.
-    fn oneof_decode_field_distinguished<B: Buf + ?Sized>(
-        value: &mut Self,
-        tag: u32,
-        wire_type: WireType,
-        buf: Capped<B>,
-        ctx: RestrictedDecodeContext,
-    ) -> Result<Canonicity, DecodeError>;
-}
-
-impl<T> DistinguishedOneofDecode for Box<T>
-where
-    T: DistinguishedOneofDecode,
-{
-    #[inline]
-    fn oneof_decode_field_distinguished<B: Buf + ?Sized>(
-        value: &mut Self,
-        tag: u32,
-        wire_type: WireType,
-        buf: Capped<B>,
-        ctx: RestrictedDecodeContext,
-    ) -> Result<Canonicity, DecodeError> {
-        DistinguishedOneofDecode::oneof_decode_field_distinguished(&mut **value, tag, wire_type, buf, ctx)
-    }
-}
-
-/// Underlying trait for a oneof that has no inherent "empty" variant, opting instead to be wrapped
-/// in an `Option`.
-pub trait NonEmptyDistinguishedOneofDecode: Sized {
-    /// Decodes from the given buffer.
-    fn oneof_decode_field_distinguished<B: Buf + ?Sized>(
-        tag: u32,
-        wire_type: WireType,
-        buf: Capped<B>,
-        ctx: RestrictedDecodeContext,
-    ) -> Result<(Self, Canonicity), DecodeError>;
-}
-
-impl<T> NonEmptyDistinguishedOneofDecode for Box<T>
-where
-    T: NonEmptyDistinguishedOneofDecode,
-{
-    #[inline]
-    fn oneof_decode_field_distinguished<B: Buf + ?Sized>(
-        tag: u32,
-        wire_type: WireType,
-        buf: Capped<B>,
-        ctx: RestrictedDecodeContext,
-    ) -> Result<(Self, Canonicity), DecodeError> {
-        NonEmptyDistinguishedOneofDecode::oneof_decode_field_distinguished(tag, wire_type, buf, ctx)
-            .map(|(val, canon)| (Box::new(val), canon))
-    }
-}
-
-impl<T> DistinguishedOneofDecode for Option<T>
-where
-    T: NonEmptyDistinguishedOneofDecode + NonEmptyOneof,
-    Self: Oneof,
-{
-    #[inline]
-    fn oneof_decode_field_distinguished<B: Buf + ?Sized>(
-        value: &mut Self,
-        tag: u32,
-        wire_type: WireType,
-        buf: Capped<B>,
-        ctx: RestrictedDecodeContext,
-    ) -> Result<Canonicity, DecodeError> {
-        if let Some(already) = value {
-            Err(DecodeError::new(if already.oneof_current_tag() == tag {
-                UnexpectedlyRepeated
-            } else {
-                ConflictingFields
-            }))
-        } else {
-            T::oneof_decode_field_distinguished(tag, wire_type, buf, ctx.clone()).and_then(
-                |(decoded, canon)| {
-                    *value = Some(decoded);
-                    ctx.check(canon)
-                },
+    impl<T, E> Decoder<E> for Option<T>
+    where
+        T: ForOverwrite + ValueDecoder<E>,
+    {
+        #[inline]
+        fn decode<B: Buf + ?Sized>(
+            wire_type: WireType,
+            duplicated: bool,
+            value: &mut Self,
+            buf: Capped<B>,
+            ctx: DecodeContext,
+        ) -> Result<(), DecodeError> {
+            if duplicated {
+                return Err(DecodeError::new(UnexpectedlyRepeated));
+            }
+            <T as FieldDecoder<E>>::decode_field(
+                wire_type,
+                value.get_or_insert_with(T::for_overwrite),
+                buf,
+                ctx,
             )
         }
-        .map_err(|mut err| {
-            let (msg, field) = T::oneof_variant_name(tag);
-            err.push(msg, field);
-            err
-        })
+    }
+
+    impl<T, E> DistinguishedDecoder<E> for Option<T>
+    where
+        Self: Decoder<E>,
+        T: DistinguishedValueDecoder<E> + ForOverwrite + Eq,
+    {
+        #[inline]
+        fn decode_distinguished<B: Buf + ?Sized>(
+            wire_type: WireType,
+            duplicated: bool,
+            value: &mut Option<T>,
+            buf: Capped<B>,
+            ctx: RestrictedDecodeContext,
+        ) -> Result<Canonicity, DecodeError> {
+            if duplicated {
+                return Err(DecodeError::new(UnexpectedlyRepeated));
+            }
+            check_wire_type(T::WIRE_TYPE, wire_type)?;
+            T::decode_value_distinguished::<true>(
+                value.get_or_insert_with(T::for_overwrite),
+                buf,
+                ctx,
+            )
+        }
+    }
+
+    impl<'a, T, E> BorrowDecoder<'a, E> for Option<T>
+    where
+        T: ForOverwrite + ValueBorrowDecoder<'a, E>,
+    {
+        #[inline]
+        fn borrow_decode(
+            wire_type: WireType,
+            duplicated: bool,
+            value: &mut Self,
+            buf: Capped<&'a [u8]>,
+            ctx: DecodeContext,
+        ) -> Result<(), DecodeError> {
+            if duplicated {
+                return Err(DecodeError::new(UnexpectedlyRepeated));
+            }
+            <T as FieldBorrowDecoder<E>>::borrow_decode_field(
+                wire_type,
+                value.get_or_insert_with(T::for_overwrite),
+                buf,
+                ctx,
+            )
+        }
+    }
+
+    impl<'a, T, E> DistinguishedBorrowDecoder<'a, E> for Option<T>
+    where
+        Self: Decoder<E>,
+        T: DistinguishedValueBorrowDecoder<'a, E> + ForOverwrite + Eq,
+    {
+        #[inline]
+        fn borrow_decode_distinguished(
+            wire_type: WireType,
+            duplicated: bool,
+            value: &mut Option<T>,
+            buf: Capped<&'a [u8]>,
+            ctx: RestrictedDecodeContext,
+        ) -> Result<Canonicity, DecodeError> {
+            if duplicated {
+                return Err(DecodeError::new(UnexpectedlyRepeated));
+            }
+            check_wire_type(T::WIRE_TYPE, wire_type)?;
+            T::borrow_decode_value_distinguished::<true>(
+                value.get_or_insert_with(T::for_overwrite),
+                buf,
+                ctx,
+            )
+        }
     }
 }
 
@@ -2353,6 +2162,7 @@ macro_rules! delegate_encoding {
                 )
             }
         }
+        // TODO(widders): borrowed
     };
 
     (
@@ -2390,6 +2200,7 @@ macro_rules! delegate_encoding {
                 )
             }
         }
+        // TODO(widders): borrowed
     };
 }
 pub(crate) use delegate_encoding;
@@ -2457,6 +2268,7 @@ macro_rules! delegate_value_encoding {
                 $crate::encoding::ValueDecoder::<$to_ty>::decode_value(value, buf, ctx)
             }
         }
+        // TODO(widders): borrowed
     };
 
     (
@@ -2496,6 +2308,7 @@ macro_rules! delegate_value_encoding {
                 )
             }
         }
+        // TODO(widders): borrowed
     };
 }
 pub(crate) use delegate_value_encoding;
@@ -2613,6 +2426,7 @@ macro_rules! encoder_where_value_encoder {
                     )
             }
         }
+        // TODO(widders): borrowed
     };
 }
 pub(crate) use encoder_where_value_encoder;

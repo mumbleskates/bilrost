@@ -6,6 +6,7 @@
 #![no_std]
 #![forbid(unsafe_op_in_unsafe_fn)]
 
+// TODO(widders): no-alloc support
 extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
@@ -19,7 +20,6 @@ pub use bilrost_derive::{DistinguishedMessage, DistinguishedOneof, Enumeration, 
 
 pub mod buf;
 mod error;
-mod message;
 mod types;
 
 #[doc(hidden)]
@@ -27,11 +27,9 @@ pub mod encoding;
 #[doc(hidden)]
 mod iter;
 
+pub use crate::encoding::message::{DistinguishedMessage, Message};
 pub use crate::encoding::{Canonicity, Enumeration, WithCanonicity};
 pub use crate::error::{DecodeError, DecodeErrorKind, EncodeError};
-pub use crate::message::{DistinguishedMessage, Message};
-#[doc(hidden)]
-pub use crate::message::{RawDistinguishedMessage, RawMessage};
 
 pub use types::Blob;
 

@@ -7,7 +7,12 @@ use quote::quote;
 use syn::{Meta, Type};
 
 use crate::attrs::tag_list_attr;
-use crate::field::{set_option, WhereFor};
+use crate::field::{
+    set_option,
+    DecodeLifetime::{self, Borrowed, Owned},
+    DecodeMode::{self, Distinguished, Relaxed},
+    WhereFor::{self, Decode, Encode},
+};
 
 #[derive(Clone)]
 pub struct Field {
@@ -60,29 +65,52 @@ impl Field {
     }
 
     /// Returns an expression which evaluates to the result of decoding the oneof field.
-    pub fn decode_expedient(&self, ident: TokenStream) -> TokenStream {
-        quote!(
-            ::bilrost::encoding::OneofDecode::oneof_decode_field(
-                #ident,
-                tag,
-                wire_type,
-                buf,
-                ctx,
-            )
-        )
-    }
-
-    /// Returns an expression which evaluates to the result of decoding the oneof field.
-    pub fn decode_distinguished(&self, ident: TokenStream) -> TokenStream {
-        quote!(
-            ::bilrost::encoding::DistinguishedOneofDecode::oneof_decode_field_distinguished(
-                #ident,
-                tag,
-                wire_type,
-                buf,
-                ctx.clone(),
-            )
-        )
+    pub fn decode(
+        &self,
+        ident: TokenStream,
+        lifetime: DecodeLifetime,
+        mode: DecodeMode,
+    ) -> TokenStream {
+        match (lifetime, mode) {
+            (Owned, Relaxed) => quote!(
+                ::bilrost::encoding::OneofDecode::oneof_decode_field(
+                    #ident,
+                    tag,
+                    wire_type,
+                    buf,
+                    ctx,
+                )
+            ),
+            (Borrowed, Relaxed) => quote!(
+                ::bilrost::encoding::OneofBorrowDecode::oneof_borrow_decode_field(
+                    #ident,
+                    tag,
+                    wire_type,
+                    buf,
+                    ctx,
+                )
+            ),
+            (Owned, Distinguished) => quote!(
+                ::bilrost::encoding::DistinguishedOneofDecode::oneof_decode_field_distinguished(
+                    #ident,
+                    tag,
+                    wire_type,
+                    buf,
+                    ctx.clone(),
+                )
+            ),
+            (Borrowed, Distinguished) => quote!(
+                ::bilrost::encoding::DistinguishedOneofBorrowDecode::
+                    oneof_borrow_decode_field_distinguished
+                (
+                    #ident,
+                    tag,
+                    wire_type,
+                    buf,
+                    ctx.clone(),
+                )
+            ),
+        }
     }
 
     /// Returns an expression which evaluates to the encoded length of the oneof field.
@@ -97,26 +125,22 @@ impl Field {
     }
 
     /// Returns the where clause constraint term for the field really implementing the oneof trait.
-    pub fn expedient_where_terms(&self, purpose: WhereFor) -> Vec<TokenStream> {
+    pub fn where_terms(&self, purpose: WhereFor) -> Vec<TokenStream> {
         let ty = &self.ty;
-        match purpose {
-            WhereFor::Encode => vec![quote!(#ty: ::bilrost::encoding::Oneof)],
-            WhereFor::DecodeOwned => vec![quote!(#ty: ::bilrost::encoding::OneofDecode)],
-            WhereFor::DecodeBorrowed => vec![quote!(#ty: ::bilrost::encoding::OneofBorrowDecode)],
-        }
-    }
-
-    /// Returns the where clause constraint term for the field really implementing the oneof trait.
-    pub fn distinguished_where_terms(&self, purpose: WhereFor) -> Vec<TokenStream> {
-        let ty = &self.ty;
-        match purpose {
-            WhereFor::Encode => vec![quote!(#ty: ::bilrost::encoding::DistinguishedOneof)],
-            WhereFor::DecodeOwned => {
-                vec![quote!(#ty: ::bilrost::encoding::DistinguishedOneofDecode)]
+        vec![match purpose {
+            Encode => quote!(#ty: ::bilrost::encoding::Oneof),
+            Decode(Owned, Relaxed) => {
+                quote!(#ty: ::bilrost::encoding::OneofDecoder)
             }
-            WhereFor::DecodeBorrowed => {
-                vec![quote!(#ty: ::bilrost::encoding::DistinguishedOneofBorrowDecode)]
+            Decode(Borrowed, Relaxed) => {
+                quote!(#ty: ::bilrost::encoding::OneofBorrowDecoder<'__a>)
             }
-        }
+            Decode(Owned, Distinguished) => {
+                quote!(#ty: ::bilrost::encoding::DistinguishedOneofDecoder)
+            }
+            Decode(Borrowed, Distinguished) => {
+                quote!(#ty: ::bilrost::encoding::DistinguishedOneofBorrowDecoder<'__a>)
+            }
+        }]
     }
 }

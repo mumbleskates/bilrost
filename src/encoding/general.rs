@@ -1,13 +1,7 @@
-use alloc::borrow::Cow;
-use alloc::collections::{BTreeMap, BTreeSet};
-use alloc::string::String;
-use alloc::vec::Vec;
-use core::mem;
-use core::str;
-
-use bytes::{Buf, BufMut, Bytes};
-
 use crate::buf::ReverseBuf;
+use crate::encoding::message::{
+    merge, merge_distinguished, RawDistinguishedMessageDecoder, RawMessage,
+};
 use crate::encoding::{
     delegate_encoding, delegate_value_encoding, encode_varint, encoded_len_varint,
     encoder_where_value_encoder, prepend_varint, Canonicity, Capped, DecodeContext, DecodeError,
@@ -15,9 +9,15 @@ use crate::encoding::{
     Proxied, RestrictedDecodeContext, Unpacked, ValueDecoder, ValueEncoder, Varint, WireType,
     Wiretyped,
 };
-use crate::message::{merge, merge_distinguished, RawDistinguishedMessage, RawMessage};
 use crate::DecodeErrorKind::InvalidValue;
 use crate::{Blob, DecodeErrorKind};
+use alloc::borrow::Cow;
+use alloc::collections::{BTreeMap, BTreeSet};
+use alloc::string::String;
+use alloc::vec::Vec;
+use bytes::{Buf, BufMut, Bytes};
+use core::mem;
+use core::str;
 
 pub struct General;
 
@@ -436,7 +436,7 @@ where
 
 impl<T> DistinguishedValueDecoder<General> for T
 where
-    T: RawDistinguishedMessage + Eq,
+    T: RawDistinguishedMessageDecoder + Eq,
 {
     const CHECKS_EMPTY: bool = true; // Empty messages are always zero-length
 

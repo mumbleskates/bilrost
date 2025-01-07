@@ -8,9 +8,9 @@ use bytes::{Buf, BufMut};
 
 use crate::buf::ReverseBuf;
 use crate::encoding::{
-    skip_field, Canonicity, Capped, DecodeContext, RestrictedDecodeContext, WireType,
+    skip_field, Canonicity, Capped, DecodeContext, RawDistinguishedMessageDecoder, RawMessage,
+    RestrictedDecodeContext, WireType,
 };
-use crate::message::{RawDistinguishedMessage, RawMessage};
 use crate::DecodeError;
 
 /// Newtype wrapper to act as a simple "bytes data" type in Bilrost. It transparently wraps a
@@ -173,7 +173,7 @@ impl RawMessage for () {
     }
 }
 
-impl RawDistinguishedMessage for () {
+impl RawDistinguishedMessageDecoder for () {
     fn raw_decode_field_distinguished<B: Buf + ?Sized>(
         &mut self,
         _tag: u32,

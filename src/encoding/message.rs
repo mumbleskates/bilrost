@@ -31,7 +31,7 @@ pub(crate) fn merge<T: RawMessage, B: Buf + ?Sized>(
 /// Merges fields from the given buffer, to its cap, into the given `DistinguishedTaggedDecodable`
 /// value. Implemented as a private standalone method to discourage "merging" as a usage pattern.
 #[inline]
-pub(crate) fn merge_distinguished<T: RawDistinguishedMessage, B: Buf + ?Sized>(
+pub(crate) fn merge_distinguished<T: RawDistinguishedMessageDecoder, B: Buf + ?Sized>(
     value: &mut T,
     mut buf: Capped<B>,
     ctx: RestrictedDecodeContext,
@@ -632,7 +632,7 @@ where
 
 impl<T> DistinguishedMessage for T
 where
-    T: RawDistinguishedMessage + Message,
+    T: RawDistinguishedMessageDecoder + Message,
 {
     fn decode_distinguished<B: Buf>(buf: B) -> Result<(Self, Canonicity), DecodeError> {
         Self::decode_restricted(buf, NotCanonical)
@@ -909,7 +909,9 @@ pub trait RawMessage: EmptyState {
 
     /// Returns the encoded length of the message without a length delimiter.
     fn raw_encoded_len(&self) -> usize;
+}
 
+pub trait RawMessageDecoder: RawMessage {
     /// Decodes a field from a buffer into `self`.
     fn raw_decode_field<B: Buf + ?Sized>(
         &mut self,
@@ -925,13 +927,40 @@ pub trait RawMessage: EmptyState {
 
 /// Complementary underlying trait for distinguished messages, all of whose fields have a
 /// distinguished encoding.
-pub trait RawDistinguishedMessage: RawMessage + Eq {
+pub trait RawDistinguishedMessageDecoder: RawMessage + Eq {
     fn raw_decode_field_distinguished<B: Buf + ?Sized>(
         &mut self,
         tag: u32,
         wire_type: WireType,
         duplicated: bool,
         buf: Capped<B>,
+        ctx: RestrictedDecodeContext,
+    ) -> Result<Canonicity, DecodeError>
+    where
+        Self: Sized;
+}
+
+pub trait RawMessageBorrowDecoder<'a>: RawMessage {
+    /// Decodes a field from a buffer into `self` from a borrowed slice.
+    fn raw_borrow_decode_field(
+        &mut self,
+        tag: u32,
+        wire_type: WireType,
+        duplicated: bool,
+        buf: Capped<&'a [u8]>,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError>
+    where
+        Self: Sized;
+}
+
+pub trait RawDistinguishedMessageBorrowDecoder<'a>: RawMessage + Eq {
+    fn raw_borrow_decode_field_distinguished(
+        &mut self,
+        tag: u32,
+        wire_type: WireType,
+        duplicated: bool,
+        buf: Capped<&'a [u8]>,
         ctx: RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError>
     where
@@ -955,7 +984,12 @@ where
     fn raw_encoded_len(&self) -> usize {
         (**self).raw_encoded_len()
     }
+}
 
+impl<T> RawMessageDecoder for Box<T>
+where
+    T: RawMessageDecoder,
+{
     fn raw_decode_field<B: Buf + ?Sized>(
         &mut self,
         tag: u32,
@@ -971,9 +1005,28 @@ where
     }
 }
 
-impl<T> RawDistinguishedMessage for Box<T>
+impl<'a, T> RawMessageBorrowDecoder<'a> for Box<T>
 where
-    T: RawDistinguishedMessage,
+    T: RawMessageBorrowDecoder<'a>,
+{
+    fn raw_borrow_decode_field(
+        &mut self,
+        tag: u32,
+        wire_type: WireType,
+        duplicated: bool,
+        buf: Capped<&'a [u8]>,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError>
+    where
+        Self: Sized,
+    {
+        (**self).raw_borrow_decode_field(tag, wire_type, duplicated, buf, ctx)
+    }
+}
+
+impl<T> RawDistinguishedMessageDecoder for Box<T>
+where
+    T: RawDistinguishedMessageDecoder,
 {
     fn raw_decode_field_distinguished<B: Buf + ?Sized>(
         &mut self,
@@ -987,6 +1040,25 @@ where
         Self: Sized,
     {
         (**self).raw_decode_field_distinguished(tag, wire_type, duplicated, buf, ctx)
+    }
+}
+
+impl<'a, T> RawDistinguishedMessageBorrowDecoder for Box<T>
+where
+    T: RawDistinguishedMessageBorrowDecoder<'a>,
+{
+    fn raw_borrow_decode_field_distinguished(
+        &mut self,
+        tag: u32,
+        wire_type: WireType,
+        duplicated: bool,
+        buf: Capped<&'a [u8]>,
+        ctx: RestrictedDecodeContext,
+    ) -> Result<Canonicity, DecodeError>
+    where
+        Self: Sized,
+    {
+        (**self).raw_borrow_decode_field_distinguished(tag, wire_type, duplicated, buf, ctx)
     }
 }
 

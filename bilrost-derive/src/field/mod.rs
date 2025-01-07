@@ -22,10 +22,21 @@ pub enum Field {
 }
 
 #[derive(Copy, Clone)]
+pub enum DecodeMode {
+    Relaxed,
+    Distinguished,
+}
+
+#[derive(Copy, Clone)]
+pub enum DecodeLifetime {
+    Owned,
+    Borrowed,
+}
+
+#[derive(Copy, Clone)]
 pub enum WhereFor {
     Encode,
-    DecodeOwned,
-    DecodeBorrowed,
+    Decode(DecodeLifetime, DecodeMode),
 }
 
 impl Field {
@@ -76,20 +87,11 @@ impl Field {
         self.tags().into_iter().max().unwrap()
     }
 
-    /// Returns the where clause condition asserting that this field's encoder encodes its type.
-    pub fn expedient_where_terms(&self, purpose: WhereFor) -> Vec<TokenStream> {
+    /// Returns the where clause condition asserting that this field has the given capability.
+    pub fn where_terms(&self, purpose: WhereFor) -> Vec<TokenStream> {
         match self {
-            Field::Value(field) => field.expedient_where_terms(purpose),
-            Field::Oneof(field) => field.expedient_where_terms(purpose),
-        }
-    }
-
-    /// Returns the where clause condition asserting that this field's encoder encodes its type in
-    /// distinguished mode.
-    pub fn distinguished_where_terms(&self, purpose: WhereFor) -> Vec<TokenStream> {
-        match self {
-            Field::Value(field) => field.distinguished_where_terms(purpose),
-            Field::Oneof(field) => field.distinguished_where_terms(purpose),
+            Field::Value(field) => field.where_terms(purpose),
+            Field::Oneof(field) => field.where_terms(purpose),
         }
     }
 
@@ -147,19 +149,15 @@ impl Field {
     }
 
     /// Returns an expression which evaluates to the result of decoding a value into the field.
-    pub fn decode_expedient(&self, ident: TokenStream) -> TokenStream {
+    pub fn decode(
+        &self,
+        ident: TokenStream,
+        lifetime: DecodeLifetime,
+        mode: DecodeMode,
+    ) -> TokenStream {
         match self {
-            Field::Value(scalar) => scalar.decode_expedient(ident),
-            Field::Oneof(oneof) => oneof.decode_expedient(ident),
-        }
-    }
-
-    /// Returns an expression which evaluates to the result of decoding a value into the field in
-    /// distinguished mode.
-    pub fn decode_distinguished(&self, ident: TokenStream) -> TokenStream {
-        match self {
-            Field::Value(scalar) => scalar.decode_distinguished(ident),
-            Field::Oneof(oneof) => oneof.decode_distinguished(ident),
+            Field::Value(scalar) => scalar.decode(ident, lifetime, mode),
+            Field::Oneof(oneof) => oneof.decode(ident, lifetime, mode),
         }
     }
 
