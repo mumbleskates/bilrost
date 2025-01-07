@@ -1,3 +1,10 @@
+## V0.1011.1
+
+### Fixes
+
+* Oneof enums can now implement distinguished decoding even when one or more of
+  their variants has a type with no "empty" state. 🎊
+
 ## v0.1011.0
 
 ### Breaking changes
