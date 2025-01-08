@@ -2392,8 +2392,8 @@ macro_rules! encoder_where_value_encoder {
         where
             T: Eq
                 + $crate::encoding::EmptyState
-                + $crate::encoding::DistinguishedValueDecoder<$encoding>
-                + $crate::encoding::Decoder<$encoding>,
+                + $crate::encoding::Encoder<$encoding>
+                + $crate::encoding::DistinguishedValueDecoder<$encoding>,
             $($($where_clause)*)?
         {
             #[inline(always)]
@@ -2409,14 +2409,18 @@ macro_rules! encoder_where_value_encoder {
                         $crate::DecodeError::new(crate::DecodeErrorKind::UnexpectedlyRepeated)
                     );
                 }
-                // decoding a bare value, empty values are unacceptable
-                $crate::encoding::DistinguishedFieldDecoder::<$encoding>
+                // decoding a value as a whole message field, empty values are unacceptable
+                 mut canon = $crate::encoding::DistinguishedFieldDecoder::<$encoding>
                     ::decode_field_distinguished::<false>(
                         wire_type,
                         value,
                         buf,
-                        ctx,
-                    )
+                        ctx.clone(),
+                    )?;
+                if !T::CHECKS_EMPTY && value.is_empty() {
+                    ctx.update(&mut canon, crate::Canonicity::NotCanonical)?;
+                }
+                Ok(canon)
             }
         }
         // TODO(widders): borrowed
