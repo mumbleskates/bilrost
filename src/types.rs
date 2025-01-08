@@ -8,8 +8,8 @@ use bytes::{Buf, BufMut};
 
 use crate::buf::ReverseBuf;
 use crate::encoding::{
-    skip_field, Canonicity, Capped, DecodeContext, RawDistinguishedMessageDecoder, RawMessage,
-    RestrictedDecodeContext, WireType,
+    skip_field, AlwaysOwned, Canonicity, Capped, DecodeContext, RawDistinguishedMessageDecoder,
+    RawMessage, RawMessageDecoder, RestrictedDecodeContext, WireType,
 };
 use crate::DecodeError;
 
@@ -157,7 +157,9 @@ impl RawMessage for () {
     fn raw_encoded_len(&self) -> usize {
         0
     }
+}
 
+impl RawMessageDecoder for () {
     fn raw_decode_field<B: Buf + ?Sized>(
         &mut self,
         _tag: u32,
@@ -190,3 +192,6 @@ impl RawDistinguishedMessageDecoder for () {
         Ok(Canonicity::HasExtensions)
     }
 }
+
+// TODO(widders): reevaluate the usefulness of this
+impl AlwaysOwned for () {}
