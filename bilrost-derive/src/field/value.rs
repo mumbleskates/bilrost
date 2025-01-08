@@ -210,7 +210,8 @@ impl Field {
                 ),
                 (Owned, Distinguished) => quote!(
                     <#ty as ::bilrost::encoding::DistinguishedFieldDecoder<#encoding>>::
-                        decode_field_distinguished
+                        // always allow empty values, oneof variants are nested
+                        decode_field_distinguished::<true>
                     (
                         wire_type,
                         #ident,
@@ -232,10 +233,11 @@ impl Field {
                     )
                 ),
                 (Owned, Distinguished) => quote!(
-                    <#ty as ::bilrost::encoding::DistinguishedFieldBorrowDecoder<#encoding>>::
-                        borrow_decode_field_distinguished
+                    <#ty as ::bilrost::encoding::DistinguishedDecoder<#encoding>>::
+                        decode_distinguished
                     (
                         wire_type,
+                        duplicated,
                         #ident,
                         buf,
                         ctx.clone(),
