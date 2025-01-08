@@ -1865,9 +1865,6 @@ where
         buf: Capped<impl Buf + ?Sized>,
         ctx: RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
-        static_assertions::const_assert!(
-            ALLOW_EMPTY || <Self as DistinguishedValueDecoder<E>>::CHECKS_EMPTY
-        );
         check_wire_type(Self::WIRE_TYPE, wire_type)?;
         Self::decode_value_distinguished::<ALLOW_EMPTY>(value, buf, ctx)
     }
@@ -1900,9 +1897,6 @@ where
         buf: Capped<&'a [u8]>,
         ctx: RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
-        static_assertions::const_assert!(
-            ALLOW_EMPTY || <Self as DistinguishedValueBorrowDecoder<'a, E>>::CHECKS_EMPTY
-        );
         check_wire_type(Self::WIRE_TYPE, wire_type)?;
         Self::borrow_decode_value_distinguished::<ALLOW_EMPTY>(value, buf, ctx)
     }
