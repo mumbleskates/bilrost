@@ -1668,10 +1668,7 @@ pub trait ValueDecoder<E>: ValueEncoder<E> {
 
 /// The core trait for decoding single values in distinguished mode. Data is always copies when it
 /// is read from the buffer.
-pub trait DistinguishedValueDecoder<E>: ValueEncoder<E>
-where
-    Self: Eq,
-{
+pub trait DistinguishedValueDecoder<E>: ValueEncoder<E> + Eq {
     /// Indicates whether the `ALLOW_EMPTY` argument in `decode_value_distinguished` has any effect.
     /// Some decoder implementations can more cheaply determine whether they were empty during
     /// decoding, and will return `NotCanonical` if `ALLOW_EMPTY` was false; for these
@@ -1698,10 +1695,7 @@ pub trait ValueBorrowDecoder<'a, E>: ValueEncoder<E> {
     ) -> Result<(), DecodeError>;
 }
 
-pub trait DistinguishedValueBorrowDecoder<'a, E>: ValueEncoder<E>
-where
-    Self: Eq,
-{
+pub trait DistinguishedValueBorrowDecoder<'a, E>: ValueEncoder<E> + Eq {
     /// Indicates whether the `ALLOW_EMPTY` argument in `decode_value_distinguished` has any effect.
     /// Some decoder implementations can more cheaply determine whether they were empty during
     /// decoding, and will return `NotCanonical` if `ALLOW_EMPTY` was false; for these
@@ -1817,7 +1811,7 @@ pub trait DistinguishedFieldBorrowDecoder<'a, E>: DistinguishedValueBorrowDecode
 
 impl<T, E> FieldEncoder<E> for T
 where
-    Self: ValueEncoder<E>,
+    T: ValueEncoder<E>,
 {
     #[inline]
     fn encode_field<B: BufMut + ?Sized>(tag: u32, value: &Self, buf: &mut B, tw: &mut TagWriter) {
@@ -1844,7 +1838,7 @@ where
 
 impl<T, E> FieldDecoder<E> for T
 where
-    Self: ValueDecoder<E>,
+    T: ValueDecoder<E>,
 {
     #[inline]
     fn decode_field<B: Buf + ?Sized>(
@@ -1860,7 +1854,7 @@ where
 
 impl<T, E> DistinguishedFieldDecoder<E> for T
 where
-    Self: DistinguishedValueDecoder<E>,
+    T: DistinguishedValueDecoder<E>,
 {
     #[inline(always)]
     fn decode_field_distinguished<const ALLOW_EMPTY: bool>(
@@ -1876,7 +1870,7 @@ where
 
 impl<'a, T, E> FieldBorrowDecoder<'a, E> for T
 where
-    Self: ValueBorrowDecoder<'a, E>,
+    T: ValueBorrowDecoder<'a, E>,
 {
     #[inline]
     fn borrow_decode_field(
@@ -1892,7 +1886,7 @@ where
 
 impl<'a, T, E> DistinguishedFieldBorrowDecoder<'a, E> for T
 where
-    Self: DistinguishedValueBorrowDecoder<'a, E>,
+    T: DistinguishedValueBorrowDecoder<'a, E>,
 {
     #[inline(always)]
     fn borrow_decode_field_distinguished<const ALLOW_EMPTY: bool>(
@@ -2362,7 +2356,7 @@ macro_rules! encoder_where_value_encoder {
             }
         }
 
-        /// Decodes plain values only when they are non-default.
+        /// Decodes plain values encoded as whole fields.
         impl<T $(, $($generics)*)?> $crate::encoding::Decoder<$encoding> for T
         where
             T: $crate::encoding::Encoder<$encoding> + $crate::encoding::ValueDecoder<$encoding>,
@@ -2386,8 +2380,9 @@ macro_rules! encoder_where_value_encoder {
             }
         }
 
-        /// Distinguished encoding for plain values forbids encoding defaulted values. This includes
+        /// Canonical encoding for plain values forbids encoding empty values. This includes
         /// directly-nested message types, which are not emitted when all their fields are default.
+        /// If an empty value is decoded it is considered fully non-canonical.
         impl<T $(, $($generics)*)?> $crate::encoding::DistinguishedDecoder<$encoding> for T
         where
             T: Eq
