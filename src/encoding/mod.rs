@@ -1554,7 +1554,7 @@ pub trait Decoder<E>: Encoder<E> {
 /// Extension trait for canonical encoding and decoding. Distinguished decoding is available via
 /// this trait, and any type that implements this trait is guaranteed to always emit canonical data
 /// via `Encoder`.
-pub trait DistinguishedDecoder<E>: Decoder<E> {
+pub trait DistinguishedDecoder<E>: Encoder<E> {
     /// Decodes a field for the value, returning a value indicating how canonical the encoding was.
     fn decode_distinguished<B: Buf + ?Sized>(
         wire_type: WireType,
@@ -1575,7 +1575,7 @@ pub trait BorrowDecoder<'a, E>: Encoder<E> {
     ) -> Result<(), DecodeError>;
 }
 
-pub trait DistinguishedBorrowDecoder<'a, E>: Decoder<E> {
+pub trait DistinguishedBorrowDecoder<'a, E>: Encoder<E> {
     /// Decodes a field for the value, returning a value indicating how canonical the encoding was.
     fn borrow_decode_distinguished(
         wire_type: WireType,
@@ -1751,7 +1751,7 @@ where
 
 /// Affiliated helper trait for ValueEncoder that provides obligate implementations for handling
 /// field keys and wire types.
-pub trait FieldEncoder<E> {
+pub trait FieldEncoder<E>: ValueEncoder<E> {
     /// Encodes exactly one field with the given tag and value into the buffer.
     fn encode_field<B: BufMut + ?Sized>(tag: u32, value: &Self, buf: &mut B, tw: &mut TagWriter);
 
@@ -1769,7 +1769,7 @@ pub trait FieldEncoder<E> {
 
 /// Affiliated helper trait for ValueDecoder that provides obligate implementations for handling
 /// field keys and wire types.
-pub trait FieldDecoder<E>: FieldEncoder<E> {
+pub trait FieldDecoder<E>: ValueDecoder<E> {
     /// Decodes a field directly from the buffer, also checking the wire type.
     fn decode_field<B: Buf + ?Sized>(
         wire_type: WireType,
@@ -1781,7 +1781,7 @@ pub trait FieldDecoder<E>: FieldEncoder<E> {
 
 /// Affiliated helper trait for DistinguishedValueDecoder that provides obligate implementations for
 /// handling field keys and wire types.
-pub trait DistinguishedFieldDecoder<E> {
+pub trait DistinguishedFieldDecoder<E>: DistinguishedValueDecoder<E> {
     /// Decodes a field directly from the buffer, also checking the wire type.
     fn decode_field_distinguished<const ALLOW_EMPTY: bool>(
         wire_type: WireType,
@@ -1791,7 +1791,9 @@ pub trait DistinguishedFieldDecoder<E> {
     ) -> Result<Canonicity, DecodeError>;
 }
 
-pub trait FieldBorrowDecoder<'a, E>: FieldEncoder<E> {
+/// Affiliated helper trait for BorrowDecoder that provides obligate implementations for handling
+/// field keys and wire types.
+pub trait FieldBorrowDecoder<'a, E>: ValueBorrowDecoder<'a, E> {
     /// Decodes a field directly from the buffer, also checking the wire type.
     fn borrow_decode_field(
         wire_type: WireType,
@@ -1801,7 +1803,9 @@ pub trait FieldBorrowDecoder<'a, E>: FieldEncoder<E> {
     ) -> Result<(), DecodeError>;
 }
 
-pub trait DistinguishedFieldBorrowDecoder<'a, E> {
+/// Affiliated helper trait for DistinguishedBorrowDecoder that provides obligate implementations
+/// for handling field keys and wire types.
+pub trait DistinguishedFieldBorrowDecoder<'a, E>: DistinguishedValueBorrowDecoder<'a, E> {
     /// Decodes a field directly from the buffer, also checking the wire type.
     fn borrow_decode_field_distinguished<const ALLOW_EMPTY: bool>(
         wire_type: WireType,
