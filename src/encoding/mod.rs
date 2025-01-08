@@ -1856,7 +1856,7 @@ where
 
 impl<T, E> DistinguishedFieldDecoder<E> for T
 where
-    Self: DistinguishedValueDecoder<E> + EmptyState,
+    Self: DistinguishedValueDecoder<E>,
 {
     #[inline(always)]
     fn decode_field_distinguished<const ALLOW_EMPTY: bool>(
@@ -1865,13 +1865,11 @@ where
         buf: Capped<impl Buf + ?Sized>,
         ctx: RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
+        static_assertions::const_assert!(
+            ALLOW_EMPTY || <Self as DistinguishedValueDecoder<E>>::CHECKS_EMPTY
+        );
         check_wire_type(Self::WIRE_TYPE, wire_type)?;
-        let canon = Self::decode_value_distinguished::<ALLOW_EMPTY>(value, buf, ctx.clone())?;
-        ctx.check(if !T::CHECKS_EMPTY && !ALLOW_EMPTY && value.is_empty() {
-            Canonicity::NotCanonical
-        } else {
-            canon
-        })
+        Self::decode_value_distinguished::<ALLOW_EMPTY>(value, buf, ctx)
     }
 }
 
@@ -1893,7 +1891,7 @@ where
 
 impl<'a, T, E> DistinguishedFieldBorrowDecoder<'a, E> for T
 where
-    Self: DistinguishedValueBorrowDecoder<'a, E> + EmptyState,
+    Self: DistinguishedValueBorrowDecoder<'a, E>,
 {
     #[inline(always)]
     fn borrow_decode_field_distinguished<const ALLOW_EMPTY: bool>(
@@ -1902,14 +1900,11 @@ where
         buf: Capped<&'a [u8]>,
         ctx: RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
+        static_assertions::const_assert!(
+            ALLOW_EMPTY || <Self as DistinguishedValueBorrowDecoder<'a, E>>::CHECKS_EMPTY
+        );
         check_wire_type(Self::WIRE_TYPE, wire_type)?;
-        let canon =
-            Self::borrow_decode_value_distinguished::<ALLOW_EMPTY>(value, buf, ctx.clone())?;
-        ctx.check(if !T::CHECKS_EMPTY && !ALLOW_EMPTY && value.is_empty() {
-            Canonicity::NotCanonical
-        } else {
-            canon
-        })
+        Self::borrow_decode_value_distinguished::<ALLOW_EMPTY>(value, buf, ctx)
     }
 }
 

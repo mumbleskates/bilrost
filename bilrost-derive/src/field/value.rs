@@ -209,20 +209,14 @@ impl Field {
                     )
                 ),
                 (Owned, Distinguished) => quote!(
-                    ::bilrost::encoding::check_wire_type(
-                        <#ty as ::bilrost::encoding::Wiretyped<#encoding>>::WIRE_TYPE,
+                    <#ty as ::bilrost::encoding::DistinguishedFieldDecoder<#encoding>>::
+                        decode_field_distinguished
+                    (
                         wire_type,
+                        #ident,
+                        buf,
+                        ctx.clone(),
                     )
-                    .and_then(|()| {
-                        <#ty as ::bilrost::encoding::DistinguishedValueDecoder<#encoding>>::
-                            // Allow empty values: oneof field values are nested
-                            decode_value_distinguished::<true>
-                        (
-                            #ident,
-                            buf,
-                            ctx.clone(),
-                        )
-                    })
                 ),
                 // TODO(widders): borrowed
             }
@@ -238,20 +232,14 @@ impl Field {
                     )
                 ),
                 (Owned, Distinguished) => quote!(
-                    ::bilrost::encoding::check_wire_type(
-                        <#ty as ::bilrost::encoding::Wiretyped<#encoding>>::WIRE_TYPE,
+                    <#ty as ::bilrost::encoding::DistinguishedFieldBorrowDecoder<#encoding>>::
+                        borrow_decode_field_distinguished
+                    (
                         wire_type,
+                        #ident,
+                        buf,
+                        ctx.clone(),
                     )
-                    .and_then(|()| {
-                        <#ty as ::bilrost::encoding::DistinguishedBorrowValueDecoder<#encoding>>::
-                            // Allow empty values: oneof field values are nested
-                            borrow_decode_value_distinguished::<true>
-                        (
-                            #ident,
-                            buf,
-                            ctx.clone(),
-                        )
-                    })
                 ),
                 // TODO(widders): borrowed
             }
