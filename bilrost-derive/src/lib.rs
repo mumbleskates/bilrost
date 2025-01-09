@@ -33,9 +33,10 @@ use syn::{
 use crate::attrs::{tag_list_attr, TagList};
 use crate::field::{
     bilrost_attrs, set_option,
-    DecodeMode::*,
+    DecodeLifetime::{self, Borrowed, Owned},
+    DecodeMode::{self, Distinguished, Relaxed},
     Field,
-    WhereFor::{self, *},
+    WhereFor::{self, Decode, Encode},
 };
 
 mod attrs;
@@ -424,18 +425,15 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     };
     let encoder_where_clause =
         append_wheres(where_clause, self_where.clone(), &unsorted_fields, Encode);
-    let owned_decoder_where_clause = append_wheres(
-        where_clause,
-        self_where.clone(),
-        &unsorted_fields,
-        DecodeOwned(Relaxed),
-    );
-    let borrow_decoder_where_clause = append_wheres(
-        where_clause,
-        self_where.clone(),
-        &unsorted_fields,
-        DecodeBorrowed(Relaxed),
-    );
+    let [owned_decoder_where_clause, borrow_decoder_where_clause] =
+        [Owned, Borrowed].map(|ownership| {
+            append_wheres(
+                where_clause,
+                self_where.clone(),
+                &unsorted_fields,
+                Decode(ownership, Relaxed),
+            )
+        });
 
     // If there can never be a tag delta larger than 31, field keys will never be more than 1 byte.
     let can_use_trivial_tag_measurer = matches!(tag_range, Some(range) if *range.end() < 32);
@@ -611,19 +609,22 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         }
     });
 
-    let decode = unsorted_fields.iter().map(|(field_ident, field)| {
-        let decode = field.decode_expedient(quote!(&mut self.#field_ident));
-        let tags = field.tags().into_iter().map(|tag| quote!(#tag));
-        let tags = Itertools::intersperse(tags, quote!(|));
+    let [decode_owned, decode_borrowed] = [Owned, Borrowed].map(|ownership| {
+        unsorted_fields.iter().map(move |(field_ident, field)| {
+            let ident = quote!(&mut self.#field_ident);
+            let decode = field.decode(ident.clone(), ownership, Relaxed);
+            let tags = field.tags().into_iter().map(|tag| quote!(#tag));
+            let tags = Itertools::intersperse(tags, quote!(|));
 
-        quote! {
-            #(#tags)* => {
-                #decode.map_err(|mut error| {
-                    error.push(STRUCT_NAME, stringify!(#field_ident));
-                    error
-                })
-            },
-        }
+            quote! {
+                #(#tags)* => {
+                    if let ::core::result::Result::Err(mut error) = #decode {
+                        error.push(STRUCT_NAME, stringify!(#field_ident));
+                        return ::core::result::Result::Err(error);
+                    }
+                }
+            }
+        })
     });
 
     let struct_name = if unsorted_fields.is_empty() {
@@ -712,9 +713,10 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
                 let _ = <Self as ::bilrost::RawMessage>::__ASSERTIONS;
                 #struct_name
                 match tag {
-                    #(#decode)*
-                    _ => ::bilrost::encoding::skip_field(wire_type, buf),
+                    #(#decode_owned)*
+                    _ => ::bilrost::encoding::skip_field(wire_type, buf)?,
                 }
+                ::core::result::Result::Ok(())
             }
 
             #[inline]
@@ -883,35 +885,34 @@ fn try_distinguished_message(input: TokenStream) -> Result<TokenStream, Error> {
         bail!("messages with ignored fields cannot be distinguished");
     }
 
-    let owned_decoder_where_clause = append_wheres(
-        where_clause_,
-        Some(quote!(Self: ::core::cmp::Eq)),
-        &unsorted_fields,
-        DecodeOwned(Distinguished),
-    );
-    let borrow_decoder_where_clause = append_wheres(
-        where_clause_,
-        Some(quote!(Self: ::core::cmp::Eq)),
-        &unsorted_fields,
-        DecodeBorrowed(Distinguished),
-    );
+    let [owned_decoder_where_clause, borrowed_decoder_where_clause] =
+        [Owned, Borrowed].map(|ownership| {
+            append_wheres(
+                where_clause_,
+                Some(quote!(Self: ::core::cmp::Eq)),
+                &unsorted_fields,
+                Decode(ownership, Distinguished),
+            )
+        });
 
-    let decode = unsorted_fields.iter().map(|(field_ident, field)| {
-        let decode = field.decode_distinguished(quote!(&mut self.#field_ident));
-        let tags = field.tags().into_iter().map(|tag| quote!(#tag));
-        let tags = Itertools::intersperse(tags, quote!(|));
+    let [decode_owned, decode_borrowed] = [Owned, Borrowed].map(|ownership| {
+        unsorted_fields.iter().map(move |(field_ident, field)| {
+            let decode = field.decode(quote!(&mut self.#field_ident), ownership, Distinguished);
+            let tags = field.tags().into_iter().map(|tag| quote!(#tag));
+            let tags = Itertools::intersperse(tags, quote!(|));
 
-        quote! {
-            #(#tags)* => {
-                ctx.update(
-                    canon,
-                    #decode.map_err(|mut error| {
+            quote! {
+                #(#tags)* => {
+                    if let ::core::option::Option::Some(mut error) = match #decode {
+                        ::core::result::Result::Ok(new_canon) => ctx.update(canon, new_canon).err(),
+                        ::core::result::Result::Err(error) => ::core::option::Option::Some(error),
+                    } {
                         error.push(STRUCT_NAME, stringify!(#field_ident));
-                        error
-                    })?,
-                )?;
-            },
-        }
+                        return ::core::result::Result::Err(error);
+                    }
+                }
+            }
+        })
     });
 
     let struct_name = if unsorted_fields.is_empty() {
@@ -940,7 +941,7 @@ fn try_distinguished_message(input: TokenStream) -> Result<TokenStream, Error> {
                 #struct_name
                 let canon = &mut ::bilrost::Canonicity::Canonical;
                 match tag {
-                    #(#decode)*
+                    #(#decode_owned)*
                     _ => {
                         ctx.update(canon, ::bilrost::Canonicity::HasExtensions)?;
                         ::bilrost::encoding::skip_field(wire_type, buf)?;
@@ -951,7 +952,7 @@ fn try_distinguished_message(input: TokenStream) -> Result<TokenStream, Error> {
         }
 
         impl #impl_generics ::bilrost::RawDistinguishedMessageBorrow<'a>
-        for #ident #ty_generics #owned_decoder_where_clause {
+        for #ident #ty_generics #borrowed_decoder_where_clause {
             #[allow(unused_variables)]
             fn raw_decode_field_distinguished<__B>(
                 &mut self,
@@ -967,7 +968,7 @@ fn try_distinguished_message(input: TokenStream) -> Result<TokenStream, Error> {
                 #struct_name
                 let canon = &mut ::bilrost::Canonicity::Canonical;
                 match tag {
-                    #(#decode)*
+                    #(#decode_borrowed)*
                     _ => {
                         ctx.update(canon, ::bilrost::Canonicity::HasExtensions)?;
                         ::bilrost::encoding::skip_field(wire_type, buf)?;
@@ -1539,7 +1540,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         ident: &ident,
         variant_ident,
         field,
-        distinguished: false,
+        mode: Relaxed,
     });
 
     let decode = quote! {
@@ -1657,6 +1658,8 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
             }
         }
 
+        // TODO(widders): borrowed
+
         #empty_state_impl
     };
 
@@ -1680,8 +1683,10 @@ struct DecoderForOneof<'a> {
     variant_ident: &'a Ident,
     /// The Field struct for this variant
     field: &'a Field,
-    /// True to generate a distinguished impl, false for expedient
-    distinguished: bool,
+    /// Ownership type
+    lifetime: DecodeLifetime,
+    /// Decoding mode
+    mode: DecodeMode,
 }
 
 impl ToTokens for DecoderForOneof<'_> {
@@ -1689,15 +1694,9 @@ impl ToTokens for DecoderForOneof<'_> {
         let ident = self.ident;
         let variant_ident = self.variant_ident;
         let field = self.field;
-
         let tag = field.first_tag();
         let with_new_value = field.with_value(quote!(new_value));
-
-        let decode = if self.distinguished {
-            field.decode_distinguished(quote!(&mut new_value))
-        } else {
-            field.decode_expedient(quote!(&mut new_value))
-        };
+        let decode = field.decode(quote!(&mut new_value), self.lifetime, self.mode);
 
         // It's important that we spell the whole expression for the decoder matching for oneofs as
         // a single Result expression that never early-returns with `?`; that way when we add guards
@@ -1705,8 +1704,14 @@ impl ToTokens for DecoderForOneof<'_> {
         // attribution) our clause that traces the error location will see every error that occurs,
         // including errors that bubble up from the inner decoders, and those error details can
         // still path down through the oneof variant.
-        if self.distinguished {
-            tokens.append_all(quote! {
+        tokens.append_all(match self.mode {
+            Relaxed => quote! {
+                #tag => {
+                    let mut new_value = ::bilrost::encoding::ForOverwrite::for_overwrite();
+                    #decode.map(|()| #ident::#variant_ident #with_new_value)
+                }
+            },
+            Distinguished => quote! {
                 #tag => {
                     let mut new_value = ::bilrost::encoding::ForOverwrite::for_overwrite();
                     #decode.and_then(|canon| {
@@ -1716,15 +1721,8 @@ impl ToTokens for DecoderForOneof<'_> {
                         ))
                     })
                 }
-            })
-        } else {
-            tokens.append_all(quote! {
-                #tag => {
-                    let mut new_value = ::bilrost::encoding::ForOverwrite::for_overwrite();
-                    #decode.map(|()| #ident::#variant_ident #with_new_value)
-                }
-            })
-        }
+            },
+        })
     }
 }
 
@@ -1761,7 +1759,7 @@ fn try_distinguished_oneof(input: TokenStream) -> Result<TokenStream, Error> {
             where_clause,
             Some(quote!(Self: ::bilrost::encoding::Oneof)),
             &fields,
-            DecodeOwned(Distinguished),
+            Decode(Owned, Distinguished),
         );
     } else {
         appropriate_oneof_trait = quote!(NonEmptyDistinguishedOneofDecoder);
@@ -1769,14 +1767,15 @@ fn try_distinguished_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         decode_field_self_arg = None;
         decode_field_return_ty = quote!((Self, ::bilrost::Canonicity));
         some = None;
-        full_where_clause = append_wheres(where_clause, None, &fields, DecodeOwned(Distinguished));
+        full_where_clause =
+            append_wheres(where_clause, None, &fields, Decode(Owned, Distinguished));
     };
 
     let decode_arms = fields.iter().map(|(variant_ident, field)| DecoderForOneof {
         ident: &ident,
         variant_ident,
         field,
-        distinguished: true,
+        mode: Distinguished,
     });
 
     let decode = quote! {
@@ -1830,6 +1829,8 @@ fn try_distinguished_oneof(input: TokenStream) -> Result<TokenStream, Error> {
                 #decode
             }
         }
+
+        // TODO(widders): borrowed
     };
 
     let aliases = encoder_alias_header();
