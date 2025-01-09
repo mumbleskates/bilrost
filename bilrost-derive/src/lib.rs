@@ -1822,18 +1822,30 @@ impl ToTokens for DecoderForOneof<'_> {
             Relaxed => quote! {
                 #tag => {
                     let mut new_value = ::bilrost::encoding::ForOverwrite::for_overwrite();
-                    #decode.map(|()| #ident::#variant_ident #with_new_value)
+                    match #decode {
+                        ::core::result::Result::Ok(()) => {
+                            ::core::result::Result::Ok(#ident::#variant_ident #with_new_value)
+                        },
+                        ::core::result::Result::Err(error) => ::core::result::Result::Err(error),
+                    }
                 }
             },
             Distinguished => quote! {
                 #tag => {
                     let mut new_value = ::bilrost::encoding::ForOverwrite::for_overwrite();
-                    #decode.and_then(|canon| {
-                        ::core::result::Result::Ok((
-                            #ident::#variant_ident #with_new_value,
-                            ctx.check(canon)?
-                        ))
-                    })
+                    match #decode {
+                        ::core::result::Result::Ok(canon) => {
+                            if let ::core::result::Result::Err(canon_error) = ctx.check(canon) {
+                                ::core::result::Result::Err(canon_error)
+                            } else {
+                                ::core::result::Result::Ok((
+                                    #ident::#variant_ident #with_new_value,
+                                    canon
+                                ))
+                            }
+                        }
+                        ::core::result::Result::Err(error) => ::core::result::Result::Err(error),
+                    }
                 }
             },
         })
