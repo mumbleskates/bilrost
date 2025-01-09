@@ -1676,9 +1676,15 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
             // The other purpose this guard serves is to attach an error path detail for the field
             // in the oneof when it bubbles back up through this call. For that reason, also
             // mentioned elsewhere, we structure most of this code to be pretty much one big
-            // Result-valued expression to serve this `.map_err()` call at the end.
-            if let #ident::#empty_ident = value {
-                #decode.map(|decoded| *value = decoded)
+            // Result-valued expression to serve this match on the very outside.
+            match if let #ident::#empty_ident = value {
+                match #decode {
+                    ::core::result::Result::Ok(decoded) => {
+                        *value = decoded;
+                        ::core::result::Result::Ok(())
+                    }
+                    ::core::result::Result::Err(error) => ::core::result::Result::Err(error),
+                }
             } else {
                 ::core::result::Result::Err(::bilrost::DecodeError::new(
                     if ::bilrost::encoding::#appropriate_oneof_trait::oneof_current_tag(value)
@@ -1689,14 +1695,17 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
                         ::bilrost::DecodeErrorKind::ConflictingFields
                     }
                 ))
-            }.map_err(|mut err| {
-                let (msg, field) =
-                    <Self as ::bilrost::encoding::#appropriate_oneof_trait>::oneof_variant_name(
-                        tag
-                    );
-                err.push(msg, field);
-                err
-            })
+            } {
+                ::core::result::Result::Err(mut error) => {
+                    let (msg, field) =
+                        <Self as ::bilrost::encoding::#appropriate_oneof_trait>::oneof_variant_name(
+                            tag
+                        );
+                    error.push(msg, field);
+                    ::core::result::Result::Err(error)
+                }
+                ok => ok,
+            }
         },
     };
 
