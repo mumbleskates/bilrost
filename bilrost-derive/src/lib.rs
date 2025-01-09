@@ -1513,12 +1513,16 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         ident,
         impl_generics,
         ty_generics,
-        where_clause,
+        where_clause: where_clause_,
         fields,
         empty_variant,
     } = preprocess_oneof(&input)?;
 
-    let where_clause = append_expedient_encoder_wheres(where_clause, None, &fields);
+    let borrow_generics = append_generic(impl_generics, quote!('__a));
+
+    let encoder_where_clause = append_wheres(where_clause_, None, &fields, Encode);
+    let owned_decoder_where_clause = append_wheres(where_clause_, None, &fields, Decode(Owned, Relaxed));
+    let borrowed_decoder_where_clause = append_wheres(where_clause_, None, &fields, Decode(Borrowed, Relaxed));
 
     let sorted_tags: Vec<u32> = fields
         .iter()
@@ -1560,9 +1564,9 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         })
         .collect();
 
-    let appropriate_oneof_trait;
-    // TODO(widders): owned & borrowed decodes
-    let appropriate_oneof_decode_trait;
+    let encoder_trait;
+    let owned_decoder_trait;
+    let borrowed_decoder_trait;
     let decode_field_self_arg;
     let decode_field_return_ty;
     let current_tag_ty;
@@ -1571,8 +1575,9 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
     let some;
 
     if let Some(empty_ident) = &empty_variant {
-        appropriate_oneof_trait = quote!(Oneof);
-        appropriate_oneof_decode_trait = quote!(OneofDecoder);
+        encoder_trait = quote!(Oneof);
+        owned_decoder_trait = quote!(OneofDecoder);
+        borrowed_decoder_trait = quote!(NonEmptyOneofDecoder);
         decode_field_self_arg = Some(quote!(value: &mut Self,));
         decode_field_return_ty = quote!(());
         some = Some(quote!(::core::option::Option::Some));
@@ -1614,8 +1619,9 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
             }
         });
     } else {
-        appropriate_oneof_trait = quote!(NonEmptyOneof);
-        appropriate_oneof_decode_trait = quote!(NonEmptyOneofDecoder);
+        encoder_trait = quote!(NonEmptyOneof);
+        owned_decoder_trait = quote!(NonEmptyOneofDecoder);
+        borrowed_decoder_trait = quote!(NonEmptyOneofBorrowDecoder);
         decode_field_self_arg = None;
         decode_field_return_ty = quote!(Self);
         some = None;
@@ -1641,25 +1647,28 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         }
     });
 
-    let decode_arms = fields.iter().map(|(variant_ident, field)| DecoderForOneof {
-        ident: &ident,
-        variant_ident,
-        field,
-        mode: Relaxed,
+    let [decode_owned, decode_borrowed] = [Owned, Borrowed].map(|ownership| {
+        let decode_arms = fields.iter().map(|(variant_ident, field)| DecoderForOneof {
+            ident: &ident,
+            variant_ident,
+            field,
+            lifetime: ownership,
+            mode: Relaxed,
+        });
+
+        quote! {
+            match tag {
+                #(#decode_arms,)*
+                _ => unreachable!(
+                    concat!("invalid ", stringify!(#ident), " tag: {}"), tag,
+                ),
+            }
+        }
     });
 
-    let decode = quote! {
-        match tag {
-            #(#decode_arms,)*
-            _ => unreachable!(
-                concat!("invalid ", stringify!(#ident), " tag: {}"), tag,
-            ),
-        }
-    };
-
-    let decode = match empty_variant {
-        None => decode,
-        Some(empty_ident) => quote! {
+    let [decode_owned, decode_borrowed] = match empty_variant {
+        None => [decode_owned, decode_borrowed],
+        Some(empty_ident) => [decode_owned, decode_borrowed].map(|decode| quote! {
             // Guards against colliding oneof field decoding are only evaluated by the Oneof trait,
             // when `oneof_decode_field` is called and the oneof value is already populated.
             // Whichever implementer is responsible for the oneof having an empty state is also
@@ -1687,9 +1696,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
                 }
             } else {
                 ::core::result::Result::Err(::bilrost::DecodeError::new(
-                    if ::bilrost::encoding::#appropriate_oneof_trait::oneof_current_tag(value)
-                        == #some(tag)
-                    {
+                    if ::bilrost::encoding::#encoder_trait::oneof_current_tag(value) == #some(tag) {
                         ::bilrost::DecodeErrorKind::UnexpectedlyRepeated
                     } else {
                         ::bilrost::DecodeErrorKind::ConflictingFields
@@ -1698,20 +1705,18 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
             } {
                 ::core::result::Result::Err(mut error) => {
                     let (msg, field) =
-                        <Self as ::bilrost::encoding::#appropriate_oneof_trait>::oneof_variant_name(
-                            tag
-                        );
+                        <Self as ::bilrost::encoding::#encoder_trait>::oneof_variant_name(tag);
                     error.push(msg, field);
                     ::core::result::Result::Err(error)
                 }
                 ok => ok,
             }
-        },
+        })
     };
 
     let expanded = quote! {
-        impl #impl_generics ::bilrost::encoding::#appropriate_oneof_trait
-        for #ident #ty_generics #where_clause
+        impl #impl_generics ::bilrost::encoding::#encoder_trait
+        for #ident #ty_generics #encoder_where_clause
         {
             const FIELD_TAGS: &'static [u32] = &[#(#sorted_tags),*];
 
@@ -1758,8 +1763,8 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
             }
         }
 
-        impl #impl_generics ::bilrost::encoding::#appropriate_oneof_decode_trait
-        for #ident #ty_generics #where_clause
+        impl #impl_generics ::bilrost::encoding::#owned_decoder_trait
+        for #ident #ty_generics #owned_decoder_where_clause
         {
             fn oneof_decode_field<__B: ::bilrost::bytes::Buf + ?Sized>(
                 #decode_field_self_arg
@@ -1768,7 +1773,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
                 buf: ::bilrost::encoding::Capped<__B>,
                 ctx: ::bilrost::encoding::DecodeContext,
             ) -> ::core::result::Result<#decode_field_return_ty, ::bilrost::DecodeError> {
-                #decode
+                #decode_owned
             }
         }
 
@@ -1869,14 +1874,15 @@ fn try_distinguished_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         empty_variant,
     } = preprocess_oneof(&input)?;
 
-    let appropriate_oneof_trait;
+    let owned_decoder_trait;
     let expedient_oneof_trait; // we must reference the parent trait for `oneof_current_tag`
     let decode_field_self_arg;
     let decode_field_return_ty;
     let some; // oneofs that have empty states return Option<u32> from `oneof_current_tag`
-    let full_where_clause;
+    let owned_decoder_where_clause;
+    let borrowed_decoder_where_clause;
     if empty_variant.is_some() {
-        appropriate_oneof_trait = quote!(DistinguishedOneofDecoder);
+        owned_decoder_trait = quote!(DistinguishedOneofDecoder);
         expedient_oneof_trait = quote!(Oneof);
         decode_field_self_arg = Some(quote!(value: &mut Self,));
         decode_field_return_ty = quote!(::bilrost::Canonicity);
@@ -1888,7 +1894,7 @@ fn try_distinguished_oneof(input: TokenStream) -> Result<TokenStream, Error> {
             Decode(Owned, Distinguished),
         );
     } else {
-        appropriate_oneof_trait = quote!(NonEmptyDistinguishedOneofDecoder);
+        owned_decoder_trait = quote!(NonEmptyDistinguishedOneofDecoder);
         expedient_oneof_trait = quote!(NonEmptyOneof);
         decode_field_self_arg = None;
         decode_field_return_ty = quote!((Self, ::bilrost::Canonicity));
@@ -1949,7 +1955,7 @@ fn try_distinguished_oneof(input: TokenStream) -> Result<TokenStream, Error> {
     };
 
     let expanded = quote! {
-        impl #impl_generics ::bilrost::encoding::#appropriate_oneof_trait
+        impl #impl_generics ::bilrost::encoding::#owned_decoder_trait
         for #ident #ty_generics #full_where_clause
         {
             fn oneof_decode_field_distinguished<__B: ::bilrost::bytes::Buf + ?Sized>(
