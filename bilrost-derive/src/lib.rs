@@ -1917,11 +1917,14 @@ fn try_distinguished_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         None => decode,
         Some(empty_ident) => quote! {
             // See the note in `try_oneof` above for details about the colliding field guard.
-            if let #ident::#empty_ident = value {
-                #decode.map(|(decoded, canon)| {
-                    *value = decoded;
-                    canon
-                })
+            match if let #ident::#empty_ident = value {
+                match #decode {
+                    ::core::result::Result::Ok((decoded, canon)) => {
+                        *value = decoded;
+                        ::core::result::Result::Ok(canon)
+                    }
+                    ::core::result::Result::Err(error) => ::core::result::Result::Err(error),
+                }
             } else {
                 ::core::result::Result::Err(::bilrost::DecodeError::new(
                     if ::bilrost::encoding::#expedient_oneof_trait::oneof_current_tag(value)
@@ -1932,12 +1935,16 @@ fn try_distinguished_oneof(input: TokenStream) -> Result<TokenStream, Error> {
                         ::bilrost::DecodeErrorKind::ConflictingFields
                     }
                 ))
-            }.map_err(|mut err| {
-                let (msg, field) =
-                    <Self as ::bilrost::encoding::#expedient_oneof_trait>::oneof_variant_name(tag);
-                err.push(msg, field);
-                err
-            })
+            } {
+                ::core::result::Result::Err(mut error) => {
+                    let (msg, field) =
+                        <Self as ::bilrost::encoding::#expedient_oneof_trait>::
+                            oneof_variant_name(tag);
+                    error.push(msg, field);
+                    ::core::result::Result::Err(error)
+                }
+                ok => ok,
+            }
         },
     };
 
