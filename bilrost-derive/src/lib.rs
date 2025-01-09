@@ -1323,10 +1323,19 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
                 _ctx: ::bilrost::encoding::DecodeContext,
             ) -> Result<(), ::bilrost::DecodeError> {
                 let decoded = buf.decode_varint()?;
-                let in_range = u32::try_from(decoded)
-                    .map_err(|_| ::bilrost::DecodeErrorKind::OutOfDomainValue)?;
-                *value = <Self as ::bilrost::Enumeration>::try_from_number(in_range)
-                    .map_err(|_| ::bilrost::DecodeErrorKind::OutOfDomainValue)?;
+                let ::core::result::Result::Ok(in_range) = u32::try_from(decoded) else {
+                    return ::core::result::Result::Err(
+                        ::bilrost::DecodeErrorKind::OutOfDomainValue.into()
+                    );
+                };
+                let ::core::result::Result::Ok(typed) = <Self as ::bilrost::Enumeration>::
+                    try_from_number
+                (in_range) else {
+                    return ::core::result::Result::Err(
+                        ::bilrost::DecodeErrorKind::OutOfDomainValue.into()
+                    );
+                };
+                *value = typed;
                 ::core::result::Result::Ok(())
             }
         }
