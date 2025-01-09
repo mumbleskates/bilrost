@@ -1,5 +1,8 @@
 use crate::buf::{ReverseBuf, ReverseBuffer};
-use crate::encoding::{encode_varint, encoded_len_varint, prepend_varint, AlwaysOwned, Canonicity, Capped, DecodeContext, EmptyState, RestrictedDecodeContext, TagReader, WireType};
+use crate::encoding::{
+    encode_varint, encoded_len_varint, prepend_varint, AlwaysOwned, Canonicity, Capped,
+    DecodeContext, EmptyState, RestrictedDecodeContext, TagReader, WireType,
+};
 use crate::Canonicity::{Canonical, NotCanonical};
 use crate::{length_delimiter_len, DecodeError, EncodeError};
 use alloc::boxed::Box;
@@ -969,9 +972,16 @@ where
     T: AlwaysOwned + RawMessageDecoder,
 {
     #[inline]
-    fn raw_borrow_decode_field(&mut self, tag: u32, wire_type: WireType, duplicated: bool, buf: Capped<&'a [u8]>, ctx: DecodeContext) -> Result<(), DecodeError>
+    fn raw_borrow_decode_field(
+        &mut self,
+        tag: u32,
+        wire_type: WireType,
+        duplicated: bool,
+        buf: Capped<&'a [u8]>,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError>
     where
-        Self: Sized
+        Self: Sized,
     {
         self.raw_decode_field(tag, wire_type, duplicated, buf, ctx)
     }
@@ -982,9 +992,16 @@ where
     T: AlwaysOwned + RawDistinguishedMessageDecoder,
 {
     #[inline]
-    fn raw_borrow_decode_field_distinguished(&mut self, tag: u32, wire_type: WireType, duplicated: bool, buf: Capped<&'a [u8]>, ctx: RestrictedDecodeContext) -> Result<Canonicity, DecodeError>
+    fn raw_borrow_decode_field_distinguished(
+        &mut self,
+        tag: u32,
+        wire_type: WireType,
+        duplicated: bool,
+        buf: Capped<&'a [u8]>,
+        ctx: RestrictedDecodeContext,
+    ) -> Result<Canonicity, DecodeError>
     where
-        Self: Sized
+        Self: Sized,
     {
         self.raw_decode_field_distinguished(tag, wire_type, duplicated, buf, ctx)
     }
