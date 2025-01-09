@@ -1359,6 +1359,9 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
                 ::core::result::Result::Ok(::bilrost::Canonicity::Canonical)
             }
         }
+
+        impl #impl_generics ::bilrost::encoding::AlwaysOwned
+        for #ident #ty_generics #where_clause {}
     };
 
     Ok(expanded)
