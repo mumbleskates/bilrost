@@ -378,7 +378,7 @@ fn append_wheres<T>(
     // dedup the where clauses by their String values
     let encoder_wheres: BTreeMap<_, _> = fields
         .iter()
-        .flat_map(|(_, field)| field.expedient_where_terms(field_purpose))
+        .flat_map(|(_, field)| field.where_terms(field_purpose))
         .map(|where_| (where_.to_string(), where_))
         .collect();
     let mut appended_wheres = encoder_wheres.values().peekable();
