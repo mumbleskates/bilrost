@@ -761,7 +761,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         }
 
         impl #impl_generics ::bilrost::encoding::ForOverwrite
-        for #ident #ty_generics #borrowed_decoder_where_clause {
+        for #ident #ty_generics #encoder_where_clause {
             fn for_overwrite() -> Self {
                 Self {
                     #(#field_idents: ::bilrost::encoding::ForOverwrite::for_overwrite(),)*
@@ -771,7 +771,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         }
 
         impl #impl_generics ::bilrost::encoding::EmptyState
-        for #ident #ty_generics #borrowed_decoder_where_clause {
+        for #ident #ty_generics #encoder_where_clause {
             fn is_empty(&self) -> bool {
                 true #(&& ::bilrost::encoding::EmptyState::is_empty(&self.#field_idents))*
             }
@@ -1593,7 +1593,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
 
         empty_state_impl = Some(quote! {
             impl #impl_generics ::bilrost::encoding::ForOverwrite
-            for #ident #ty_generics #where_clause {
+            for #ident #ty_generics #encoder_where_clause {
                 #[inline]
                 fn for_overwrite() -> Self {
                     #ident::#empty_ident
@@ -1601,7 +1601,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
             }
 
             impl #impl_generics ::bilrost::encoding::EmptyState
-            for #ident #ty_generics #where_clause {
+            for #ident #ty_generics #encoder_where_clause {
                 #[inline]
                 fn is_empty(&self) -> bool {
                     matches!(self, #ident::#empty_ident)
