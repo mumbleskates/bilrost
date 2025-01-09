@@ -423,9 +423,10 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     } else {
         None
     };
+    let borrow_generics = append_generic(impl_generics, quote!('__a));
     let encoder_where_clause =
         append_wheres(where_clause, self_where.clone(), &unsorted_fields, Encode);
-    let [owned_decoder_where_clause, borrow_decoder_where_clause] =
+    let [owned_decoder_where_clause, borrowed_decoder_where_clause] =
         [Owned, Borrowed].map(|ownership| {
             append_wheres(
                 where_clause,
@@ -697,6 +698,16 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
                 tw.finalize(buf);
             }
 
+            #[inline]
+            fn raw_encoded_len(&self) -> usize {
+                let _ = <Self as ::bilrost::RawMessage>::__ASSERTIONS;
+                let tm = &mut #tag_measurer_ty::new();
+                0 #(+ #encoded_len)*
+            }
+        }
+
+        impl #impl_generics ::bilrost::encoding::RawMessageDecoder
+        for #ident #ty_generics #owned_decoder_where_clause {
             #[allow(unused_variables)]
             #[inline]
             fn raw_decode_field<__B>(
@@ -718,17 +729,32 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
                 }
                 ::core::result::Result::Ok(())
             }
+        }
 
+        impl #borrow_generics ::bilrost::encoding::RawMessageBorrowDecoder<'__a>
+        for #ident #ty_generics #borrowed_decoder_where_clause {
+            #[allow(unused_variables)]
             #[inline]
-            fn raw_encoded_len(&self) -> usize {
+            fn raw_borrow_decode_field(
+                &mut self,
+                tag: u32,
+                wire_type: ::bilrost::encoding::WireType,
+                duplicated: bool,
+                buf: ::bilrost::encoding::Capped<&'__a [u8]>,
+                ctx: ::bilrost::encoding::DecodeContext,
+            ) -> ::core::result::Result<(), ::bilrost::DecodeError> {
                 let _ = <Self as ::bilrost::RawMessage>::__ASSERTIONS;
-                let tm = &mut #tag_measurer_ty::new();
-                0 #(+ #encoded_len)*
+                #struct_name
+                match tag {
+                    #(#decode_borrowed)*
+                    _ => ::bilrost::encoding::skip_field(wire_type, buf)?,
+                }
+                ::core::result::Result::Ok(())
             }
         }
 
         impl #impl_generics ::bilrost::encoding::ForOverwrite
-        for #ident #ty_generics #borrow_decoder_where_clause {
+        for #ident #ty_generics #borrowed_decoder_where_clause {
             fn for_overwrite() -> Self {
                 Self {
                     #(#field_idents: ::bilrost::encoding::ForOverwrite::for_overwrite(),)*
@@ -738,7 +764,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         }
 
         impl #impl_generics ::bilrost::encoding::EmptyState
-        for #ident #ty_generics #borrow_decoder_where_clause {
+        for #ident #ty_generics #borrowed_decoder_where_clause {
             fn is_empty(&self) -> bool {
                 true #(&& ::bilrost::encoding::EmptyState::is_empty(&self.#field_idents))*
             }
