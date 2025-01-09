@@ -423,7 +423,9 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     } else {
         None
     };
+
     let borrow_generics = append_generic(impl_generics, quote!('__a));
+
     let encoder_where_clause =
         append_wheres(where_clause, self_where.clone(), &unsorted_fields, Encode);
     let [owned_decoder_where_clause, borrowed_decoder_where_clause] =
@@ -674,7 +676,8 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     // Even in rust 1.79 nightly, if the constant is never named anywhere the assertions won't
     // actually run.
     let expanded = quote! {
-        impl #impl_generics ::bilrost::RawMessage for #ident #ty_generics #encoder_where_clause {
+        impl #impl_generics ::bilrost::encoding::RawMessage
+        for #ident #ty_generics #encoder_where_clause {
             const __ASSERTIONS: () = { #(#static_guards)* };
 
             #[allow(unused_variables)]
@@ -682,7 +685,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
             where
                 __B: ::bilrost::bytes::BufMut + ?Sized,
             {
-                let _ = <Self as ::bilrost::RawMessage>::__ASSERTIONS;
+                let _ = <Self as ::bilrost::encoding::RawMessage>::__ASSERTIONS;
                 let tw = &mut ::bilrost::encoding::TagWriter::new();
                 #(#encode)*
             }
@@ -692,7 +695,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
             where
                 __B: ::bilrost::buf::ReverseBuf + ?Sized,
             {
-                let _ = <Self as ::bilrost::RawMessage>::__ASSERTIONS;
+                let _ = <Self as ::bilrost::encoding::RawMessage>::__ASSERTIONS;
                 let tw = &mut ::bilrost::encoding::TagRevWriter::new();
                 #(#prepend)*
                 tw.finalize(buf);
@@ -700,7 +703,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
 
             #[inline]
             fn raw_encoded_len(&self) -> usize {
-                let _ = <Self as ::bilrost::RawMessage>::__ASSERTIONS;
+                let _ = <Self as ::bilrost::encoding::RawMessage>::__ASSERTIONS;
                 let tm = &mut #tag_measurer_ty::new();
                 0 #(+ #encoded_len)*
             }
@@ -721,7 +724,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
             where
                 __B: ::bilrost::bytes::Buf + ?Sized,
             {
-                let _ = <Self as ::bilrost::RawMessage>::__ASSERTIONS;
+                let _ = <Self as ::bilrost::encoding::RawMessage>::__ASSERTIONS;
                 #struct_name
                 match tag {
                     #(#decode_owned)*
@@ -743,7 +746,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
                 buf: ::bilrost::encoding::Capped<&'__a [u8]>,
                 ctx: ::bilrost::encoding::DecodeContext,
             ) -> ::core::result::Result<(), ::bilrost::DecodeError> {
-                let _ = <Self as ::bilrost::RawMessage>::__ASSERTIONS;
+                let _ = <Self as ::bilrost::encoding::RawMessage>::__ASSERTIONS;
                 #struct_name
                 match tag {
                     #(#decode_borrowed)*
@@ -812,19 +815,22 @@ fn message_via_oneof(input: DeriveInput) -> Result<TokenStream, Error> {
         bail!("Message can only be derived for Oneof enums that have an empty variant.")
     }
 
+    let borrow_generics = append_generic(impl_generics, quote!('__a));
+
     let encoder_where_clause =
         append_self_where(where_clause, Some(quote!(Self: ::bilrost::encoding::Oneof)));
     let owned_decoder_where_clause = append_self_where(
         where_clause,
         Some(quote!(Self: ::bilrost::encoding::OneofDecoder)),
     );
-    let borrow_decoder_where_clause = append_self_where(
+    let borrowed_decoder_where_clause = append_self_where(
         where_clause,
         Some(quote!(Self: ::bilrost::encoding::OneofBorrowDecoder)),
     );
 
     Ok(quote! {
-        impl #impl_generics ::bilrost::RawMessage for #ident #ty_generics #encoder_where_clause {
+        impl #impl_generics ::bilrost::encoding::RawMessage
+        for #ident #ty_generics #encoder_where_clause {
             const __ASSERTIONS: () = ();
 
             #[inline(always)]
@@ -850,6 +856,17 @@ fn message_via_oneof(input: DeriveInput) -> Result<TokenStream, Error> {
             }
 
             #[inline(always)]
+            fn raw_encoded_len(&self) -> usize {
+                <Self as ::bilrost::encoding::Oneof>::oneof_encoded_len(
+                    self,
+                    &mut #tag_measurer::new(),
+                )
+            }
+        }
+
+        impl #impl_generics ::bilrost::encoding::RawMessageDecoder
+        for #ident #ty_generics #owned_decoder_where_clause {
+            #[inline(always)]
             fn raw_decode_field<__B>(
                 &mut self,
                 tag: u32,
@@ -873,13 +890,30 @@ fn message_via_oneof(input: DeriveInput) -> Result<TokenStream, Error> {
                     ::core::result::Result::Ok(())
                 }
             }
+        }
 
+        impl #borrow_generics ::bilrost::encoding::RawMessageBorrowDecoder<'__a>
+        for #ident #ty_generics #borrowed_decoder_where_clause {
             #[inline(always)]
-            fn raw_encoded_len(&self) -> usize {
-                <Self as ::bilrost::encoding::Oneof>::oneof_encoded_len(
-                    self,
-                    &mut #tag_measurer::new(),
-                )
+            fn raw_borrow_decode_field(
+                &mut self,
+                tag: u32,
+                wire_type: ::bilrost::encoding::WireType,
+                _duplicated: bool,
+                buf: ::bilrost::encoding::Capped<&'__a [u8]>,
+                ctx: ::bilrost::encoding::DecodeContext,
+            ) -> ::core::result::Result<(), ::bilrost::DecodeError> {
+                if <Self as ::bilrost::encoding::Oneof>::FIELD_TAGS.contains(&tag) {
+                    <Self as ::bilrost::encoding::OneofDecoder>::oneof_decode_field(
+                        self,
+                        tag,
+                        wire_type,
+                        buf,
+                        ctx,
+                    )
+                } else {
+                    ::core::result::Result::Ok(())
+                }
             }
         }
     })
@@ -910,6 +944,8 @@ fn try_distinguished_message(input: TokenStream) -> Result<TokenStream, Error> {
     if has_ignored_fields {
         bail!("messages with ignored fields cannot be distinguished");
     }
+
+    let borrow_generics = append_generic(impl_generics, quote!('__a));
 
     let [owned_decoder_where_clause, borrowed_decoder_where_clause] =
         [Owned, Borrowed].map(|ownership| {
@@ -950,9 +986,10 @@ fn try_distinguished_message(input: TokenStream) -> Result<TokenStream, Error> {
     };
 
     let expanded = quote! {
-        impl #impl_generics ::bilrost::RawDistinguishedMessage
+        impl #impl_generics ::bilrost::encoding::RawDistinguishedMessageDecoder
         for #ident #ty_generics #owned_decoder_where_clause {
             #[allow(unused_variables)]
+            #[inline]
             fn raw_decode_field_distinguished<__B>(
                 &mut self,
                 tag: u32,
@@ -977,20 +1014,18 @@ fn try_distinguished_message(input: TokenStream) -> Result<TokenStream, Error> {
             }
         }
 
-        impl #impl_generics ::bilrost::RawDistinguishedMessageBorrow<'a>
+        impl #borrow_generics ::bilrost::encoding::RawDistinguishedMessageBorrowDecoder<'__a>
         for #ident #ty_generics #borrowed_decoder_where_clause {
             #[allow(unused_variables)]
-            fn raw_decode_field_distinguished<__B>(
+            #[inline]
+            fn raw_borrow_decode_field_distinguished(
                 &mut self,
                 tag: u32,
                 wire_type: ::bilrost::encoding::WireType,
                 duplicated: bool,
-                buf: ::bilrost::encoding::Capped<__B>,
+                buf: ::bilrost::encoding::Capped<&'__a [u8]>,
                 ctx: ::bilrost::encoding::RestrictedDecodeContext,
-            ) -> ::core::result::Result<::bilrost::Canonicity, ::bilrost::DecodeError>
-            where
-                __B: ::bilrost::bytes::Buf + ?Sized,
-            {
+            ) -> ::core::result::Result<::bilrost::Canonicity, ::bilrost::DecodeError> {
                 #struct_name
                 let canon = &mut ::bilrost::Canonicity::Canonical;
                 match tag {
@@ -1034,13 +1069,15 @@ fn distinguished_message_via_oneof(input: DeriveInput) -> Result<TokenStream, Er
         )
     }
 
+    let borrow_generics = append_generic(impl_generics, quote!('__a));
+
     let owned_decoder_where_clause = append_self_where(
         where_clause_,
         Some(quote!(
             Self: ::bilrost::encoding::DistinguishedOneofDecoder + ::core::cmp::Eq
         )),
     );
-    let borrow_decoder_where_clause = append_self_where(
+    let borrowed_decoder_where_clause = append_self_where(
         where_clause_,
         Some(quote!(
             Self: ::bilrost::encoding::DistinguishedOneofBorrowDecoder + ::core::cmp::Eq
@@ -1048,9 +1085,8 @@ fn distinguished_message_via_oneof(input: DeriveInput) -> Result<TokenStream, Er
     );
 
     Ok(quote! {
-        impl #impl_generics ::bilrost::RawDistinguishedMessage for #ident #ty_generics
-        #owned_decoder_where_clause
-        {
+        impl #impl_generics ::bilrost::encoding::RawDistinguishedMessageDecoder
+        for #ident #ty_generics #owned_decoder_where_clause {
             #[inline(always)]
             fn raw_decode_field_distinguished<__B>(
                 &mut self,
@@ -1063,6 +1099,33 @@ fn distinguished_message_via_oneof(input: DeriveInput) -> Result<TokenStream, Er
             where
                 __B: ::bilrost::bytes::Buf + ?Sized,
             {
+                if <Self as ::bilrost::encoding::Oneof>::FIELD_TAGS.contains(&tag) {
+                    <Self as ::bilrost::encoding::DistinguishedOneofDecoder>::
+                        oneof_decode_field_distinguished
+                    (
+                        self,
+                        tag,
+                        wire_type,
+                        buf,
+                        ctx,
+                    )
+                } else {
+                    ctx.check(::bilrost::Canonicity::HasExtensions)
+                }
+            }
+        }
+
+        impl #borrow_generics ::bilrost::encoding::RawDistinguishedMessageBorrowDecoder<'__a>
+        for #ident #ty_generics #borrowed_decoder_where_clause {
+            #[inline(always)]
+            fn raw_decode_field_distinguished(
+                &mut self,
+                tag: u32,
+                wire_type: ::bilrost::encoding::WireType,
+                _duplicated: bool,
+                buf: ::bilrost::encoding::Capped<&'__a [u8]>,
+                ctx: ::bilrost::encoding::RestrictedDecodeContext,
+            ) -> ::core::result::Result<::bilrost::Canonicity, ::bilrost::DecodeError> {
                 if <Self as ::bilrost::encoding::Oneof>::FIELD_TAGS.contains(&tag) {
                     <Self as ::bilrost::encoding::DistinguishedOneofDecoder>::
                         oneof_decode_field_distinguished
