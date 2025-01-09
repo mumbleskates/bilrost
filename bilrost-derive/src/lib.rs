@@ -494,8 +494,12 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
                     let mut nparts = 0usize;
                     #(#parts)*
                     let parts = &mut parts[..nparts];
-                    parts.sort_unstable_by_key(|(tag, _)| *tag);
-                    parts.iter().map(|(_, len_func)| (len_func.unwrap())(self, tm)).sum::<usize>()
+                    <[_]>::sort_unstable_by_key(parts, |(tag, _)| *tag);
+                    let mut total_len = 0usize;
+                    for (_, len_func_option) in parts {
+                        total_len += ::core::option::Option::unwrap(*len_func_option)(self, tm)
+                    }
+                    total_len
                 }
             }
         }
