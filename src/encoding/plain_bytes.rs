@@ -7,9 +7,9 @@ use bytes::{Buf, BufMut};
 
 use crate::encoding::{
     const_varint, delegate_encoding, encode_varint, encoded_len_varint,
-    encoder_where_value_encoder, prepend_varint, Canonicity, Capped, DecodeContext, DecodeError,
-    DistinguishedValueDecoder, RestrictedDecodeContext, ValueDecoder, ValueEncoder, WireType,
-    Wiretyped,
+    encoder_where_value_encoder, prepend_varint, AlwaysOwnedDelegatingEncoder, Canonicity, Capped,
+    DecodeContext, DecodeError, DistinguishedValueDecoder, RestrictedDecodeContext, ValueDecoder,
+    ValueEncoder, WireType, Wiretyped,
 };
 use crate::DecodeErrorKind::InvalidValue;
 
@@ -21,6 +21,8 @@ use crate::DecodeErrorKind::InvalidValue;
 pub struct PlainBytes;
 
 encoder_where_value_encoder!(PlainBytes);
+
+impl AlwaysOwnedDelegatingEncoder for PlainBytes {}
 
 impl Wiretyped<PlainBytes> for Vec<u8> {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;

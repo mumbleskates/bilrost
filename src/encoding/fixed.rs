@@ -4,9 +4,9 @@ use bytes::{Buf, BufMut};
 
 use crate::buf::ReverseBuf;
 use crate::encoding::{
-    delegate_encoding, encoder_where_value_encoder, Canonicity, Capped, DecodeContext,
-    DistinguishedValueDecoder, RestrictedDecodeContext, ValueDecoder, ValueEncoder, WireType,
-    Wiretyped,
+    delegate_encoding, encoder_where_value_encoder, AlwaysOwnedDelegatingEncoder, Canonicity,
+    Capped, DecodeContext, DistinguishedValueDecoder, RestrictedDecodeContext, ValueDecoder,
+    ValueEncoder, WireType, Wiretyped,
 };
 use crate::DecodeError;
 use crate::DecodeErrorKind::Truncated;
@@ -14,6 +14,8 @@ use crate::DecodeErrorKind::Truncated;
 pub struct Fixed;
 
 encoder_where_value_encoder!(Fixed);
+
+impl AlwaysOwnedDelegatingEncoder for Fixed {}
 
 delegate_encoding!(delegate from (Fixed) to (crate::encoding::Unpacked<Fixed>) for type (Vec<T>)
     including distinguished with generics (T));

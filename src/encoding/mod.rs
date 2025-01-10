@@ -1518,8 +1518,12 @@ mod with_canonicity {
 
 /// Marker trait indicating that a type always decodes to its owned form. When implemented, borrowed
 /// decoding will delegate to the owned Decoder implementation for the Decoder and ValueDecoder
-/// traits.
+/// traits for marked decoders.
 pub trait AlwaysOwned {}
+
+/// Marker trait indicating that an encoder always delegate encoding for values marked with
+/// AlwaysOwned.
+pub trait AlwaysOwnedDelegatingEncoder {}
 
 /// The core trait for encoding bilrost data.
 pub trait Encoder<E> {
@@ -1589,6 +1593,7 @@ pub trait DistinguishedBorrowDecoder<'a, E>: Encoder<E> {
 impl<'a, T, E> BorrowDecoder<'a, E> for T
 where
     T: AlwaysOwned + Decoder<E>,
+    E: AlwaysOwnedDelegatingEncoder,
 {
     #[inline]
     fn borrow_decode(
@@ -1605,6 +1610,7 @@ where
 impl<'a, T, E> DistinguishedBorrowDecoder<'a, E> for T
 where
     T: AlwaysOwned + DistinguishedDecoder<E>,
+    E: AlwaysOwnedDelegatingEncoder,
 {
     #[inline]
     fn borrow_decode_distinguished(
@@ -1716,6 +1722,7 @@ pub trait DistinguishedValueBorrowDecoder<'a, E>: ValueEncoder<E> + Eq {
 impl<'a, E, T> ValueBorrowDecoder<'a, E> for T
 where
     T: AlwaysOwned + ValueDecoder<E>,
+    E: AlwaysOwnedDelegatingEncoder,
 {
     #[inline]
     fn borrow_decode_value(
@@ -1730,6 +1737,7 @@ where
 impl<'a, E, T> DistinguishedValueBorrowDecoder<'a, E> for T
 where
     T: AlwaysOwned + DistinguishedValueDecoder<E>,
+    E: AlwaysOwnedDelegatingEncoder,
 {
     const CHECKS_EMPTY: bool = T::CHECKS_EMPTY;
 
@@ -2300,6 +2308,8 @@ macro_rules! delegate_value_encoding {
 }
 pub(crate) use delegate_value_encoding;
 
+// TODO(widders): can this now be done as a marker trait implemented on the encoder rather than as
+//  a macro?
 /// Most kinds of encoder want to act as field encoders for bare values in any situation where they
 /// also implement value encoding. Only a couple encoders want to do anything fancy, like accepting
 /// alternate wire-types in relaxed mode; the rest want to use this to blanket those definitions.

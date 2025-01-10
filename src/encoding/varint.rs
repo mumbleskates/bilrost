@@ -1,8 +1,9 @@
 use crate::buf::ReverseBuf;
 use crate::encoding::{
     encode_varint, encoded_len_varint, encoder_where_value_encoder, prepend_varint, AlwaysOwned,
-    Buf, BufMut, Canonicity, Capped, DecodeContext, DistinguishedValueDecoder,
-    RestrictedDecodeContext, ValueDecoder, ValueEncoder, WireType, Wiretyped,
+    AlwaysOwnedDelegatingEncoder, Buf, BufMut, Canonicity, Capped, DecodeContext,
+    DistinguishedValueDecoder, RestrictedDecodeContext, ValueDecoder, ValueEncoder, WireType,
+    Wiretyped,
 };
 use crate::DecodeError;
 use crate::DecodeErrorKind::OutOfDomainValue;
@@ -10,6 +11,8 @@ use crate::DecodeErrorKind::OutOfDomainValue;
 pub struct Varint;
 
 encoder_where_value_encoder!(Varint);
+
+impl AlwaysOwnedDelegatingEncoder for Varint {}
 
 /// Zig-zag encoding: These functions implement storing signed in unsigned integers by encoding the
 /// sign bit in the least significant bit.

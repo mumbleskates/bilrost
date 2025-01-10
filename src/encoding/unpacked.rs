@@ -5,207 +5,246 @@ use crate::encoding::value_traits::{
     Collection, DistinguishedCollection, EmptyState, ForOverwrite,
 };
 use crate::encoding::{
-    check_wire_type, peek_repeated_field, Capped, DecodeContext, Decoder, DistinguishedDecoder,
+    check_wire_type, peek_repeated_field, BorrowDecoder, Capped, DecodeContext, Decoder,
+    DistinguishedBorrowDecoder, DistinguishedDecoder, DistinguishedValueBorrowDecoder,
     DistinguishedValueDecoder, Encoder, FieldEncoder, General, Packed, RestrictedDecodeContext,
-    TagMeasurer, TagRevWriter, TagWriter, ValueDecoder, ValueEncoder, WireType, Wiretyped,
+    TagMeasurer, TagRevWriter, TagWriter, ValueBorrowDecoder, ValueDecoder, ValueEncoder, WireType,
+    Wiretyped,
 };
 use crate::DecodeErrorKind::{InvalidValue, UnexpectedlyRepeated};
 use crate::{Canonicity, DecodeError};
 
 pub struct Unpacked<E = General>(E);
 
-/// Decodes a collection value from the unpacked representation. This greedily consumes consecutive
-/// fields as long as they have the same tag.
-#[inline]
-pub(crate) fn decode<T, E>(
-    wire_type: WireType,
-    collection: &mut T,
-    mut buf: Capped<impl Buf + ?Sized>,
-    ctx: DecodeContext,
-) -> Result<(), DecodeError>
-where
-    T: Collection,
-    T::Item: ForOverwrite + ValueDecoder<E>,
-{
-    check_wire_type(<T::Item as Wiretyped<E>>::WIRE_TYPE, wire_type)?;
-    loop {
-        // Decode one item
-        let mut new_item = T::Item::for_overwrite();
-        ValueDecoder::<E>::decode_value(&mut new_item, buf.lend(), ctx.clone())?;
-        collection.insert(new_item)?;
+macro_rules! define_decoders {
+    (
+        decoder: $decoder:ident,
+        value_decoder: $value_decoder:ident::$value_decoder_method:ident,
+        distinguished_value_decoder:
+            $distinguished_value_decoder:ident::$distinguished_value_decoder_method:ident,
+        buf: ($($buf:tt)*),
+        $(lifetime: $lifetime:lifetime,)?
+    ) => {
+        /// Decodes a collection value from the unpacked representation. This greedily consumes
+        /// consecutive fields as long as they have the same tag.
+        #[inline]
+        pub(crate) fn decode<$($lifetime,)? T, E>(
+            wire_type: WireType,
+            collection: &mut T,
+            mut buf: Capped<$($buf)*>,
+            ctx: DecodeContext,
+        ) -> Result<(), DecodeError>
+        where
+            T: Collection,
+            T::Item: ForOverwrite + $value_decoder <$($lifetime,)? E>,
+        {
+            check_wire_type(<T::Item as Wiretyped<E>>::WIRE_TYPE, wire_type)?;
+            loop {
+                // Decode one item
+                let mut new_item = T::Item::for_overwrite();
+                $value_decoder::<E>::$value_decoder_method(&mut new_item, buf.lend(), ctx.clone())?;
+                collection.insert(new_item)?;
 
-        if let Some(next_wire_type) = peek_repeated_field(&mut buf) {
-            check_wire_type(<T::Item as Wiretyped<E>>::WIRE_TYPE, next_wire_type)?;
-        } else {
-            break;
+                if let Some(next_wire_type) = peek_repeated_field(&mut buf) {
+                    check_wire_type(<T::Item as Wiretyped<E>>::WIRE_TYPE, next_wire_type)?;
+                } else {
+                    break;
+                }
+            }
+            Ok(())
         }
-    }
-    Ok(())
-}
 
-/// Decodes an array value from either unpacked or packed representation. If there are not exactly
-/// the expected number of fields the value is considered to be invalid.
-#[inline]
-fn decode_array_either_repr<T, const N: usize, E>(
-    wire_type: WireType,
-    arr: &mut [T; N],
-    buf: Capped<impl Buf + ?Sized>,
-    ctx: DecodeContext,
-) -> Result<(), DecodeError>
-where
-    T: ValueDecoder<E>,
-{
-    if wire_type == WireType::LengthDelimited
-        && <T as Wiretyped<E>>::WIRE_TYPE != WireType::LengthDelimited
-    {
-        // We've encountered a length-delimited field when we aren't expecting one; try decoding
-        // it in packed format instead.
-        ValueDecoder::<Packed<E>>::decode_value(arr, buf, ctx)
-    } else {
-        // Otherwise, decode in unpacked mode.
-        decode_array_unpacked_only(wire_type, arr, buf, ctx)
-    }
-}
-
-/// Decodes an array value in only the unpacked representation. If there are not exactly the
-/// expected number of fields the value is considered to be invalid.
-#[inline]
-pub(crate) fn decode_array_unpacked_only<T, const N: usize, E>(
-    wire_type: WireType,
-    arr: &mut [T; N],
-    mut buf: Capped<impl Buf + ?Sized>,
-    ctx: DecodeContext,
-) -> Result<(), DecodeError>
-where
-    T: ValueDecoder<E>,
-{
-    check_wire_type(<T as Wiretyped<E>>::WIRE_TYPE, wire_type)?;
-    for (i, dest) in arr.iter_mut().enumerate() {
-        // The initial field key is consumed, but we must read the repeated field key for each one
-        // after that.
-        if i > 0 {
-            if let Some(next_wire_type) = peek_repeated_field(&mut buf) {
-                check_wire_type(<T as Wiretyped<E>>::WIRE_TYPE, next_wire_type)?;
+        /// Decodes an array value from either unpacked or packed representation. If there are not
+        /// exactly the expected number of fields the value is considered to be invalid.
+        #[inline]
+        pub(super) fn decode_array_either_repr<$($lifetime,)? T, const N: usize, E>(
+            wire_type: WireType,
+            arr: &mut [T; N],
+            buf: Capped<$($buf)*>,
+            ctx: DecodeContext,
+        ) -> Result<(), DecodeError>
+        where
+            T: $value_decoder <$($lifetime,)? E>,
+        {
+            if wire_type == WireType::LengthDelimited
+                && <T as Wiretyped<E>>::WIRE_TYPE != WireType::LengthDelimited
+            {
+                // We've encountered a length-delimited field when we aren't expecting one; try
+                // decoding it in packed format instead.
+                $value_decoder::<Packed<E>>::$value_decoder_method(arr, buf, ctx)
             } else {
-                // Not enough value fields
-                return Err(DecodeError::new(InvalidValue));
+                // Otherwise, decode in unpacked mode.
+                decode_array_unpacked_only(wire_type, arr, buf, ctx)
             }
         }
-        // Decode one item
-        ValueDecoder::<E>::decode_value(dest, buf.lend(), ctx.clone())?;
-    }
-    if peek_repeated_field(&mut buf).is_some() {
-        // Too many value fields
-        Err(DecodeError::new(InvalidValue))
-    } else {
-        Ok(())
-    }
-}
 
-/// Decodes a collection value from the unpacked representation in distinguished mode. This greedily
-/// consumes consecutive fields as long as they have the same tag.
-#[inline]
-pub(crate) fn decode_distinguished<T, E>(
-    wire_type: WireType,
-    collection: &mut T,
-    mut buf: Capped<impl Buf + ?Sized>,
-    ctx: RestrictedDecodeContext,
-) -> Result<Canonicity, DecodeError>
-where
-    T: DistinguishedCollection,
-    T::Item: ForOverwrite + Eq + DistinguishedValueDecoder<E>,
-{
-    check_wire_type(<T::Item as Wiretyped<E>>::WIRE_TYPE, wire_type)?;
-    let mut canon = Canonicity::Canonical;
-    loop {
-        // Decode one item
-        let mut new_item = T::Item::for_overwrite();
-        // Decoded field values are nested within the collection; empty values are OK
-        canon.update(
-            DistinguishedValueDecoder::<E>::decode_value_distinguished::<true>(
-                &mut new_item,
-                buf.lend(),
-                ctx.clone(),
-            )?,
-        );
-        ctx.update(&mut canon, collection.insert_distinguished(new_item)?)?;
-
-        if let Some(next_wire_type) = peek_repeated_field(&mut buf) {
-            check_wire_type(<T::Item as Wiretyped<E>>::WIRE_TYPE, next_wire_type)?;
-        } else {
-            break;
-        }
-    }
-    Ok(canon)
-}
-
-/// Decodes an array value from either packed or unpacked in distinguished mode. If there are
-/// not exactly the expected number of fields the value is considered to be invalid.
-#[inline]
-fn decode_distinguished_array_either_repr<T, const N: usize, E>(
-    wire_type: WireType,
-    arr: &mut [T; N],
-    buf: Capped<impl Buf + ?Sized>,
-    ctx: RestrictedDecodeContext,
-) -> Result<Canonicity, DecodeError>
-where
-    T: Eq + ValueDecoder<E> + DistinguishedValueDecoder<E>,
-{
-    if wire_type == WireType::LengthDelimited
-        && <T as Wiretyped<E>>::WIRE_TYPE != WireType::LengthDelimited
-    {
-        // We've encountered a length-delimited field when we aren't expecting one; try decoding
-        // it in packed format instead.
-        // The data is already known to be non-canonical; use relaxed decoding
-        _ = ctx.check(Canonicity::NotCanonical)?;
-        ValueDecoder::<Packed<E>>::decode_value(arr, buf, ctx.into_inner())?;
-        Ok(Canonicity::NotCanonical)
-    } else {
-        // Otherwise, decode in unpacked mode.
-        decode_distinguished_array_unpacked_only(wire_type, arr, buf, ctx)
-    }
-}
-
-/// Decodes an array value from the unpacked representation in distinguished mode. If there are
-/// not exactly the expected number of fields the value is considered to be invalid.
-#[inline]
-fn decode_distinguished_array_unpacked_only<T, const N: usize, E>(
-    wire_type: WireType,
-    arr: &mut [T; N],
-    mut buf: Capped<impl Buf + ?Sized>,
-    ctx: RestrictedDecodeContext,
-) -> Result<Canonicity, DecodeError>
-where
-    T: Eq + DistinguishedValueDecoder<E>,
-{
-    check_wire_type(<T as Wiretyped<E>>::WIRE_TYPE, wire_type)?;
-    let mut canon = Canonicity::Canonical;
-    for (i, dest) in arr.iter_mut().enumerate() {
-        // The initial field key is consumed, but we must read the repeated field key for each one
-        // after that.
-        if i > 0 {
-            if let Some(next_wire_type) = peek_repeated_field(&mut buf) {
-                check_wire_type(<T as Wiretyped<E>>::WIRE_TYPE, next_wire_type)?;
+        /// Decodes an array value in only the unpacked representation. If there are not exactly the
+        /// expected number of fields the value is considered to be invalid.
+        #[inline]
+        pub(crate) fn decode_array_unpacked_only<$($lifetime,)? T, const N: usize, E>(
+            wire_type: WireType,
+            arr: &mut [T; N],
+            mut buf: Capped<$($buf)*>,
+            ctx: DecodeContext,
+        ) -> Result<(), DecodeError>
+        where
+            T: $value_decoder <$($lifetime,)? E>,
+        {
+            check_wire_type(<T as Wiretyped<E>>::WIRE_TYPE, wire_type)?;
+            for (i, dest) in arr.iter_mut().enumerate() {
+                // The initial field key is consumed, but we must read the repeated field key for
+                // each one after that.
+                if i > 0 {
+                    if let Some(next_wire_type) = peek_repeated_field(&mut buf) {
+                        check_wire_type(<T as Wiretyped<E>>::WIRE_TYPE, next_wire_type)?;
+                    } else {
+                        // Not enough value fields
+                        return Err(DecodeError::new(InvalidValue));
+                    }
+                }
+                // Decode one item
+                $value_decoder::<E>::$value_decoder_method(dest, buf.lend(), ctx.clone())?;
+            }
+            if peek_repeated_field(&mut buf).is_some() {
+                // Too many value fields
+                Err(DecodeError::new(InvalidValue))
             } else {
-                // Not enough value fields
-                return Err(DecodeError::new(InvalidValue));
+                Ok(())
             }
         }
-        // Decode one item. Empty values are allowed
-        canon.update(
-            DistinguishedValueDecoder::<E>::decode_value_distinguished::<true>(
-                dest,
-                buf.lend(),
-                ctx.clone(),
-            )?,
-        );
-    }
-    if peek_repeated_field(&mut buf).is_some() {
-        // Too many value fields
-        Err(DecodeError::new(InvalidValue))
-    } else {
-        Ok(canon)
-    }
+
+        /// Decodes a collection value from the unpacked representation in distinguished mode. This
+        /// greedily consumes consecutive fields as long as they have the same tag.
+        #[inline]
+        pub(crate) fn decode_distinguished<$($lifetime,)? T, E>(
+            wire_type: WireType,
+            collection: &mut T,
+            mut buf: Capped<$($buf)*>,
+            ctx: RestrictedDecodeContext,
+        ) -> Result<Canonicity, DecodeError>
+        where
+            T: DistinguishedCollection,
+            T::Item: ForOverwrite + Eq + $distinguished_value_decoder <$($lifetime,)? E>,
+        {
+            check_wire_type(<T::Item as Wiretyped<E>>::WIRE_TYPE, wire_type)?;
+            let mut canon = Canonicity::Canonical;
+            loop {
+                // Decode one item
+                let mut new_item = T::Item::for_overwrite();
+                // Decoded field values are nested within the collection; empty values are OK
+                canon.update(
+                    $distinguished_value_decoder::<E>::$distinguished_value_decoder_method::<true>(
+                        &mut new_item,
+                        buf.lend(),
+                        ctx.clone(),
+                    )?,
+                );
+                ctx.update(&mut canon, collection.insert_distinguished(new_item)?)?;
+
+                if let Some(next_wire_type) = peek_repeated_field(&mut buf) {
+                    check_wire_type(<T::Item as Wiretyped<E>>::WIRE_TYPE, next_wire_type)?;
+                } else {
+                    break;
+                }
+            }
+            Ok(canon)
+        }
+
+        /// Decodes an array value from either packed or unpacked in distinguished mode. If there
+        /// are not exactly the expected number of fields the value is considered to be invalid.
+        #[inline]
+        pub(super) fn decode_distinguished_array_either_repr<$($lifetime,)? T, const N: usize, E>(
+            wire_type: WireType,
+            arr: &mut [T; N],
+            buf: Capped<$($buf)*>,
+            ctx: RestrictedDecodeContext,
+        ) -> Result<Canonicity, DecodeError>
+        where
+            T: Eq
+                + $value_decoder <$($lifetime,)? E>
+                + $distinguished_value_decoder <$($lifetime,)? E>,
+        {
+            if wire_type == WireType::LengthDelimited
+                && <T as Wiretyped<E>>::WIRE_TYPE != WireType::LengthDelimited
+            {
+                // We've encountered a length-delimited field when we aren't expecting one; try
+                // decoding it in packed format instead.
+                // The data is already known to be non-canonical; use relaxed decoding
+                _ = ctx.check(Canonicity::NotCanonical)?;
+                $value_decoder::<Packed<E>>::$value_decoder_method(arr, buf, ctx.into_inner())?;
+                Ok(Canonicity::NotCanonical)
+            } else {
+                // Otherwise, decode in unpacked mode.
+                decode_distinguished_array_unpacked_only(wire_type, arr, buf, ctx)
+            }
+        }
+
+        /// Decodes an array value from the unpacked representation in distinguished mode. If there
+        /// are not exactly the expected number of fields the value is considered to be invalid.
+        #[inline]
+        fn decode_distinguished_array_unpacked_only<$($lifetime,)? T, const N: usize, E>(
+            wire_type: WireType,
+            arr: &mut [T; N],
+            mut buf: Capped<$($buf)*>,
+            ctx: RestrictedDecodeContext,
+        ) -> Result<Canonicity, DecodeError>
+        where
+            T: Eq + $distinguished_value_decoder <$($lifetime,)? E>,
+        {
+            check_wire_type(<T as Wiretyped<E>>::WIRE_TYPE, wire_type)?;
+            let mut canon = Canonicity::Canonical;
+            for (i, dest) in arr.iter_mut().enumerate() {
+                // The initial field key is consumed, but we must read the repeated field key for
+                // each one after that.
+                if i > 0 {
+                    if let Some(next_wire_type) = peek_repeated_field(&mut buf) {
+                        check_wire_type(<T as Wiretyped<E>>::WIRE_TYPE, next_wire_type)?;
+                    } else {
+                        // Not enough value fields
+                        return Err(DecodeError::new(InvalidValue));
+                    }
+                }
+                // Decode one item. Empty values are allowed
+                canon.update(
+                    $distinguished_value_decoder::<E>::$distinguished_value_decoder_method::<true>(
+                        dest,
+                        buf.lend(),
+                        ctx.clone(),
+                    )?,
+                );
+            }
+            if peek_repeated_field(&mut buf).is_some() {
+                // Too many value fields
+                Err(DecodeError::new(InvalidValue))
+            } else {
+                Ok(canon)
+            }
+        }
+    };
+}
+
+pub(crate) mod owned {
+    use super::*;
+
+    define_decoders!(
+        decoder: Decoder,
+        value_decoder: ValueDecoder::decode_value,
+        distinguished_value_decoder: DistinguishedValueDecoder::decode_value_distinguished,
+        buf: (impl Buf + ?Sized),
+    );
+}
+
+pub(crate) mod borrowed {
+    use super::*;
+
+    define_decoders!(
+        decoder: BorrowDecoder,
+        value_decoder: ValueBorrowDecoder::borrow_decode_value,
+        distinguished_value_decoder:
+            DistinguishedValueBorrowDecoder::borrow_decode_value_distinguished,
+        buf: (&'a [u8]),
+        lifetime: 'a,
+    );
 }
 
 /// Unpacked encodes vecs as repeated fields and in relaxed decoding mode will accept both packed
@@ -246,68 +285,6 @@ where
     }
 }
 
-impl<C, T, E> Decoder<Unpacked<E>> for C
-where
-    C: Collection<Item = T>,
-    T: ForOverwrite + ValueDecoder<E>,
-{
-    #[inline]
-    fn decode<B: Buf + ?Sized>(
-        wire_type: WireType,
-        duplicated: bool,
-        value: &mut C,
-        buf: Capped<B>,
-        ctx: DecodeContext,
-    ) -> Result<(), DecodeError> {
-        if duplicated {
-            return Err(DecodeError::new(UnexpectedlyRepeated));
-        }
-        if wire_type == WireType::LengthDelimited
-            && <C::Item as Wiretyped<E>>::WIRE_TYPE != WireType::LengthDelimited
-        {
-            // We've encountered a length-delimited field when we aren't expecting one; try decoding
-            // it in packed format instead.
-            ValueDecoder::<Packed<E>>::decode_value(value, buf, ctx)
-        } else {
-            // Otherwise, decode in unpacked mode.
-            decode::<C, E>(wire_type, value, buf, ctx)
-        }
-    }
-}
-
-/// Distinguished encoding enforces only the repeated field representation is allowed.
-impl<C, T, E> DistinguishedDecoder<Unpacked<E>> for C
-where
-    Self: DistinguishedCollection<Item = T> + ValueDecoder<Packed<E>> + Decoder<Unpacked<E>>,
-    T: ForOverwrite + Eq + DistinguishedValueDecoder<E>,
-{
-    #[inline]
-    fn decode_distinguished<B: Buf + ?Sized>(
-        wire_type: WireType,
-        duplicated: bool,
-        value: &mut C,
-        buf: Capped<B>,
-        ctx: RestrictedDecodeContext,
-    ) -> Result<Canonicity, DecodeError> {
-        if duplicated {
-            return Err(DecodeError::new(UnexpectedlyRepeated));
-        }
-        if wire_type == WireType::LengthDelimited
-            && <T as Wiretyped<E>>::WIRE_TYPE != WireType::LengthDelimited
-        {
-            // We've encountered a length-delimited field when we aren't expecting one; try decoding
-            // it in packed format instead.
-            // The data is already known to be non-canonical; use relaxed decoding
-            _ = ctx.check(Canonicity::NotCanonical)?;
-            <C as ValueDecoder<Packed<E>>>::decode_value(value, buf, ctx.into_inner())?;
-            Ok(Canonicity::NotCanonical)
-        } else {
-            // Otherwise, decode in unpacked mode.
-            decode_distinguished::<C, E>(wire_type, value, buf, ctx)
-        }
-    }
-}
-
 /// Unpacked encodes arrays as repeated fields if any of the values are non-empty, and in relaxed
 /// decoding mode will accept both packed and un-packed encodings.
 impl<T, const N: usize, E> Encoder<Unpacked<E>> for [T; N]
@@ -344,50 +321,6 @@ where
             tm.key_len(tag) + ValueEncoder::<E>::many_values_encoded_len(value.iter()) + N - 1
         } else {
             0
-        }
-    }
-}
-
-impl<T, const N: usize, E> Decoder<Unpacked<E>> for [T; N]
-where
-    T: EmptyState + ValueDecoder<E>,
-{
-    #[inline]
-    fn decode<B: Buf + ?Sized>(
-        wire_type: WireType,
-        duplicated: bool,
-        value: &mut [T; N],
-        buf: Capped<B>,
-        ctx: DecodeContext,
-    ) -> Result<(), DecodeError> {
-        if duplicated {
-            return Err(DecodeError::new(UnexpectedlyRepeated));
-        }
-        decode_array_either_repr(wire_type, value, buf, ctx)
-    }
-}
-
-/// Distinguished encoding considers only the repeated field representation to be canonical.
-impl<T, const N: usize, E> DistinguishedDecoder<Unpacked<E>> for [T; N]
-where
-    T: Eq + EmptyState + DistinguishedValueDecoder<E> + ValueDecoder<E>,
-{
-    #[inline]
-    fn decode_distinguished<B: Buf + ?Sized>(
-        wire_type: WireType,
-        duplicated: bool,
-        value: &mut [T; N],
-        buf: Capped<B>,
-        ctx: RestrictedDecodeContext,
-    ) -> Result<Canonicity, DecodeError> {
-        if duplicated {
-            return Err(DecodeError::new(UnexpectedlyRepeated));
-        }
-        let canon = decode_distinguished_array_either_repr(wire_type, value, buf, ctx.clone())?;
-        if EmptyState::is_empty(value) {
-            ctx.check(Canonicity::NotCanonical)
-        } else {
-            Ok(canon)
         }
     }
 }
@@ -436,55 +369,212 @@ where
     }
 }
 
-impl<T, const N: usize, E> Decoder<Unpacked<E>> for Option<[T; N]>
-where
-    T: ForOverwrite + ValueDecoder<E>,
-{
-    #[inline]
-    fn decode<B: Buf + ?Sized>(
-        wire_type: WireType,
-        duplicated: bool,
-        value: &mut Option<[T; N]>,
-        buf: Capped<B>,
-        ctx: DecodeContext,
-    ) -> Result<(), DecodeError> {
-        if duplicated {
-            return Err(DecodeError::new(UnexpectedlyRepeated));
+macro_rules! impl_decoders {
+    (
+        decoder: $decoder:ident::$decoder_method:ident,
+        distinguished_decoder: $distinguished_decoder:ident::$distinguished_decoder_method:ident,
+        value_decoder: $value_decoder:ident::$value_decoder_method:ident,
+        distinguished_value_decoder:
+            $distinguished_value_decoder:ident::$distinguished_value_decoder_method:ident,
+        mode: $mode:ident,
+        $(buf_bound: $buf:ident => ($($buf_bound:tt)*),)?
+        $(lifetime: $lifetime:lifetime,)?
+    ) => {
+        impl<$($lifetime,)? C, T, E> $decoder <$($lifetime,)? Unpacked<E>> for C
+        where
+            C: Collection<Item = T>,
+            T: ForOverwrite + $value_decoder <$($lifetime,)? E>,
+        {
+            #[inline]
+            fn $decoder_method $(<$buf: $($buf_bound)*>)? (
+                wire_type: WireType,
+                duplicated: bool,
+                value: &mut C,
+                buf: Capped<$($buf)? $(&$lifetime [u8])?>,
+                ctx: DecodeContext,
+            ) -> Result<(), DecodeError> {
+                if duplicated {
+                    return Err(DecodeError::new(UnexpectedlyRepeated));
+                }
+                if wire_type == WireType::LengthDelimited
+                    && <C::Item as Wiretyped<E>>::WIRE_TYPE != WireType::LengthDelimited
+                {
+                    // We've encountered a length-delimited field when we aren't expecting one; try decoding
+                    // it in packed format instead.
+                    $value_decoder::<Packed<E>>::$value_decoder_method(value, buf, ctx)
+                } else {
+                    // Otherwise, decode in unpacked mode.
+                    $mode::decode::<C, E>(wire_type, value, buf, ctx)
+                }
+            }
         }
-        decode_array_either_repr(
-            wire_type,
-            value.get_or_insert_with(ForOverwrite::for_overwrite),
-            buf,
-            ctx,
-        )
-    }
+
+        /// Distinguished encoding enforces only the repeated field representation is allowed.
+        impl<$($lifetime,)? C, T, E> $distinguished_decoder <$($lifetime,)? Unpacked<E>> for C
+        where
+            Self: DistinguishedCollection<Item = T>
+                + $value_decoder <$($lifetime,)? Packed<E>>
+                + $decoder <$($lifetime,)? Unpacked<E>>,
+            T: ForOverwrite + Eq + $distinguished_value_decoder <$($lifetime,)? E>,
+        {
+            #[inline]
+            fn $distinguished_decoder_method $(<$buf: $($buf_bound)*>)? (
+                wire_type: WireType,
+                duplicated: bool,
+                value: &mut C,
+                buf: Capped<$($buf)? $(&$lifetime [u8])?>,
+                ctx: RestrictedDecodeContext,
+            ) -> Result<Canonicity, DecodeError> {
+                if duplicated {
+                    return Err(DecodeError::new(UnexpectedlyRepeated));
+                }
+                if wire_type == WireType::LengthDelimited
+                    && <T as Wiretyped<E>>::WIRE_TYPE != WireType::LengthDelimited
+                {
+                    // We've encountered a length-delimited field when we aren't expecting one; try decoding
+                    // it in packed format instead.
+                    // The data is already known to be non-canonical; use relaxed decoding
+                    _ = ctx.check(Canonicity::NotCanonical)?;
+                    $value_decoder::<Packed<E>>::$value_decoder_method(
+                        value,
+                        buf,
+                        ctx.into_inner(),
+                    )?;
+                    Ok(Canonicity::NotCanonical)
+                } else {
+                    // Otherwise, decode in unpacked mode.
+                    $mode::decode_distinguished::<C, E>(wire_type, value, buf, ctx)
+                }
+            }
+        }
+
+        impl<$($lifetime,)? T, const N: usize, E> $decoder <$($lifetime,)? Unpacked<E>> for [T; N]
+        where
+            T: EmptyState + $value_decoder <$($lifetime,)? E>,
+        {
+            #[inline]
+            fn $decoder_method $(<$buf: $($buf_bound)*>)? (
+                wire_type: WireType,
+                duplicated: bool,
+                value: &mut [T; N],
+                buf: Capped<$($buf)? $(&$lifetime [u8])?>,
+                ctx: DecodeContext,
+            ) -> Result<(), DecodeError> {
+                if duplicated {
+                    return Err(DecodeError::new(UnexpectedlyRepeated));
+                }
+                $mode::decode_array_either_repr(wire_type, value, buf, ctx)
+            }
+        }
+
+        /// Distinguished encoding considers only the repeated field representation to be canonical.
+        impl<$($lifetime,)? T, const N: usize, E>
+        $distinguished_decoder <$($lifetime,)? Unpacked<E>> for [T; N]
+        where
+            T: Eq
+                + EmptyState
+                + $distinguished_value_decoder <$($lifetime,)? E>
+                + $value_decoder <$($lifetime,)? E>,
+        {
+            #[inline]
+            fn $distinguished_decoder_method $(<$buf: $($buf_bound)*>)? (
+                wire_type: WireType,
+                duplicated: bool,
+                value: &mut [T; N],
+                buf: Capped<$($buf)? $(&$lifetime [u8])?>,
+                ctx: RestrictedDecodeContext,
+            ) -> Result<Canonicity, DecodeError> {
+                if duplicated {
+                    return Err(DecodeError::new(UnexpectedlyRepeated));
+                }
+                let canon = $mode::decode_distinguished_array_either_repr(
+                    wire_type,
+                    value,
+                    buf,
+                    ctx.clone(),
+                )?;
+                if EmptyState::is_empty(value) {
+                    ctx.check(Canonicity::NotCanonical)
+                } else {
+                    Ok(canon)
+                }
+            }
+        }
+
+        impl<$($lifetime,)? T, const N: usize, E>
+        $decoder <$($lifetime,)? Unpacked<E>> for Option<[T; N]>
+        where
+            T: ForOverwrite + $value_decoder <$($lifetime,)? E>,
+        {
+            #[inline]
+            fn $decoder_method $(<$buf: $($buf_bound)*>)? (
+                wire_type: WireType,
+                duplicated: bool,
+                value: &mut Option<[T; N]>,
+                buf: Capped<$($buf)? $(&$lifetime [u8])?>,
+                ctx: DecodeContext,
+            ) -> Result<(), DecodeError> {
+                if duplicated {
+                    return Err(DecodeError::new(UnexpectedlyRepeated));
+                }
+                $mode::decode_array_either_repr(
+                    wire_type,
+                    value.get_or_insert_with(ForOverwrite::for_overwrite),
+                    buf,
+                    ctx,
+                )
+            }
+        }
+
+        /// Distinguished encoding enforces only the repeated field representation is considered to be
+        /// canonical.
+        impl<$($lifetime,)? T, const N: usize, E>
+        $distinguished_decoder <$($lifetime,)? Unpacked<E>> for Option<[T; N]>
+        where
+            T: Eq
+                + ForOverwrite
+                + $distinguished_value_decoder<$($lifetime,)? E>
+                + $value_decoder<$($lifetime,)? E>,
+        {
+            #[inline]
+            fn $distinguished_decoder_method $(<$buf: $($buf_bound)*>)? (
+                wire_type: WireType,
+                duplicated: bool,
+                value: &mut Option<[T; N]>,
+                buf: Capped<$($buf)? $(&$lifetime [u8])?>,
+                ctx: RestrictedDecodeContext,
+            ) -> Result<Canonicity, DecodeError> {
+                if duplicated {
+                    return Err(DecodeError::new(UnexpectedlyRepeated));
+                }
+                $mode::decode_distinguished_array_either_repr(
+                    wire_type,
+                    value.get_or_insert_with(ForOverwrite::for_overwrite),
+                    buf,
+                    ctx,
+                )
+            }
+        }
+    };
 }
 
-/// Distinguished encoding enforces only the repeated field representation is considered to be
-/// canonical.
-impl<T, const N: usize, E> DistinguishedDecoder<Unpacked<E>> for Option<[T; N]>
-where
-    T: Eq + ForOverwrite + DistinguishedValueDecoder<E> + ValueDecoder<E>,
-{
-    #[inline]
-    fn decode_distinguished<B: Buf + ?Sized>(
-        wire_type: WireType,
-        duplicated: bool,
-        value: &mut Option<[T; N]>,
-        buf: Capped<B>,
-        ctx: RestrictedDecodeContext,
-    ) -> Result<Canonicity, DecodeError> {
-        if duplicated {
-            return Err(DecodeError::new(UnexpectedlyRepeated));
-        }
-        decode_distinguished_array_either_repr(
-            wire_type,
-            value.get_or_insert_with(ForOverwrite::for_overwrite),
-            buf,
-            ctx,
-        )
-    }
-}
+impl_decoders!(
+    decoder: Decoder::decode,
+    distinguished_decoder: DistinguishedDecoder::decode_distinguished,
+    value_decoder: ValueDecoder::decode_value,
+    distinguished_value_decoder: DistinguishedValueDecoder::decode_value_distinguished,
+    mode: owned,
+    buf_bound: B => (Buf + ?Sized),
+);
+
+impl_decoders!(
+    decoder: BorrowDecoder::borrow_decode,
+    distinguished_decoder: DistinguishedBorrowDecoder::borrow_decode_distinguished,
+    value_decoder: ValueBorrowDecoder::borrow_decode_value,
+    distinguished_value_decoder: DistinguishedValueBorrowDecoder::borrow_decode_value_distinguished,
+    mode: borrowed,
+    lifetime: 'a,
+);
 
 #[cfg(test)]
 mod test {
