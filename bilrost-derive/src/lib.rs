@@ -1581,7 +1581,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
     if let Some(empty_ident) = &empty_variant {
         encoder_trait = quote!(Oneof);
         owned_decoder_trait = quote!(OneofDecoder);
-        borrowed_decoder_trait = quote!(NonEmptyOneofDecoder);
+        borrowed_decoder_trait = quote!(OneofBorrowDecoder);
         decode_field_self_arg = Some(quote!(value: &mut Self,));
         decode_field_return_ty = quote!(());
         some = Some(quote!(::core::option::Option::Some));
