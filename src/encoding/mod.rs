@@ -2405,7 +2405,7 @@ macro_rules! encoder_where_value_encoder {
                     );
                 }
                 // decoding a value as a whole message field, empty values are unacceptable
-                 mut canon = $crate::encoding::DistinguishedFieldDecoder::<$encoding>
+                let mut canon = $crate::encoding::DistinguishedFieldDecoder::<$encoding>
                     ::decode_field_distinguished::<false>(
                         wire_type,
                         value,
