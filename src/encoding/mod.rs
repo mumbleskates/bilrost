@@ -3303,9 +3303,10 @@ mod test {
         );
     }
 
-    fn check_rejects_wrong_wire_type_distinguished<T: ForOverwrite + DistinguishedDecoder<E>, E>(
-        wire_type: WireType,
-    ) {
+    fn check_rejects_wrong_wire_type_distinguished<T, E>(wire_type: WireType)
+    where
+        T: ForOverwrite + Decoder<E> + DistinguishedDecoder<E>,
+    {
         let mut out = T::for_overwrite();
         assert_eq!(
             <T as DistinguishedDecoder<E>>::decode_distinguished(
