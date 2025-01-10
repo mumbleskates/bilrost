@@ -12,7 +12,7 @@ use bytes::{Buf, BufMut, Bytes, BytesMut};
 /// Merges fields from the given buffer, to its cap, into the given `TaggedDecodable` value.
 /// Implemented as a private standalone method to discourage "merging" as a usage pattern.
 #[inline]
-pub(crate) fn merge<T: RawMessage, B: Buf + ?Sized>(
+pub(crate) fn merge<T: RawMessageDecoder, B: Buf + ?Sized>(
     value: &mut T,
     mut buf: Capped<B>,
     ctx: DecodeContext,
@@ -469,9 +469,10 @@ pub trait DistinguishedMessage: Message {
 //  alternate encoding mode which emits field groups to be sorted in a stricter way, only grouping
 //  truly contiguous runs of field ids so that they can be sorted with any other type's fields at
 //  runtime.
+// TODO(widders): break up this trait into encodes and decodes
 impl<T> Message for T
 where
-    T: RawMessage + Sized,
+    T: RawMessageDecoder + Sized,
 {
     fn encode<B: BufMut + ?Sized>(&self, buf: &mut B) -> Result<(), EncodeError> {
         let required = self.encoded_len();
