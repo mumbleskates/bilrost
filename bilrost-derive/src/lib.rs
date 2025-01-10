@@ -969,12 +969,14 @@ fn try_distinguished_message(input: TokenStream) -> Result<TokenStream, Error> {
 
             quote! {
                 #(#tags)* => {
-                    if let ::core::option::Option::Some(mut error) = match #decode {
-                        ::core::result::Result::Ok(new_canon) => ctx.update(canon, new_canon).err(),
-                        ::core::result::Result::Err(error) => ::core::option::Option::Some(error),
-                    } {
-                        error.push(STRUCT_NAME, stringify!(#field_ident));
-                        return ::core::result::Result::Err(error);
+                    match #decode {
+                        ::core::result::Result::Ok(new_canon) => {
+                            canon.update(new_canon);
+                        }
+                        ::core::result::Result::Err(mut error) => {
+                            error.push(STRUCT_NAME, stringify!(#field_ident));
+                            return ::core::result::Result::Err(error);
+                        }
                     }
                 }
             }
@@ -1839,16 +1841,10 @@ impl ToTokens for DecoderForOneof<'_> {
                 #tag => {
                     let mut new_value = ::bilrost::encoding::ForOverwrite::for_overwrite();
                     match #decode {
-                        ::core::result::Result::Ok(canon) => {
-                            if let ::core::result::Result::Err(canon_error) = ctx.check(canon) {
-                                ::core::result::Result::Err(canon_error)
-                            } else {
-                                ::core::result::Result::Ok((
-                                    #ident::#variant_ident #with_new_value,
-                                    canon
-                                ))
-                            }
-                        }
+                        ::core::result::Result::Ok(canon) => ::core::result::Result::Ok((
+                            #ident::#variant_ident #with_new_value,
+                            canon
+                        )),
                         ::core::result::Result::Err(error) => ::core::result::Result::Err(error),
                     }
                 }

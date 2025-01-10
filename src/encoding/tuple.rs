@@ -151,7 +151,7 @@ macro_rules! impl_tuple {
                     return ctx.check(Canonicity::NotCanonical);
                 }
                 ctx.limit_reached()?;
-                let canon = &mut Canonicity::Canonical;
+                let mut canon = Canonicity::Canonical;
                 let ctx = ctx.enter_recursion();
                 let tr = &mut TagReader::new();
                 let mut last_tag = None::<u32>;
@@ -162,8 +162,7 @@ macro_rules! impl_tuple {
                     // Decode the field. Each tuple field has a tag corresponding to its index.
                     match tag {
                         $($numbers => {
-                            ctx.update(
-                                canon,
+                            canon.update(
                                 $letters::decode_distinguished(
                                     wire_type,
                                     duplicated,
@@ -175,15 +174,15 @@ macro_rules! impl_tuple {
                                         error.push($name, stringify!($numbers));
                                         error
                                     })?
-                            )?;
+                            );
                         })*
                         _ => {
-                            ctx.update(canon, Canonicity::HasExtensions)?;
+                            ctx.update(&mut canon, Canonicity::HasExtensions)?;
                             skip_field(wire_type, buf.lend())?;
                         },
                     }
                 }
-                Ok(*canon)
+                Ok(canon)
             }
         }
 

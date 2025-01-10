@@ -104,20 +104,19 @@ where
             // No number of fixed-sized values can pack evenly into this size.
             return Err(DecodeError::new(Truncated));
         }
-        let canon = &mut Canonicity::Canonical;
+        let mut canon = Canonicity::Canonical;
         while capped.has_remaining()? {
             let mut new_val = T::for_overwrite();
-            ctx.update(
-                canon,
+            canon.update(
                 DistinguishedValueDecoder::<E>::decode_value_distinguished::<true>(
                     &mut new_val,
                     capped.lend(),
                     ctx.clone(),
                 )?,
-            )?;
-            ctx.update(canon, value.insert_distinguished(new_val)?)?;
+            );
+            ctx.update(&mut canon, value.insert_distinguished(new_val)?)?;
         }
-        Ok(*canon)
+        Ok(canon)
     }
 }
 
@@ -206,11 +205,11 @@ where
                 buf,
                 ctx.clone(),
             )?;
-            ctx.check(if !C::CHECKS_EMPTY && value.is_empty() {
-                Canonicity::NotCanonical
+            if !C::CHECKS_EMPTY && value.is_empty() {
+                ctx.check(Canonicity::NotCanonical)
             } else {
-                canon
-            })
+                Ok(canon)
+            }
         } else {
             // Otherwise, try decoding it in the unpacked representation
             _ = ctx.check(Canonicity::NotCanonical)?;
@@ -314,22 +313,21 @@ where
             return Err(DecodeError::new(InvalidValue));
         }
 
-        let canon = &mut Canonicity::Canonical;
+        let mut canon = Canonicity::Canonical;
         for dest in value.iter_mut() {
             // If the value's size was already checked, we don't need to check again
             if <T as Wiretyped<E>>::WIRE_TYPE.fixed_size().is_none() && !capped.has_remaining()? {
                 // Not enough values
                 return Err(DecodeError::new(InvalidValue));
             }
-            ctx.update(
-                canon,
+            canon.update(
                 // Empty values are allowed because they are nested
                 DistinguishedValueDecoder::<E>::decode_value_distinguished::<true>(
                     dest,
                     capped.lend(),
                     ctx.clone(),
                 )?,
-            )?;
+            );
         }
 
         // If the value's size was already checked, we don't need to check again
@@ -337,7 +335,7 @@ where
             // Too many values or trailing data
             Err(DecodeError::new(InvalidValue))
         } else {
-            Ok(*canon)
+            Ok(canon)
         }
     }
 }
@@ -423,15 +421,14 @@ where
                 buf,
                 ctx.clone(),
             )?;
-            ctx.check(
-                if
-                /* !<[T; N]>::CHECKS_EMPTY && /* it never checks */ */
-                value.is_empty() {
-                    Canonicity::NotCanonical
-                } else {
-                    canon
-                },
-            )
+
+            if
+            /* !<[T; N]>::CHECKS_EMPTY && /* it never checks */ */
+            value.is_empty() {
+                ctx.check(Canonicity::NotCanonical)
+            } else {
+                Ok(canon)
+            }
         } else {
             // Otherwise, try decoding it in the unpacked representation
             _ = ctx.check(Canonicity::NotCanonical)?;

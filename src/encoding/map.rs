@@ -137,29 +137,27 @@ where
             // No number of fixed-sized key+value pairs can pack evenly into this size.
             return Err(DecodeError::new(Truncated));
         }
-        let canon = &mut Canonicity::Canonical;
+        let mut canon = Canonicity::Canonical;
         while capped.has_remaining()? {
             let mut new_key = K::for_overwrite();
             let mut new_val = V::for_overwrite();
-            ctx.update(
-                canon,
+            canon.update(
                 DistinguishedValueDecoder::<KE>::decode_value_distinguished::<true>(
                     &mut new_key,
                     capped.lend(),
                     ctx.clone(),
                 )?,
-            )?;
-            ctx.update(
-                canon,
+            );
+            canon.update(
                 DistinguishedValueDecoder::<VE>::decode_value_distinguished::<true>(
                     &mut new_val,
                     capped.lend(),
                     ctx.clone(),
                 )?,
-            )?;
-            ctx.update(canon, value.insert_distinguished(new_key, new_val)?)?;
+            );
+            ctx.update(&mut canon, value.insert_distinguished(new_key, new_val)?)?;
         }
-        Ok(*canon)
+        Ok(canon)
     }
 }
 

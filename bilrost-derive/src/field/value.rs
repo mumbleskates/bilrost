@@ -216,7 +216,7 @@ impl Field {
                         wire_type,
                         #ident,
                         buf,
-                        ctx.clone(),
+                        ctx,
                     )
                 ),
                 // TODO(widders): borrowed
@@ -240,7 +240,7 @@ impl Field {
                         duplicated,
                         #ident,
                         buf,
-                        ctx.clone(),
+                        ctx,
                     )
                 ),
                 // TODO(widders): borrowed

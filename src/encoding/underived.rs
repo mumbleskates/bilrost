@@ -131,7 +131,7 @@ macro_rules! underived_decode_distinguished {
                 Result::<_, crate::DecodeError>::Ok(Canonicity::NotCanonical)
             } else {
                 ctx.limit_reached()?;
-                let canon = &mut Canonicity::Canonical;
+                let mut canon = Canonicity::Canonical;
                 let ctx = ctx.enter_recursion();
                 let tr = &mut TagReader::new();
                 let mut last_tag = None::<u32>;
@@ -141,8 +141,7 @@ macro_rules! underived_decode_distinguished {
                     last_tag = Some(tag);
                     match tag {
                         $($tag => {
-                            ctx.update(
-                                canon,
+                            canon.update(
                                 DistinguishedDecoder::<$encoder>::decode_distinguished(
                                     wire_type,
                                     duplicated,
@@ -153,15 +152,15 @@ macro_rules! underived_decode_distinguished {
                                     error.push(stringify!($name), stringify!($field_name));
                                     error
                                 })?,
-                            )?;
+                            );
                         })*
                         _ => {
-                            ctx.update(canon, Canonicity::HasExtensions)?;
+                            ctx.update(&mut canon, Canonicity::HasExtensions)?;
                             skip_field(wire_type, buf.lend())?;
                         },
                     }
                 }
-                Result::<_, crate::DecodeError>::Ok(*canon)
+                Result::<_, crate::DecodeError>::Ok(canon)
             }
         }
     };

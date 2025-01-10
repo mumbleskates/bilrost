@@ -43,10 +43,6 @@ pub(crate) fn merge_distinguished<T: RawDistinguishedMessageDecoder, B: Buf + ?S
         let (tag, wire_type) = tr.decode_key(buf.lend())?;
         let duplicated = last_tag == Some(tag);
         last_tag = Some(tag);
-        // We update canon directly instead of using ctx.update() because the raw message field
-        // decoding is already responsible for 100% of the constraint checking; we would never
-        // actually find anything new if we checked against the context constraint in
-        // merge_distinguished.
         canon.update(value.raw_decode_field_distinguished(
             tag,
             wire_type,

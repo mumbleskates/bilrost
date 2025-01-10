@@ -256,10 +256,10 @@ mod generic_oneof_grant_empty_state_impls {
                     ConflictingFields
                 }))
             } else {
-                T::oneof_decode_field_distinguished(tag, wire_type, buf, ctx.clone()).and_then(
+                T::oneof_decode_field_distinguished(tag, wire_type, buf, ctx.clone()).map(
                     |(decoded, canon)| {
                         *value = Some(decoded);
-                        ctx.check(canon)
+                        canon
                     },
                 )
             }

@@ -116,20 +116,19 @@ where
     T::Item: ForOverwrite + Eq + DistinguishedValueDecoder<E>,
 {
     check_wire_type(<T::Item as Wiretyped<E>>::WIRE_TYPE, wire_type)?;
-    let canon = &mut Canonicity::Canonical;
+    let mut canon = Canonicity::Canonical;
     loop {
         // Decode one item
         let mut new_item = T::Item::for_overwrite();
         // Decoded field values are nested within the collection; empty values are OK
-        ctx.update(
-            canon,
+        canon.update(
             DistinguishedValueDecoder::<E>::decode_value_distinguished::<true>(
                 &mut new_item,
                 buf.lend(),
                 ctx.clone(),
             )?,
-        )?;
-        ctx.update(canon, collection.insert_distinguished(new_item)?)?;
+        );
+        ctx.update(&mut canon, collection.insert_distinguished(new_item)?)?;
 
         if let Some(next_wire_type) = peek_repeated_field(&mut buf) {
             check_wire_type(<T::Item as Wiretyped<E>>::WIRE_TYPE, next_wire_type)?;
@@ -137,7 +136,7 @@ where
             break;
         }
     }
-    Ok(*canon)
+    Ok(canon)
 }
 
 /// Decodes an array value from either packed or unpacked in distinguished mode. If there are
@@ -180,7 +179,7 @@ where
     T: Eq + DistinguishedValueDecoder<E>,
 {
     check_wire_type(<T as Wiretyped<E>>::WIRE_TYPE, wire_type)?;
-    let canon = &mut Canonicity::Canonical;
+    let mut canon = Canonicity::Canonical;
     for (i, dest) in arr.iter_mut().enumerate() {
         // The initial field key is consumed, but we must read the repeated field key for each one
         // after that.
@@ -193,20 +192,19 @@ where
             }
         }
         // Decode one item. Empty values are allowed
-        ctx.update(
-            canon,
+        canon.update(
             DistinguishedValueDecoder::<E>::decode_value_distinguished::<true>(
                 dest,
                 buf.lend(),
                 ctx.clone(),
             )?,
-        )?;
+        );
     }
     if peek_repeated_field(&mut buf).is_some() {
         // Too many value fields
         Err(DecodeError::new(InvalidValue))
     } else {
-        Ok(*canon)
+        Ok(canon)
     }
 }
 
@@ -386,11 +384,11 @@ where
             return Err(DecodeError::new(UnexpectedlyRepeated));
         }
         let canon = decode_distinguished_array_either_repr(wire_type, value, buf, ctx.clone())?;
-        ctx.check(if EmptyState::is_empty(value) {
-            Canonicity::NotCanonical
+        if EmptyState::is_empty(value) {
+            ctx.check(Canonicity::NotCanonical)
         } else {
-            canon
-        })
+            Ok(canon)
+        }
     }
 }
 
