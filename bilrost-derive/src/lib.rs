@@ -617,30 +617,22 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     });
 
     let [decode_owned, decode_borrowed] = [Owned, Borrowed].map(|lifetime| {
+        let ident = ident.clone();
         unsorted_fields.iter().map(move |(field_ident, field)| {
-            let ident = quote!(&mut self.#field_ident);
-            let decode = field.decode(ident.clone(), lifetime, Relaxed);
+            let decode = field.decode(quote!(&mut self.#field_ident), lifetime, Relaxed);
             let tags = field.tags().into_iter().map(|tag| quote!(#tag));
             let tags = Itertools::intersperse(tags, quote!(|));
 
             quote! {
                 #(#tags)* => {
                     if let ::core::result::Result::Err(mut error) = #decode {
-                        error.push(STRUCT_NAME, stringify!(#field_ident));
+                        error.push(stringify!(#ident), stringify!(#field_ident));
                         return ::core::result::Result::Err(error);
                     }
                 }
             }
         })
     });
-
-    let struct_name = if unsorted_fields.is_empty() {
-        quote!()
-    } else {
-        quote!(
-            const STRUCT_NAME: &'static str = stringify!(#ident);
-        )
-    };
 
     let methods = unsorted_fields
         .iter()
@@ -729,7 +721,6 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
                 __B: ::bilrost::bytes::Buf + ?Sized,
             {
                 let _ = <Self as ::bilrost::encoding::RawMessage>::__ASSERTIONS;
-                #struct_name
                 match tag {
                     #(#decode_owned)*
                     _ => ::bilrost::encoding::skip_field(wire_type, buf)?,
@@ -751,7 +742,6 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
                 ctx: ::bilrost::encoding::DecodeContext,
             ) -> ::core::result::Result<(), ::bilrost::DecodeError> {
                 let _ = <Self as ::bilrost::encoding::RawMessage>::__ASSERTIONS;
-                #struct_name
                 match tag {
                     #(#decode_borrowed)*
                     _ => ::bilrost::encoding::skip_field(wire_type, buf)?,
@@ -962,6 +952,7 @@ fn try_distinguished_message(input: TokenStream) -> Result<TokenStream, Error> {
         });
 
     let [decode_owned, decode_borrowed] = [Owned, Borrowed].map(|lifetime| {
+        let ident = ident.clone();
         unsorted_fields.iter().map(move |(field_ident, field)| {
             let decode = field.decode(quote!(&mut self.#field_ident), lifetime, Distinguished);
             let tags = field.tags().into_iter().map(|tag| quote!(#tag));
@@ -974,7 +965,7 @@ fn try_distinguished_message(input: TokenStream) -> Result<TokenStream, Error> {
                             canon.update(new_canon);
                         }
                         ::core::result::Result::Err(mut error) => {
-                            error.push(STRUCT_NAME, stringify!(#field_ident));
+                            error.push(stringify!(#ident), stringify!(#field_ident));
                             return ::core::result::Result::Err(error);
                         }
                     }
@@ -982,14 +973,6 @@ fn try_distinguished_message(input: TokenStream) -> Result<TokenStream, Error> {
             }
         })
     });
-
-    let struct_name = if unsorted_fields.is_empty() {
-        quote!()
-    } else {
-        quote!(
-            const STRUCT_NAME: &'static str = stringify!(#ident);
-        )
-    };
 
     let expanded = quote! {
         impl #impl_generics ::bilrost::encoding::RawDistinguishedMessageDecoder
@@ -1007,7 +990,6 @@ fn try_distinguished_message(input: TokenStream) -> Result<TokenStream, Error> {
             where
                 __B: ::bilrost::bytes::Buf + ?Sized,
             {
-                #struct_name
                 let canon = &mut ::bilrost::Canonicity::Canonical;
                 match tag {
                     #(#decode_owned)*
@@ -1032,7 +1014,6 @@ fn try_distinguished_message(input: TokenStream) -> Result<TokenStream, Error> {
                 buf: ::bilrost::encoding::Capped<&'__a [u8]>,
                 ctx: ::bilrost::encoding::RestrictedDecodeContext,
             ) -> ::core::result::Result<::bilrost::Canonicity, ::bilrost::DecodeError> {
-                #struct_name
                 let canon = &mut ::bilrost::Canonicity::Canonical;
                 match tag {
                     #(#decode_borrowed)*
