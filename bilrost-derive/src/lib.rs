@@ -829,7 +829,7 @@ fn message_via_oneof(input: DeriveInput) -> Result<TokenStream, Error> {
     );
     let borrowed_decoder_where_clause = append_self_where(
         where_clause,
-        Some(quote!(Self: ::bilrost::encoding::OneofBorrowDecoder)),
+        Some(quote!(Self: ::bilrost::encoding::OneofBorrowDecoder<'__a>)),
     );
 
     Ok(quote! {
@@ -1086,7 +1086,7 @@ fn distinguished_message_via_oneof(input: DeriveInput) -> Result<TokenStream, Er
     let borrowed_decoder_where_clause = append_self_where(
         where_clause_,
         Some(quote!(
-            Self: ::bilrost::encoding::DistinguishedOneofBorrowDecoder + ::core::cmp::Eq
+            Self: ::bilrost::encoding::DistinguishedOneofBorrowDecoder<'__a> + ::core::cmp::Eq
         )),
     );
 
