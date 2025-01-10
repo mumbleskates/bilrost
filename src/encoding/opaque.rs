@@ -10,8 +10,8 @@ use bytes::{Buf, BufMut};
 use crate::buf::ReverseBuf;
 use crate::encoding::{
     encode_varint, encoded_len_varint, prepend_varint, Capped, DecodeContext, EmptyState,
-    ForOverwrite, RawDistinguishedMessageDecoder, RawMessage, RestrictedDecodeContext,
-    RuntimeTagMeasurer, TagMeasurer, TagRevWriter, TagWriter, WireType,
+    ForOverwrite, RawDistinguishedMessageDecoder, RawMessage, RawMessageDecoder,
+    RestrictedDecodeContext, RuntimeTagMeasurer, TagMeasurer, TagRevWriter, TagWriter, WireType,
 };
 use crate::iter::FlatAdapter;
 use crate::DecodeErrorKind::Truncated;
@@ -372,7 +372,9 @@ impl RawMessage for OpaqueMessage<'_> {
             .map(|(tag, value)| tm.key_len(*tag) + value.value_encoded_len())
             .sum()
     }
+}
 
+impl RawMessageDecoder for OpaqueMessage<'_> {
     fn raw_decode_field<B: Buf + ?Sized>(
         &mut self,
         tag: u32,
@@ -380,10 +382,7 @@ impl RawMessage for OpaqueMessage<'_> {
         _duplicated: bool,
         buf: Capped<B>,
         _ctx: DecodeContext,
-    ) -> Result<(), DecodeError>
-    where
-        Self: Sized,
-    {
+    ) -> Result<(), DecodeError> {
         self.insert(tag, OpaqueValue::decode_value(wire_type, buf)?);
         Ok(())
     }
@@ -405,3 +404,5 @@ impl RawDistinguishedMessageDecoder for OpaqueMessage<'_> {
         Ok(Canonicity::Canonical)
     }
 }
+
+// TODO(widders): borrowed decoding for OpaqueMessage is already possible :D
