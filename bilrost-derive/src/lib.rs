@@ -1523,8 +1523,10 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
     let borrow_generics = append_generic(impl_generics, quote!('__a));
 
     let encoder_where_clause = append_wheres(where_clause_, None, &fields, Encode);
-    let owned_decoder_where_clause = append_wheres(where_clause_, None, &fields, Decode(Owned, Relaxed));
-    let borrowed_decoder_where_clause = append_wheres(where_clause_, None, &fields, Decode(Borrowed, Relaxed));
+    let owned_decoder_where_clause =
+        append_wheres(where_clause_, None, &fields, Decode(Owned, Relaxed));
+    let borrowed_decoder_where_clause =
+        append_wheres(where_clause_, None, &fields, Decode(Borrowed, Relaxed));
 
     let sorted_tags: Vec<u32> = fields
         .iter()
@@ -1779,7 +1781,19 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
             }
         }
 
-        // TODO(widders): borrowed
+        impl #borrow_generics ::bilrost::encoding::#borrowed_decoder_trait
+        for #ident #ty_generics #borrowed_decoder_where_clause
+        {
+            fn oneof_borrow_decode_field(
+                #decode_field_self_arg
+                tag: u32,
+                wire_type: ::bilrost::encoding::WireType,
+                buf: ::bilrost::encoding::Capped<&'__a [u8]>,
+                ctx: ::bilrost::encoding::DecodeContext,
+            ) -> ::core::result::Result<#decode_field_return_ty, ::bilrost::DecodeError> {
+                #decode_borrowed
+            }
+        }
 
         #empty_state_impl
     };
