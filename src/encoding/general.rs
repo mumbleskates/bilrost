@@ -1,13 +1,16 @@
 use crate::buf::ReverseBuf;
 use crate::encoding::message::{
-    merge, merge_distinguished, RawDistinguishedMessageDecoder, RawMessage,
+    borrow_merge, borrow_merge_distinguished, merge, merge_distinguished,
+    RawDistinguishedMessageDecoder, RawMessage,
 };
 use crate::encoding::{
     delegate_encoding, delegate_value_encoding, encode_varint, encoded_len_varint,
     encoder_where_value_encoder, prepend_varint, AlwaysOwnedDelegatingEncoder, Canonicity, Capped,
-    DecodeContext, DecodeError, DistinguishedProxiable, DistinguishedValueDecoder, Fixed, Map,
-    Packed, PlainBytes, Proxiable, Proxied, RawMessageDecoder, RestrictedDecodeContext, Unpacked,
-    ValueDecoder, ValueEncoder, Varint, WireType, Wiretyped,
+    DecodeContext, DecodeError, DistinguishedProxiable, DistinguishedValueBorrowDecoder,
+    DistinguishedValueDecoder, Fixed, Map, Packed, PlainBytes, Proxiable, Proxied,
+    RawDistinguishedMessageBorrowDecoder, RawMessageBorrowDecoder, RawMessageDecoder,
+    RestrictedDecodeContext, Unpacked, ValueBorrowDecoder, ValueDecoder, ValueEncoder, Varint,
+    WireType, Wiretyped,
 };
 use crate::DecodeErrorKind::InvalidValue;
 use crate::{Blob, DecodeErrorKind};
@@ -457,5 +460,44 @@ where
             return Ok(Canonicity::NotCanonical);
         }
         merge_distinguished(value, buf, ctx.enter_recursion())
+    }
+}
+
+impl<'a, T> ValueBorrowDecoder<'a, General> for T
+where
+    T: RawMessageBorrowDecoder<'a>,
+{
+    #[inline]
+    fn borrow_decode_value(
+        value: &mut T,
+        mut buf: Capped<&'a [u8]>,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError> {
+        ctx.limit_reached()?;
+        borrow_merge(value, buf.take_length_delimited()?, ctx.enter_recursion())
+    }
+}
+
+impl<'a, T> DistinguishedValueBorrowDecoder<'a, General> for T
+where
+    T: RawDistinguishedMessageBorrowDecoder<'a> + Eq,
+{
+    const CHECKS_EMPTY: bool = true; // Empty messages are always zero-length
+
+    #[inline]
+    fn borrow_decode_value_distinguished<const ALLOW_EMPTY: bool>(
+        value: &mut T,
+        mut buf: Capped<&'a [u8]>,
+        ctx: RestrictedDecodeContext,
+    ) -> Result<Canonicity, DecodeError> {
+        ctx.limit_reached()?;
+        let buf = buf.take_length_delimited()?;
+        // Empty message types always encode and decode from zero bytes. It is far cheaper to check
+        // here than to check after the value has been decoded and checking the message's
+        // `is_empty()`.
+        if !ALLOW_EMPTY && buf.remaining_before_cap() == 0 {
+            return Ok(Canonicity::NotCanonical);
+        }
+        borrow_merge_distinguished(value, buf, ctx.enter_recursion())
     }
 }

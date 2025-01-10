@@ -54,6 +54,51 @@ pub(crate) fn merge_distinguished<T: RawDistinguishedMessageDecoder, B: Buf + ?S
     Ok(canon)
 }
 
+/// Merges fields from the given buffer, to its cap, into the given `TaggedDecodable` value.
+/// Implemented as a private standalone method to discourage "merging" as a usage pattern.
+#[inline]
+pub(crate) fn borrow_merge<'a, T: RawMessageBorrowDecoder<'a>>(
+    value: &mut T,
+    mut buf: Capped<&'a [u8]>,
+    ctx: DecodeContext,
+) -> Result<(), DecodeError> {
+    let tr = &mut TagReader::new();
+    let mut last_tag = None::<u32>;
+    while buf.has_remaining()? {
+        let (tag, wire_type) = tr.decode_key(buf.lend())?;
+        let duplicated = last_tag == Some(tag);
+        last_tag = Some(tag);
+        value.raw_borrow_decode_field(tag, wire_type, duplicated, buf.lend(), ctx.clone())?;
+    }
+    Ok(())
+}
+
+/// Merges fields from the given buffer, to its cap, into the given `DistinguishedTaggedDecodable`
+/// value. Implemented as a private standalone method to discourage "merging" as a usage pattern.
+#[inline]
+pub(crate) fn borrow_merge_distinguished<'a, T: RawDistinguishedMessageBorrowDecoder<'a>>(
+    value: &mut T,
+    mut buf: Capped<&'a [u8]>,
+    ctx: RestrictedDecodeContext,
+) -> Result<Canonicity, DecodeError> {
+    let tr = &mut TagReader::new();
+    let mut last_tag = None::<u32>;
+    let mut canon = Canonical;
+    while buf.has_remaining()? {
+        let (tag, wire_type) = tr.decode_key(buf.lend())?;
+        let duplicated = last_tag == Some(tag);
+        last_tag = Some(tag);
+        canon.update(value.raw_borrow_decode_field_distinguished(
+            tag,
+            wire_type,
+            duplicated,
+            buf.lend(),
+            ctx.clone(),
+        )?);
+    }
+    Ok(canon)
+}
+
 /// A Bilrost message. Provides basic encoding and decoding functionality for message types.
 pub trait Message: EmptyState {
     /// Encodes the message to a buffer.

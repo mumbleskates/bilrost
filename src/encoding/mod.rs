@@ -2157,7 +2157,30 @@ macro_rules! delegate_encoding {
                 )
             }
         }
-        // TODO(widders): borrowed
+
+        impl<'__a$(, $($value_generics)*)?>
+        $crate::encoding::BorrowDecoder<'__a, $from_ty> for $value_ty
+        where
+            Self: $crate::encoding::BorrowDecoder<'__a, $to_ty>,
+            $($($where_clause)*)?
+        {
+            #[inline(always)]
+            fn borrow_decode(
+                wire_type: $crate::encoding::WireType,
+                duplicated: bool,
+                value: &mut $value_ty,
+                buf: $crate::encoding::Capped<&'__a [u8]>,
+                ctx: $crate::encoding::DecodeContext,
+            ) -> Result<(), $crate::DecodeError> {
+                $crate::encoding::BorrowDecoder::<$to_ty>::borrow_decode(
+                    wire_type,
+                    duplicated,
+                    value,
+                    buf,
+                    ctx,
+                )
+            }
+        }
     };
 
     (
@@ -2195,7 +2218,32 @@ macro_rules! delegate_encoding {
                 )
             }
         }
-        // TODO(widders): borrowed
+
+        impl<'__a$(, $($value_generics)*)?>
+        $crate::encoding::DistinguishedBorrowDecoder<'__a, $from_ty>
+        for $value_ty
+        where
+            Self: $crate::encoding::DistinguishedBorrowDecoder<'__a, $to_ty>
+                + $crate::encoding::Encoder<$to_ty>,
+            $($($where_clause)*)?
+        {
+            #[inline(always)]
+            fn borrow_decode_distinguished(
+                wire_type: $crate::encoding::WireType,
+                duplicated: bool,
+                value: &mut $value_ty,
+                buf: $crate::encoding::Capped<&'__a [u8]>,
+                ctx: $crate::encoding::RestrictedDecodeContext,
+            ) -> Result<$crate::Canonicity, $crate::DecodeError> {
+                $crate::encoding::DistinguishedBorrowDecoder::<$to_ty>::borrow_decode_distinguished(
+                    wire_type,
+                    duplicated,
+                    value,
+                    buf,
+                    ctx,
+                )
+            }
+        }
     };
 }
 pub(crate) use delegate_encoding;
