@@ -429,12 +429,12 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     let encoder_where_clause =
         append_wheres(where_clause, self_where.clone(), &unsorted_fields, Encode);
     let [owned_decoder_where_clause, borrowed_decoder_where_clause] =
-        [Owned, Borrowed].map(|ownership| {
+        [Owned, Borrowed].map(|lifetime| {
             append_wheres(
                 where_clause,
                 self_where.clone(),
                 &unsorted_fields,
-                Decode(ownership, Relaxed),
+                Decode(lifetime, Relaxed),
             )
         });
 
@@ -616,10 +616,10 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         }
     });
 
-    let [decode_owned, decode_borrowed] = [Owned, Borrowed].map(|ownership| {
+    let [decode_owned, decode_borrowed] = [Owned, Borrowed].map(|lifetime| {
         unsorted_fields.iter().map(move |(field_ident, field)| {
             let ident = quote!(&mut self.#field_ident);
-            let decode = field.decode(ident.clone(), ownership, Relaxed);
+            let decode = field.decode(ident.clone(), lifetime, Relaxed);
             let tags = field.tags().into_iter().map(|tag| quote!(#tag));
             let tags = Itertools::intersperse(tags, quote!(|));
 
@@ -952,18 +952,18 @@ fn try_distinguished_message(input: TokenStream) -> Result<TokenStream, Error> {
     let borrow_generics = append_generic(impl_generics, quote!('__a));
 
     let [owned_decoder_where_clause, borrowed_decoder_where_clause] =
-        [Owned, Borrowed].map(|ownership| {
+        [Owned, Borrowed].map(|lifetime| {
             append_wheres(
                 where_clause_,
                 Some(quote!(Self: ::core::cmp::Eq)),
                 &unsorted_fields,
-                Decode(ownership, Distinguished),
+                Decode(lifetime, Distinguished),
             )
         });
 
-    let [decode_owned, decode_borrowed] = [Owned, Borrowed].map(|ownership| {
+    let [decode_owned, decode_borrowed] = [Owned, Borrowed].map(|lifetime| {
         unsorted_fields.iter().map(move |(field_ident, field)| {
-            let decode = field.decode(quote!(&mut self.#field_ident), ownership, Distinguished);
+            let decode = field.decode(quote!(&mut self.#field_ident), lifetime, Distinguished);
             let tags = field.tags().into_iter().map(|tag| quote!(#tag));
             let tags = Itertools::intersperse(tags, quote!(|));
 
@@ -1649,12 +1649,12 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         }
     });
 
-    let [decode_owned, decode_borrowed] = [Owned, Borrowed].map(|ownership| {
+    let [decode_owned, decode_borrowed] = [Owned, Borrowed].map(|lifetime| {
         let decode_arms = fields.iter().map(|(variant_ident, field)| DecoderForOneof {
             ident: &ident,
             variant_ident,
             field,
-            lifetime: ownership,
+            lifetime,
             mode: Relaxed,
         });
 
@@ -1795,7 +1795,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
 }
 
 /// Oneof decoders have four different cases they may be implemented in: implemented for either
-/// NonEmptyOneof or Oneof, and either expedient or distinguished. The code for these should all be
+/// NonEmptyOneof or Oneof, and either relaxed or distinguished. The code for these should all be
 /// similarly deduplicated.
 struct DecoderForOneof<'a> {
     /// The ident of the oneof enum itself
@@ -1804,7 +1804,7 @@ struct DecoderForOneof<'a> {
     variant_ident: &'a Ident,
     /// The Field struct for this variant
     field: &'a Field,
-    /// Ownership type
+    /// Decoded ownership lifetime
     lifetime: DecodeLifetime,
     /// Decoding mode
     mode: DecodeMode,
