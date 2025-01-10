@@ -279,10 +279,13 @@ impl Field {
                         quote!(#ty: ::bilrost::encoding::ValueBorrowDecoder<'__a, #encoding>)
                     }
                     Decode(Owned, Distinguished) => {
-                        quote!(#ty: ::bilrost::encoding::ValueBorrowDecoder<#encoding>)
+                        quote!(#ty: ::bilrost::encoding::DistinguishedValueDecoder<#encoding>)
                     }
                     Decode(Borrowed, Distinguished) => {
-                        quote!(#ty: ::bilrost::encoding::ValueBorrowDecoder<'__a, #encoding>)
+                        quote!(
+                            #ty: ::bilrost::encoding::
+                                DistinguishedValueBorrowDecoder<'__a, #encoding>
+                        )
                     }
                 },
                 quote!(#ty: ::bilrost::encoding::ForOverwrite),
