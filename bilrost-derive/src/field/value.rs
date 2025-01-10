@@ -225,9 +225,9 @@ impl Field {
             }
         };
         let duplicated_arg = if self.in_oneof {
-            Some(quote!(duplicated,))
-        } else {
             None
+        } else {
+            Some(quote!(duplicated,))
         };
         quote!(
             <#ty as ::bilrost::encoding::#decoder_trait<#encoding>>::#call(
