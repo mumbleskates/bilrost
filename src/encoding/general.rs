@@ -6,8 +6,8 @@ use crate::encoding::{
     delegate_encoding, delegate_value_encoding, encode_varint, encoded_len_varint,
     encoder_where_value_encoder, prepend_varint, Canonicity, Capped, DecodeContext, DecodeError,
     DistinguishedProxiable, DistinguishedValueDecoder, Fixed, Map, Packed, PlainBytes, Proxiable,
-    Proxied, RestrictedDecodeContext, Unpacked, ValueDecoder, ValueEncoder, Varint, WireType,
-    Wiretyped,
+    Proxied, RawMessageDecoder, RestrictedDecodeContext, Unpacked, ValueDecoder, ValueEncoder,
+    Varint, WireType, Wiretyped,
 };
 use crate::DecodeErrorKind::InvalidValue;
 use crate::{Blob, DecodeErrorKind};
@@ -421,7 +421,7 @@ where
 
 impl<T> ValueDecoder<General> for T
 where
-    T: RawMessage,
+    T: RawMessageDecoder,
 {
     #[inline]
     fn decode_value<B: Buf + ?Sized>(
