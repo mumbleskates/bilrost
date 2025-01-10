@@ -395,8 +395,8 @@ fn append_wheres<T>(
 
 /// Adds the given identifier to the generics list
 fn append_generic(generics: &Generics, ident: TokenStream) -> TokenStream {
-    let params = generics.params.iter();
-    quote!(<#ident, #(#params)*>)
+    let params = &generics.params;
+    quote!(<#ident, #params>)
 }
 
 fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
