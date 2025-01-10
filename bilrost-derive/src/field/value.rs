@@ -198,54 +198,46 @@ impl Field {
     ) -> TokenStream {
         let encoding = &self.encoding;
         let ty = &self.ty;
-        if self.in_oneof {
+        let (decoder_trait, call) = if self.in_oneof {
             match (lifetime, mode) {
-                (Owned, Relaxed) => quote!(
-                    <#ty as ::bilrost::encoding::FieldDecoder<#encoding>>::decode_field(
-                        wire_type,
-                        #ident,
-                        buf,
-                        ctx,
-                    )
+                (Owned, Relaxed) => (quote!(FieldDecoder), quote!(decode_field)),
+                (Owned, Distinguished) => (
+                    quote!(DistinguishedFieldDecoder),
+                    quote!(decode_field_distinguished::<true>), // empty values are ok
                 ),
-                (Owned, Distinguished) => quote!(
-                    <#ty as ::bilrost::encoding::DistinguishedFieldDecoder<#encoding>>::
-                        // always allow empty values, oneof variants are nested
-                        decode_field_distinguished::<true>
-                    (
-                        wire_type,
-                        #ident,
-                        buf,
-                        ctx,
-                    )
+                (Borrowed, Relaxed) => (quote!(FieldBorrowDecoder), quote!(borrow_decode_field)),
+                (Borrowed, Distinguished) => (
+                    quote!(DistinguishedFieldBorrowDecoder),
+                    quote!(borrow_decode_field_distinguished::<true>), // empty values are ok
                 ),
-                // TODO(widders): borrowed
             }
         } else {
             match (lifetime, mode) {
-                (Owned, Relaxed) => quote!(
-                    <#ty as ::bilrost::encoding::Decoder<#encoding>>::decode(
-                        wire_type,
-                        duplicated,
-                        #ident,
-                        buf,
-                        ctx,
-                    )
+                (Owned, Relaxed) => (quote!(Decoder), quote!(decode)),
+                (Owned, Distinguished) => {
+                    (quote!(DistinguishedDecoder), quote!(decode_distinguished))
+                }
+                (Borrowed, Relaxed) => (quote!(BorrowDecoder), quote!(borrow_decode)),
+                (Borrowed, Distinguished) => (
+                    quote!(DistinguishedBorrowDecoder),
+                    quote!(borrow_decode_distinguished),
                 ),
-                (Owned, Distinguished) => quote!(
-                    <#ty as ::bilrost::encoding::DistinguishedDecoder<#encoding>>::
-                        decode_distinguished
-                    (
-                        wire_type,
-                        duplicated,
-                        #ident,
-                        buf,
-                        ctx,
-                    )
-                ),
-                // TODO(widders): borrowed
             }
-        }
+        };
+        let duplicated_arg = if self.in_oneof {
+            Some(quote!(duplicated,))
+        } else {
+            None
+        };
+        quote!(
+            <#ty as ::bilrost::encoding::#decoder_trait<#encoding>>::#call(
+                wire_type,
+                #duplicated_arg
+                #ident,
+                buf,
+                ctx,
+            )
+        )
     }
 
     /// Returns an expression which evaluates to the encoded length of the field. The given ident
