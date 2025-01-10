@@ -939,7 +939,7 @@ fn try_distinguished_message(input: TokenStream) -> Result<TokenStream, Error> {
         ident,
         impl_generics,
         ty_generics,
-        where_clause: where_clause_,
+        where_clause,
         unsorted_fields,
         has_ignored_fields,
         tag_range: _,
@@ -954,7 +954,7 @@ fn try_distinguished_message(input: TokenStream) -> Result<TokenStream, Error> {
     let [owned_decoder_where_clause, borrowed_decoder_where_clause] =
         [Owned, Borrowed].map(|lifetime| {
             append_wheres(
-                where_clause_,
+                where_clause,
                 Some(quote!(Self: ::core::cmp::Eq)),
                 &unsorted_fields,
                 Decode(lifetime, Distinguished),
@@ -1063,7 +1063,7 @@ fn distinguished_message_via_oneof(input: DeriveInput) -> Result<TokenStream, Er
         ident,
         impl_generics,
         ty_generics,
-        where_clause: where_clause_,
+        where_clause,
         fields: _,
         empty_variant,
     } = preprocess_oneof(&input)?;
@@ -1078,13 +1078,13 @@ fn distinguished_message_via_oneof(input: DeriveInput) -> Result<TokenStream, Er
     let borrow_generics = append_generic(impl_generics, quote!('__a));
 
     let owned_decoder_where_clause = append_self_where(
-        where_clause_,
+        where_clause,
         Some(quote!(
             Self: ::bilrost::encoding::DistinguishedOneofDecoder + ::core::cmp::Eq
         )),
     );
     let borrowed_decoder_where_clause = append_self_where(
-        where_clause_,
+        where_clause,
         Some(quote!(
             Self: ::bilrost::encoding::DistinguishedOneofBorrowDecoder<'__a> + ::core::cmp::Eq
         )),
@@ -1515,18 +1515,18 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         ident,
         impl_generics,
         ty_generics,
-        where_clause: where_clause_,
+        where_clause,
         fields,
         empty_variant,
     } = preprocess_oneof(&input)?;
 
     let borrow_generics = append_generic(impl_generics, quote!('__a));
 
-    let encoder_where_clause = append_wheres(where_clause_, None, &fields, Encode);
+    let encoder_where_clause = append_wheres(where_clause, None, &fields, Encode);
     let owned_decoder_where_clause =
-        append_wheres(where_clause_, None, &fields, Decode(Owned, Relaxed));
+        append_wheres(where_clause, None, &fields, Decode(Owned, Relaxed));
     let borrowed_decoder_where_clause =
-        append_wheres(where_clause_, None, &fields, Decode(Borrowed, Relaxed));
+        append_wheres(where_clause, None, &fields, Decode(Borrowed, Relaxed));
 
     let sorted_tags: Vec<u32> = fields
         .iter()
