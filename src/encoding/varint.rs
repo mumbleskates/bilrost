@@ -1,8 +1,8 @@
 use crate::buf::ReverseBuf;
 use crate::encoding::{
-    encode_varint, encoded_len_varint, encoder_where_value_encoder, prepend_varint, Buf, BufMut,
-    Canonicity, Capped, DecodeContext, DistinguishedValueDecoder, RestrictedDecodeContext,
-    ValueDecoder, ValueEncoder, WireType, Wiretyped,
+    encode_varint, encoded_len_varint, encoder_where_value_encoder, prepend_varint, AlwaysOwned,
+    Buf, BufMut, Canonicity, Capped, DecodeContext, DistinguishedValueDecoder,
+    RestrictedDecodeContext, ValueDecoder, ValueEncoder, WireType, Wiretyped,
 };
 use crate::DecodeError;
 use crate::DecodeErrorKind::OutOfDomainValue;
@@ -108,6 +108,8 @@ macro_rules! varint {
                 Ok(Canonicity::Canonical)
             }
         }
+
+        impl AlwaysOwned for $ty {}
 
         #[cfg(test)]
         mod $name {
