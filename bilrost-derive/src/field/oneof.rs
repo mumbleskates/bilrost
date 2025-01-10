@@ -71,46 +71,22 @@ impl Field {
         lifetime: DecodeLifetime,
         mode: DecodeMode,
     ) -> TokenStream {
-        match (lifetime, mode) {
-            (Owned, Relaxed) => quote!(
-                ::bilrost::encoding::OneofDecode::oneof_decode_field(
-                    #ident,
-                    tag,
-                    wire_type,
-                    buf,
-                    ctx,
-                )
+        let (trait_name, call) = match (lifetime, mode) {
+            (Owned, Relaxed) => (quote!(OneofDecoder), quote!(oneof_decode_field)),
+            (Borrowed, Relaxed) => (
+                quote!(OneofBorrowDecoder),
+                quote!(oneof_borrow_decode_field),
             ),
-            (Borrowed, Relaxed) => quote!(
-                ::bilrost::encoding::OneofBorrowDecode::oneof_borrow_decode_field(
-                    #ident,
-                    tag,
-                    wire_type,
-                    buf,
-                    ctx,
-                )
+            (Owned, Distinguished) => (
+                quote!(DistinguishedOneofDecoder),
+                quote!(oneof_decode_field_distinguished),
             ),
-            (Owned, Distinguished) => quote!(
-                ::bilrost::encoding::DistinguishedOneofDecode::oneof_decode_field_distinguished(
-                    #ident,
-                    tag,
-                    wire_type,
-                    buf,
-                    ctx.clone(),
-                )
+            (Borrowed, Distinguished) => (
+                quote!(DistinguishedOneofBorrowDecoder),
+                quote!(oneof_borrow_decode_field_distinguished),
             ),
-            (Borrowed, Distinguished) => quote!(
-                ::bilrost::encoding::DistinguishedOneofBorrowDecode::
-                    oneof_borrow_decode_field_distinguished
-                (
-                    #ident,
-                    tag,
-                    wire_type,
-                    buf,
-                    ctx.clone(),
-                )
-            ),
-        }
+        };
+        quote!(::bilrost::encoding::#trait_name::#call(#ident, tag, wire_type, buf, ctx))
     }
 
     /// Returns an expression which evaluates to the encoded length of the oneof field.
