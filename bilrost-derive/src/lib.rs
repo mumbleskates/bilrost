@@ -1581,7 +1581,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
     if let Some(empty_ident) = &empty_variant {
         encoder_trait = quote!(Oneof);
         owned_decoder_trait = quote!(OneofDecoder);
-        borrowed_decoder_trait = quote!(OneofBorrowDecoder);
+        borrowed_decoder_trait = quote!(OneofBorrowDecoder<'__a>);
         decode_field_self_arg = Some(quote!(value: &mut Self,));
         decode_field_return_ty = quote!(());
         some = Some(quote!(::core::option::Option::Some));
@@ -1625,7 +1625,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
     } else {
         encoder_trait = quote!(NonEmptyOneof);
         owned_decoder_trait = quote!(NonEmptyOneofDecoder);
-        borrowed_decoder_trait = quote!(NonEmptyOneofBorrowDecoder);
+        borrowed_decoder_trait = quote!(NonEmptyOneofBorrowDecoder<'__a>);
         decode_field_self_arg = None;
         decode_field_return_ty = quote!(Self);
         some = None;
@@ -1896,7 +1896,7 @@ fn try_distinguished_oneof(input: TokenStream) -> Result<TokenStream, Error> {
     let borrowed_decoder_where_clause;
     if empty_variant.is_some() {
         owned_decoder_trait = quote!(DistinguishedOneofDecoder);
-        borrowed_decoder_trait = quote!(DistinguishedOneofBorrowDecoder);
+        borrowed_decoder_trait = quote!(DistinguishedOneofBorrowDecoder<'__a>);
         relaxed_oneof_trait = quote!(Oneof);
         decode_field_self_arg = Some(quote!(value: &mut Self,));
         decode_field_return_ty = quote!(::bilrost::Canonicity);
@@ -1912,7 +1912,7 @@ fn try_distinguished_oneof(input: TokenStream) -> Result<TokenStream, Error> {
             });
     } else {
         owned_decoder_trait = quote!(NonEmptyDistinguishedOneofDecoder);
-        borrowed_decoder_trait = quote!(NonEmptyDistinguishedOneofBorrowDecoder);
+        borrowed_decoder_trait = quote!(NonEmptyDistinguishedOneofBorrowDecoder<'__a>);
         relaxed_oneof_trait = quote!(NonEmptyOneof);
         decode_field_self_arg = None;
         decode_field_return_ty = quote!((Self, ::bilrost::Canonicity));
