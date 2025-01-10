@@ -201,11 +201,11 @@ impl Field {
         let (decoder_trait, call) = if self.in_oneof {
             match (lifetime, mode) {
                 (Owned, Relaxed) => (quote!(FieldDecoder), quote!(decode_field)),
+                (Borrowed, Relaxed) => (quote!(FieldBorrowDecoder), quote!(borrow_decode_field)),
                 (Owned, Distinguished) => (
                     quote!(DistinguishedFieldDecoder),
                     quote!(decode_field_distinguished::<true>), // empty values are ok
                 ),
-                (Borrowed, Relaxed) => (quote!(FieldBorrowDecoder), quote!(borrow_decode_field)),
                 (Borrowed, Distinguished) => (
                     quote!(DistinguishedFieldBorrowDecoder),
                     quote!(borrow_decode_field_distinguished::<true>), // empty values are ok
@@ -214,10 +214,10 @@ impl Field {
         } else {
             match (lifetime, mode) {
                 (Owned, Relaxed) => (quote!(Decoder), quote!(decode)),
+                (Borrowed, Relaxed) => (quote!(BorrowDecoder), quote!(borrow_decode)),
                 (Owned, Distinguished) => {
                     (quote!(DistinguishedDecoder), quote!(decode_distinguished))
                 }
-                (Borrowed, Relaxed) => (quote!(BorrowDecoder), quote!(borrow_decode)),
                 (Borrowed, Distinguished) => (
                     quote!(DistinguishedBorrowDecoder),
                     quote!(borrow_decode_distinguished),
