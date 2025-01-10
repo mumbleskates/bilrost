@@ -8,8 +8,9 @@ use bytes::{Buf, BufMut};
 
 use crate::buf::ReverseBuf;
 use crate::encoding::{
-    skip_field, AlwaysOwned, Canonicity, Capped, DecodeContext, RawDistinguishedMessageDecoder,
-    RawMessage, RawMessageDecoder, RestrictedDecodeContext, WireType,
+    skip_field, Canonicity, Capped, DecodeContext,
+    RawDistinguishedMessageBorrowDecoder, RawDistinguishedMessageDecoder, RawMessage,
+    RawMessageBorrowDecoder, RawMessageDecoder, RestrictedDecodeContext, WireType,
 };
 use crate::DecodeError;
 
@@ -193,5 +194,30 @@ impl RawDistinguishedMessageDecoder for () {
     }
 }
 
-// TODO(widders): reevaluate the usefulness of this
-impl AlwaysOwned for () {}
+impl RawMessageBorrowDecoder<'_> for () {
+    fn raw_borrow_decode_field(
+        &mut self,
+        _tag: u32,
+        wire_type: WireType,
+        _duplicated: bool,
+        buf: Capped<&'_ [u8]>,
+        _ctx: DecodeContext,
+    ) -> Result<(), DecodeError> {
+        skip_field(wire_type, buf)
+    }
+}
+
+impl RawDistinguishedMessageBorrowDecoder<'_> for () {
+    fn raw_borrow_decode_field_distinguished(
+        &mut self,
+        _tag: u32,
+        wire_type: WireType,
+        _duplicated: bool,
+        buf: Capped<&'_ [u8]>,
+        ctx: RestrictedDecodeContext,
+    ) -> Result<Canonicity, DecodeError> {
+        _ = ctx.check(Canonicity::HasExtensions)?;
+        skip_field(wire_type, buf)?;
+        Ok(Canonicity::HasExtensions)
+    }
+}
