@@ -3034,9 +3034,7 @@ fn oneof_as_message() {
 #[test]
 fn oneof_as_message_unqualified() {
     #[allow(dead_code)]
-    #[derive(
-        Debug, PartialEq, Eq, Oneof, DistinguishedOneof, /*Message,*/ DistinguishedMessage,
-    )]
+    #[derive(Debug, PartialEq, Eq, Oneof, DistinguishedOneof, Message, DistinguishedMessage)]
     enum Maybe<T> {
         Nothing,
         #[bilrost(1)]
