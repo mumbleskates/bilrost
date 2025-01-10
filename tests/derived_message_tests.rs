@@ -5,7 +5,7 @@
 use bilrost::encoding::opaque::{OpaqueMessage, OpaqueValue as OV};
 use bilrost::encoding::{
     self, encode_varint, Collection, DistinguishedOneofDecoder, EmptyState, Fixed, General,
-    Mapping, Oneof, Packed, Varint,
+    Mapping, Oneof, OneofDecoder, Packed, Varint,
 };
 use bilrost::Canonicity::{HasExtensions, NotCanonical};
 use bilrost::DecodeErrorKind::{
@@ -1361,7 +1361,13 @@ fn bytes_for_surrogate(surrogate_codepoint: u32) -> [u8; 3] {
 
 fn parsing_string_type<'a, T>()
 where
-    T: 'a + Debug + Eq + From<&'a str> + EmptyState + encoding::DistinguishedDecoder<General>,
+    T: 'a
+        + Debug
+        + Eq
+        + From<&'a str>
+        + EmptyState
+        + encoding::Decoder<General>
+        + encoding::DistinguishedDecoder<General>,
 {
     #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
     struct Foo<T>(T);
@@ -2781,7 +2787,7 @@ fn truncated_packed_collection() {
 fn oneof_field_decoding() {
     fn do_oneof_field_decoding<T>(expected_a: T, expected_b: T)
     where
-        T: Debug + Eq + DistinguishedOneofDecoder,
+        T: Debug + Eq + OneofDecoder + DistinguishedOneofDecoder,
     {
         #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
         struct Foo<T>(#[bilrost(oneof = "1, 2")] T);
@@ -2869,7 +2875,7 @@ fn oneof_with_errors_inside() {
 
     fn do_test_oneof_with_errors_inside<OneofType>(child_field: &str)
     where
-        OneofType: Debug + Eq + DistinguishedOneofDecoder,
+        OneofType: Debug + Eq + OneofDecoder + DistinguishedOneofDecoder,
     {
         #[derive(Clone, Debug, PartialEq, Eq, Message, DistinguishedMessage)]
         struct Foo<O> {
