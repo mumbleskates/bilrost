@@ -2356,8 +2356,6 @@ macro_rules! delegate_value_encoding {
 }
 pub(crate) use delegate_value_encoding;
 
-// TODO(widders): can this now be done as a marker trait implemented on the encoder rather than as
-//  a macro?
 /// Most kinds of encoder want to act as field encoders for bare values in any situation where they
 /// also implement value encoding. Only a couple encoders want to do anything fancy, like accepting
 /// alternate wire-types in relaxed mode; the rest want to use this to blanket those definitions.
