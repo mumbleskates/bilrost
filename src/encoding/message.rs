@@ -1039,7 +1039,7 @@ where
     }
 }
 
-impl<'a, T> RawDistinguishedMessageBorrowDecoder for Box<T>
+impl<'a, T> RawDistinguishedMessageBorrowDecoder<'a> for Box<T>
 where
     T: RawDistinguishedMessageBorrowDecoder<'a>,
 {
