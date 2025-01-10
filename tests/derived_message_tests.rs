@@ -2,14 +2,6 @@
 //! types of bilrost messages and their fields. If there's an observed behavior in a type of message
 //! or field that we implement, we want to demonstrate it here.
 
-use std::borrow::Cow;
-use std::default::Default;
-use std::fmt::Debug;
-use std::iter;
-use std::marker::PhantomData;
-
-use itertools::{repeat_n, Itertools};
-
 use bilrost::encoding::opaque::{OpaqueMessage, OpaqueValue as OV};
 use bilrost::encoding::{
     self, encode_varint, Collection, DistinguishedOneofDecoder, EmptyState, Fixed, General,
@@ -22,6 +14,13 @@ use bilrost::DecodeErrorKind::{
 };
 use bilrost::{DecodeErrorKind, DistinguishedMessage, Enumeration, Message, Oneof};
 use bilrost_derive::DistinguishedOneof;
+use core::mem::size_of;
+use itertools::{repeat_n, Itertools};
+use std::borrow::Cow;
+use std::default::Default;
+use std::fmt::Debug;
+use std::iter;
+use std::marker::PhantomData;
 
 trait IntoOpaqueMessage<'a> {
     fn into_opaque_message(self) -> OpaqueMessage<'a>;
