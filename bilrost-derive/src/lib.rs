@@ -908,7 +908,7 @@ fn message_via_oneof(input: DeriveInput) -> Result<TokenStream, Error> {
                 ctx: ::bilrost::encoding::DecodeContext,
             ) -> ::core::result::Result<(), ::bilrost::DecodeError> {
                 if <Self as ::bilrost::encoding::Oneof>::FIELD_TAGS.contains(&tag) {
-                    <Self as ::bilrost::encoding::OneofDecoder>::oneof_decode_field(
+                    <Self as ::bilrost::encoding::OneofBorrowDecoder>::oneof_borrow_decode_field(
                         self,
                         tag,
                         wire_type,
@@ -1133,8 +1133,8 @@ fn distinguished_message_via_oneof(input: DeriveInput) -> Result<TokenStream, Er
                 ctx: ::bilrost::encoding::RestrictedDecodeContext,
             ) -> ::core::result::Result<::bilrost::Canonicity, ::bilrost::DecodeError> {
                 if <Self as ::bilrost::encoding::Oneof>::FIELD_TAGS.contains(&tag) {
-                    <Self as ::bilrost::encoding::DistinguishedOneofDecoder>::
-                        oneof_decode_field_distinguished
+                    <Self as ::bilrost::encoding::DistinguishedOneofBorrowDecoder>::
+                        oneof_borrow_decode_field_distinguished
                     (
                         self,
                         tag,
