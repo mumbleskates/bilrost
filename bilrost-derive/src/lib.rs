@@ -1124,7 +1124,7 @@ fn distinguished_message_via_oneof(input: DeriveInput) -> Result<TokenStream, Er
         impl #borrow_generics ::bilrost::encoding::RawDistinguishedMessageBorrowDecoder<'__a>
         for #ident #ty_generics #borrowed_decoder_where_clause {
             #[inline(always)]
-            fn raw_decode_field_distinguished(
+            fn raw_borrow_decode_field_distinguished(
                 &mut self,
                 tag: u32,
                 wire_type: ::bilrost::encoding::WireType,
