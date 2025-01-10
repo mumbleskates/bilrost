@@ -1885,7 +1885,7 @@ fn try_distinguished_oneof(input: TokenStream) -> Result<TokenStream, Error> {
     } = preprocess_oneof(&input)?;
 
     let borrow_generics = append_generic(impl_generics, quote!('__a));
-    
+
     let owned_decoder_trait;
     let borrowed_decoder_trait;
     let relaxed_oneof_trait; // we must reference the parent trait for `oneof_current_tag`
@@ -1919,12 +1919,7 @@ fn try_distinguished_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         some = None;
         [owned_decoder_where_clause, borrowed_decoder_where_clause] =
             [Owned, Borrowed].map(|lifetime| {
-                append_wheres(
-                    where_clause,
-                    None,
-                    &fields,
-                    Decode(lifetime, Distinguished),
-                )
+                append_wheres(where_clause, None, &fields, Decode(lifetime, Distinguished))
             });
     };
 
@@ -1936,7 +1931,7 @@ fn try_distinguished_oneof(input: TokenStream) -> Result<TokenStream, Error> {
             lifetime,
             mode: Distinguished,
         });
-        
+
         quote! {
             match tag {
                 #(#decode_arms,)*
@@ -1949,35 +1944,37 @@ fn try_distinguished_oneof(input: TokenStream) -> Result<TokenStream, Error> {
 
     let [decode_owned, decode_borrowed] = match empty_variant {
         None => [decode_owned, decode_borrowed],
-        Some(empty_ident) => [decode_owned, decode_borrowed].map(|decode| quote! {
-            // See the note in `try_oneof` above for details about the colliding field guard.
-            match if let #ident::#empty_ident = value {
-                match #decode {
-                    ::core::result::Result::Ok((decoded, canon)) => {
-                        *value = decoded;
-                        ::core::result::Result::Ok(canon)
+        Some(empty_ident) => [decode_owned, decode_borrowed].map(|decode| {
+            quote! {
+                // See the note in `try_oneof` above for details about the colliding field guard.
+                match if let #ident::#empty_ident = value {
+                    match #decode {
+                        ::core::result::Result::Ok((decoded, canon)) => {
+                            *value = decoded;
+                            ::core::result::Result::Ok(canon)
+                        }
+                        ::core::result::Result::Err(error) => ::core::result::Result::Err(error),
                     }
-                    ::core::result::Result::Err(error) => ::core::result::Result::Err(error),
-                }
-            } else {
-                ::core::result::Result::Err(::bilrost::DecodeError::new(
-                    if ::bilrost::encoding::#relaxed_oneof_trait::oneof_current_tag(value)
-                        == #some(tag)
-                    {
-                        ::bilrost::DecodeErrorKind::UnexpectedlyRepeated
-                    } else {
-                        ::bilrost::DecodeErrorKind::ConflictingFields
+                } else {
+                    ::core::result::Result::Err(::bilrost::DecodeError::new(
+                        if ::bilrost::encoding::#relaxed_oneof_trait::oneof_current_tag(value)
+                            == #some(tag)
+                        {
+                            ::bilrost::DecodeErrorKind::UnexpectedlyRepeated
+                        } else {
+                            ::bilrost::DecodeErrorKind::ConflictingFields
+                        }
+                    ))
+                } {
+                    ::core::result::Result::Err(mut error) => {
+                        let (msg, field) =
+                            <Self as ::bilrost::encoding::#relaxed_oneof_trait>::
+                                oneof_variant_name(tag);
+                        error.push(msg, field);
+                        ::core::result::Result::Err(error)
                     }
-                ))
-            } {
-                ::core::result::Result::Err(mut error) => {
-                    let (msg, field) =
-                        <Self as ::bilrost::encoding::#relaxed_oneof_trait>::
-                            oneof_variant_name(tag);
-                    error.push(msg, field);
-                    ::core::result::Result::Err(error)
+                    ok => ok,
                 }
-                ok => ok,
             }
         }),
     };

@@ -1,7 +1,7 @@
 use crate::buf::{ReverseBuf, ReverseBuffer};
 use crate::encoding::{
-    encode_varint, encoded_len_varint, prepend_varint, AlwaysOwned, Canonicity, Capped,
-    DecodeContext, EmptyState, RestrictedDecodeContext, TagReader, WireType,
+    encode_varint, encoded_len_varint, prepend_varint, Canonicity, Capped, DecodeContext,
+    EmptyState, RestrictedDecodeContext, TagReader, WireType,
 };
 use crate::Canonicity::{Canonical, NotCanonical};
 use crate::{length_delimiter_len, DecodeError, EncodeError};

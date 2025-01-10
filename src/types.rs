@@ -8,9 +8,9 @@ use bytes::{Buf, BufMut};
 
 use crate::buf::ReverseBuf;
 use crate::encoding::{
-    skip_field, Canonicity, Capped, DecodeContext,
-    RawDistinguishedMessageBorrowDecoder, RawDistinguishedMessageDecoder, RawMessage,
-    RawMessageBorrowDecoder, RawMessageDecoder, RestrictedDecodeContext, WireType,
+    skip_field, Canonicity, Capped, DecodeContext, RawDistinguishedMessageBorrowDecoder,
+    RawDistinguishedMessageDecoder, RawMessage, RawMessageBorrowDecoder, RawMessageDecoder,
+    RestrictedDecodeContext, WireType,
 };
 use crate::DecodeError;
 
