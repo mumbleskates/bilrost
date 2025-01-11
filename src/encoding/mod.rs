@@ -2357,9 +2357,95 @@ macro_rules! delegate_value_encoding {
 }
 pub(crate) use delegate_value_encoding;
 
-/// Most kinds of encoder want to act as field encoders for bare values in any situation where they
-/// also implement value encoding. Only a couple encoders want to do anything fancy, like accepting
-/// alternate wire-types in relaxed mode; the rest want to use this to blanket those definitions.
+/// Most kinds of encodings want to act as field decoders for bare values in any situation where
+/// they also implement value decoding. Only a couple encodings want to do anything fancy, like
+/// accepting alternate wire-types in relaxed mode; the rest want to use this to blanket those
+/// definitions.
+macro_rules! __impl_decoder_where_value_decoder {
+    (
+        mode: $mode:ident,
+        relaxed: $relaxed:ident::$relaxed_method:ident,
+        relaxed_value: $relaxed_value:ident::$relaxed_value_method:ident,
+        relaxed_field: $relaxed_field:ident::$relaxed_field_method:ident,
+        distinguished: $distinguished:ident::$distinguished_method:ident,
+        distinguished_value: $distinguished_value:ident::$distinguished_value_method:ident,
+        distinguished_field: $distinguished_field:ident::$distinguished_field_method:ident,
+        buf_ty: $buf_ty:ty,
+        impl_buf_ty: $impl_buf_ty:ty,
+        $(buf_generic: ($($buf_generic:tt)*),)?
+        $(lifetime: $lifetime:lifetime,)?
+        encoding: $encoding:ty,
+        $(with where clause ($($where_clause:tt)*),)?
+        $(with generics ($($generics:tt)*),)?
+    ) => {
+        /// Decodes plain values encoded as whole fields.
+        impl<$($lifetime,)? T $(, $($generics)*)?>
+        $crate::encoding::$relaxed <$($lifetime,)? $encoding> for T
+        where
+            T: $crate::encoding::EmptyState
+                + $crate::encoding::$relaxed_value <$($lifetime,)? $encoding>,
+            $($($where_clause)*)?
+        {
+            #[inline(always)]
+            fn $relaxed_method $($($buf_generic)*)? (
+                wire_type: WireType,
+                duplicated: bool,
+                value: &mut T,
+                buf: Capped<$buf_ty>,
+                ctx: DecodeContext,
+            ) -> Result<(), $crate::DecodeError> {
+                if duplicated {
+                    return Err(
+                        $crate::DecodeError::new($crate::DecodeErrorKind::UnexpectedlyRepeated)
+                    );
+                }
+                $crate::encoding::$relaxed_field::<$encoding>::$relaxed_field_method(
+                    wire_type, value, buf, ctx)
+            }
+        }
+
+        /// Canonical encoding for plain values forbids encoding empty values. This includes
+        /// directly-nested message types, which are not emitted when all their fields are default.
+        /// If an empty value is decoded it is considered fully non-canonical.
+        impl<$($lifetime,)? T $(, $($generics)*)?>
+        $crate::encoding::$distinguished <$($lifetime,)? $encoding> for T
+        where
+            T: Eq
+                + $crate::encoding::EmptyState
+                + $crate::encoding::$distinguished_value <$($lifetime,)? $encoding>,
+            $($($where_clause)*)?
+        {
+            #[inline(always)]
+            fn $distinguished_method $($($buf_generic)*)? (
+                wire_type: $crate::encoding::WireType,
+                duplicated: bool,
+                value: &mut T,
+                buf: $crate::encoding::Capped<$buf_ty>,
+                ctx: $crate::encoding::RestrictedDecodeContext,
+            ) -> Result<$crate::Canonicity, $crate::DecodeError> {
+                if duplicated {
+                    return Err(
+                        $crate::DecodeError::new(crate::DecodeErrorKind::UnexpectedlyRepeated)
+                    );
+                }
+                // decoding a value as a whole message field, empty values are unacceptable
+                let mut canon = $crate::encoding::$distinguished_field::<$encoding>
+                    ::$distinguished_field_method::<false>(
+                        wire_type,
+                        value,
+                        buf,
+                        ctx.clone(),
+                    )?;
+                if !T::CHECKS_EMPTY && value.is_empty() {
+                    ctx.update(&mut canon, crate::Canonicity::NotCanonical)?;
+                }
+                Ok(canon)
+            }
+        }
+    };
+}
+pub(crate) use __impl_decoder_where_value_decoder;
+
 macro_rules! encoder_where_value_encoder {
     (
         $encoding:ty
@@ -2413,69 +2499,20 @@ macro_rules! encoder_where_value_encoder {
             }
         }
 
-        /// Decodes plain values encoded as whole fields.
-        impl<T $(, $($generics)*)?> $crate::encoding::Decoder<$encoding> for T
-        where
-            T: $crate::encoding::Encoder<$encoding> + $crate::encoding::ValueDecoder<$encoding>,
-            $($($where_clause)*)?
-        {
-            #[inline(always)]
-            fn decode<B: Buf + ?Sized>(
-                wire_type: WireType,
-                duplicated: bool,
-                value: &mut T,
-                buf: Capped<B>,
-                ctx: DecodeContext,
-            ) -> Result<(), $crate::DecodeError> {
-                if duplicated {
-                    return Err(
-                        $crate::DecodeError::new($crate::DecodeErrorKind::UnexpectedlyRepeated)
-                    );
-                }
-                $crate::encoding::FieldDecoder::<$encoding>::decode_field(
-                    wire_type, value, buf, ctx)
-            }
-        }
-
-        /// Canonical encoding for plain values forbids encoding empty values. This includes
-        /// directly-nested message types, which are not emitted when all their fields are default.
-        /// If an empty value is decoded it is considered fully non-canonical.
-        impl<T $(, $($generics)*)?> $crate::encoding::DistinguishedDecoder<$encoding> for T
-        where
-            T: Eq
-                + $crate::encoding::EmptyState
-                + $crate::encoding::Encoder<$encoding>
-                + $crate::encoding::DistinguishedValueDecoder<$encoding>,
-            $($($where_clause)*)?
-        {
-            #[inline(always)]
-            fn decode_distinguished<B: Buf + ?Sized>(
-                wire_type: $crate::encoding::WireType,
-                duplicated: bool,
-                value: &mut T,
-                buf: $crate::encoding::Capped<B>,
-                ctx: $crate::encoding::RestrictedDecodeContext,
-            ) -> Result<$crate::Canonicity, $crate::DecodeError> {
-                if duplicated {
-                    return Err(
-                        $crate::DecodeError::new(crate::DecodeErrorKind::UnexpectedlyRepeated)
-                    );
-                }
-                // decoding a value as a whole message field, empty values are unacceptable
-                let mut canon = $crate::encoding::DistinguishedFieldDecoder::<$encoding>
-                    ::decode_field_distinguished::<false>(
-                        wire_type,
-                        value,
-                        buf,
-                        ctx.clone(),
-                    )?;
-                if !T::CHECKS_EMPTY && value.is_empty() {
-                    ctx.update(&mut canon, crate::Canonicity::NotCanonical)?;
-                }
-                Ok(canon)
-            }
-        }
-        // TODO(widders): borrowed
+        $crate::encoding::decoding_modes::invoke!(
+            $crate::encoding::__impl_decoder_where_value_decoder,
+            owned,
+            encoding: $encoding,
+            $(with where clause ($($where_clause)*),)?
+            $(with generics ($($generics)*),)?
+        );
+        $crate::encoding::decoding_modes::invoke!(
+            $crate::encoding::__impl_decoder_where_value_decoder,
+            borrowed,
+            encoding: $encoding,
+            $(with where clause ($($where_clause)*),)?
+            $(with generics ($($generics)*),)?
+        );
     };
 }
 pub(crate) use encoder_where_value_encoder;

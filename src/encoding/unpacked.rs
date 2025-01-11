@@ -11,7 +11,7 @@ use crate::encoding::{
 };
 use crate::DecodeErrorKind::{InvalidValue, UnexpectedlyRepeated};
 use crate::{Canonicity, DecodeError};
-use bytes::{Buf, BufMut};
+use bytes::BufMut;
 
 pub struct Unpacked<E = General>(E);
 
@@ -20,8 +20,10 @@ macro_rules! define_decoders {
         mode: $mode:ident,
         relaxed: $relaxed:ident::$relaxed_method:ident,
         relaxed_value: $relaxed_value:ident::$relaxed_value_method:ident,
+        relaxed_field: $relaxed_field:ident::$relaxed_field_method:ident,
         distinguished: $distinguished:ident::$distinguished_method:ident,
         distinguished_value: $distinguished_value:ident::$distinguished_value_method:ident,
+        distinguished_field: $distinguished_field:ident::$distinguished_field_method:ident,
         buf_ty: $buf_ty:ty,
         impl_buf_ty: $impl_buf_ty:ty,
         $(buf_generic: ($($buf_generic:tt)*),)?
@@ -362,8 +364,10 @@ macro_rules! impl_decoders {
         mode: $mode:ident,
         relaxed: $relaxed:ident::$relaxed_method:ident,
         relaxed_value: $relaxed_value:ident::$relaxed_value_method:ident,
+        relaxed_field: $relaxed_field:ident::$relaxed_field_method:ident,
         distinguished: $distinguished:ident::$distinguished_method:ident,
         distinguished_value: $distinguished_value:ident::$distinguished_value_method:ident,
+        distinguished_field: $distinguished_field:ident::$distinguished_field_method:ident,
         buf_ty: $buf_ty:ty,
         impl_buf_ty: $impl_buf_ty:ty,
         $(buf_generic: ($($buf_generic:tt)*),)?
