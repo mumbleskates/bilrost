@@ -1,5 +1,3 @@
-use bytes::{Buf, BufMut};
-
 use crate::buf::ReverseBuf;
 use crate::encoding::value_traits::{DistinguishedMapping, Mapping};
 use crate::encoding::{
@@ -9,6 +7,7 @@ use crate::encoding::{
     ValueDecoder, ValueEncoder, WireType, Wiretyped,
 };
 use crate::DecodeErrorKind::Truncated;
+use bytes::{Buf, BufMut};
 
 pub struct Map<KE, VE>(KE, VE);
 

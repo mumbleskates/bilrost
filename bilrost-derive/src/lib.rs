@@ -11,6 +11,14 @@
 
 extern crate alloc;
 
+use crate::attrs::{tag_list_attr, TagList};
+use crate::field::{
+    bilrost_attrs, set_option,
+    DecodeLifetime::{self, Borrowed, Owned},
+    DecodeMode::{self, Distinguished, Relaxed},
+    Field,
+    WhereFor::{self, Decode, Encode},
+};
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::format;
 use alloc::string::ToString;
@@ -19,7 +27,6 @@ use alloc::vec::Vec;
 use core::iter::repeat;
 use core::mem::take;
 use core::ops::{Deref, RangeInclusive};
-
 use eyre::{bail, eyre as err, Error};
 use itertools::Itertools;
 use proc_macro2::{Span, TokenStream};
@@ -28,15 +35,6 @@ use syn::{
     parse2, Attribute, Data, DataEnum, DataStruct, DeriveInput, Expr, Fields, FieldsNamed,
     FieldsUnnamed, Generics, Ident, Index, Meta, MetaList, MetaNameValue, Pat, TypeGenerics,
     Variant, WhereClause,
-};
-
-use crate::attrs::{tag_list_attr, TagList};
-use crate::field::{
-    bilrost_attrs, set_option,
-    DecodeLifetime::{self, Borrowed, Owned},
-    DecodeMode::{self, Distinguished, Relaxed},
-    Field,
-    WhereFor::{self, Decode, Encode},
 };
 
 mod attrs;

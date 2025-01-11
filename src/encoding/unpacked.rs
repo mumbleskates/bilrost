@@ -1,5 +1,3 @@
-use bytes::{Buf, BufMut};
-
 use crate::buf::ReverseBuf;
 use crate::encoding::value_traits::{
     Collection, DistinguishedCollection, EmptyState, ForOverwrite,
@@ -13,6 +11,7 @@ use crate::encoding::{
 };
 use crate::DecodeErrorKind::{InvalidValue, UnexpectedlyRepeated};
 use crate::{Canonicity, DecodeError};
+use bytes::{Buf, BufMut};
 
 pub struct Unpacked<E = General>(E);
 
