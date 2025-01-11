@@ -2278,7 +2278,22 @@ macro_rules! delegate_value_encoding {
                 $crate::encoding::ValueDecoder::<$to_ty>::decode_value(value, buf, ctx)
             }
         }
-        // TODO(widders): borrowed
+
+        impl<'__a $(, $($value_generics)*)?>
+        $crate::encoding::ValueBorrowDecoder<'__a, $from_ty> for $value_ty
+        where
+            Self: $crate::encoding::ValueBorrowDecoder<'__a, $to_ty>,
+            $($($where_clause)+ ,)?
+        {
+            #[inline(always)]
+            fn borrow_decode_value(
+                value: &mut $value_ty,
+                buf: $crate::encoding::Capped<&'__a [u8]>,
+                ctx: $crate::encoding::DecodeContext,
+            ) -> Result<(), $crate::DecodeError> {
+                $crate::encoding::ValueBorrowDecoder::<$to_ty>::borrow_decode_value(value, buf, ctx)
+            }
+        }
     };
 
     (
@@ -2318,7 +2333,33 @@ macro_rules! delegate_value_encoding {
                 )
             }
         }
-        // TODO(widders): borrowed
+
+        impl<'__a $(, $($value_generics)*)?>
+        $crate::encoding::DistinguishedValueBorrowDecoder<'__a, $from_ty> for $value_ty
+        where
+            Self: $crate::encoding::DistinguishedValueBorrowDecoder<'__a, $to_ty>,
+            $($($relaxed_where)+ ,)?
+            $($($distinguished_where)+ ,)?
+        {
+            const CHECKS_EMPTY: bool = <
+                $value_ty as $crate::encoding::DistinguishedValueBorrowDecoder<'__a, $to_ty>
+            >::CHECKS_EMPTY;
+
+            #[inline(always)]
+            fn borrow_decode_value_distinguished<const ALLOW_EMPTY: bool>(
+                value: &mut $value_ty,
+                buf: $crate::encoding::Capped<&'__a [u8]>,
+                ctx: $crate::encoding::RestrictedDecodeContext,
+            ) -> Result<$crate::Canonicity, $crate::DecodeError> {
+                $crate::encoding::DistinguishedValueBorrowDecoder::<$to_ty>::
+                    borrow_decode_value_distinguished::<ALLOW_EMPTY>
+                (
+                    value,
+                    buf,
+                    ctx,
+                )
+            }
+        }
     };
 }
 pub(crate) use delegate_value_encoding;
