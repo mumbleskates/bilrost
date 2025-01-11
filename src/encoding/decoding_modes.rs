@@ -42,9 +42,9 @@ macro_rules! invoke {
             distinguished: DistinguishedDecoder::decode_distinguished,
             distinguished_value: DistinguishedValueDecoder::decode_value_distinguished,
             distinguished_field: DistinguishedFieldDecoder::decode_field_distinguished,
-            buf_ty: B,
+            buf_ty: __B,
             impl_buf_ty: impl bytes::Buf + ?Sized,
-            buf_generic: (<B: bytes::Buf + ?Sized>),
+            buf_generic: (<__B: bytes::Buf + ?Sized>),
             $($($more_args)*)?
         );
     };
@@ -57,9 +57,9 @@ macro_rules! invoke {
             distinguished: DistinguishedBorrowDecoder::borrow_decode_distinguished,
             distinguished_value: DistinguishedValueBorrowDecoder::borrow_decode_value_distinguished,
             distinguished_field: DistinguishedFieldBorrowDecoder::borrow_decode_field_distinguished,
-            buf_ty: &'a [u8],
-            impl_buf_ty: &'a [u8],
-            lifetime: 'a,
+            buf_ty: &'__a [u8],
+            impl_buf_ty: &'__a [u8],
+            lifetime: '__a,
             $($($more_args)*)?
         );
     };
