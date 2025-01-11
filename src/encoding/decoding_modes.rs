@@ -1,3 +1,6 @@
+//! These common macros allow deduplication of the code that defines common decoding for different
+//! decoding modes.
+//!
 //! Arguments to use for `other_macro!`:
 /*!
 ```rust
