@@ -93,6 +93,7 @@ use core::default::Default;
 use core::fmt::Debug;
 use core::ops::{Deref, DerefMut};
 
+pub(crate) mod decoding_modes;
 mod fixed;
 mod general;
 mod local_proxy;

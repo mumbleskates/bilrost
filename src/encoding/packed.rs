@@ -5,11 +5,11 @@ use crate::encoding::value_traits::{
     Collection, DistinguishedCollection, EmptyState, ForOverwrite,
 };
 use crate::encoding::{
-    encode_varint, encoded_len_varint, prepend_varint, unpacked, BorrowDecoder, Canonicity, Capped,
-    DecodeContext, DecodeError, Decoder, DistinguishedBorrowDecoder, DistinguishedDecoder,
-    DistinguishedValueBorrowDecoder, DistinguishedValueDecoder, Encoder, FieldEncoder, General,
-    RestrictedDecodeContext, TagMeasurer, TagRevWriter, TagWriter, ValueBorrowDecoder,
-    ValueDecoder, ValueEncoder, WireType, Wiretyped,
+    decoding_modes, encode_varint, encoded_len_varint, prepend_varint, unpacked, BorrowDecoder,
+    Canonicity, Capped, DecodeContext, DecodeError, Decoder, DistinguishedBorrowDecoder,
+    DistinguishedDecoder, DistinguishedValueBorrowDecoder, DistinguishedValueDecoder, Encoder,
+    FieldEncoder, General, RestrictedDecodeContext, TagMeasurer, TagRevWriter, TagWriter,
+    ValueBorrowDecoder, ValueDecoder, ValueEncoder, WireType, Wiretyped,
 };
 use crate::DecodeErrorKind::{InvalidValue, Truncated, UnexpectedlyRepeated};
 
@@ -157,23 +157,25 @@ where
 
 macro_rules! impl_decoders {
     (
-        relaxed: $relaxed_trait:ident::$relaxed_method:ident,
-        relaxed_value: $relaxed_value_trait:ident::$relaxed_value_method:ident,
-        distinguished: $distinguished_trait:ident::$distinguished_method:ident,
-        distinguished_value: $distinguished_value_trait:ident::$distinguished_value_method:ident,
-        unpacked_mode: $unpacked_mode:ident,
-        $(buf_bound: $buf_ty:ident => ($($buf_bound:tt)*),)?
+        mode: $mode:ident,
+        relaxed: $relaxed:ident::$relaxed_method:ident,
+        relaxed_value: $relaxed_value:ident::$relaxed_value_method:ident,
+        distinguished: $distinguished:ident::$distinguished_method:ident,
+        distinguished_value: $distinguished_value:ident::$distinguished_value_method:ident,
+        buf_ty: $buf_ty:ty,
+        impl_buf_ty: $impl_buf_ty:ty,
+        $(buf_generic: ($($buf_generic:tt)*),)?
         $(lifetime: $lifetime:lifetime,)?
     ) => {
-        impl<$($lifetime,)? C, T, E> $relaxed_value_trait<$($lifetime,)? Packed<E>> for C
+        impl<$($lifetime,)? C, T, E> $relaxed_value <$($lifetime,)? Packed<E>> for C
         where
             C: Collection<Item = T>,
-            T: ForOverwrite + $relaxed_value_trait<$($lifetime,)? E>,
+            T: ForOverwrite + $relaxed_value<$($lifetime,)? E>,
         {
             #[inline]
-            fn $relaxed_value_method $(<$buf_ty: $($buf_bound)*>)? (
+            fn $relaxed_value_method $($($buf_generic)*)? (
                 value: &mut C,
-                mut buf: Capped<$($buf_ty)? $(&$lifetime [u8])?>,
+                mut buf: Capped<$buf_ty>,
                 ctx: DecodeContext,
             ) -> Result<(), DecodeError> {
                 let mut capped = buf.take_length_delimited()?;
@@ -187,24 +189,28 @@ macro_rules! impl_decoders {
                 }
                 while capped.has_remaining()? {
                     let mut new_val = T::for_overwrite();
-                    $relaxed_value_trait::<E>::$relaxed_value_method(&mut new_val, capped.lend(), ctx.clone())?;
+                    $relaxed_value::<E>::$relaxed_value_method(
+                        &mut new_val,
+                        capped.lend(),
+                        ctx.clone(),
+                    )?;
                     value.insert(new_val)?;
                 }
                 Ok(())
             }
         }
 
-        impl<$($lifetime,)? C, T, E> $distinguished_value_trait<$($lifetime,)? Packed<E>> for C
+        impl<$($lifetime,)? C, T, E> $distinguished_value<$($lifetime,)? Packed<E>> for C
         where
             C: DistinguishedCollection<Item = T> + Eq,
-            T: ForOverwrite + Eq + $distinguished_value_trait<$($lifetime,)? E>,
+            T: ForOverwrite + Eq + $distinguished_value<$($lifetime,)? E>,
         {
             const CHECKS_EMPTY: bool = false;
 
             #[inline]
             fn $distinguished_value_method <const ALLOW_EMPTY: bool>(
                 value: &mut C,
-                mut buf: Capped<$(impl $($buf_bound)*)? $(&$lifetime [u8])?>,
+                mut buf: Capped<$impl_buf_ty>,
                 ctx: RestrictedDecodeContext,
             ) -> Result<Canonicity, DecodeError> {
                 let mut capped = buf.take_length_delimited()?;
@@ -220,7 +226,7 @@ macro_rules! impl_decoders {
                 while capped.has_remaining()? {
                     let mut new_val = T::for_overwrite();
                     canon.update(
-                        $distinguished_value_trait::<E>::$distinguished_value_method::<true>(
+                        $distinguished_value::<E>::$distinguished_value_method::<true>(
                             &mut new_val,
                             capped.lend(),
                             ctx.clone(),
@@ -232,44 +238,45 @@ macro_rules! impl_decoders {
             }
         }
 
-        impl<$($lifetime,)? C, T, E> $relaxed_trait <$($lifetime,)? Packed<E>> for C
+        impl<$($lifetime,)? C, T, E> $relaxed <$($lifetime,)? Packed<E>> for C
         where
-            C: Collection<Item = T> + $relaxed_value_trait <$($lifetime,)? Packed<E>>,
-            T: ForOverwrite + $relaxed_value_trait <$($lifetime,)? E>,
+            C: Collection<Item = T> + $relaxed_value <$($lifetime,)? Packed<E>>,
+            T: ForOverwrite + $relaxed_value <$($lifetime,)? E>,
         {
             #[inline]
-            fn $relaxed_method $(<$buf_ty: $($buf_bound)*>)? (
+            fn $relaxed_method $($($buf_generic)*)? (
                 wire_type: WireType,
                 duplicated: bool,
                 value: &mut C,
-                buf: Capped<$($buf_ty)? $(&$lifetime [u8])?>,
+                buf: Capped<$buf_ty>,
                 ctx: DecodeContext,
             ) -> Result<(), DecodeError> {
                 if duplicated {
                     return Err(DecodeError::new(UnexpectedlyRepeated));
                 }
                 if wire_type == WireType::LengthDelimited {
-                    // We've encountered the expected length-delimited type: decode it in packed format.
+                    // We've encountered the expected length-delimited type: decode it in packed
+                    // format.
                     Self::$relaxed_value_method(value, buf, ctx)
                 } else {
                     // Otherwise, try decoding it in the unpacked representation
-                    unpacked::$unpacked_mode::decode::<C, E>(wire_type, value, buf, ctx)
+                    unpacked::$mode::decode::<C, E>(wire_type, value, buf, ctx)
                 }
             }
         }
 
-        impl<$($lifetime,)? C, T, E> $distinguished_trait <$($lifetime,)? Packed<E>> for C
+        impl<$($lifetime,)? C, T, E> $distinguished <$($lifetime,)? Packed<E>> for C
         where
             C: DistinguishedCollection<Item = T>
-                + $distinguished_value_trait <$($lifetime,)? Packed<E>>,
-            T: ForOverwrite + Eq + $relaxed_value_trait <$($lifetime,)? E>,
+                + $distinguished_value <$($lifetime,)? Packed<E>>,
+            T: ForOverwrite + Eq + $relaxed_value <$($lifetime,)? E>,
         {
             #[inline]
-            fn $distinguished_method $(<$buf_ty: $($buf_bound)*>)? (
+            fn $distinguished_method $($($buf_generic)*)? (
                 wire_type: WireType,
                 duplicated: bool,
                 value: &mut C,
-                buf: Capped<$($buf_ty)? $(&$lifetime [u8])?>,
+                buf: Capped<$buf_ty>,
                 ctx: RestrictedDecodeContext,
             ) -> Result<Canonicity, DecodeError> {
                 if duplicated {
@@ -278,7 +285,7 @@ macro_rules! impl_decoders {
                 if wire_type == WireType::LengthDelimited {
                     // We've encountered the expected length-delimited type: decode it in packed
                     // format. Set ALLOW_EMPTY to false: empty collections are not canonical
-                    let canon = $distinguished_value_trait::<Packed<E>>::
+                    let canon = $distinguished_value::<Packed<E>>::
                         $distinguished_value_method::<false>
                     (
                         value,
@@ -293,7 +300,7 @@ macro_rules! impl_decoders {
                 } else {
                     // Otherwise, try decoding it in the unpacked representation
                     _ = ctx.check(Canonicity::NotCanonical)?;
-                    unpacked::$unpacked_mode::decode::<C, E>(
+                    unpacked::$mode::decode::<C, E>(
                         wire_type,
                         value,
                         buf,
@@ -305,14 +312,14 @@ macro_rules! impl_decoders {
         }
 
         impl<$($lifetime,)? T, const N: usize, E>
-        $relaxed_value_trait <$($lifetime,)? Packed<E>> for [T; N]
+        $relaxed_value <$($lifetime,)? Packed<E>> for [T; N]
         where
-            T: $relaxed_value_trait <$($lifetime,)? E>,
+            T: $relaxed_value <$($lifetime,)? E>,
         {
             #[inline]
-            fn $relaxed_value_method $(<$buf_ty: $($buf_bound)*>)? (
+            fn $relaxed_value_method $($($buf_generic)*)? (
                 value: &mut [T; N],
-                mut buf: Capped<$($buf_ty)? $(&$lifetime [u8])?>,
+                mut buf: Capped<$buf_ty>,
                 ctx: DecodeContext,
             ) -> Result<(), DecodeError> {
                 let mut capped = buf.take_length_delimited()?;
@@ -327,15 +334,19 @@ macro_rules! impl_decoders {
 
                 for dest in value {
                     // If the value's size was already checked, we don't need to check again
-                    if <T as Wiretyped<E>>::WIRE_TYPE.fixed_size().is_none() && !capped.has_remaining()? {
+                    if <T as Wiretyped<E>>::WIRE_TYPE.fixed_size().is_none()
+                        && !capped.has_remaining()?
+                    {
                         // Not enough values
                         return Err(DecodeError::new(InvalidValue));
                     }
-                    $relaxed_value_trait::<E>::$relaxed_value_method(dest, capped.lend(), ctx.clone())?;
+                    $relaxed_value::<E>::$relaxed_value_method(dest, capped.lend(), ctx.clone())?;
                 }
 
                 // If the value's size was already checked, we don't need to check again
-                if <T as Wiretyped<E>>::WIRE_TYPE.fixed_size().is_none() && capped.has_remaining()? {
+                if <T as Wiretyped<E>>::WIRE_TYPE.fixed_size().is_none()
+                    && capped.has_remaining()?
+                {
                     // Too many values or trailing data
                     Err(DecodeError::new(InvalidValue))
                 } else {
@@ -345,16 +356,16 @@ macro_rules! impl_decoders {
         }
 
         impl<$($lifetime,)? T, const N: usize, E>
-        $distinguished_value_trait <$($lifetime,)? Packed<E>> for [T; N]
+        $distinguished_value <$($lifetime,)? Packed<E>> for [T; N]
         where
-            T: $distinguished_value_trait <$($lifetime,)? E>,
+            T: $distinguished_value <$($lifetime,)? E>,
         {
             const CHECKS_EMPTY: bool = false;
 
             #[inline]
             fn $distinguished_value_method <const ALLOW_EMPTY: bool>(
                 value: &mut [T; N],
-                mut buf: Capped<$(impl $($buf_bound)*)? $(&$lifetime [u8])?>,
+                mut buf: Capped<$impl_buf_ty>,
                 ctx: RestrictedDecodeContext,
             ) -> Result<Canonicity, DecodeError> {
                 let mut capped = buf.take_length_delimited()?;
@@ -370,13 +381,15 @@ macro_rules! impl_decoders {
                 let mut canon = Canonicity::Canonical;
                 for dest in value.iter_mut() {
                     // If the value's size was already checked, we don't need to check again
-                    if <T as Wiretyped<E>>::WIRE_TYPE.fixed_size().is_none() && !capped.has_remaining()? {
+                    if <T as Wiretyped<E>>::WIRE_TYPE.fixed_size().is_none()
+                        && !capped.has_remaining()?
+                    {
                         // Not enough values
                         return Err(DecodeError::new(InvalidValue));
                     }
                     canon.update(
                         // Empty values are allowed because they are nested
-                        $distinguished_value_trait::<E>::$distinguished_value_method::<true>(
+                        $distinguished_value::<E>::$distinguished_value_method::<true>(
                             dest,
                             capped.lend(),
                             ctx.clone(),
@@ -385,7 +398,9 @@ macro_rules! impl_decoders {
                 }
 
                 // If the value's size was already checked, we don't need to check again
-                if <T as Wiretyped<E>>::WIRE_TYPE.fixed_size().is_none() && capped.has_remaining()? {
+                if <T as Wiretyped<E>>::WIRE_TYPE.fixed_size().is_none()
+                    && capped.has_remaining()?
+                {
                     // Too many values or trailing data
                     Err(DecodeError::new(InvalidValue))
                 } else {
@@ -395,27 +410,28 @@ macro_rules! impl_decoders {
         }
 
         impl<$($lifetime,)? T, const N: usize, E>
-        $relaxed_trait <$($lifetime,)? Packed<E>> for [T; N]
+        $relaxed <$($lifetime,)? Packed<E>> for [T; N]
         where
-            T: EmptyState + $relaxed_value_trait <$($lifetime,)? E>,
+            T: EmptyState + $relaxed_value <$($lifetime,)? E>,
         {
             #[inline]
-            fn $relaxed_method $(<$buf_ty: $($buf_bound)*>)? (
+            fn $relaxed_method $($($buf_generic)*)? (
                 wire_type: WireType,
                 duplicated: bool,
                 value: &mut [T; N],
-                buf: Capped<$($buf_ty)? $(&$lifetime [u8])?>,
+                buf: Capped<$buf_ty>,
                 ctx: DecodeContext,
             ) -> Result<(), DecodeError> {
                 if duplicated {
                     return Err(DecodeError::new(UnexpectedlyRepeated));
                 }
                 if wire_type == WireType::LengthDelimited {
-                    // We've encountered the expected length-delimited type: decode it in packed format.
+                    // We've encountered the expected length-delimited type: decode it in packed
+                    // format.
                     Self::$relaxed_value_method(value, buf, ctx)
                 } else {
                     // Otherwise, try decoding it in the unpacked representation
-                    unpacked::$unpacked_mode::decode_array_unpacked_only::<T, N, E>(
+                    unpacked::$mode::decode_array_unpacked_only::<T, N, E>(
                         wire_type,
                         value,
                         buf,
@@ -426,28 +442,29 @@ macro_rules! impl_decoders {
         }
 
         impl<$($lifetime,)? T, const N: usize, E>
-        $distinguished_trait <$($lifetime,)? Packed<E>> for [T; N]
+        $distinguished <$($lifetime,)? Packed<E>> for [T; N]
         where
             T: Eq
                 + EmptyState
-                + $distinguished_value_trait <$($lifetime,)? E>
-                + $relaxed_value_trait <$($lifetime,)? E>,
+                + $distinguished_value <$($lifetime,)? E>
+                + $relaxed_value <$($lifetime,)? E>,
         {
             #[inline]
-            fn $distinguished_method $(<$buf_ty: $($buf_bound)*>)? (
+            fn $distinguished_method $($($buf_generic)*)? (
                 wire_type: WireType,
                 duplicated: bool,
                 value: &mut [T; N],
-                buf: Capped<$($buf_ty)? $(&$lifetime [u8])?>,
+                buf: Capped<$buf_ty>,
                 ctx: RestrictedDecodeContext,
             ) -> Result<Canonicity, DecodeError> {
                 if duplicated {
                     return Err(DecodeError::new(UnexpectedlyRepeated));
                 }
                 if wire_type == WireType::LengthDelimited {
-                    // We've encountered the expected length-delimited type: decode it in packed format.
+                    // We've encountered the expected length-delimited type: decode it in packed
+                    // format.
                     // Set ALLOW_EMPTY to false: empty collections are not canonical
-                    let canon = $distinguished_value_trait::<Packed<E>>::
+                    let canon = $distinguished_value::<Packed<E>>::
                         $distinguished_value_method::<false>
                     (
                         value,
@@ -465,7 +482,7 @@ macro_rules! impl_decoders {
                 } else {
                     // Otherwise, try decoding it in the unpacked representation
                     _ = ctx.check(Canonicity::NotCanonical)?;
-                    unpacked::$unpacked_mode::decode_array_unpacked_only::<T, N, E>(
+                    unpacked::$mode::decode_array_unpacked_only::<T, N, E>(
                         wire_type,
                         value,
                         buf,
@@ -478,20 +495,5 @@ macro_rules! impl_decoders {
     };
 }
 
-impl_decoders!(
-    relaxed: Decoder::decode,
-    relaxed_value: ValueDecoder::decode_value,
-    distinguished: DistinguishedDecoder::decode_distinguished,
-    distinguished_value: DistinguishedValueDecoder::decode_value_distinguished,
-    unpacked_mode: owned,
-    buf_bound: B => (Buf + ?Sized),
-);
-
-impl_decoders!(
-    relaxed: BorrowDecoder::borrow_decode,
-    relaxed_value: ValueBorrowDecoder::borrow_decode_value,
-    distinguished: DistinguishedBorrowDecoder::borrow_decode_distinguished,
-    distinguished_value: DistinguishedValueBorrowDecoder::borrow_decode_value_distinguished,
-    unpacked_mode: borrowed,
-    lifetime: 'a,
-);
+decoding_modes::invoke!(impl_decoders, owned);
+decoding_modes::invoke!(impl_decoders, borrowed);
