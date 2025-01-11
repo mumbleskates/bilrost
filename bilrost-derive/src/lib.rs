@@ -1140,6 +1140,7 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
 
     let generics = &input.generics;
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+    let borrow_generics = append_generic(generics, quote!('__a));
 
     let punctuated_variants = match input.data {
         Data::Enum(DataEnum { variants, .. }) => variants,
@@ -1341,8 +1342,42 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
             }
         }
 
-        impl #impl_generics ::bilrost::encoding::AlwaysOwned
-        for #ident #ty_generics #where_clause {}
+        impl #borrow_generics
+        ::bilrost::encoding::ValueBorrowDecoder<'__a, ::bilrost::encoding::General>
+        for #ident #ty_generics #where_clause {
+            #[inline(always)]
+            fn borrow_decode_value(
+                value: &mut Self,
+                mut buf: ::bilrost::encoding::Capped<&'__a [u8]>,
+                ctx: ::bilrost::encoding::DecodeContext,
+            ) -> Result<(), ::bilrost::DecodeError> {
+                ::bilrost::encoding::ValueDecoder::<::bilrost::encoding::General>::decode_value(
+                    value,
+                    buf,
+                    ctx,
+                )
+            }
+        }
+
+        impl #borrow_generics
+        ::bilrost::encoding::DistinguishedValueBorrowDecoder<'__a, ::bilrost::encoding::General>
+        for #ident #ty_generics #where_clause {
+            const CHECKS_EMPTY: bool = false;
+
+            #[inline(always)]
+            fn borrow_decode_value_distinguished<const ALLOW_EMPTY: bool>(
+                value: &mut Self,
+                buf: ::bilrost::encoding::Capped<&'__a [u8]>,
+                ctx: ::bilrost::encoding::RestrictedDecodeContext,
+            ) -> Result<::bilrost::Canonicity, ::bilrost::DecodeError> {
+                ::bilrost::encoding::ValueDecoder::<::bilrost::encoding::General>::decode_value(
+                    value,
+                    buf,
+                    ctx.into_inner(),
+                )?;
+                ::core::result::Result::Ok(::bilrost::Canonicity::Canonical)
+            }
+        }
     };
 
     Ok(expanded)

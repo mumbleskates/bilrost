@@ -4,7 +4,7 @@ use bytes::{Buf, BufMut};
 
 use crate::buf::ReverseBuf;
 use crate::encoding::{
-    delegate_encoding, encoding_implemented_via_value_encoding, AlwaysOwnedDelegatingEncoder,
+    delegate_encoding, delegate_value_encoding, encoding_implemented_via_value_encoding,
     Canonicity, Capped, DecodeContext, DistinguishedValueDecoder, RestrictedDecodeContext,
     ValueDecoder, ValueEncoder, WireType, Wiretyped,
 };
@@ -14,8 +14,6 @@ use crate::DecodeErrorKind::Truncated;
 pub struct Fixed;
 
 encoding_implemented_via_value_encoding!(Fixed);
-
-impl AlwaysOwnedDelegatingEncoder for Fixed {}
 
 delegate_encoding!(delegate from (Fixed) to (crate::encoding::Unpacked<Fixed>) for type (Vec<T>)
     including distinguished with generics (T));
@@ -77,6 +75,9 @@ macro_rules! fixed_width_int {
         $get:ident
     ) => {
         fixed_width_common!($ty, $wire_type, $put, $prepend, $get);
+        delegate_value_encoding!(
+            encoding (Fixed) borrows type ($ty) as owned including distinguished
+        );
 
         impl DistinguishedValueDecoder<Fixed> for $ty {
             const CHECKS_EMPTY: bool = false;
@@ -117,6 +118,7 @@ macro_rules! fixed_width_float {
         $get:ident
     ) => {
         fixed_width_common!($ty, $wire_type, $put, $prepend, $get);
+        delegate_value_encoding!(encoding (Fixed) borrows type ($ty) as owned);
 
         #[cfg(test)]
         mod $test_name {
@@ -138,6 +140,10 @@ macro_rules! fixed_width_float {
 
 macro_rules! fixed_width_array {
     ($test_name:ident, $N:literal, $wire_type:ident) => {
+        delegate_value_encoding!(
+            encoding (Fixed) borrows type ([u8; $N]) as owned including distinguished
+        );
+
         impl Wiretyped<Fixed> for [u8; $N] {
             const WIRE_TYPE: WireType = WireType::$wire_type;
         }

@@ -1517,15 +1517,6 @@ mod with_canonicity {
     }
 }
 
-/// Marker trait indicating that a type always decodes to its owned form. When implemented, borrowed
-/// decoding will delegate to the owned implementation for the ValueDecoder traits for marked
-/// encodings.
-pub trait AlwaysOwned {}
-
-/// Marker trait indicating that an encoder always delegate encoding for values marked with
-/// AlwaysOwned.
-pub trait AlwaysOwnedDelegatingEncoder {}
-
 // TODO(widders): macro to delegate borrowed decoding for indicated type and encoding
 
 /// The core trait for encoding bilrost data.
@@ -1686,38 +1677,6 @@ pub trait DistinguishedValueBorrowDecoder<'a, E>: ValueEncoder<E> + Eq {
         buf: Capped<&'a [u8]>,
         ctx: RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError>;
-}
-
-impl<'a, E, T> ValueBorrowDecoder<'a, E> for T
-where
-    T: AlwaysOwned + ValueDecoder<E>,
-    E: AlwaysOwnedDelegatingEncoder,
-{
-    #[inline]
-    fn borrow_decode_value(
-        value: &mut Self,
-        buf: Capped<&'a [u8]>,
-        ctx: DecodeContext,
-    ) -> Result<(), DecodeError> {
-        ValueDecoder::<E>::decode_value(value, buf, ctx)
-    }
-}
-
-impl<'a, E, T> DistinguishedValueBorrowDecoder<'a, E> for T
-where
-    T: AlwaysOwned + DistinguishedValueDecoder<E>,
-    E: AlwaysOwnedDelegatingEncoder,
-{
-    const CHECKS_EMPTY: bool = T::CHECKS_EMPTY;
-
-    #[inline]
-    fn borrow_decode_value_distinguished<const ALLOW_EMPTY: bool>(
-        value: &mut Self,
-        buf: Capped<&'a [u8]>,
-        ctx: RestrictedDecodeContext,
-    ) -> Result<Canonicity, DecodeError> {
-        DistinguishedValueDecoder::<E>::decode_value_distinguished::<ALLOW_EMPTY>(value, buf, ctx)
-    }
 }
 
 /// Affiliated helper trait for ValueEncoder that provides obligate implementations for handling
@@ -2363,7 +2322,65 @@ macro_rules! delegate_value_encoding {
             }
         }
     };
+
+    (
+        encoding ($encoding:ty) borrows type ($ty:ty) as owned
+        $(with where clause ($($where_clause:tt)+))?
+        $(with generics ($($impl_generics:tt)*))?
+    ) => {
+        impl<'__a, $($($impl_generics)*)?>
+        $crate::encoding::ValueBorrowDecoder<'__a, $encoding> for $ty
+        where
+            $ty: $crate::encoding::ValueDecoder<$encoding>,
+        {
+            #[inline]
+            fn borrow_decode_value(
+                value: &mut Self,
+                buf: $crate::encoding::Capped<&'__a [u8]>,
+                ctx: $crate::encoding::DecodeContext,
+            ) -> Result<(), $crate::DecodeError> {
+                $crate::encoding::ValueDecoder::<$encoding>::decode_value(value, buf, ctx)
+            }
+        }
+    };
+
+    (
+        encoding ($encoding:ty) borrows type ($ty:ty) as owned including distinguished
+        $(with where clause ($($where_clause:tt)+))?
+        $(with generics ($($impl_generics:tt)*))?
+    ) => {
+        $crate::encoding::delegate_value_encoding!(
+            encoding ($encoding) borrows type ($ty) as owned
+            $(with where clause ($($where_clause)*))?
+            $(with generics ($($impl_generics)*))?
+        );
+
+        impl<'__a, $($($impl_generics)*)?>
+        $crate::encoding::DistinguishedValueBorrowDecoder<'__a, $encoding> for $ty
+        where
+            $ty: $crate::encoding::DistinguishedValueDecoder<$encoding>,
+        {
+            const CHECKS_EMPTY: bool =
+                <$ty as $crate::encoding::DistinguishedValueDecoder<$encoding>>::CHECKS_EMPTY;
+
+            #[inline]
+            fn borrow_decode_value_distinguished<const ALLOW_EMPTY: bool>(
+                value: &mut Self,
+                buf: $crate::encoding::Capped<&'__a [u8]>,
+                ctx: $crate::encoding::RestrictedDecodeContext,
+            ) -> Result<$crate::Canonicity, $crate::DecodeError> {
+                $crate::encoding::DistinguishedValueDecoder::<$encoding>::
+                    decode_value_distinguished::<ALLOW_EMPTY>
+                (
+                    value,
+                    buf,
+                    ctx,
+                )
+            }
+        }
+    };
 }
+// TODO(widders): this could be made public
 pub(crate) use delegate_value_encoding;
 
 /// Most kinds of encodings want to act as field decoders for bare values in any situation where

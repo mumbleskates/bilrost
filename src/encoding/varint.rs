@@ -1,9 +1,8 @@
 use crate::buf::ReverseBuf;
 use crate::encoding::{
     encode_varint, encoded_len_varint, encoding_implemented_via_value_encoding, prepend_varint,
-    AlwaysOwned, AlwaysOwnedDelegatingEncoder, Buf, BufMut, Canonicity, Capped, DecodeContext,
-    DistinguishedValueDecoder, RestrictedDecodeContext, ValueDecoder, ValueEncoder, WireType,
-    Wiretyped,
+    Buf, BufMut, Canonicity, Capped, DecodeContext, DistinguishedValueDecoder,
+    RestrictedDecodeContext, ValueDecoder, ValueEncoder, WireType, Wiretyped,
 };
 use crate::DecodeError;
 use crate::DecodeErrorKind::OutOfDomainValue;
@@ -11,8 +10,6 @@ use crate::DecodeErrorKind::OutOfDomainValue;
 pub struct Varint;
 
 encoding_implemented_via_value_encoding!(Varint);
-
-impl AlwaysOwnedDelegatingEncoder for Varint {}
 
 /// Zig-zag encoding: These functions implement storing signed in unsigned integers by encoding the
 /// sign bit in the least significant bit.
@@ -112,7 +109,9 @@ macro_rules! varint {
             }
         }
 
-        impl AlwaysOwned for $ty {}
+        crate::encoding::delegate_value_encoding!(
+            encoding (Varint) borrows type ($ty) as owned including distinguished
+        );
 
         #[cfg(test)]
         mod $name {

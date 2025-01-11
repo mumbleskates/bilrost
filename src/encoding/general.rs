@@ -150,6 +150,8 @@ impl DistinguishedValueDecoder<General> for String {
     }
 }
 
+delegate_value_encoding!(encoding (General) borrows type (String) as owned including distinguished);
+
 #[cfg(test)]
 mod string {
     use super::{General, String};
@@ -208,6 +210,8 @@ impl DistinguishedValueDecoder<General> for Cow<'_, str> {
         )
     }
 }
+
+// TODO(widders): borrow cow
 
 #[cfg(test)]
 mod cow_string {
@@ -268,6 +272,8 @@ impl DistinguishedValueDecoder<General> for Bytes {
     }
 }
 
+delegate_value_encoding!(encoding (General) borrows type (Bytes) as owned including distinguished);
+
 #[cfg(test)]
 mod bytes_blob {
     use super::{Bytes, General, Vec};
@@ -325,6 +331,8 @@ impl DistinguishedValueDecoder<General> for Blob {
         )
     }
 }
+
+delegate_value_encoding!(encoding (General) borrows type (Blob) as owned including distinguished);
 
 #[cfg(test)]
 mod blob {

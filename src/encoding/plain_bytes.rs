@@ -6,10 +6,10 @@ use crate::buf::ReverseBuf;
 use bytes::{Buf, BufMut};
 
 use crate::encoding::{
-    const_varint, delegate_encoding, encode_varint, encoded_len_varint,
-    encoding_implemented_via_value_encoding, prepend_varint, AlwaysOwnedDelegatingEncoder,
-    Canonicity, Capped, DecodeContext, DecodeError, DistinguishedValueDecoder,
-    RestrictedDecodeContext, ValueDecoder, ValueEncoder, WireType, Wiretyped,
+    const_varint, delegate_encoding, delegate_value_encoding, encode_varint, encoded_len_varint,
+    encoding_implemented_via_value_encoding, prepend_varint, Canonicity, Capped, DecodeContext,
+    DecodeError, DistinguishedValueDecoder, RestrictedDecodeContext, ValueDecoder, ValueEncoder,
+    WireType, Wiretyped,
 };
 use crate::DecodeErrorKind::InvalidValue;
 
@@ -21,8 +21,6 @@ use crate::DecodeErrorKind::InvalidValue;
 pub struct PlainBytes;
 
 encoding_implemented_via_value_encoding!(PlainBytes);
-
-impl AlwaysOwnedDelegatingEncoder for PlainBytes {}
 
 impl Wiretyped<PlainBytes> for Vec<u8> {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
@@ -73,6 +71,10 @@ impl DistinguishedValueDecoder<PlainBytes> for Vec<u8> {
         Ok(Canonicity::Canonical)
     }
 }
+
+delegate_value_encoding!(
+    encoding (PlainBytes) borrows type (Vec<u8>) as owned including distinguished
+);
 
 delegate_encoding!(delegate from (PlainBytes) to (crate::encoding::Unpacked<PlainBytes>)
     for type (Vec<Vec<u8>>) including distinguished);
@@ -142,6 +144,8 @@ impl DistinguishedValueDecoder<PlainBytes> for Cow<'_, [u8]> {
         )
     }
 }
+
+// TODO(widders): borrow cow
 
 #[cfg(test)]
 mod cow_bytes {
@@ -215,6 +219,11 @@ impl<const N: usize> DistinguishedValueDecoder<PlainBytes> for [u8; N] {
         Ok(Canonicity::Canonical)
     }
 }
+
+delegate_value_encoding!(
+    encoding (PlainBytes) borrows type ([u8; N]) as owned including distinguished
+    with generics (const N: usize)
+);
 
 #[cfg(test)]
 mod u8_array {
