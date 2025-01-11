@@ -1526,6 +1526,8 @@ pub trait AlwaysOwned {}
 /// AlwaysOwned.
 pub trait AlwaysOwnedDelegatingEncoder {}
 
+// TODO(widders): macro to delegate borrowed decoding for indicated type and encoding
+
 /// The core trait for encoding bilrost data.
 pub trait Encoder<E> {
     /// Encodes the a field with the given tag and value.
