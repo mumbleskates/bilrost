@@ -19,7 +19,7 @@ use bytes::{Buf, BufMut};
 
 use crate::buf::ReverseBuf;
 use crate::encoding::{
-    delegate_value_encoding, encode_varint, encoded_len_varint, encoder_where_value_encoder,
+    decoder_where_value_decoder, delegate_value_encoding, encode_varint, encoded_len_varint,
     prepend_varint, skip_field, Canonicity, Capped, DecodeContext, Decoder, DistinguishedDecoder,
     DistinguishedValueDecoder, EmptyState, Encoder, General, RestrictedDecodeContext, TagReader,
     TagRevWriter, TagWriter, TrivialTagMeasurer, ValueDecoder, ValueEncoder, WireType, Wiretyped,
@@ -40,7 +40,7 @@ macro_rules! impl_tuple {
     ) => {
         // All tuple types encode as nested messages, so all of them implement ValueEncoder and
         // should therefore implement Encoder in terms of that.
-        encoder_where_value_encoder!(
+        decoder_where_value_decoder!(
             ($($encodings,)*),
             with generics ($($encodings),*)
         );

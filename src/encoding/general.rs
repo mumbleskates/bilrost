@@ -4,8 +4,8 @@ use crate::encoding::message::{
     RawDistinguishedMessageDecoder, RawMessage,
 };
 use crate::encoding::{
-    delegate_encoding, delegate_value_encoding, encode_varint, encoded_len_varint,
-    encoder_where_value_encoder, prepend_varint, Canonicity, Capped, DecodeContext, DecodeError,
+    decoder_where_value_decoder, delegate_encoding, delegate_value_encoding, encode_varint,
+    encoded_len_varint, prepend_varint, Canonicity, Capped, DecodeContext, DecodeError,
     DistinguishedProxiable, DistinguishedValueBorrowDecoder, DistinguishedValueDecoder, Fixed, Map,
     Packed, PlainBytes, Proxiable, Proxied, RawDistinguishedMessageBorrowDecoder,
     RawMessageBorrowDecoder, RawMessageDecoder, RestrictedDecodeContext, Unpacked,
@@ -23,7 +23,7 @@ use core::str;
 
 pub struct General;
 
-encoder_where_value_encoder!(General);
+decoder_where_value_decoder!(General);
 
 // General implements unpacked encodings by default, but only for select collection types. Other
 // implementers of the `Collection` trait must use Unpacked or Packed.

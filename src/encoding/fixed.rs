@@ -4,7 +4,7 @@ use bytes::{Buf, BufMut};
 
 use crate::buf::ReverseBuf;
 use crate::encoding::{
-    delegate_encoding, encoder_where_value_encoder, AlwaysOwnedDelegatingEncoder, Canonicity,
+    decoder_where_value_decoder, delegate_encoding, AlwaysOwnedDelegatingEncoder, Canonicity,
     Capped, DecodeContext, DistinguishedValueDecoder, RestrictedDecodeContext, ValueDecoder,
     ValueEncoder, WireType, Wiretyped,
 };
@@ -13,7 +13,7 @@ use crate::DecodeErrorKind::Truncated;
 
 pub struct Fixed;
 
-encoder_where_value_encoder!(Fixed);
+decoder_where_value_decoder!(Fixed);
 
 impl AlwaysOwnedDelegatingEncoder for Fixed {}
 
