@@ -5,8 +5,8 @@ use crate::encoding::value_traits::{
     Collection, DistinguishedCollection, EmptyState, ForOverwrite,
 };
 use crate::encoding::{
-    decoding_modes, check_wire_type, peek_repeated_field, BorrowDecoder, Capped, DecodeContext, Decoder,
-    DistinguishedBorrowDecoder, DistinguishedDecoder, DistinguishedValueBorrowDecoder,
+    check_wire_type, decoding_modes, peek_repeated_field, BorrowDecoder, Capped, DecodeContext,
+    Decoder, DistinguishedBorrowDecoder, DistinguishedDecoder, DistinguishedValueBorrowDecoder,
     DistinguishedValueDecoder, Encoder, FieldEncoder, General, Packed, RestrictedDecodeContext,
     TagMeasurer, TagRevWriter, TagWriter, ValueBorrowDecoder, ValueDecoder, ValueEncoder, WireType,
     Wiretyped,

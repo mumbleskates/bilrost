@@ -3,9 +3,10 @@ use bytes::{Buf, BufMut};
 use crate::buf::ReverseBuf;
 use crate::encoding::value_traits::{DistinguishedMapping, Mapping};
 use crate::encoding::{
-    encode_varint, encoded_len_varint, encoder_where_value_encoder, prepend_varint, Canonicity,
-    Capped, DecodeContext, DecodeError, DistinguishedValueDecoder, ForOverwrite,
-    RestrictedDecodeContext, ValueDecoder, ValueEncoder, WireType, Wiretyped,
+    decoding_modes, encode_varint, encoded_len_varint, encoder_where_value_encoder, prepend_varint,
+    Canonicity, Capped, DecodeContext, DecodeError, DistinguishedValueBorrowDecoder,
+    DistinguishedValueDecoder, ForOverwrite, RestrictedDecodeContext, ValueBorrowDecoder,
+    ValueDecoder, ValueEncoder, WireType, Wiretyped,
 };
 use crate::DecodeErrorKind::Truncated;
 
@@ -78,88 +79,108 @@ where
     }
 }
 
-impl<M, K, V, KE, VE> ValueDecoder<Map<KE, VE>> for M
-where
-    M: Mapping<Key = K, Value = V>,
-    K: ForOverwrite + ValueDecoder<KE>,
-    V: ForOverwrite + ValueDecoder<VE>,
-{
-    fn decode_value<B: Buf + ?Sized>(
-        value: &mut M,
-        mut buf: Capped<B>,
-        ctx: DecodeContext,
-    ) -> Result<(), DecodeError> {
-        let mut capped = buf.take_length_delimited()?;
-        // MSRV: this could be .is_some_and(..)
-        if matches!(
-            combined_fixed_size(
-                <M::Key as Wiretyped<KE>>::WIRE_TYPE,
-                <M::Value as Wiretyped<VE>>::WIRE_TYPE,
-            ),
-            Some(fixed_size) if capped.remaining_before_cap() % fixed_size != 0
-        ) {
-            // No number of fixed-sized key+value pairs can pack evenly into this size.
-            return Err(DecodeError::new(Truncated));
+macro_rules! impl_decoders {
+    (
+        mode: $mode:ident,
+        relaxed: $relaxed:ident::$relaxed_method:ident,
+        relaxed_value: $relaxed_value:ident::$relaxed_value_method:ident,
+        distinguished: $distinguished:ident::$distinguished_method:ident,
+        distinguished_value: $distinguished_value:ident::$distinguished_value_method:ident,
+        buf_ty: $buf_ty:ty,
+        impl_buf_ty: $impl_buf_ty:ty,
+        $(buf_generic: ($($buf_generic:tt)*),)?
+        $(lifetime: $lifetime:lifetime,)?
+    ) => {
+        impl<$($lifetime,)? M, K, V, KE, VE> $relaxed_value <$($lifetime,)? Map<KE, VE>> for M
+        where
+            M: Mapping<Key = K, Value = V>,
+            K: ForOverwrite + $relaxed_value <$($lifetime,)? KE>,
+            V: ForOverwrite + $relaxed_value <$($lifetime,)? VE>,
+        {
+            fn $relaxed_value_method $($($buf_generic)*)? (
+                value: &mut M,
+                mut buf: Capped<$buf_ty>,
+                ctx: DecodeContext,
+            ) -> Result<(), DecodeError> {
+                let mut capped = buf.take_length_delimited()?;
+                // MSRV: this could be .is_some_and(..)
+                if matches!(
+                    combined_fixed_size(
+                        <M::Key as Wiretyped<KE>>::WIRE_TYPE,
+                        <M::Value as Wiretyped<VE>>::WIRE_TYPE,
+                    ),
+                    Some(fixed_size) if capped.remaining_before_cap() % fixed_size != 0
+                ) {
+                    // No number of fixed-sized key+value pairs can pack evenly into this size.
+                    return Err(DecodeError::new(Truncated));
+                }
+                while capped.has_remaining()? {
+                    let mut new_key = K::for_overwrite();
+                    let mut new_val = V::for_overwrite();
+                    $relaxed_value::<KE>::$relaxed_value_method(
+                        &mut new_key, capped.lend(), ctx.clone())?;
+                    $relaxed_value::<VE>::$relaxed_value_method(
+                        &mut new_val, capped.lend(), ctx.clone())?;
+                    value.insert(new_key, new_val)?;
+                }
+                Ok(())
+            }
         }
-        while capped.has_remaining()? {
-            let mut new_key = K::for_overwrite();
-            let mut new_val = V::for_overwrite();
-            ValueDecoder::<KE>::decode_value(&mut new_key, capped.lend(), ctx.clone())?;
-            ValueDecoder::<VE>::decode_value(&mut new_val, capped.lend(), ctx.clone())?;
-            value.insert(new_key, new_val)?;
+
+        impl<$($lifetime,)? M, K, V, KE, VE>
+        $distinguished_value <$($lifetime,)? Map<KE, VE>> for M
+        where
+            M: DistinguishedMapping<Key = K, Value = V> + Eq,
+            K: ForOverwrite + Eq + $distinguished_value <$($lifetime,)? KE>,
+            V: ForOverwrite + Eq + $distinguished_value <$($lifetime,)? VE>,
+        {
+            const CHECKS_EMPTY: bool = false;
+
+            fn $distinguished_value_method <const ALLOW_EMPTY: bool>(
+                value: &mut M,
+                mut buf: Capped<$impl_buf_ty>,
+                ctx: RestrictedDecodeContext,
+            ) -> Result<Canonicity, DecodeError> {
+                let mut capped = buf.take_length_delimited()?;
+                // MSRV: this could be .is_some_and(..)
+                if matches!(
+                    combined_fixed_size(
+                        <M::Key as Wiretyped<KE>>::WIRE_TYPE,
+                        <M::Value as Wiretyped<VE>>::WIRE_TYPE,
+                    ),
+                    Some(fixed_size) if capped.remaining_before_cap() % fixed_size != 0
+                ) {
+                    // No number of fixed-sized key+value pairs can pack evenly into this size.
+                    return Err(DecodeError::new(Truncated));
+                }
+                let mut canon = Canonicity::Canonical;
+                while capped.has_remaining()? {
+                    let mut new_key = K::for_overwrite();
+                    let mut new_val = V::for_overwrite();
+                    canon.update(
+                        $distinguished_value::<KE>::$distinguished_value_method::<true>(
+                            &mut new_key,
+                            capped.lend(),
+                            ctx.clone(),
+                        )?,
+                    );
+                    canon.update(
+                        $distinguished_value::<VE>::$distinguished_value_method::<true>(
+                            &mut new_val,
+                            capped.lend(),
+                            ctx.clone(),
+                        )?,
+                    );
+                    ctx.update(&mut canon, value.insert_distinguished(new_key, new_val)?)?;
+                }
+                Ok(canon)
+            }
         }
-        Ok(())
     }
 }
 
-impl<M, K, V, KE, VE> DistinguishedValueDecoder<Map<KE, VE>> for M
-where
-    M: DistinguishedMapping<Key = K, Value = V> + Eq,
-    K: ForOverwrite + Eq + DistinguishedValueDecoder<KE>,
-    V: ForOverwrite + Eq + DistinguishedValueDecoder<VE>,
-{
-    const CHECKS_EMPTY: bool = false;
-
-    fn decode_value_distinguished<const ALLOW_EMPTY: bool>(
-        value: &mut M,
-        mut buf: Capped<impl Buf + ?Sized>,
-        ctx: RestrictedDecodeContext,
-    ) -> Result<Canonicity, DecodeError> {
-        let mut capped = buf.take_length_delimited()?;
-        // MSRV: this could be .is_some_and(..)
-        if matches!(
-            combined_fixed_size(
-                <M::Key as Wiretyped<KE>>::WIRE_TYPE,
-                <M::Value as Wiretyped<VE>>::WIRE_TYPE,
-            ),
-            Some(fixed_size) if capped.remaining_before_cap() % fixed_size != 0
-        ) {
-            // No number of fixed-sized key+value pairs can pack evenly into this size.
-            return Err(DecodeError::new(Truncated));
-        }
-        let mut canon = Canonicity::Canonical;
-        while capped.has_remaining()? {
-            let mut new_key = K::for_overwrite();
-            let mut new_val = V::for_overwrite();
-            canon.update(
-                DistinguishedValueDecoder::<KE>::decode_value_distinguished::<true>(
-                    &mut new_key,
-                    capped.lend(),
-                    ctx.clone(),
-                )?,
-            );
-            canon.update(
-                DistinguishedValueDecoder::<VE>::decode_value_distinguished::<true>(
-                    &mut new_val,
-                    capped.lend(),
-                    ctx.clone(),
-                )?,
-            );
-            ctx.update(&mut canon, value.insert_distinguished(new_key, new_val)?)?;
-        }
-        Ok(canon)
-    }
-}
+decoding_modes::invoke!(impl_decoders, owned);
+decoding_modes::invoke!(impl_decoders, borrowed);
 
 #[cfg(test)]
 mod test {
