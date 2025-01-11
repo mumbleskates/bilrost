@@ -4,16 +4,16 @@ use bytes::{Buf, BufMut};
 
 use crate::buf::ReverseBuf;
 use crate::encoding::{
-    decoder_where_value_decoder, delegate_encoding, AlwaysOwnedDelegatingEncoder, Canonicity,
-    Capped, DecodeContext, DistinguishedValueDecoder, RestrictedDecodeContext, ValueDecoder,
-    ValueEncoder, WireType, Wiretyped,
+    delegate_encoding, encoding_implemented_via_value_encoding, AlwaysOwnedDelegatingEncoder,
+    Canonicity, Capped, DecodeContext, DistinguishedValueDecoder, RestrictedDecodeContext,
+    ValueDecoder, ValueEncoder, WireType, Wiretyped,
 };
 use crate::DecodeError;
 use crate::DecodeErrorKind::Truncated;
 
 pub struct Fixed;
 
-decoder_where_value_decoder!(Fixed);
+encoding_implemented_via_value_encoding!(Fixed);
 
 impl AlwaysOwnedDelegatingEncoder for Fixed {}
 

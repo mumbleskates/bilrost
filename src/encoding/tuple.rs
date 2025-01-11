@@ -19,12 +19,12 @@ use bytes::{Buf, BufMut};
 
 use crate::buf::ReverseBuf;
 use crate::encoding::{
-    decoder_where_value_decoder, delegate_value_encoding, encode_varint, encoded_len_varint,
-    prepend_varint, skip_field, BorrowDecoder, Canonicity, Capped, DecodeContext, Decoder,
-    DistinguishedBorrowDecoder, DistinguishedDecoder, DistinguishedValueBorrowDecoder,
-    DistinguishedValueDecoder, EmptyState, Encoder, General, RestrictedDecodeContext, TagReader,
-    TagRevWriter, TagWriter, TrivialTagMeasurer, ValueBorrowDecoder, ValueDecoder, ValueEncoder,
-    WireType, Wiretyped,
+    delegate_value_encoding, encode_varint, encoded_len_varint,
+    encoding_implemented_via_value_encoding, prepend_varint, skip_field, BorrowDecoder, Canonicity,
+    Capped, DecodeContext, Decoder, DistinguishedBorrowDecoder, DistinguishedDecoder,
+    DistinguishedValueBorrowDecoder, DistinguishedValueDecoder, EmptyState, Encoder, General,
+    RestrictedDecodeContext, TagReader, TagRevWriter, TagWriter, TrivialTagMeasurer,
+    ValueBorrowDecoder, ValueDecoder, ValueEncoder, WireType, Wiretyped,
 };
 use crate::DecodeError;
 
@@ -42,7 +42,7 @@ macro_rules! impl_tuple {
     ) => {
         // All tuple types encode as nested messages, so all of them implement ValueEncoder and
         // should therefore implement Encoder in terms of that.
-        decoder_where_value_decoder!(
+        encoding_implemented_via_value_encoding!(
             ($($encodings,)*),
             with generics ($($encodings),*)
         );

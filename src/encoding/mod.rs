@@ -2455,11 +2455,11 @@ macro_rules! __impl_decoder_where_value_decoder {
 }
 pub(crate) use __impl_decoder_where_value_decoder;
 
-macro_rules! decoder_where_value_decoder {
+macro_rules! encoding_implemented_via_value_encoding {
     (
         $encoding:ty
         $(, with where clause ($($where_clause:tt)*))?
-        $(, with generics ($($generics:tt)*))?
+        $(, with generics ($($generics:tt)*) $(,)?)?
     ) => {
         /// Encodes plain values only when they are non-default.
         impl<T $(, $($generics)*)?> $crate::encoding::Encoder<$encoding> for T
@@ -2524,7 +2524,7 @@ macro_rules! decoder_where_value_decoder {
         );
     };
 }
-pub(crate) use decoder_where_value_decoder;
+pub(crate) use encoding_implemented_via_value_encoding;
 
 #[cfg(test)]
 mod test {

@@ -6,10 +6,10 @@ use crate::buf::ReverseBuf;
 use bytes::{Buf, BufMut};
 
 use crate::encoding::{
-    const_varint, decoder_where_value_decoder, delegate_encoding, encode_varint,
-    encoded_len_varint, prepend_varint, AlwaysOwnedDelegatingEncoder, Canonicity, Capped,
-    DecodeContext, DecodeError, DistinguishedValueDecoder, RestrictedDecodeContext, ValueDecoder,
-    ValueEncoder, WireType, Wiretyped,
+    const_varint, delegate_encoding, encode_varint, encoded_len_varint,
+    encoding_implemented_via_value_encoding, prepend_varint, AlwaysOwnedDelegatingEncoder,
+    Canonicity, Capped, DecodeContext, DecodeError, DistinguishedValueDecoder,
+    RestrictedDecodeContext, ValueDecoder, ValueEncoder, WireType, Wiretyped,
 };
 use crate::DecodeErrorKind::InvalidValue;
 
@@ -20,7 +20,7 @@ use crate::DecodeErrorKind::InvalidValue;
 /// `Vec<u8>`.
 pub struct PlainBytes;
 
-decoder_where_value_decoder!(PlainBytes);
+encoding_implemented_via_value_encoding!(PlainBytes);
 
 impl AlwaysOwnedDelegatingEncoder for PlainBytes {}
 

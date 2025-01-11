@@ -1,7 +1,7 @@
 use crate::buf::ReverseBuf;
 use crate::encoding::{
-    decoder_where_value_decoder, encode_varint, encoded_len_varint, prepend_varint, AlwaysOwned,
-    AlwaysOwnedDelegatingEncoder, Buf, BufMut, Canonicity, Capped, DecodeContext,
+    encode_varint, encoded_len_varint, encoding_implemented_via_value_encoding, prepend_varint,
+    AlwaysOwned, AlwaysOwnedDelegatingEncoder, Buf, BufMut, Canonicity, Capped, DecodeContext,
     DistinguishedValueDecoder, RestrictedDecodeContext, ValueDecoder, ValueEncoder, WireType,
     Wiretyped,
 };
@@ -10,7 +10,7 @@ use crate::DecodeErrorKind::OutOfDomainValue;
 
 pub struct Varint;
 
-decoder_where_value_decoder!(Varint);
+encoding_implemented_via_value_encoding!(Varint);
 
 impl AlwaysOwnedDelegatingEncoder for Varint {}
 

@@ -1,17 +1,21 @@
 use crate::buf::ReverseBuf;
 use crate::encoding::value_traits::{DistinguishedMapping, Mapping};
 use crate::encoding::{
-    decoder_where_value_decoder, decoding_modes, encode_varint, encoded_len_varint, prepend_varint,
-    Canonicity, Capped, DecodeContext, DecodeError, DistinguishedValueBorrowDecoder,
-    DistinguishedValueDecoder, ForOverwrite, RestrictedDecodeContext, ValueBorrowDecoder,
-    ValueDecoder, ValueEncoder, WireType, Wiretyped,
+    decoding_modes, encode_varint, encoded_len_varint, encoding_implemented_via_value_encoding,
+    prepend_varint, Canonicity, Capped, DecodeContext, DecodeError,
+    DistinguishedValueBorrowDecoder, DistinguishedValueDecoder, ForOverwrite,
+    RestrictedDecodeContext, ValueBorrowDecoder, ValueDecoder, ValueEncoder, WireType, Wiretyped,
 };
 use crate::DecodeErrorKind::Truncated;
 use bytes::{Buf, BufMut};
 
 pub struct Map<KE, VE>(KE, VE);
 
-decoder_where_value_decoder!(Map<KE, VE>, with where clause (T: Mapping), with generics (KE, VE));
+encoding_implemented_via_value_encoding!(
+    Map<KE, VE>,
+    with where clause (T: Mapping),
+    with generics (KE, VE),
+);
 
 /// Maps are always length delimited.
 impl<T, KE, VE> Wiretyped<Map<KE, VE>> for T {
