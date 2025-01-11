@@ -25,8 +25,6 @@ pub struct General;
 
 encoder_where_value_encoder!(General);
 
-impl AlwaysOwnedDelegatingEncoder for General {}
-
 // General implements unpacked encodings by default, but only for select collection types. Other
 // implementers of the `Collection` trait must use Unpacked or Packed.
 delegate_encoding!(delegate from (General) to (Unpacked<General>)
