@@ -1,7 +1,6 @@
 use alloc::collections::BTreeMap;
 use alloc::string::String;
 use alloc::vec::Vec;
-
 use bilrost::{DistinguishedMessage, Message, Oneof};
 
 /// A Duration represents a signed, fixed-length span of time represented as a count of seconds and
