@@ -1518,8 +1518,8 @@ mod with_canonicity {
 }
 
 /// Marker trait indicating that a type always decodes to its owned form. When implemented, borrowed
-/// decoding will delegate to the owned Decoder implementation for the Decoder and ValueDecoder
-/// traits for marked decoders.
+/// decoding will delegate to the owned implementation for the ValueDecoder traits for marked
+/// encodings.
 pub trait AlwaysOwned {}
 
 /// Marker trait indicating that an encoder always delegate encoding for values marked with
@@ -1589,40 +1589,6 @@ pub trait DistinguishedBorrowDecoder<'a, E>: Encoder<E> {
         buf: Capped<&'a [u8]>,
         ctx: RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError>;
-}
-
-impl<'a, T, E> BorrowDecoder<'a, E> for T
-where
-    T: AlwaysOwned + Decoder<E>,
-    E: AlwaysOwnedDelegatingEncoder,
-{
-    #[inline]
-    fn borrow_decode(
-        wire_type: WireType,
-        duplicated: bool,
-        value: &mut Self,
-        buf: Capped<&'a [u8]>,
-        ctx: DecodeContext,
-    ) -> Result<(), DecodeError> {
-        Decoder::<E>::decode(wire_type, duplicated, value, buf, ctx)
-    }
-}
-
-impl<'a, T, E> DistinguishedBorrowDecoder<'a, E> for T
-where
-    T: AlwaysOwned + DistinguishedDecoder<E>,
-    E: AlwaysOwnedDelegatingEncoder,
-{
-    #[inline]
-    fn borrow_decode_distinguished(
-        wire_type: WireType,
-        duplicated: bool,
-        value: &mut Self,
-        buf: Capped<&'a [u8]>,
-        ctx: RestrictedDecodeContext,
-    ) -> Result<Canonicity, DecodeError> {
-        DistinguishedDecoder::<E>::decode_distinguished(wire_type, duplicated, value, buf, ctx)
-    }
 }
 
 /// Encoders' wire-type is relied upon by both relaxed and distinguished encoders, but it is written
@@ -2446,7 +2412,7 @@ macro_rules! __impl_decoder_where_value_decoder {
 }
 pub(crate) use __impl_decoder_where_value_decoder;
 
-macro_rules! encoder_where_value_encoder {
+macro_rules! decoder_where_value_decoder {
     (
         $encoding:ty
         $(, with where clause ($($where_clause:tt)*))?
@@ -2515,7 +2481,7 @@ macro_rules! encoder_where_value_encoder {
         );
     };
 }
-pub(crate) use encoder_where_value_encoder;
+pub(crate) use decoder_where_value_decoder;
 
 #[cfg(test)]
 mod test {
