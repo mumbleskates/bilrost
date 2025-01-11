@@ -20,9 +20,11 @@ use bytes::{Buf, BufMut};
 use crate::buf::ReverseBuf;
 use crate::encoding::{
     decoder_where_value_decoder, delegate_value_encoding, encode_varint, encoded_len_varint,
-    prepend_varint, skip_field, Canonicity, Capped, DecodeContext, Decoder, DistinguishedDecoder,
+    prepend_varint, skip_field, BorrowDecoder, Canonicity, Capped, DecodeContext, Decoder,
+    DistinguishedBorrowDecoder, DistinguishedDecoder, DistinguishedValueBorrowDecoder,
     DistinguishedValueDecoder, EmptyState, Encoder, General, RestrictedDecodeContext, TagReader,
-    TagRevWriter, TagWriter, TrivialTagMeasurer, ValueDecoder, ValueEncoder, WireType, Wiretyped,
+    TagRevWriter, TagWriter, TrivialTagMeasurer, ValueBorrowDecoder, ValueDecoder, ValueEncoder,
+    WireType, Wiretyped,
 };
 use crate::DecodeError;
 
@@ -164,6 +166,111 @@ macro_rules! impl_tuple {
                         $($numbers => {
                             canon.update(
                                 $letters::decode_distinguished(
+                                    wire_type,
+                                    duplicated,
+                                    &mut value.$numbers,
+                                    buf.lend(),
+                                    ctx.clone(),
+                                )
+                                    .map_err(|mut error| {
+                                        error.push($name, stringify!($numbers));
+                                        error
+                                    })?
+                            );
+                        })*
+                        _ => {
+                            ctx.update(&mut canon, Canonicity::HasExtensions)?;
+                            skip_field(wire_type, buf.lend())?;
+                        },
+                    }
+                }
+                Ok(canon)
+            }
+        }
+
+        // We'd like to implement the borrowed decoders here with decoding_modes::invoke!, but it
+        // seems the optional lifetime and the repeating elements in the tuple won't nest in
+        // macro_rules!.
+
+        impl<'a, $($letters,)* $($encodings,)*>
+        ValueBorrowDecoder<'a, ($($encodings,)*)> for ($($letters,)*)
+        where
+            $($letters: EmptyState + BorrowDecoder<'a, $encodings>,)*
+        {
+            #[inline]
+            fn borrow_decode_value(
+                value: &mut Self,
+                mut buf: Capped<&'a [u8]>,
+                ctx: DecodeContext,
+            ) -> Result<(), DecodeError> {
+                let mut buf = buf.take_length_delimited()?;
+                ctx.limit_reached()?;
+                let ctx = ctx.enter_recursion();
+                let tr = &mut TagReader::new();
+                let mut last_tag = None::<u32>;
+                while buf.has_remaining()? {
+                    let (tag, wire_type) = tr.decode_key(buf.lend())?;
+                    let duplicated = last_tag == Some(tag);
+                    last_tag = Some(tag);
+                    // Decode the field. Each tuple field has a tag corresponding to its index.
+                    match tag {
+                        $($numbers => {
+                            $letters::borrow_decode(
+                                wire_type,
+                                duplicated,
+                                &mut value.$numbers,
+                                buf.lend(),
+                                ctx.clone(),
+                            ).map_err(|mut error| {
+                                error.push($name, stringify!($numbers));
+                                error
+                            })?
+                        })*
+                        _ => skip_field(wire_type, buf.lend())?,
+                    }
+                }
+                Ok(())
+            }
+        }
+
+        impl<'a, $($letters,)* $($encodings,)*>
+        DistinguishedValueBorrowDecoder<'a, ($($encodings,)*)> for ($($letters,)*)
+        where
+            Self: Eq,
+            $($letters: Eq + EmptyState + DistinguishedBorrowDecoder<'a, $encodings>,)*
+        {
+            const CHECKS_EMPTY: bool = true; // Message types are always zero-length when empty
+
+            #[inline]
+            fn borrow_decode_value_distinguished<const ALLOW_EMPTY: bool>(
+                value: &mut Self,
+                mut buf: Capped<&'a [u8]>,
+                ctx: RestrictedDecodeContext,
+            ) -> Result<Canonicity, DecodeError>
+            where
+                Self: Sized,
+            {
+                let mut buf = buf.take_length_delimited()?;
+                // Since tuples emulate messages, empty values always encode and decode from zero
+                // bytes. It is far cheaper to check here than to check after the value has been
+                // decoded and checking the value's `is_empty()`.
+                if !ALLOW_EMPTY && buf.remaining_before_cap() == 0 {
+                    return ctx.check(Canonicity::NotCanonical);
+                }
+                ctx.limit_reached()?;
+                let mut canon = Canonicity::Canonical;
+                let ctx = ctx.enter_recursion();
+                let tr = &mut TagReader::new();
+                let mut last_tag = None::<u32>;
+                while buf.has_remaining()? {
+                    let (tag, wire_type) = tr.decode_key(buf.lend())?;
+                    let duplicated = last_tag == Some(tag);
+                    last_tag = Some(tag);
+                    // Decode the field. Each tuple field has a tag corresponding to its index.
+                    match tag {
+                        $($numbers => {
+                            canon.update(
+                                $letters::borrow_decode_distinguished(
                                     wire_type,
                                     duplicated,
                                     &mut value.$numbers,
