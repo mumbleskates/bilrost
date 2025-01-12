@@ -244,7 +244,7 @@ pub trait OwnedMessage: Message {
 /// "restricted" methods is `HasExtensions`: "distinguished" methods already dispatch to passing
 /// `NotCanonical`, and when `Canonical` is passed only `Canonical` can be returned from a
 /// successful result (hence the "canonical" methods).
-pub trait DistinguishedOwnedMessage: Message {
+pub trait DistinguishedOwnedMessage: OwnedMessage {
     // ------------ Distinguished mode ------------
 
     /// Decodes an instance of the message from a buffer in distinguished mode.
@@ -511,6 +511,7 @@ pub trait DistinguishedOwnedMessage: Message {
 }
 
 /// Basic decoding functionality for a Bilrost message that can decode from a borrowed slice.
+// TODO(widders): create impl
 pub trait BorrowedMessage<'a>: Message {
     /// Decodes an instance of the message from a buffer.
     ///
@@ -534,7 +535,7 @@ pub trait BorrowedMessage<'a>: Message {
     fn replace_borrowed_from_length_delimited(&mut self, buf: &'a [u8]) -> Result<(), DecodeError>;
 }
 
-/// An enhanced trait for owned Bilrost messages that promise a distinguished representation.
+/// An enhanced trait for borrowed Bilrost messages that promise a distinguished representation.
 ///
 /// Implementation of this trait comes with the following promises:
 ///
@@ -559,7 +560,8 @@ pub trait BorrowedMessage<'a>: Message {
 /// "restricted" methods is `HasExtensions`: "distinguished" methods already dispatch to passing
 /// `NotCanonical`, and when `Canonical` is passed only `Canonical` can be returned from a
 /// successful result (hence the "canonical" methods).
-pub trait DistinguishedBorrowedMessage<'a>: Message {
+// TODO(widders): create impl
+pub trait DistinguishedBorrowedMessage<'a>: BorrowedMessage<'a> {
     // ------------ Distinguished mode ------------
 
     /// Decodes an instance of the message from a buffer in distinguished mode.
@@ -580,14 +582,17 @@ pub trait DistinguishedBorrowedMessage<'a>: Message {
 
     /// Decodes the non-ignored fields of this message from the buffer in distinguished mode,
     /// replacing their values.
-    fn replace_distinguished_borrowed_from(&mut self, buf: &'a [u8]) -> Result<Canonicity, DecodeError>; // TODO(widders): dyn-compatible now
+    fn replace_distinguished_borrowed_from(
+        &mut self,
+        buf: &'a [u8],
+    ) -> Result<Canonicity, DecodeError>;
 
     /// Decodes the non-ignored fields of this message in distinguished mode, replacing their values
     /// from a length-delimited value encoded in the buffer.
     fn replace_distinguished_borrowed_from_length_delimited(
         &mut self,
         buf: &'a [u8],
-    ) -> Result<Canonicity, DecodeError>; // TODO(widders): dyn-compatible now
+    ) -> Result<Canonicity, DecodeError>;
 
     // ------------ Restricted mode ------------
 
@@ -665,10 +670,9 @@ pub trait DistinguishedBorrowedMessage<'a>: Message {
 //  alternate encoding mode which emits field groups to be sorted in a stricter way, only grouping
 //  truly contiguous runs of field ids so that they can be sorted with any other type's fields at
 //  runtime.
-// TODO(widders): break up this trait into encodes and decodes
 impl<T> Message for T
 where
-    T: RawMessageDecoder + Sized,
+    T: RawMessage + Sized,
 {
     fn encode<B: BufMut + ?Sized>(&self, buf: &mut B) -> Result<(), EncodeError> {
         let required = self.encoded_len();
@@ -695,38 +699,6 @@ where
         encode_varint(len as u64, buf);
         self.raw_encode(buf);
         Ok(())
-    }
-
-    fn decode<B: Buf>(mut buf: B) -> Result<Self, DecodeError> {
-        Self::decode_capped(Capped::new(&mut buf))
-    }
-
-    fn decode_length_delimited<B: Buf>(mut buf: B) -> Result<Self, DecodeError> {
-        Self::decode_capped(Capped::new_length_delimited(&mut buf)?)
-    }
-
-    #[doc(hidden)]
-    fn decode_capped<B: Buf + ?Sized>(buf: Capped<B>) -> Result<Self, DecodeError> {
-        let mut message = Self::empty();
-        merge(&mut message, buf, DecodeContext::default())?;
-        Ok(message)
-    }
-
-    fn replace_from<B: Buf>(&mut self, mut buf: B) -> Result<(), DecodeError> {
-        self.replace_from_capped(Capped::new(&mut buf))
-    }
-
-    fn replace_from_length_delimited<B: Buf>(&mut self, mut buf: B) -> Result<(), DecodeError> {
-        self.replace_from_capped(Capped::new_length_delimited(&mut buf)?)
-    }
-
-    #[doc(hidden)]
-    fn replace_from_capped<B: Buf + ?Sized>(&mut self, buf: Capped<B>) -> Result<(), DecodeError> {
-        self.clear();
-        merge(self, buf, DecodeContext::default()).map_err(|err| {
-            self.clear();
-            err
-        })
     }
 
     fn encoded_len(&self) -> usize {
@@ -800,6 +772,43 @@ where
     fn encode_length_delimited_dyn(&self, buf: &mut dyn BufMut) -> Result<(), EncodeError> {
         self.encode_length_delimited(buf)
     }
+}
+
+impl<T> OwnedMessage for T
+where
+    T: RawMessageDecoder + Sized,
+{
+    fn decode<B: Buf>(mut buf: B) -> Result<Self, DecodeError> {
+        Self::decode_capped(Capped::new(&mut buf))
+    }
+
+    fn decode_length_delimited<B: Buf>(mut buf: B) -> Result<Self, DecodeError> {
+        Self::decode_capped(Capped::new_length_delimited(&mut buf)?)
+    }
+
+    #[doc(hidden)]
+    fn decode_capped<B: Buf + ?Sized>(buf: Capped<B>) -> Result<Self, DecodeError> {
+        let mut message = Self::empty();
+        merge(&mut message, buf, DecodeContext::default())?;
+        Ok(message)
+    }
+
+    fn replace_from<B: Buf>(&mut self, mut buf: B) -> Result<(), DecodeError> {
+        self.replace_from_capped(Capped::new(&mut buf))
+    }
+
+    fn replace_from_length_delimited<B: Buf>(&mut self, mut buf: B) -> Result<(), DecodeError> {
+        self.replace_from_capped(Capped::new_length_delimited(&mut buf)?)
+    }
+
+    #[doc(hidden)]
+    fn replace_from_capped<B: Buf + ?Sized>(&mut self, buf: Capped<B>) -> Result<(), DecodeError> {
+        self.clear();
+        merge(self, buf, DecodeContext::default()).map_err(|err| {
+            self.clear();
+            err
+        })
+    }
 
     fn replace_from_slice(&mut self, buf: &[u8]) -> Result<(), DecodeError> {
         self.replace_from(buf)
@@ -823,9 +832,9 @@ where
     }
 }
 
-impl<T> DistinguishedMessage for T
+impl<T> DistinguishedOwnedMessage for T
 where
-    T: RawDistinguishedMessageDecoder + Message,
+    T: RawDistinguishedMessageDecoder + RawMessageDecoder,
 {
     fn decode_distinguished<B: Buf>(buf: B) -> Result<(Self, Canonicity), DecodeError> {
         Self::decode_restricted(buf, NotCanonical)
@@ -1256,13 +1265,13 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{DistinguishedMessage, Message, Vec};
+    use super::{DistinguishedOwnedMessage, Message, OwnedMessage, Vec};
     use crate::WithCanonicity;
 
-    const _MESSAGE_IS_DYN_COMPATIBLE: Option<&dyn Message> = None;
-    const _DISTINGUISHED_MESSAGE_IS_DYN_COMPATIBLE: Option<&dyn DistinguishedMessage> = None;
+    const _MESSAGE_IS_DYN_COMPATIBLE: Option<&dyn OwnedMessage> = None;
+    const _DISTINGUISHED_MESSAGE_IS_DYN_COMPATIBLE: Option<&dyn DistinguishedOwnedMessage> = None;
 
-    fn use_dyn_messages<M: Message>(safe: &mut dyn Message, mut msg: M) {
+    fn use_dyn_messages<M: OwnedMessage>(safe: &mut dyn OwnedMessage, mut msg: M) {
         let mut vec = Vec::<u8>::new();
 
         safe.encoded_len();
@@ -1281,8 +1290,8 @@ mod tests {
         msg.clear();
     }
 
-    fn use_dyn_distinguished_messages<M: DistinguishedMessage>(
-        safe: &mut dyn DistinguishedMessage,
+    fn use_dyn_distinguished_messages<M: DistinguishedOwnedMessage>(
+        safe: &mut dyn DistinguishedOwnedMessage,
         mut msg: M,
     ) {
         let mut vec = Vec::<u8>::new();
