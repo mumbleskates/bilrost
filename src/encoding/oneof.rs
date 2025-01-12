@@ -271,7 +271,70 @@ mod generic_oneof_grant_empty_state_impls {
         }
     }
 
-    // TODO(widders): borrowed
+    impl<'a, T> OneofBorrowDecoder<'a> for Option<T>
+    where
+        T: NonEmptyOneofBorrowDecoder<'a>,
+    {
+        #[inline]
+        fn oneof_borrow_decode_field(
+            value: &mut Self,
+            tag: u32,
+            wire_type: WireType,
+            buf: Capped<&'a [u8]>,
+            ctx: DecodeContext,
+        ) -> Result<(), DecodeError> {
+            if let Some(already) = value {
+                Err(DecodeError::new(if already.oneof_current_tag() == tag {
+                    UnexpectedlyRepeated
+                } else {
+                    ConflictingFields
+                }))
+            } else {
+                T::oneof_borrow_decode_field(tag, wire_type, buf, ctx)
+                    .map(|decoded| *value = Some(decoded))
+            }
+            .map_err(|mut err| {
+                let (msg, field) = T::oneof_variant_name(tag);
+                err.push(msg, field);
+                err
+            })
+        }
+    }
+
+    impl<'a, T> DistinguishedOneofBorrowDecoder<'a> for Option<T>
+    where
+        T: NonEmptyDistinguishedOneofBorrowDecoder<'a> + NonEmptyOneof,
+        Self: Oneof,
+    {
+        #[inline]
+        fn oneof_borrow_decode_field_distinguished(
+            value: &mut Self,
+            tag: u32,
+            wire_type: WireType,
+            buf: Capped<&'a [u8]>,
+            ctx: RestrictedDecodeContext,
+        ) -> Result<Canonicity, DecodeError> {
+            if let Some(already) = value {
+                Err(DecodeError::new(if already.oneof_current_tag() == tag {
+                    UnexpectedlyRepeated
+                } else {
+                    ConflictingFields
+                }))
+            } else {
+                T::oneof_borrow_decode_field_distinguished(tag, wire_type, buf, ctx.clone()).map(
+                    |(decoded, canon)| {
+                        *value = Some(decoded);
+                        canon
+                    },
+                )
+            }
+            .map_err(|mut err| {
+                let (msg, field) = T::oneof_variant_name(tag);
+                err.push(msg, field);
+                err
+            })
+        }
+    }
 }
 
 /// These are the impls that make the oneof trait transparent to Box
