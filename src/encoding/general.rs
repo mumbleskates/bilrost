@@ -7,7 +7,7 @@ use crate::encoding::{
     delegate_encoding, delegate_value_encoding, encode_varint, encoded_len_varint,
     encoding_implemented_via_value_encoding, prepend_varint, Canonicity, Capped, DecodeContext,
     DecodeError, DistinguishedProxiable, DistinguishedValueBorrowDecoder,
-    DistinguishedValueDecoder, Fixed, Map, Packed, PlainBytes, Proxiable, Proxied,
+    DistinguishedValueDecoder, Fixed, ForOverwrite, Map, Packed, PlainBytes, Proxiable, Proxied,
     RawDistinguishedMessageBorrowDecoder, RawMessageBorrowDecoder, RawMessageDecoder,
     RestrictedDecodeContext, Unpacked, ValueBorrowDecoder, ValueDecoder, ValueEncoder, Varint,
     WireType, Wiretyped,
@@ -66,6 +66,53 @@ delegate_value_encoding!(delegate from (General) to (Varint)
 delegate_value_encoding!(delegate from (General) to (Fixed) for type (f32));
 delegate_value_encoding!(delegate from (General) to (Fixed) for type (f64));
 
+impl Wiretyped<General> for &str {
+    const WIRE_TYPE: WireType = WireType::LengthDelimited;
+}
+
+impl ValueEncoder<General> for &str {
+    #[inline]
+    fn encode_value<B: BufMut + ?Sized>(value: &&str, buf: &mut B) {
+        ValueEncoder::<PlainBytes>::encode_value(&value.as_bytes(), buf)
+    }
+
+    #[inline]
+    fn prepend_value<B: ReverseBuf + ?Sized>(value: &&str, buf: &mut B) {
+        ValueEncoder::<PlainBytes>::prepend_value(&value.as_bytes(), buf)
+    }
+
+    #[inline]
+    fn value_encoded_len(value: &&str) -> usize {
+        ValueEncoder::<PlainBytes>::value_encoded_len(&value.as_bytes())
+    }
+}
+
+impl<'a> ValueBorrowDecoder<'a, General> for &'a str {
+    #[inline]
+    fn borrow_decode_value(
+        value: &mut Self,
+        mut buf: Capped<&'a [u8]>,
+        _ctx: DecodeContext,
+    ) -> Result<(), DecodeError> {
+        *value = str::from_utf8(buf.take_borrowed_length_delimited()?).map_err(|_| InvalidValue)?;
+        Ok(())
+    }
+}
+
+impl<'a> DistinguishedValueBorrowDecoder<'a, General> for &'a str {
+    const CHECKS_EMPTY: bool = false;
+
+    #[inline]
+    fn borrow_decode_value_distinguished<const ALLOW_EMPTY: bool>(
+        value: &mut Self,
+        buf: Capped<&'a [u8]>,
+        ctx: RestrictedDecodeContext,
+    ) -> Result<Canonicity, DecodeError> {
+        ValueBorrowDecoder::<General>::borrow_decode_value(value, buf, ctx.into_inner())?;
+        Ok(Canonicity::Canonical)
+    }
+}
+
 impl Wiretyped<General> for String {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
 }
@@ -73,19 +120,17 @@ impl Wiretyped<General> for String {
 impl ValueEncoder<General> for String {
     #[inline]
     fn encode_value<B: BufMut + ?Sized>(value: &String, buf: &mut B) {
-        encode_varint(value.len() as u64, buf);
-        buf.put_slice(value.as_bytes());
+        ValueEncoder::<PlainBytes>::encode_value(&value.as_bytes(), buf)
     }
 
     #[inline]
     fn prepend_value<B: ReverseBuf + ?Sized>(value: &String, buf: &mut B) {
-        buf.prepend_slice(value.as_bytes());
-        prepend_varint(value.len() as u64, buf);
+        ValueEncoder::<PlainBytes>::prepend_value(&value.as_bytes(), buf)
     }
 
     #[inline]
     fn value_encoded_len(value: &String) -> usize {
-        encoded_len_varint(value.len() as u64) + value.len()
+        ValueEncoder::<PlainBytes>::value_encoded_len(&value.as_bytes())
     }
 }
 
@@ -167,19 +212,17 @@ impl Wiretyped<General> for Cow<'_, str> {
 impl ValueEncoder<General> for Cow<'_, str> {
     #[inline]
     fn encode_value<B: BufMut + ?Sized>(value: &Cow<str>, buf: &mut B) {
-        encode_varint(value.len() as u64, buf);
-        buf.put_slice(value.as_bytes());
+        ValueEncoder::<PlainBytes>::encode_value(&value.as_bytes(), buf)
     }
 
     #[inline]
     fn prepend_value<B: ReverseBuf + ?Sized>(value: &Cow<str>, buf: &mut B) {
-        buf.prepend_slice(value.as_bytes());
-        prepend_varint(value.len() as u64, buf);
+        ValueEncoder::<PlainBytes>::prepend_value(&value.as_bytes(), buf)
     }
 
     #[inline]
     fn value_encoded_len(value: &Cow<str>) -> usize {
-        encoded_len_varint(value.len() as u64) + value.len()
+        ValueEncoder::<PlainBytes>::value_encoded_len(&value.as_bytes())
     }
 }
 
@@ -211,7 +254,33 @@ impl DistinguishedValueDecoder<General> for Cow<'_, str> {
     }
 }
 
-// TODO(widders): borrow cow
+impl<'a> ValueBorrowDecoder<'a, General> for Cow<'a, str> {
+    #[inline]
+    fn borrow_decode_value(
+        value: &mut Cow<'a, str>,
+        buf: Capped<&'a [u8]>,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError> {
+        let mut s = <&str>::for_overwrite();
+        ValueBorrowDecoder::<General>::borrow_decode_value(&mut s, buf, ctx)?;
+        *value = Cow::Borrowed(s);
+        Ok(())
+    }
+}
+
+impl<'a> DistinguishedValueBorrowDecoder<'a, General> for Cow<'a, str> {
+    const CHECKS_EMPTY: bool = <&str as DistinguishedValueBorrowDecoder<'a, General>>::CHECKS_EMPTY;
+
+    #[inline]
+    fn borrow_decode_value_distinguished<const ALLOW_EMPTY: bool>(
+        value: &mut Cow<'a, str>,
+        buf: Capped<&'a [u8]>,
+        ctx: RestrictedDecodeContext,
+    ) -> Result<Canonicity, DecodeError> {
+        ValueBorrowDecoder::<General>::borrow_decode_value(value, buf, ctx.into_inner())?;
+        Ok(Canonicity::Canonical)
+    }
+}
 
 #[cfg(test)]
 mod cow_string {
@@ -227,20 +296,18 @@ impl Wiretyped<General> for Bytes {
 
 impl ValueEncoder<General> for Bytes {
     #[inline]
-    fn encode_value<B: BufMut + ?Sized>(value: &Bytes, mut buf: &mut B) {
-        encode_varint(value.len() as u64, buf);
-        (&mut buf).put(value.clone()); // `put` needs Self to be sized, so we use the ref type
+    fn encode_value<B: BufMut + ?Sized>(value: &Bytes, buf: &mut B) {
+        ValueEncoder::<PlainBytes>::encode_value(&&**value, buf)
     }
 
     #[inline]
     fn prepend_value<B: ReverseBuf + ?Sized>(value: &Bytes, buf: &mut B) {
-        buf.prepend_slice(value);
-        prepend_varint(value.len() as u64, buf);
+        ValueEncoder::<PlainBytes>::prepend_value(&&**value, buf)
     }
 
     #[inline]
     fn value_encoded_len(value: &Bytes) -> usize {
-        encoded_len_varint(value.len() as u64) + value.len()
+        ValueEncoder::<PlainBytes>::value_encoded_len(&&**value)
     }
 }
 
@@ -289,18 +356,17 @@ impl Wiretyped<General> for Blob {
 impl ValueEncoder<General> for Blob {
     #[inline]
     fn encode_value<B: BufMut + ?Sized>(value: &Blob, buf: &mut B) {
-        ValueEncoder::<PlainBytes>::encode_value(&**value, buf)
+        ValueEncoder::<PlainBytes>::encode_value(&value.as_slice(), buf)
     }
 
     #[inline]
     fn prepend_value<B: ReverseBuf + ?Sized>(value: &Blob, buf: &mut B) {
-        buf.prepend_slice(value);
-        prepend_varint(value.len() as u64, buf);
+        ValueEncoder::<PlainBytes>::prepend_value(&value.as_slice(), buf)
     }
 
     #[inline]
     fn value_encoded_len(value: &Blob) -> usize {
-        ValueEncoder::<PlainBytes>::value_encoded_len(&**value)
+        ValueEncoder::<PlainBytes>::value_encoded_len(&value.as_slice())
     }
 }
 

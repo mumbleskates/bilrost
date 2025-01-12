@@ -1,17 +1,15 @@
-use alloc::borrow::Cow;
-use alloc::vec::Vec;
-use core::ops::Deref;
-
 use crate::buf::ReverseBuf;
-use bytes::{Buf, BufMut};
-
 use crate::encoding::{
     const_varint, delegate_encoding, delegate_value_encoding, encode_varint, encoded_len_varint,
     encoding_implemented_via_value_encoding, prepend_varint, Canonicity, Capped, DecodeContext,
-    DecodeError, DistinguishedValueDecoder, RestrictedDecodeContext, ValueDecoder, ValueEncoder,
-    WireType, Wiretyped,
+    DecodeError, DistinguishedValueBorrowDecoder, DistinguishedValueDecoder, ForOverwrite,
+    RestrictedDecodeContext, ValueBorrowDecoder, ValueDecoder, ValueEncoder, WireType, Wiretyped,
 };
 use crate::DecodeErrorKind::InvalidValue;
+use alloc::borrow::Cow;
+use alloc::vec::Vec;
+use bytes::{Buf, BufMut};
+use core::ops::Deref;
 
 /// `PlainBytes` implements encoding for blob values directly into `Vec<u8>`, and provides the base
 /// implementation for that functionality. `Vec<u8>` cannot generically dispatch to `General`'s
@@ -22,6 +20,55 @@ pub struct PlainBytes;
 
 encoding_implemented_via_value_encoding!(PlainBytes);
 
+impl Wiretyped<PlainBytes> for &[u8] {
+    const WIRE_TYPE: WireType = WireType::LengthDelimited;
+}
+
+impl ValueEncoder<PlainBytes> for &[u8] {
+    #[inline]
+    fn encode_value<B: BufMut + ?Sized>(value: &&[u8], buf: &mut B) {
+        encode_varint(value.len() as u64, buf);
+        buf.put_slice(value);
+    }
+
+    #[inline]
+    fn prepend_value<B: ReverseBuf + ?Sized>(value: &&[u8], buf: &mut B) {
+        buf.prepend_slice(value);
+        prepend_varint(value.len() as u64, buf);
+    }
+
+    #[inline]
+    fn value_encoded_len(value: &&[u8]) -> usize {
+        encoded_len_varint(value.len() as u64) + value.len()
+    }
+}
+
+impl<'a> ValueBorrowDecoder<'a, PlainBytes> for &'a [u8] {
+    #[inline]
+    fn borrow_decode_value(
+        value: &mut Self,
+        mut buf: Capped<&'a [u8]>,
+        _ctx: DecodeContext,
+    ) -> Result<(), DecodeError> {
+        *value = buf.take_borrowed_length_delimited()?;
+        Ok(())
+    }
+}
+
+impl<'a> DistinguishedValueBorrowDecoder<'a, PlainBytes> for &'a [u8] {
+    const CHECKS_EMPTY: bool = false;
+
+    #[inline]
+    fn borrow_decode_value_distinguished<const ALLOW_EMPTY: bool>(
+        value: &mut Self,
+        mut buf: Capped<&'a [u8]>,
+        _ctx: RestrictedDecodeContext,
+    ) -> Result<Canonicity, DecodeError> {
+        *value = buf.take_borrowed_length_delimited()?;
+        Ok(Canonicity::Canonical)
+    }
+}
+
 impl Wiretyped<PlainBytes> for Vec<u8> {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
 }
@@ -29,19 +76,17 @@ impl Wiretyped<PlainBytes> for Vec<u8> {
 impl ValueEncoder<PlainBytes> for Vec<u8> {
     #[inline]
     fn encode_value<B: BufMut + ?Sized>(value: &Vec<u8>, buf: &mut B) {
-        encode_varint(value.len() as u64, buf);
-        buf.put_slice(value.as_slice());
+        ValueEncoder::<PlainBytes>::encode_value(&value.as_slice(), buf)
     }
 
     #[inline]
     fn prepend_value<B: ReverseBuf + ?Sized>(value: &Vec<u8>, buf: &mut B) {
-        buf.prepend_slice(value);
-        prepend_varint(value.len() as u64, buf);
+        ValueEncoder::<PlainBytes>::prepend_value(&value.as_slice(), buf)
     }
 
     #[inline]
     fn value_encoded_len(value: &Vec<u8>) -> usize {
-        encoded_len_varint(value.len() as u64) + value.len()
+        ValueEncoder::<PlainBytes>::value_encoded_len(&value.as_slice())
     }
 }
 
@@ -80,6 +125,10 @@ delegate_encoding!(delegate from (PlainBytes) to (crate::encoding::Unpacked<Plai
     for type (Vec<Vec<u8>>) including distinguished);
 delegate_encoding!(delegate from (PlainBytes) to (crate::encoding::Unpacked<PlainBytes>)
     for type (Vec<Cow<'a, [u8]>>) including distinguished with generics ('a));
+delegate_encoding!(delegate from (PlainBytes) to (crate::encoding::Unpacked<PlainBytes>)
+    for type (Vec<&'a [u8]>) including distinguished with generics ('a));
+delegate_encoding!(delegate from (PlainBytes) to (crate::encoding::Unpacked<PlainBytes>)
+    for type (Vec<&'a [u8; N]>) including distinguished with generics ('a, const N: usize));
 
 #[cfg(test)]
 mod vec_u8 {
@@ -101,19 +150,17 @@ impl Wiretyped<PlainBytes> for Cow<'_, [u8]> {
 impl ValueEncoder<PlainBytes> for Cow<'_, [u8]> {
     #[inline]
     fn encode_value<B: BufMut + ?Sized>(value: &Cow<[u8]>, buf: &mut B) {
-        encode_varint(value.len() as u64, buf);
-        buf.put_slice(value.as_ref());
+        ValueEncoder::<PlainBytes>::encode_value(&&**value, buf)
     }
 
     #[inline]
     fn prepend_value<B: ReverseBuf + ?Sized>(value: &Cow<[u8]>, buf: &mut B) {
-        buf.prepend_slice(value);
-        prepend_varint(value.len() as u64, buf);
+        ValueEncoder::<PlainBytes>::prepend_value(&&**value, buf)
     }
 
     #[inline]
     fn value_encoded_len(value: &Cow<[u8]>) -> usize {
-        encoded_len_varint(value.len() as u64) + value.len()
+        ValueEncoder::<PlainBytes>::value_encoded_len(&&**value)
     }
 }
 
@@ -145,7 +192,34 @@ impl DistinguishedValueDecoder<PlainBytes> for Cow<'_, [u8]> {
     }
 }
 
-// TODO(widders): borrow cow
+impl<'a> ValueBorrowDecoder<'a, PlainBytes> for Cow<'a, [u8]> {
+    #[inline]
+    fn borrow_decode_value(
+        value: &mut Cow<'a, [u8]>,
+        buf: Capped<&'a [u8]>,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError> {
+        let mut s = <&[u8]>::for_overwrite();
+        ValueBorrowDecoder::<PlainBytes>::borrow_decode_value(&mut s, buf, ctx)?;
+        *value = Cow::Borrowed(s);
+        Ok(())
+    }
+}
+
+impl<'a> DistinguishedValueBorrowDecoder<'a, PlainBytes> for Cow<'a, [u8]> {
+    const CHECKS_EMPTY: bool =
+        <&[u8] as DistinguishedValueBorrowDecoder<'a, PlainBytes>>::CHECKS_EMPTY;
+
+    #[inline]
+    fn borrow_decode_value_distinguished<const ALLOW_EMPTY: bool>(
+        value: &mut Cow<'a, [u8]>,
+        buf: Capped<&'a [u8]>,
+        ctx: RestrictedDecodeContext,
+    ) -> Result<Canonicity, DecodeError> {
+        ValueBorrowDecoder::<PlainBytes>::borrow_decode_value(value, buf, ctx.into_inner())?;
+        Ok(Canonicity::Canonical)
+    }
+}
 
 #[cfg(test)]
 mod cow_bytes {
@@ -225,6 +299,8 @@ delegate_value_encoding!(
     with generics (const N: usize)
 );
 
+// TODO(widders): implement &[u8; N]
+
 #[cfg(test)]
 mod u8_array {
     mod length_0 {
@@ -299,17 +375,18 @@ macro_rules! plain_bytes_vec_impl {
         impl$(<$($generics)*>)? $crate::encoding::ValueEncoder<$crate::encoding::PlainBytes>
         for $ty {
             fn encode_value<B: $crate::bytes::BufMut + ?Sized>(value: &$ty, buf: &mut B) {
-                $crate::encoding::encode_varint(value.len() as u64, buf);
-                buf.put_slice(value.as_slice());
+                $crate::encoding::ValueEncoder::<$crate::encoding::PlainBytes>::encode_value
+                    (&&**value, buf)
             }
 
             fn prepend_value<B: $crate::buf::ReverseBuf + ?Sized>(value: &$ty, buf: &mut B) {
-                buf.prepend_slice(value);
-                $crate::encoding::prepend_varint(value.len() as u64, buf);
+                $crate::encoding::ValueEncoder::<$crate::encoding::PlainBytes>::prepend_value
+                    (&&**value, buf)
             }
 
             fn value_encoded_len(value: &$ty) -> usize {
-                $crate::encoding::encoded_len_varint(value.len() as u64) + value.len()
+                $crate::encoding::ValueEncoder::<$crate::encoding::PlainBytes>::value_encoded_len
+                    (&&**value)
             }
         }
 
