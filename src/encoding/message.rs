@@ -99,7 +99,7 @@ pub(crate) fn borrow_merge_distinguished<'a, T: RawDistinguishedMessageBorrowDec
     Ok(canon)
 }
 
-/// A Bilrost message. Provides basic encoding and decoding functionality for message types.
+/// A Bilrost message. Provides basic encoding functionality for message types.
 pub trait Message: EmptyState {
     /// Encodes the message to a buffer.
     ///
@@ -117,42 +117,6 @@ pub trait Message: EmptyState {
     ///
     /// An error will be returned if the buffer does not have sufficient capacity.
     fn encode_length_delimited<B: BufMut + ?Sized>(&self, buf: &mut B) -> Result<(), EncodeError>
-    where
-        Self: Sized;
-
-    /// Decodes an instance of the message from a buffer.
-    ///
-    /// The entire buffer will be consumed.
-    fn decode<B: Buf>(buf: B) -> Result<Self, DecodeError>
-    where
-        Self: Sized;
-
-    /// Decodes a length-delimited instance of the message from the buffer.
-    fn decode_length_delimited<B: Buf>(buf: B) -> Result<Self, DecodeError>
-    where
-        Self: Sized;
-
-    /// Decodes an instance from the given `Capped` buffer, consuming it to its cap.
-    #[doc(hidden)]
-    fn decode_capped<B: Buf + ?Sized>(buf: Capped<B>) -> Result<Self, DecodeError>
-    where
-        Self: Sized;
-
-    /// Decodes the non-ignored fields of this message from the buffer, replacing their values.
-    fn replace_from<B: Buf>(&mut self, buf: B) -> Result<(), DecodeError>
-    where
-        Self: Sized;
-
-    /// Decodes the non-ignored fields of this message, replacing their values from a
-    /// length-delimited value encoded in the buffer.
-    fn replace_from_length_delimited<B: Buf>(&mut self, buf: B) -> Result<(), DecodeError>
-    where
-        Self: Sized;
-
-    /// Decodes the non-ignored fields of this message, replacing their values from the given capped
-    /// buffer.
-    #[doc(hidden)]
-    fn replace_from_capped<B: Buf + ?Sized>(&mut self, buf: Capped<B>) -> Result<(), DecodeError>
     where
         Self: Sized;
 
@@ -192,6 +156,48 @@ pub trait Message: EmptyState {
 
     /// Encodes the message with a length-delimiter to a `Bytes` buffer.
     fn encode_length_delimited_dyn(&self, buf: &mut dyn BufMut) -> Result<(), EncodeError>;
+}
+
+/// Basic decoding functionality for a Bilrost message that can decode to an owned form. This
+/// trait's decoding methods can decode from any byte buffer that implements `bytes::Buf`.
+pub trait OwnedMessage: Message {
+    /// Decodes an instance of the message from a buffer.
+    ///
+    /// The entire buffer will be consumed.
+    fn decode<B: Buf>(buf: B) -> Result<Self, DecodeError>
+    where
+        Self: Sized;
+
+    /// Decodes a length-delimited instance of the message from the buffer.
+    fn decode_length_delimited<B: Buf>(buf: B) -> Result<Self, DecodeError>
+    where
+        Self: Sized;
+
+    /// Decodes an instance from the given `Capped` buffer, consuming it to its cap.
+    #[doc(hidden)]
+    fn decode_capped<B: Buf + ?Sized>(buf: Capped<B>) -> Result<Self, DecodeError>
+    where
+        Self: Sized;
+
+    /// Decodes the non-ignored fields of this message from the buffer, replacing their values.
+    fn replace_from<B: Buf>(&mut self, buf: B) -> Result<(), DecodeError>
+    where
+        Self: Sized;
+
+    /// Decodes the non-ignored fields of this message, replacing their values from a
+    /// length-delimited value encoded in the buffer.
+    fn replace_from_length_delimited<B: Buf>(&mut self, buf: B) -> Result<(), DecodeError>
+    where
+        Self: Sized;
+
+    /// Decodes the non-ignored fields of this message, replacing their values from the given capped
+    /// buffer.
+    #[doc(hidden)]
+    fn replace_from_capped<B: Buf + ?Sized>(&mut self, buf: Capped<B>) -> Result<(), DecodeError>
+    where
+        Self: Sized;
+
+    // ------------ Dyn-compatible methods follow ------------
 
     /// Decodes the non-ignored fields of this message from the buffer, replacing their values.
     fn replace_from_slice(&mut self, buf: &[u8]) -> Result<(), DecodeError>;
@@ -213,7 +219,7 @@ pub trait Message: EmptyState {
     fn replace_from_capped_dyn(&mut self, buf: Capped<dyn Buf>) -> Result<(), DecodeError>;
 }
 
-/// An enhanced trait for Bilrost messages that promise a distinguished representation.
+/// An enhanced trait for owned Bilrost messages that promise a distinguished representation.
 ///
 /// Implementation of this trait comes with the following promises:
 ///
@@ -238,7 +244,7 @@ pub trait Message: EmptyState {
 /// "restricted" methods is `HasExtensions`: "distinguished" methods already dispatch to passing
 /// `NotCanonical`, and when `Canonical` is passed only `Canonical` can be returned from a
 /// successful result (hence the "canonical" methods).
-pub trait DistinguishedMessage: Message {
+pub trait DistinguishedOwnedMessage: Message {
     // ------------ Distinguished mode ------------
 
     /// Decodes an instance of the message from a buffer in distinguished mode.
