@@ -8,6 +8,29 @@ use crate::{Canonicity, DecodeError};
 use alloc::vec::Vec;
 use bytes::{Buf, BufMut};
 
+empty_state_via_default!(&bstr::BStr);
+
+impl Wiretyped<PlainBytes> for &bstr::BStr {
+    const WIRE_TYPE: WireType = WireType::LengthDelimited;
+}
+
+impl ValueEncoder<PlainBytes> for &bstr::BStr {
+    #[inline]
+    fn encode_value<B: BufMut + ?Sized>(value: &&bstr::BStr, buf: &mut B) {
+        ValueEncoder::<PlainBytes>::encode_value(&&***value, buf)
+    }
+
+    #[inline]
+    fn prepend_value<B: ReverseBuf + ?Sized>(value: &&bstr::BStr, buf: &mut B) {
+        ValueEncoder::<PlainBytes>::prepend_value(&&***value, buf)
+    }
+
+    #[inline]
+    fn value_encoded_len(value: &&bstr::BStr) -> usize {
+        ValueEncoder::<PlainBytes>::value_encoded_len(&&***value)
+    }
+}
+
 for_overwrite_via_default!(bstr::BString);
 
 impl EmptyState for bstr::BString {
@@ -71,9 +94,7 @@ impl DistinguishedValueDecoder<General> for bstr::BString {
     }
 }
 
-empty_state_via_default!(&bstr::BStr);
-
-// TODO(widders): do this via &[u8]
+// TODO(widders): Cow<BStr>
 
 #[cfg(test)]
 mod test {

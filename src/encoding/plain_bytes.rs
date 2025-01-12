@@ -299,7 +299,64 @@ delegate_value_encoding!(
     with generics (const N: usize)
 );
 
-// TODO(widders): implement &[u8; N]
+impl<const N: usize> Wiretyped<PlainBytes> for &[u8; N] {
+    const WIRE_TYPE: WireType = WireType::LengthDelimited;
+}
+
+impl<const N: usize> ValueEncoder<PlainBytes> for &[u8; N] {
+    #[inline]
+    fn encode_value<B: BufMut + ?Sized>(value: &&[u8; N], buf: &mut B) {
+        ValueEncoder::<PlainBytes>::encode_value(&value.as_slice(), buf)
+    }
+
+    #[inline]
+    fn prepend_value<B: ReverseBuf + ?Sized>(value: &&[u8; N], buf: &mut B) {
+        ValueEncoder::<PlainBytes>::prepend_value(&value.as_slice(), buf)
+    }
+
+    #[inline]
+    fn value_encoded_len(value: &&[u8; N]) -> usize {
+        ValueEncoder::<PlainBytes>::value_encoded_len(&value.as_slice())
+    }
+
+    #[inline]
+    fn many_values_encoded_len<I>(values: I) -> usize
+    where
+        I: ExactSizeIterator,
+        I::Item: Deref<Target = Self>,
+    {
+        values.len() * (const_varint(N as u64).len() + N)
+    }
+}
+
+impl<'a, const N: usize> ValueBorrowDecoder<'a, PlainBytes> for &'a [u8; N] {
+    #[inline]
+    fn borrow_decode_value(
+        value: &mut &'a [u8; N],
+        mut buf: Capped<&'a [u8]>,
+        _ctx: DecodeContext,
+    ) -> Result<(), DecodeError> {
+        *value = buf
+            .take_borrowed_length_delimited()?
+            .try_into()
+            .map_err(|_| InvalidValue)?;
+        Ok(())
+    }
+}
+
+impl<'a, const N: usize> DistinguishedValueBorrowDecoder<'a, PlainBytes> for &'a [u8; N] {
+    const CHECKS_EMPTY: bool = false;
+
+    #[inline]
+    fn borrow_decode_value_distinguished<const ALLOW_EMPTY: bool>(
+        value: &mut &'a [u8; N],
+        buf: Capped<&'a [u8]>,
+        ctx: RestrictedDecodeContext,
+    ) -> Result<Canonicity, DecodeError> {
+        ValueBorrowDecoder::<PlainBytes>::borrow_decode_value(value, buf, ctx.into_inner())?;
+        Ok(Canonicity::Canonical)
+    }
+}
 
 #[cfg(test)]
 mod u8_array {
