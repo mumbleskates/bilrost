@@ -1,8 +1,5 @@
 use crate::buf::ReverseBuf;
-use crate::encoding::{
-    Capped, DecodeContext, DistinguishedValueDecoder, RestrictedDecodeContext, ValueDecoder,
-    ValueEncoder, WireType, Wiretyped,
-};
+use crate::encoding::{Capped, DecodeContext, DistinguishedValueBorrowDecoder, DistinguishedValueDecoder, RestrictedDecodeContext, ValueBorrowDecoder, ValueDecoder, ValueEncoder, WireType, Wiretyped};
 use crate::{Canonicity, DecodeError, DecodeErrorKind};
 use bytes::{Buf, BufMut};
 use core::ops::Deref;
@@ -114,6 +111,44 @@ where
     ) -> Result<Canonicity, DecodeError> {
         let mut proxy = T::new_proxy();
         let mut canon = DistinguishedValueDecoder::<E>::decode_value_distinguished::<ALLOW_EMPTY>(
+            &mut proxy, buf, ctx,
+        )?;
+        canon.update(value.decode_proxy_distinguished(proxy)?);
+        Ok(canon)
+    }
+}
+
+impl<'a, T, E> ValueBorrowDecoder<'a, Proxied<E>> for T
+where
+    T: Proxiable,
+    T::Proxy: ValueBorrowDecoder<'a, E>,
+{
+    #[inline]
+    fn borrow_decode_value(
+        value: &mut Self,
+        buf: Capped<&'a [u8]>,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError> {
+        let mut proxy = T::new_proxy();
+        ValueBorrowDecoder::<E>::borrow_decode_value(&mut proxy, buf, ctx)?;
+        Ok(value.decode_proxy(proxy)?)
+    }
+}
+
+impl<'a, T, E> DistinguishedValueBorrowDecoder<'a, Proxied<E>> for T
+where
+    T: DistinguishedProxiable + Eq,
+    T::Proxy: DistinguishedValueBorrowDecoder<'a, E>,
+{
+    const CHECKS_EMPTY: bool = T::Proxy::CHECKS_EMPTY;
+
+    fn borrow_decode_value_distinguished<const ALLOW_EMPTY: bool>(
+        value: &mut Self,
+        buf: Capped<&'a [u8]>,
+        ctx: RestrictedDecodeContext,
+    ) -> Result<Canonicity, DecodeError> {
+        let mut proxy = T::new_proxy();
+        let mut canon = DistinguishedValueBorrowDecoder::<E>::borrow_decode_value_distinguished::<ALLOW_EMPTY>(
             &mut proxy, buf, ctx,
         )?;
         canon.update(value.decode_proxy_distinguished(proxy)?);
