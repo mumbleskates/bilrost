@@ -2587,6 +2587,7 @@ mod test {
     use crate::Blob;
     use crate::DecodeErrorKind::OutOfDomainValue;
 
+    // TODO(widders): this needs to have borrowed decoding coverage
     /// Generalized proptest macro. Kind must be either `relaxed` or `distinguished`.
     macro_rules! check_type_test {
         ($encoder:ty, $kind:ident, $ty:ty, $wire_type:expr) => {

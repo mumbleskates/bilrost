@@ -66,6 +66,8 @@ delegate_value_encoding!(delegate from (General) to (Varint)
 delegate_value_encoding!(delegate from (General) to (Fixed) for type (f32));
 delegate_value_encoding!(delegate from (General) to (Fixed) for type (f64));
 
+// TODO(widders): type tests for &str, &[u8], &[u8; N], and &bstr::BStr
+
 impl Wiretyped<General> for &str {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
 }
