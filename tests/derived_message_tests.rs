@@ -12,7 +12,10 @@ use bilrost::DecodeErrorKind::{
     ConflictingFields, InvalidValue, InvalidVarint, OutOfDomainValue, TagOverflowed, Truncated,
     UnexpectedlyRepeated, WrongWireType,
 };
-use bilrost::{DecodeErrorKind, DistinguishedMessage, Enumeration, Message, Oneof};
+use bilrost::{
+    DecodeErrorKind, DistinguishedMessage, DistinguishedOwnedMessage, Enumeration, Message, Oneof,
+    OwnedMessage,
+};
 use bilrost_derive::DistinguishedOneof;
 use core::mem::size_of;
 use itertools::{repeat_n, Itertools};
@@ -49,7 +52,7 @@ impl<'a> IntoOpaqueMessage<'a> for &[(u32, OV<'a>)] {
 
 impl IntoOpaqueMessage<'static> for Vec<u8> {
     fn into_opaque_message(self) -> OpaqueMessage<'static> {
-        <() as Message>::decode(self.as_slice()).expect("did not decode with ignore unit");
+        <() as OwnedMessage>::decode(self.as_slice()).expect("did not decode with ignore unit");
         OpaqueMessage::decode(self.as_slice()).expect("did not decode")
     }
 }
@@ -73,7 +76,7 @@ trait FromOpaque {
     fn from_opaque<'a>(from: impl IntoOpaqueMessage<'a>) -> Self;
 }
 
-impl<T: Message> FromOpaque for T {
+impl<T: OwnedMessage> FromOpaque for T {
     fn from_opaque<'a>(from: impl IntoOpaqueMessage<'a>) -> Self {
         Self::decode(&*from.into_opaque_message().encode_to_vec()).expect("failed to decode")
     }
@@ -105,7 +108,7 @@ mod assert {
 
     pub(super) fn decodes<'a, M>(from: impl IntoOpaqueMessage<'a>, into: M)
     where
-        M: Message + Debug + PartialEq + EmptyState,
+        M: OwnedMessage + Debug + PartialEq + EmptyState,
     {
         let encoded = from.into_opaque_message().encode_to_vec();
         assert_eq!(M::decode(encoded.as_slice()).as_ref(), Ok(&into));
@@ -119,7 +122,7 @@ mod assert {
         err: DecodeErrorKind,
         err_path: &str,
     ) where
-        M: Message + Debug + EmptyState,
+        M: OwnedMessage + Debug + EmptyState,
     {
         let encoded = from.into_opaque_message().encode_to_vec();
         assert_error(
@@ -139,7 +142,7 @@ mod assert {
 
     pub(super) fn decodes_distinguished<'a, M>(from: impl IntoOpaqueMessage<'a>, into: M)
     where
-        M: DistinguishedMessage + Debug + Eq + EmptyState,
+        M: DistinguishedOwnedMessage + Debug + Eq + EmptyState,
     {
         let encoded = from.into_opaque_message().encode_to_vec();
         assert_eq!(M::decode(encoded.as_slice()).as_ref(), Ok(&into));
@@ -213,7 +216,7 @@ mod assert {
         expected_canon: Canonicity,
         err_expectations: impl RestrictedExpectations,
     ) where
-        M: DistinguishedMessage + Debug + Eq + EmptyState,
+        M: DistinguishedOwnedMessage + Debug + Eq + EmptyState,
     {
         assert_ne!(expected_canon, Canonical); // otherwise why call this function
         let encoded = from.into_opaque_message().encode_to_vec();
@@ -289,7 +292,7 @@ mod assert {
         err: DecodeErrorKind,
         err_path: &str,
     ) where
-        M: DistinguishedMessage + Debug + EmptyState,
+        M: DistinguishedOwnedMessage + Debug + EmptyState,
     {
         let encoded = from.into_opaque_message().encode_to_vec();
         assert_error(
@@ -322,7 +325,7 @@ mod assert {
         );
     }
 
-    pub(super) fn encodes<'a, M: Message>(value: M, becomes: impl IntoOpaqueMessage<'a>) {
+    pub(super) fn encodes<'a, M: OwnedMessage>(value: M, becomes: impl IntoOpaqueMessage<'a>) {
         let forward_encoded = value.encode_to_vec();
         assert_eq!(
             OpaqueMessage::decode(forward_encoded.as_slice()),
@@ -342,7 +345,7 @@ mod assert {
 
     pub(super) fn is_invalid<M>(value: impl AsRef<[u8]>, err: DecodeErrorKind, err_path: &str)
     where
-        M: Message + Debug + EmptyState,
+        M: OwnedMessage + Debug + EmptyState,
     {
         assert_error(
             M::decode(value.as_ref()).expect_err("decoded without error"),
@@ -364,7 +367,7 @@ mod assert {
         err: DecodeErrorKind,
         err_path: &str,
     ) where
-        M: DistinguishedMessage + Debug + EmptyState,
+        M: DistinguishedOwnedMessage + Debug + EmptyState,
     {
         assert_error(
             M::decode_distinguished(value.as_ref()).expect_err("decoded without error"),
@@ -399,32 +402,32 @@ fn derived_trait_bounds() {
         #[bilrost(2)]
         Two(T),
     }
-    static_assertions::assert_impl_all!(A<bool>: Oneof, DistinguishedOneofDecoder);
-    static_assertions::assert_impl_all!(A<f32>: Oneof);
+    static_assertions::assert_impl_all!(A<bool>: DistinguishedOneofDecoder);
+    static_assertions::assert_impl_all!(A<f32>: OneofDecoder);
     static_assertions::assert_not_impl_any!(A<f32>: DistinguishedOneofDecoder);
-    static_assertions::assert_not_impl_any!(A<X>: Oneof, DistinguishedOneofDecoder);
+    static_assertions::assert_not_impl_any!(A<X>: DistinguishedOneofDecoder);
 
     #[allow(dead_code)]
     #[derive(PartialEq, Eq, Message, DistinguishedMessage)]
     struct Inner<U>(U);
-    static_assertions::assert_impl_all!(Inner<bool>: Message, DistinguishedMessage);
-    static_assertions::assert_impl_all!(Inner<f32>: Message);
-    static_assertions::assert_not_impl_any!(Inner<f32>: DistinguishedMessage);
-    static_assertions::assert_not_impl_any!(Inner<X>: Message, DistinguishedMessage);
+    static_assertions::assert_impl_all!(Inner<bool>: DistinguishedOwnedMessage);
+    static_assertions::assert_impl_all!(Inner<f32>: OwnedMessage);
+    static_assertions::assert_not_impl_any!(Inner<f32>: DistinguishedOwnedMessage);
+    static_assertions::assert_not_impl_any!(Inner<X>: DistinguishedOwnedMessage);
 
     #[allow(dead_code)]
     #[derive(PartialEq, Eq, Message, DistinguishedMessage)]
     struct Foo<T, U, V>(#[bilrost(oneof(1, 2))] A<T>, Inner<U>, V);
-    static_assertions::assert_impl_all!(Foo<bool, bool, bool>: Message, DistinguishedMessage);
-    static_assertions::assert_impl_all!(Foo<f32, bool, bool>: Message);
-    static_assertions::assert_impl_all!(Foo<bool, f32, bool>: Message);
-    static_assertions::assert_impl_all!(Foo<bool, bool, f32>: Message);
-    static_assertions::assert_not_impl_any!(Foo<f32, bool, bool>: DistinguishedMessage);
-    static_assertions::assert_not_impl_any!(Foo<bool, f32, bool>: DistinguishedMessage);
-    static_assertions::assert_not_impl_any!(Foo<bool, bool, f32>: DistinguishedMessage);
-    static_assertions::assert_not_impl_any!(Foo<X, bool, bool>: Message, DistinguishedMessage);
-    static_assertions::assert_not_impl_any!(Foo<bool, X, bool>: Message, DistinguishedMessage);
-    static_assertions::assert_not_impl_any!(Foo<bool, bool, X>: Message, DistinguishedMessage);
+    static_assertions::assert_impl_all!(Foo<bool, bool, bool>: DistinguishedOwnedMessage);
+    static_assertions::assert_impl_all!(Foo<f32, bool, bool>: OwnedMessage);
+    static_assertions::assert_impl_all!(Foo<bool, f32, bool>: OwnedMessage);
+    static_assertions::assert_impl_all!(Foo<bool, bool, f32>: OwnedMessage);
+    static_assertions::assert_not_impl_any!(Foo<f32, bool, bool>: DistinguishedOwnedMessage);
+    static_assertions::assert_not_impl_any!(Foo<bool, f32, bool>: DistinguishedOwnedMessage);
+    static_assertions::assert_not_impl_any!(Foo<bool, bool, f32>: DistinguishedOwnedMessage);
+    static_assertions::assert_not_impl_any!(Foo<X, bool, bool>: DistinguishedOwnedMessage);
+    static_assertions::assert_not_impl_any!(Foo<bool, X, bool>: DistinguishedOwnedMessage);
+    static_assertions::assert_not_impl_any!(Foo<bool, bool, X>: DistinguishedOwnedMessage);
 }
 
 #[test]
@@ -436,7 +439,7 @@ fn recursive_messages() {
         children: Vec<Tree>,
     }
 
-    static_assertions::assert_impl_all!(Tree: Message, DistinguishedMessage);
+    static_assertions::assert_impl_all!(Tree: DistinguishedOwnedMessage);
 }
 
 // Tests for encoding rigor
@@ -996,9 +999,9 @@ fn generic_encodings() {
         }
     }
 
-    static_assertions::assert_impl_all!(Foo<String, General>: Message);
+    static_assertions::assert_impl_all!(Foo<String, General>: OwnedMessage);
     static_assertions::assert_not_impl_any!(Foo<u8, General>: Message);
-    static_assertions::assert_impl_all!(Foo<u8, Varint>: Message);
+    static_assertions::assert_impl_all!(Foo<u8, Varint>: OwnedMessage);
 }
 
 // Varint tests
@@ -1500,9 +1503,9 @@ fn parsing_byte_arrays() {
     #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
     struct Bar<const N: usize>(#[bilrost(tag(1), encoding(fixed))] [u8; N]);
 
-    static_assertions::assert_not_impl_any!(Bar<0>: Message, DistinguishedMessage);
-    static_assertions::assert_not_impl_any!(Bar<2>: Message, DistinguishedMessage);
-    static_assertions::assert_not_impl_any!(Bar<16>: Message, DistinguishedMessage);
+    static_assertions::assert_not_impl_any!(Bar<0>: Message);
+    static_assertions::assert_not_impl_any!(Bar<2>: Message);
+    static_assertions::assert_not_impl_any!(Bar<16>: Message);
     assert::decodes_distinguished([(1, OV::fixed_u32(0x04030201))], Bar([1, 2, 3, 4]));
     assert::decodes_non_canonically([(1, OV::fixed_u32(0))], Bar([0; 4]), NotCanonical, "Bar.0");
     assert::decodes_distinguished([(1, OV::SixtyFourBit([8; 8]))], Bar([8; 8]));
@@ -3047,16 +3050,18 @@ fn oneof_as_message_unqualified() {
     }
 
     static_assertions::assert_impl_all!(
-        Maybe<i32>: Oneof, DistinguishedOneofDecoder, Message, DistinguishedMessage
+        Maybe<i32>: DistinguishedOneofDecoder, DistinguishedOwnedMessage
     );
 
-    static_assertions::assert_impl_all!(Maybe<f64>: Oneof, Message);
-    static_assertions::assert_not_impl_any!(Maybe<f64>: DistinguishedOneofDecoder, DistinguishedMessage);
+    static_assertions::assert_impl_all!(Maybe<f64>: Oneof, OwnedMessage);
+    static_assertions::assert_not_impl_any!(
+        Maybe<f64>: DistinguishedOneofDecoder, DistinguishedOwnedMessage
+    );
 
     #[allow(dead_code)]
     struct NotEncodable;
     static_assertions::assert_not_impl_any!(
-        Maybe<NotEncodable>: Oneof, DistinguishedOneofDecoder, Message, DistinguishedMessage
+        Maybe<NotEncodable>: DistinguishedOneofDecoder, DistinguishedOwnedMessage
     );
 }
 
@@ -3114,32 +3119,28 @@ fn enumeration_decoding() {
     #[derive(Clone, Debug, PartialEq, Eq, Message, DistinguishedMessage)]
     struct Unpacked<T>(#[bilrost(encoding(unpacked))] T);
 
-    static_assertions::assert_impl_all!(Packed<[HasZero; 5]>: Message, DistinguishedMessage);
-    static_assertions::assert_impl_all!(Unpacked<[HasZero; 5]>: Message, DistinguishedMessage);
+    static_assertions::assert_impl_all!(Packed<[HasZero; 5]>: DistinguishedOwnedMessage);
+    static_assertions::assert_impl_all!(Unpacked<[HasZero; 5]>: DistinguishedOwnedMessage);
     // Fixed-size arrays of enumeration types that don't impl EmptyState aren't supported, because
     // the array type has no empty state either.
     static_assertions::assert_not_impl_any!(Packed<[DefaultButNoZero; 5]>:
-        Message, DistinguishedMessage);
+        DistinguishedOwnedMessage);
     static_assertions::assert_not_impl_any!(Unpacked<[DefaultButNoZero; 5]>:
-        Message, DistinguishedMessage);
+        DistinguishedOwnedMessage);
 
-    static_assertions::assert_impl_all!(Packed<Option<[HasZero; 5]>>:
-        Message, DistinguishedMessage);
-    static_assertions::assert_impl_all!(Unpacked<Option<[HasZero; 5]>>:
-        Message, DistinguishedMessage);
+    static_assertions::assert_impl_all!(Packed<Option<[HasZero; 5]>>: DistinguishedOwnedMessage);
+    static_assertions::assert_impl_all!(Unpacked<Option<[HasZero; 5]>>: DistinguishedOwnedMessage);
     static_assertions::assert_impl_all!(Packed<Option<[DefaultButNoZero; 5]>>:
-        Message, DistinguishedMessage);
+        DistinguishedOwnedMessage);
     static_assertions::assert_impl_all!(Unpacked<Option<[DefaultButNoZero; 5]>>:
-        Message, DistinguishedMessage);
+        DistinguishedOwnedMessage);
 
-    static_assertions::assert_impl_all!(Packed<Vec<HasZero>>: Message, DistinguishedMessage);
-    static_assertions::assert_impl_all!(Unpacked<Vec<HasZero>>: Message, DistinguishedMessage);
+    static_assertions::assert_impl_all!(Packed<Vec<HasZero>>: DistinguishedOwnedMessage);
+    static_assertions::assert_impl_all!(Unpacked<Vec<HasZero>>: DistinguishedOwnedMessage);
     // If the empty state of the collection is that it has no items, then we *can* represent a
     // collection of values that don't implement EmptyState themselves.
-    static_assertions::assert_impl_all!(Packed<Vec<DefaultButNoZero>>:
-        Message, DistinguishedMessage);
-    static_assertions::assert_impl_all!(Unpacked<Vec<DefaultButNoZero>>:
-        Message, DistinguishedMessage);
+    static_assertions::assert_impl_all!(Packed<Vec<DefaultButNoZero>>: DistinguishedOwnedMessage);
+    static_assertions::assert_impl_all!(Unpacked<Vec<DefaultButNoZero>>: DistinguishedOwnedMessage);
 }
 
 #[test]
@@ -3428,11 +3429,11 @@ fn tuples() {
     #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
     struct FooTuple<T, U>(#[bilrost(encoding((varint, general)))] (T, U));
 
-    static_assertions::assert_impl_all!(FooTuple<bool, bool>: Message, DistinguishedMessage);
-    static_assertions::assert_impl_all!(FooTuple<bool, f32>: Message);
-    static_assertions::assert_not_impl_any!(FooTuple<bool, f32>: DistinguishedMessage);
+    static_assertions::assert_impl_all!(FooTuple<bool, bool>: DistinguishedOwnedMessage);
+    static_assertions::assert_impl_all!(FooTuple<bool, f32>: OwnedMessage);
+    static_assertions::assert_not_impl_any!(FooTuple<bool, f32>: DistinguishedOwnedMessage);
     // f32 doesn't support the "varint" encoding.
-    static_assertions::assert_not_impl_any!(FooTuple<f32, f32>: Message);
+    static_assertions::assert_not_impl_any!(FooTuple<f32, f32>: OwnedMessage);
 
     assert_eq!(
         FooTuple((1i8, "foo".to_string())).encode_to_vec(),
