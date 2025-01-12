@@ -511,7 +511,6 @@ pub trait DistinguishedOwnedMessage: OwnedMessage {
 }
 
 /// Basic decoding functionality for a Bilrost message that can decode from a borrowed slice.
-// TODO(widders): create impl
 pub trait BorrowedMessage<'a>: Message {
     /// Decodes an instance of the message from a buffer.
     ///
@@ -560,7 +559,6 @@ pub trait BorrowedMessage<'a>: Message {
 /// "restricted" methods is `HasExtensions`: "distinguished" methods already dispatch to passing
 /// `NotCanonical`, and when `Canonical` is passed only `Canonical` can be returned from a
 /// successful result (hence the "canonical" methods).
-// TODO(widders): create impl
 pub trait DistinguishedBorrowedMessage<'a>: BorrowedMessage<'a> {
     // ------------ Distinguished mode ------------
 
@@ -1092,6 +1090,158 @@ where
         buf: Capped<dyn Buf>,
     ) -> Result<(), DecodeError> {
         self.replace_restricted_from_capped(buf, Canonical)
+            .map(|canon| debug_assert_eq!(canon, Canonical))
+    }
+}
+
+impl<'a, T> BorrowedMessage<'a> for T
+where
+    T: RawMessageBorrowDecoder<'a> + Sized,
+{
+    fn decode_borrowed(mut buf: &'a [u8]) -> Result<Self, DecodeError> {
+        let mut message = Self::empty();
+        borrow_merge(
+            &mut message,
+            Capped::new(&mut buf),
+            DecodeContext::default(),
+        )?;
+        Ok(message)
+    }
+
+    fn decode_borrowed_length_delimited(mut buf: &'a [u8]) -> Result<Self, DecodeError> {
+        Self::decode_borrowed(Capped::new(&mut buf).take_borrowed_length_delimited()?)
+    }
+
+    fn replace_borrowed_from(&mut self, mut buf: &'a [u8]) -> Result<(), DecodeError> {
+        self.clear();
+        borrow_merge(self, Capped::new(&mut buf), DecodeContext::default()).map_err(|err| {
+            self.clear();
+            err
+        })
+    }
+
+    fn replace_borrowed_from_length_delimited(
+        &mut self,
+        mut buf: &'a [u8],
+    ) -> Result<(), DecodeError> {
+        self.replace_borrowed_from(Capped::new(&mut buf).take_borrowed_length_delimited()?)
+    }
+}
+
+impl<'a, T> DistinguishedBorrowedMessage<'a> for T
+where
+    T: RawDistinguishedMessageBorrowDecoder<'a> + RawMessageBorrowDecoder<'a>,
+{
+    fn decode_distinguished_borrowed(buf: &'a [u8]) -> Result<(Self, Canonicity), DecodeError> {
+        Self::decode_restricted_borrowed(buf, NotCanonical)
+    }
+
+    fn decode_distinguished_borrowed_length_delimited(
+        buf: &'a [u8],
+    ) -> Result<(Self, Canonicity), DecodeError> {
+        Self::decode_restricted_borrowed_length_delimited(buf, NotCanonical)
+    }
+
+    fn replace_distinguished_borrowed_from(
+        &mut self,
+        buf: &'a [u8],
+    ) -> Result<Canonicity, DecodeError> {
+        self.replace_restricted_borrowed_from(buf, NotCanonical)
+    }
+
+    fn replace_distinguished_borrowed_from_length_delimited(
+        &mut self,
+        buf: &'a [u8],
+    ) -> Result<Canonicity, DecodeError> {
+        self.replace_restricted_borrowed_from_length_delimited(buf, NotCanonical)
+    }
+
+    fn decode_restricted_borrowed(
+        mut buf: &'a [u8],
+        restrict_to: Canonicity,
+    ) -> Result<(Self, Canonicity), DecodeError>
+    where
+        Self: Sized,
+    {
+        let mut message = Self::empty();
+        let canon = borrow_merge_distinguished(
+            &mut message,
+            Capped::new(&mut buf),
+            RestrictedDecodeContext::new(restrict_to),
+        )?;
+        Ok((message, canon))
+    }
+
+    fn decode_restricted_borrowed_length_delimited(
+        mut buf: &'a [u8],
+        restrict_to: Canonicity,
+    ) -> Result<(Self, Canonicity), DecodeError>
+    where
+        Self: Sized,
+    {
+        Self::decode_restricted_borrowed(
+            Capped::new(&mut buf).take_borrowed_length_delimited()?,
+            restrict_to,
+        )
+    }
+
+    fn replace_restricted_borrowed_from(
+        &mut self,
+        mut buf: &'a [u8],
+        restrict_to: Canonicity,
+    ) -> Result<Canonicity, DecodeError>
+    where
+        Self: Sized,
+    {
+        self.clear();
+        borrow_merge_distinguished(
+            self,
+            Capped::new(&mut buf),
+            RestrictedDecodeContext::new(restrict_to),
+        ).map_err(|err| {
+            self.clear();
+            err
+        })
+    }
+
+    fn replace_restricted_borrowed_from_length_delimited(
+        &mut self,
+        mut buf: &'a [u8],
+        restrict_to: Canonicity,
+    ) -> Result<Canonicity, DecodeError>
+    where
+        Self: Sized,
+    {
+        self.replace_restricted_borrowed_from(
+            Capped::new(&mut buf).take_borrowed_length_delimited()?,
+            restrict_to,
+        )
+    }
+
+    fn decode_canonical_borrowed(buf: &'a [u8]) -> Result<Self, DecodeError> {
+        Self::decode_restricted_borrowed(buf, Canonical).map(|(val, canon)| {
+            debug_assert_eq!(canon, Canonical);
+            val
+        })
+    }
+
+    fn decode_canonical_borrowed_length_delimited(buf: &'a [u8]) -> Result<Self, DecodeError> {
+        Self::decode_restricted_borrowed_length_delimited(buf, Canonical).map(|(val, canon)| {
+            debug_assert_eq!(canon, Canonical);
+            val
+        })
+    }
+
+    fn replace_canonical_borrowed_from(&mut self, buf: &'a [u8]) -> Result<(), DecodeError> {
+        self.replace_restricted_borrowed_from(buf, Canonical)
+            .map(|canon| debug_assert_eq!(canon, Canonical))
+    }
+
+    fn replace_canonical_borrowed_from_length_delimited(
+        &mut self,
+        buf: &'a [u8],
+    ) -> Result<(), DecodeError> {
+        self.replace_restricted_borrowed_from_length_delimited(buf, Canonical)
             .map(|canon| debug_assert_eq!(canon, Canonical))
     }
 }
