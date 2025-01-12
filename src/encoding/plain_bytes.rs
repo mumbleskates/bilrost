@@ -285,6 +285,12 @@ macro_rules! plain_bytes_vec_impl {
         $do_extend:expr
         $(, with generics ($($generics:tt)*))?
     ) => {
+        $crate::encoding::delegate_value_encoding!(
+            encoding ($crate::encoding::PlainBytes)
+            borrows type ($ty) as owned including distinguished
+            $(with generics ($($generics)*))?
+        );
+
         impl$(<$($generics)*>)? $crate::encoding::Wiretyped<$crate::encoding::PlainBytes> for $ty {
             const WIRE_TYPE: $crate::encoding::WireType =
                 $crate::encoding::WireType::LengthDelimited;
