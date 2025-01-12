@@ -879,6 +879,8 @@ impl<'a, B: 'a + Buf + ?Sized> Capped<'a, B> {
     #[inline(always)]
     pub fn take_length_delimited(&mut self) -> Result<Capped<B>, DecodeError> {
         let len = decode_length_delimiter(&mut *self.buf)?;
+        // Rather than checking that len + extra_bytes_remaining fits in remaining, we subtract and
+        // compare the smaller values to avoid situations that may overflow.
         let remaining = self.buf.remaining();
         if len > remaining {
             return Err(DecodeError::new(Truncated));
@@ -937,6 +939,35 @@ impl<'a, B: 'a + Buf + ?Sized> Capped<'a, B> {
             Ordering::Equal => Ok(false),
             Ordering::Greater => Ok(true),
         }
+    }
+}
+
+impl<'a> Capped<'_, &'a [u8]> {
+    /// Reads a length delimiter from the beginning of the wrapped slice, then advances that inner
+    /// slice past the delineated bytes and returns them borrowed with lifetime if the instance's
+    /// cap is not overrun.
+    #[inline(always)]
+    pub fn take_borrowed_length_delimited(&mut self) -> Result<&'a [u8], DecodeError> {
+        let len = decode_length_delimiter(&mut *self.buf)?;
+        // Rather than checking that len + extra_bytes_remaining fits in remaining, we subtract and
+        // compare the smaller values to avoid situations that may overflow.
+        let remaining = self.buf.remaining();
+        if len > remaining {
+            return Err(DecodeError::new(Truncated));
+        }
+        let extra_bytes_remaining = remaining - len;
+        if extra_bytes_remaining < self.extra_bytes_remaining {
+            return Err(DecodeError::new(Truncated));
+        }
+
+        // Unlike the non-borrowed impl, we advance the buf and give the slice directly as a result.
+        let taken;
+        // MSRV: this could be `split_at_unchecked` (1.79)
+        (taken, *self.buf) =
+            // SAFETY: we checked above that `self.buf` is of at least length `len`
+            unsafe { (self.buf.get_unchecked(..len), self.buf.get_unchecked(len..)) };
+
+        Ok(taken)
     }
 }
 
