@@ -27,7 +27,9 @@ pub mod encoding;
 #[doc(hidden)]
 mod iter;
 
-pub use crate::encoding::message::{DistinguishedMessage, Message};
+pub use crate::encoding::message::{
+    BorrowedMessage, DistinguishedBorrowedMessage, DistinguishedOwnedMessage, Message, OwnedMessage,
+};
 pub use crate::encoding::{Canonicity, Enumeration, WithCanonicity};
 pub use crate::error::{DecodeError, DecodeErrorKind, EncodeError};
 
