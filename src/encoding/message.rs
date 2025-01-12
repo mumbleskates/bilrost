@@ -510,6 +510,151 @@ pub trait DistinguishedOwnedMessage: Message {
     ) -> Result<(), DecodeError>;
 }
 
+/// Basic decoding functionality for a Bilrost message that can decode from a borrowed slice.
+pub trait BorrowedMessage<'a>: Message {
+    /// Decodes an instance of the message from a buffer.
+    ///
+    /// The entire buffer will be consumed.
+    fn decode_borrowed(buf: &'a [u8]) -> Result<Self, DecodeError>
+    where
+        Self: Sized;
+
+    /// Decodes a length-delimited instance of the message from the buffer.
+    fn decode_borrowed_length_delimited(buf: &'a [u8]) -> Result<Self, DecodeError>
+    where
+        Self: Sized;
+
+    // ------------ Dyn-compatible methods follow ------------
+
+    /// Decodes the non-ignored fields of this message from the buffer, replacing their values.
+    fn replace_borrowed_from(&mut self, buf: &'a [u8]) -> Result<(), DecodeError>;
+
+    /// Decodes the non-ignored fields of this message, replacing their values from a
+    /// length-delimited value encoded in the buffer.
+    fn replace_borrowed_from_length_delimited(&mut self, buf: &'a [u8]) -> Result<(), DecodeError>;
+}
+
+/// An enhanced trait for owned Bilrost messages that promise a distinguished representation.
+///
+/// Implementation of this trait comes with the following promises:
+///
+///  1. The message will always encode to the same bytes as any other message with an equal value.
+///  2. A message equal to that value will only ever decode canonically and without error from that
+///     exact sequence of bytes, not from any other.
+///
+/// Distinguished decoding methods come in three flavors:
+/// * "distinguished" methods, which decode anything that relaxed decoding will and return the
+///   value along with a `Canonicity`
+/// * "restricted" methods, which also require a minimum `Canonicity` and will early-exit decoding
+///   and return an appropriate error if the canonicity violates that constraint:
+///     * restrict to `Canonical` will return an error any time the encoding is not fully canonical
+///     * restrict to `HasExtensions` will return an error any time the encoding has known fields
+///       with non-canonical representations, but will not fail when unknown fields are present
+///     * passing `NotCanonical` gives exactly the same result as using the distinguished decoding
+///       methods
+/// * "canonical" methods, which are shorthand for "restricted" methods with `Canonical` constraint
+///   and do not return the `Canonicity`, because it will always be fully `Canonical`.
+///
+/// Note that currently the only restriction level that is sensible to explicitly pass to
+/// "restricted" methods is `HasExtensions`: "distinguished" methods already dispatch to passing
+/// `NotCanonical`, and when `Canonical` is passed only `Canonical` can be returned from a
+/// successful result (hence the "canonical" methods).
+pub trait DistinguishedBorrowedMessage<'a>: Message {
+    // ------------ Distinguished mode ------------
+
+    /// Decodes an instance of the message from a buffer in distinguished mode.
+    ///
+    /// The entire buffer will be consumed.
+    fn decode_distinguished_borrowed(buf: &'a [u8]) -> Result<(Self, Canonicity), DecodeError>
+    where
+        Self: Sized;
+
+    /// Decodes a length-delimited instance of the message from the buffer in distinguished mode.
+    fn decode_distinguished_borrowed_length_delimited(
+        buf: &'a [u8],
+    ) -> Result<(Self, Canonicity), DecodeError>
+    where
+        Self: Sized;
+
+    // ------------ Dyn-compatible methods follow ------------
+
+    /// Decodes the non-ignored fields of this message from the buffer in distinguished mode,
+    /// replacing their values.
+    fn replace_distinguished_borrowed_from(&mut self, buf: &'a [u8]) -> Result<Canonicity, DecodeError>; // TODO(widders): dyn-compatible now
+
+    /// Decodes the non-ignored fields of this message in distinguished mode, replacing their values
+    /// from a length-delimited value encoded in the buffer.
+    fn replace_distinguished_borrowed_from_length_delimited(
+        &mut self,
+        buf: &'a [u8],
+    ) -> Result<Canonicity, DecodeError>; // TODO(widders): dyn-compatible now
+
+    // ------------ Restricted mode ------------
+
+    /// Decodes an instance of the message from a buffer in restricted mode.
+    ///
+    /// The entire buffer will be consumed.
+    fn decode_restricted_borrowed(
+        buf: &'a [u8],
+        restrict_to: Canonicity,
+    ) -> Result<(Self, Canonicity), DecodeError>
+    where
+        Self: Sized;
+
+    /// Decodes a length-delimited instance of the message from the buffer in restricted mode.
+    fn decode_restricted_borrowed_length_delimited(
+        buf: &'a [u8],
+        restrict_to: Canonicity,
+    ) -> Result<(Self, Canonicity), DecodeError>
+    where
+        Self: Sized;
+
+    // ------------ Dyn-compatible methods follow ------------
+
+    /// Decodes the non-ignored fields of this message from the buffer in restricted mode,
+    /// replacing their values.
+    fn replace_restricted_borrowed_from(
+        &mut self,
+        buf: &'a [u8],
+        restrict_to: Canonicity,
+    ) -> Result<Canonicity, DecodeError>;
+
+    /// Decodes the non-ignored fields of this message in restricted mode, replacing their values
+    /// from a length-delimited value encoded in the buffer.
+    fn replace_restricted_borrowed_from_length_delimited(
+        &mut self,
+        buf: &'a [u8],
+        restrict_to: Canonicity,
+    ) -> Result<Canonicity, DecodeError>;
+
+    // ------------ Canonical mode ------------
+
+    /// Decodes an instance of the message from a buffer in canonical mode.
+    ///
+    /// The entire buffer will be consumed.
+    fn decode_canonical_borrowed(buf: &'a [u8]) -> Result<Self, DecodeError>
+    where
+        Self: Sized;
+
+    /// Decodes a length-delimited instance of the message from the buffer in canonical mode.
+    fn decode_canonical_borrowed_length_delimited(buf: &'a [u8]) -> Result<Self, DecodeError>
+    where
+        Self: Sized;
+
+    // ------------ Dyn-compatible methods follow ------------
+
+    /// Decodes the non-ignored fields of this message from the buffer in canonical mode,
+    /// replacing their values.
+    fn replace_canonical_borrowed_from(&mut self, buf: &'a [u8]) -> Result<(), DecodeError>;
+
+    /// Decodes the non-ignored fields of this message in canonical mode, replacing their values
+    /// from a length-delimited value encoded in the buffer.
+    fn replace_canonical_borrowed_from_length_delimited(
+        &mut self,
+        buf: &'a [u8],
+    ) -> Result<(), DecodeError>;
+}
+
 /// `Message` is implemented as a usability layer on top of the basic functionality afforded by
 /// `RawMessage`.
 // TODO(widders): in the future, make it possible to decode with extension Message types for all
