@@ -804,6 +804,7 @@ where
     #[doc(hidden)]
     fn replace_from_capped<B: Buf + ?Sized>(&mut self, buf: Capped<B>) -> Result<(), DecodeError> {
         self.clear();
+        // MSRV: here, and elsewhere, this `map_err` could be `inspect_err` (1.76)
         merge(self, buf, DecodeContext::default()).map_err(|err| {
             self.clear();
             err
