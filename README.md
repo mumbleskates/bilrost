@@ -372,7 +372,7 @@ bilrost = "0.1012.0-dev"
 Then, we derive `bilrost::Message` for our struct type:
 
 ```rust,
-use bilrost::Message;
+use bilrost::{Message, OwnedMessage};
 
 #[derive(Debug, PartialEq, Message)]
 struct BucketFile {
@@ -401,7 +401,7 @@ Later, more fields can be added to that same struct and it will still decode the
 same data.
 
 ```rust,
-# use bilrost::Message;
+# use bilrost::{Message, OwnedMessage};
 #[derive(Debug, Default, PartialEq, Message)]
 struct BucketFile {
     #[bilrost(1)]
@@ -894,7 +894,7 @@ There are a few other attributes available inside the "bilrost" attribute:
 struct Foo {
     #[bilrost(tag(5), encoding(general))]
     name: String,
-    age: int64, // Oops! Uses tag 6! Compile error
+    age: int64, // Oops! Error: "message Foo field age has reserved tag 6"
 }
 ```
 
@@ -924,7 +924,7 @@ struct Foo {
 ```rust,compile_fail
 # use bilrost::Message;
 #[derive(Message)]
-//       ^^^^^^^ the trait `Encoder<Vec<Tree>>` is not implemented for `General`
+//       ^^^^^^^ overflow evaluating the requirement `Tree: ValueEncoder<General>`
 struct Tree {
     name: String,
     children: Vec<Tree>,
@@ -1174,8 +1174,8 @@ allows iterating over the slices in the buffer for vectored writing.
 
 ```rust,
 use bilrost::{
-    DistinguishedMessage, DistinguishedOneof, Message, Oneof,
-    WithCanonicity,
+    DistinguishedMessage, DistinguishedOwnedMessage, DistinguishedOneof,
+    Message, Oneof, OwnedMessage, WithCanonicity,
 };
 use bytes::Bytes;
 use std::collections::BTreeMap;
