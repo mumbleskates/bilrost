@@ -10,8 +10,9 @@ use bytes::{Buf, BufMut};
 use crate::buf::ReverseBuf;
 use crate::encoding::{
     encode_varint, encoded_len_varint, prepend_varint, Capped, DecodeContext, EmptyState,
-    ForOverwrite, RawDistinguishedMessageDecoder, RawMessage, RawMessageDecoder,
-    RestrictedDecodeContext, RuntimeTagMeasurer, TagMeasurer, TagRevWriter, TagWriter, WireType,
+    ForOverwrite, RawDistinguishedMessageBorrowDecoder, RawDistinguishedMessageDecoder, RawMessage,
+    RawMessageBorrowDecoder, RawMessageDecoder, RestrictedDecodeContext, RuntimeTagMeasurer,
+    TagMeasurer, TagRevWriter, TagWriter, WireType,
 };
 use crate::iter::FlatAdapter;
 use crate::DecodeErrorKind::Truncated;
@@ -191,6 +192,34 @@ impl<'a> OpaqueValue<'a> {
                 let mut val = Vec::new();
                 val.put(buf.take_length_delimited()?.take_all());
                 LengthDelimited(Cow::Owned(val))
+            }
+            WireType::ThirtyTwoBit => {
+                if buf.remaining_before_cap() < 4 {
+                    return Err(DecodeError::new(Truncated));
+                }
+                let mut val = [0u8; 4];
+                buf.copy_to_slice(&mut val);
+                ThirtyTwoBit(val)
+            }
+            WireType::SixtyFourBit => {
+                if buf.remaining_before_cap() < 8 {
+                    return Err(DecodeError::new(Truncated));
+                }
+                let mut val = [0u8; 8];
+                buf.copy_to_slice(&mut val);
+                SixtyFourBit(val)
+            }
+        })
+    }
+
+    fn borrow_decode_value(
+        wire_type: WireType,
+        mut buf: Capped<&'a [u8]>,
+    ) -> Result<Self, DecodeError> {
+        Ok(match wire_type {
+            WireType::Varint => Varint(buf.decode_varint()?),
+            WireType::LengthDelimited => {
+                LengthDelimited(Cow::Borrowed(buf.take_borrowed_length_delimited()?))
             }
             WireType::ThirtyTwoBit => {
                 if buf.remaining_before_cap() < 4 {
@@ -405,4 +434,33 @@ impl RawDistinguishedMessageDecoder for OpaqueMessage<'_> {
     }
 }
 
-// TODO(widders): borrowed decoding for OpaqueMessage is already possible :D
+impl<'a> RawMessageBorrowDecoder<'a> for OpaqueMessage<'a> {
+    fn raw_borrow_decode_field(
+        &mut self,
+        tag: u32,
+        wire_type: WireType,
+        _duplicated: bool,
+        buf: Capped<&'a [u8]>,
+        _ctx: DecodeContext,
+    ) -> Result<(), DecodeError> {
+        self.insert(tag, OpaqueValue::borrow_decode_value(wire_type, buf)?);
+        Ok(())
+    }
+}
+
+impl<'a> RawDistinguishedMessageBorrowDecoder<'a> for OpaqueMessage<'a> {
+    fn raw_borrow_decode_field_distinguished(
+        &mut self,
+        tag: u32,
+        wire_type: WireType,
+        duplicated: bool,
+        buf: Capped<&'a [u8]>,
+        ctx: RestrictedDecodeContext,
+    ) -> Result<Canonicity, DecodeError>
+    where
+        Self: Sized,
+    {
+        self.raw_borrow_decode_field(tag, wire_type, duplicated, buf, ctx.into_inner())?;
+        Ok(Canonicity::Canonical)
+    }
+}
