@@ -463,7 +463,7 @@ where
         // here than to check after the value has been decoded and checking the message's
         // `is_empty()`.
         if !ALLOW_EMPTY && buf.remaining_before_cap() == 0 {
-            return Ok(Canonicity::NotCanonical);
+            return ctx.check(Canonicity::NotCanonical);
         }
         merge_distinguished(value, buf, ctx.enter_recursion())
     }
@@ -502,7 +502,7 @@ where
         // here than to check after the value has been decoded and checking the message's
         // `is_empty()`.
         if !ALLOW_EMPTY && buf.remaining_before_cap() == 0 {
-            return Ok(Canonicity::NotCanonical);
+            return ctx.check(Canonicity::NotCanonical);
         }
         borrow_merge_distinguished(value, buf, ctx.enter_recursion())
     }

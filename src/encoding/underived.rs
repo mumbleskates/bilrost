@@ -128,7 +128,7 @@ macro_rules! underived_decode_distinguished {
             let mut buf = $buf.take_length_delimited()?;
             let ctx = $ctx;
             if !ALLOW_EMPTY && buf.remaining_before_cap() == 0 {
-                Result::<_, crate::DecodeError>::Ok(Canonicity::NotCanonical)
+                ctx.check(Canonicity::NotCanonical)
             } else {
                 ctx.limit_reached()?;
                 let mut canon = Canonicity::Canonical;
