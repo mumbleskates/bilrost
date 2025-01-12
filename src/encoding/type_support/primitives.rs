@@ -39,6 +39,25 @@ macro_rules! empty_state_for_float {
 empty_state_for_float!(f32);
 empty_state_for_float!(f64);
 
+empty_state_via_default!(&str);
+empty_state_via_default!(&[u8]);
+
+impl<const N: usize> ForOverwrite for &[u8; N] {
+    fn for_overwrite() -> Self {
+        &[0; N]
+    }
+}
+
+impl<const N: usize> EmptyState for &[u8; N] {
+    fn is_empty(&self) -> bool {
+        *self == Self::empty()
+    }
+
+    fn clear(&mut self) {
+        *self = Self::empty();
+    }
+}
+
 macro_rules! impls_for_tuple {
     (($($letters:ident),*), ($($numbers:tt),*)$(,)?) => {
         impl<$($letters,)*> ForOverwrite for ($($letters,)*)

@@ -1,5 +1,5 @@
 use crate::buf::ReverseBuf;
-use crate::encoding::value_traits::for_overwrite_via_default;
+use crate::encoding::value_traits::{empty_state_via_default, for_overwrite_via_default};
 use crate::encoding::{
     Capped, DecodeContext, DistinguishedValueDecoder, EmptyState, General, PlainBytes,
     RestrictedDecodeContext, ValueDecoder, ValueEncoder, WireType, Wiretyped,
@@ -70,6 +70,10 @@ impl DistinguishedValueDecoder<General> for bstr::BString {
         )
     }
 }
+
+empty_state_via_default!(&bstr::BStr);
+
+// TODO(widders): do this via &[u8]
 
 #[cfg(test)]
 mod test {
