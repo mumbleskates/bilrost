@@ -4,8 +4,8 @@
 
 use bilrost::encoding::opaque::{OpaqueMessage, OpaqueValue as OV};
 use bilrost::encoding::{
-    self, encode_varint, Collection, DistinguishedOneofDecoder, EmptyState, Fixed, General,
-    Mapping, Oneof, OneofDecoder, Packed, Varint,
+    self, encode_varint, Collection, DistinguishedOneofBorrowDecoder, DistinguishedOneofDecoder,
+    EmptyState, Fixed, General, Mapping, Oneof, OneofBorrowDecoder, OneofDecoder, Varint,
 };
 use bilrost::Canonicity::{HasExtensions, NotCanonical};
 use bilrost::DecodeErrorKind::{
@@ -13,8 +13,7 @@ use bilrost::DecodeErrorKind::{
     UnexpectedlyRepeated, WrongWireType,
 };
 use bilrost::{
-    DecodeErrorKind, DistinguishedOwnedMessage, Enumeration, Message, Oneof,
-    OwnedMessage,
+    DecodeErrorKind, DistinguishedOwnedMessage, Enumeration, Message, Oneof, OwnedMessage,
 };
 use core::mem::size_of;
 use itertools::{repeat_n, Itertools};
@@ -84,7 +83,9 @@ impl<T: OwnedMessage> FromOpaque for T {
 mod assert {
     use super::*;
     use bilrost::Canonicity::Canonical;
-    use bilrost::{Canonicity, DecodeError, WithCanonicity};
+    use bilrost::{
+        BorrowedMessage, Canonicity, DecodeError, DistinguishedBorrowedMessage, WithCanonicity,
+    };
     use bytes::BufMut;
 
     #[allow(unused_variables)]
@@ -105,9 +106,72 @@ mod assert {
         );
     }
 
-    pub(super) fn decodes<'a, M>(from: impl IntoOpaqueMessage<'a>, into: M)
+    macro_rules! decodes {
+        (owned relaxed, $from:expr, $into:expr $(,)?) => {{
+            let encoded = $from.into_opaque_message();
+            $crate::assert::decodes_owned(&encoded, $into);
+            let stash = &mut vec![];
+            $crate::assert::decodes_borrowed(&encoded, $into, stash);
+        }};
+        (borrowed relaxed, $from:expr, $into:expr $(,)?) => {{
+            let encoded = $from.into_opaque_message();
+            let stash = &mut vec![];
+            $crate::assert::decodes_borrowed(&encoded, $into, stash);
+        }};
+
+        (owned distinguished, $from:expr, $into:expr $(,)?) => {{
+            let encoded = $from.into_opaque_message();
+            $crate::assert::decodes_distinguished_owned(&encoded, $into);
+            let stash = &mut vec![];
+            $crate::assert::decodes_distinguished_borrowed(&encoded, $into, stash);
+        }};
+        (borrowed distinguished, $from:expr, $into:expr $(,)?) => {{
+            let encoded = $from.into_opaque_message();
+            let stash = &mut vec![];
+            $crate::assert::decodes_distinguished_borrowed(&encoded, $into, stash);
+        }};
+
+        (owned non-canonically, $from:expr, $into:expr, $canon:expr, $err:expr $(,)?) => {{
+            let encoded = $from.into_opaque_message();
+            $crate::assert::decodes_non_canonically_owned(&encoded, $into, $canon, $err);
+            let stash = &mut vec![];
+            $crate::assert::decodes_non_canonically_borrowed(&encoded, $into, $canon, $err, stash);
+        }};
+        (borrowed non-canonically, $from:expr, $into:expr, $canon:expr, $err:expr $(,)?) => {{
+            let encoded = $from.into_opaque_message();
+            let stash = &mut vec![];
+            $crate::assert::decodes_non_canonically_borrowed(&encoded, $into, $canon, $err, stash);
+        }};
+
+        (owned relaxed errs for $ty:ty, $from:expr, $err:expr, $path:expr $(,)?) => {{
+            let encoded = $from.into_opaque_message();
+            $crate::assert::doesnt_decode_owned::<$ty>(&encoded, $err, $path);
+            let stash = &mut vec![];
+            $crate::assert::doesnt_decode_borrowed::<$ty>(&encoded, $err, $path, stash);
+        }};
+        (borrowed relaxed errs for $ty:ty, $from:expr, $err:expr, $path:expr $(,)?) => {{
+            let encoded = $from.into_opaque_message();
+            let stash = &mut vec![];
+            $crate::assert::doesnt_decode_borrowed::<$ty>(&encoded, $err, $path, stash);
+        }};
+
+        (owned never decodes $ty:ty, $from:expr, $err:expr, $path:expr $(,)?) => {{
+            let encoded = $from.into_opaque_message();
+            $crate::assert::never_decodes_owned::<$ty>(&encoded, $err, $path);
+            let stash = &mut vec![];
+            $crate::assert::never_decodes_borrowed::<$ty>(&encoded, $err, $path, stash);
+        }};
+        (borrowed never decodes $ty:ty, $from:expr, $err:expr, $path:expr $(,)?) => {{
+            let encoded = $from.into_opaque_message();
+            let stash = &mut vec![];
+            $crate::assert::never_decodes_borrowed::<$ty>(&encoded, $err, $path, stash);
+        }};
+    }
+    pub(super) use decodes;
+
+    pub(super) fn decodes_owned<'a, M>(from: impl IntoOpaqueMessage<'a>, into: M)
     where
-        M: OwnedMessage + Debug + PartialEq + EmptyState,
+        M: OwnedMessage + BorrowedMessage<'a> + Debug + PartialEq + EmptyState,
     {
         let encoded = from.into_opaque_message().encode_to_vec();
         assert_eq!(M::decode(encoded.as_slice()).as_ref(), Ok(&into));
@@ -116,7 +180,21 @@ mod assert {
         assert_eq!(&to_replace, &into);
     }
 
-    pub(super) fn doesnt_decode<'a, M>(
+    pub(super) fn decodes_borrowed<'a, M>(
+        from: impl IntoOpaqueMessage<'a>,
+        into: M,
+        lifetime_stash: &'a mut Vec<u8>,
+    ) where
+        M: BorrowedMessage<'a> + PartialEq + Debug,
+    {
+        *lifetime_stash = from.into_opaque_message().encode_to_vec();
+        assert_eq!(M::decode_borrowed(lifetime_stash).as_ref(), Ok(&into));
+        let mut to_replace = M::empty();
+        to_replace.replace_borrowed_from(lifetime_stash).unwrap();
+        assert_eq!(&to_replace, &into);
+    }
+
+    pub(super) fn doesnt_decode_owned<'a, M>(
         from: impl IntoOpaqueMessage<'a>,
         err: DecodeErrorKind,
         err_path: &str,
@@ -139,7 +217,31 @@ mod assert {
         );
     }
 
-    pub(super) fn decodes_distinguished<'a, M>(from: impl IntoOpaqueMessage<'a>, into: M)
+    pub(super) fn doesnt_decode_borrowed<'a, M>(
+        from: impl IntoOpaqueMessage<'a>,
+        err: DecodeErrorKind,
+        err_path: &str,
+        lifetime_stash: &'a mut Vec<u8>,
+    ) where
+        M: BorrowedMessage<'a> + Debug + EmptyState,
+    {
+        *lifetime_stash = from.into_opaque_message().encode_to_vec();
+        assert_error(
+            M::decode_borrowed(lifetime_stash).expect_err("unexpectedly decoded without error"),
+            err,
+            err_path,
+        );
+        let mut to_replace = M::empty();
+        assert_error(
+            to_replace
+                .replace_borrowed_from(lifetime_stash)
+                .expect_err("unexpectedly replaced without error"),
+            err,
+            err_path,
+        );
+    }
+
+    pub(super) fn decodes_distinguished_owned<'a, M>(from: impl IntoOpaqueMessage<'a>, into: M)
     where
         M: DistinguishedOwnedMessage + Debug + Eq + EmptyState,
     {
@@ -176,6 +278,56 @@ mod assert {
         assert_eq!(encoded, into.encode_contiguous().into_vec());
     }
 
+    pub(super) fn decodes_distinguished_borrowed<'a, M>(
+        from: impl IntoOpaqueMessage<'a>,
+        into: M,
+        lifetime_stash: &'a mut Vec<u8>,
+    ) where
+        M: DistinguishedBorrowedMessage<'a> + Debug + Eq + EmptyState,
+    {
+        *lifetime_stash = from.into_opaque_message().encode_to_vec();
+        assert_eq!(M::decode_borrowed(lifetime_stash).as_ref(), Ok(&into));
+        let (decoded, canon) = M::decode_distinguished_borrowed(lifetime_stash)
+            .expect("distinguished borrowed decoding failed");
+        assert_eq!(
+            &decoded, &into,
+            "distinguished borrowed decoded doesn't match"
+        );
+        assert_eq!(canon, Canonical);
+        let mut to_replace = M::empty();
+        to_replace.replace_borrowed_from(lifetime_stash).unwrap();
+        assert_eq!(
+            &to_replace, &into,
+            "doesn't match after relaxed borrowed replace"
+        );
+        to_replace = M::empty();
+        assert_eq!(
+            to_replace.replace_distinguished_borrowed_from(lifetime_stash),
+            Ok(Canonical)
+        );
+        assert_eq!(
+            &to_replace, &into,
+            "doesn't match after distinguished borrowed replace"
+        );
+        assert_eq!(
+            lifetime_stash,
+            &into.encode_to_vec(),
+            "distinguished encoding does not round trip"
+        );
+        assert_eq!(
+            into.encoded_len(),
+            lifetime_stash.len(),
+            "encoded_len was wrong"
+        );
+        let mut prepend_round_trip = Vec::new();
+        prepend_round_trip.put(into.encode_fast());
+        assert_eq!(
+            lifetime_stash, &prepend_round_trip,
+            "distinguished encoding does not round trip with prepend",
+        );
+        assert_eq!(lifetime_stash, &into.encode_contiguous().into_vec());
+    }
+
     /// Trait for easily passing expectations for restricted decoding results to
     /// `decodes_non_canonically`.
     pub(super) trait RestrictedExpectations {
@@ -209,7 +361,7 @@ mod assert {
         }
     }
 
-    pub(super) fn decodes_non_canonically<'a, M>(
+    pub(super) fn decodes_non_canonically_owned<'a, M>(
         from: impl IntoOpaqueMessage<'a>,
         into: M,
         expected_canon: Canonicity,
@@ -270,10 +422,74 @@ mod assert {
                 error_path,
             );
         }
+    }
+
+    pub(super) fn decodes_non_canonically_borrowed<'a, M>(
+        from: impl IntoOpaqueMessage<'a>,
+        into: M,
+        expected_canon: Canonicity,
+        err_expectations: impl RestrictedExpectations,
+        lifetime_stash: &'a mut Vec<u8>,
+    ) where
+        M: DistinguishedBorrowedMessage<'a> + Debug + Eq + EmptyState,
+    {
+        assert_ne!(expected_canon, Canonical); // otherwise why call this function
+        *lifetime_stash = from.into_opaque_message().encode_to_vec();
+
+        assert_eq!(M::decode_borrowed(lifetime_stash).as_ref(), Ok(&into));
+
+        let mut to_replace = M::empty();
+        to_replace.replace_borrowed_from(lifetime_stash).unwrap();
+        assert_eq!(&to_replace, &into);
+
+        let (decoded, canon) = M::decode_distinguished_borrowed(lifetime_stash)
+            .expect("error decoding in distinguished mode with non-canonical data");
+        assert_eq!(&decoded, &into, "distinguished decoded doesn't match");
+        assert_eq!(canon, expected_canon);
+
+        let mut to_replace = M::empty();
+        assert_eq!(
+            to_replace
+                .replace_distinguished_borrowed_from(lifetime_stash)
+                .expect("error replacing in distinguished mode with non-canonical data"),
+            expected_canon
+        );
+        assert_eq!(
+            &to_replace, &into,
+            "doesn't match after distinguished replace"
+        );
+
+        // also check that restricted mode errs, and errs correctly
+        for (restricted_canon, error_path) in
+            err_expectations.for_expected_canonicity(expected_canon)
+        {
+            let more_strict = match restricted_canon {
+                NotCanonical => HasExtensions,
+                HasExtensions => Canonical,
+                Canonical => unreachable!(),
+            };
+            let expected_canon_err = restricted_canon.canonical().unwrap_err();
+            assert_error(
+                M::decode_restricted_borrowed(lifetime_stash, more_strict).expect_err(
+                    "decoded non-distinguished data in restricted mode but got no error",
+                ),
+                expected_canon_err,
+                error_path,
+            );
+            assert_error(
+                to_replace
+                    .replace_restricted_borrowed_from(lifetime_stash, more_strict)
+                    .expect_err(
+                        "replaced non-distinguished data in restricted mode but got no error",
+                    ),
+                expected_canon_err,
+                error_path,
+            );
+        }
 
         let round_tripped = into.encode_to_vec();
         assert_ne!(
-            encoded, round_tripped,
+            &round_tripped, lifetime_stash,
             "encoding round tripped, but did not decode distinguished"
         );
         assert_eq!(
@@ -281,12 +497,9 @@ mod assert {
             round_tripped.len(),
             "encoded_len was wrong"
         );
-
-        // The resulting message value should round-trip canonically when reencoded.
-        decodes_distinguished(into.encode_to_vec(), into);
     }
 
-    pub(super) fn never_decodes<'a, M>(
+    pub(super) fn never_decodes_owned<'a, M>(
         from: impl IntoOpaqueMessage<'a>,
         err: DecodeErrorKind,
         err_path: &str,
@@ -318,6 +531,45 @@ mod assert {
         assert_error(
             to_replace
                 .replace_distinguished_from(encoded.as_slice())
+                .expect_err("unexpectedly replaced in distinguished mode without error"),
+            err,
+            err_path,
+        );
+    }
+
+    pub(super) fn never_decodes_borrowed<'a, M>(
+        from: impl IntoOpaqueMessage<'a>,
+        err: DecodeErrorKind,
+        err_path: &str,
+        lifetime_stash: &'a mut Vec<u8>,
+    ) where
+        M: DistinguishedBorrowedMessage<'a> + Debug + EmptyState,
+    {
+        *lifetime_stash = from.into_opaque_message().encode_to_vec();
+        assert_error(
+            M::decode_borrowed(lifetime_stash)
+                .expect_err("unepectedly decoded in relaxed mode without error"),
+            err,
+            err_path,
+        );
+        let mut to_replace = M::empty();
+        assert_error(
+            to_replace
+                .replace_borrowed_from(lifetime_stash)
+                .expect_err("unexpectedly replaced in relaxed mode without error"),
+            err,
+            err_path,
+        );
+        assert_error(
+            M::decode_distinguished_borrowed(lifetime_stash)
+                .expect_err("unexpectedly decoded in distinguished mode without error"),
+            err,
+            err_path,
+        );
+        let mut to_replace = M::empty();
+        assert_error(
+            to_replace
+                .replace_distinguished_borrowed_from(lifetime_stash)
                 .expect_err("unexpectedly replaced in distinguished mode without error"),
             err,
             err_path,
@@ -538,7 +790,7 @@ fn derived_message_field_ordering() {
                 .chain([a, b, c, d].into_iter().flatten())
                 .map(|tag| (tag, OV::bool(true))),
         );
-        assert::decodes_distinguished(&opaque_message, Struct::from_opaque(&opaque_message));
+        assert::decodes!(owned distinguished, &opaque_message, Struct::from_opaque(&opaque_message));
     }
 }
 
@@ -552,24 +804,28 @@ fn field_tag_limits() {
         #[bilrost(4294967295)]
         maximum: Option<bool>,
     }
-    assert::decodes_distinguished(
+    assert::decodes!(
+        owned distinguished,
         [(0, OV::bool(false)), (u32::MAX, OV::bool(true))],
         Foo {
             minimum: Some(false),
             maximum: Some(true),
         },
     );
-    assert::never_decodes::<Foo>(
+    assert::decodes!(
+        owned never decodes Foo,
         [(0, OV::bool(false)), (0, OV::bool(true))],
         UnexpectedlyRepeated,
         "Foo.minimum",
     );
-    assert::never_decodes::<Foo>(
+    assert::decodes!(
+        owned never decodes Foo,
         [(u32::MAX, OV::bool(false)), (u32::MAX, OV::bool(true))],
         UnexpectedlyRepeated,
         "Foo.maximum",
     );
-    assert::decodes_non_canonically(
+    assert::decodes!(
+        owned non-canonically,
         [
             (0, OV::bool(true)),
             (234234234, OV::string("unknown")), // unknown field
@@ -603,9 +859,9 @@ fn message_catting_behavior() {
     .encode_to_vec();
     let mut combined = first;
     combined.extend(second);
-    assert::decodes_distinguished(
-        combined,
-        [
+    assert_eq!(
+        OpaqueMessage::decode(combined.as_slice()),
+        Ok([
             (0, OV::string("zero")),
             (1, OV::string("one")),
             (2, OV::string("two")),
@@ -616,7 +872,7 @@ fn message_catting_behavior() {
             (3, OV::string("one again")),
             (4, OV::string("two again")),
         ]
-        .into_opaque_message(),
+        .into_opaque_message()),
     );
 }
 
@@ -671,7 +927,8 @@ fn ignored_fields() {
         also: usize,
     }
 
-    assert::decodes(
+    assert::decodes!(
+        owned relaxed,
         [(1, OV::i64(1)), (2, OV::i64(-2))],
         FooPlus {
             x: 1,
@@ -685,7 +942,8 @@ fn ignored_fields() {
         y: 10,
         also: 123,
     };
-    assert::decodes(
+    assert::decodes!(
+        owned relaxed,
         foo_msg.encode_to_vec(),
         FooPlus {
             x: 5,
@@ -773,7 +1031,8 @@ fn ignored_fields_with_defaults() {
         }
     );
 
-    assert::decodes(
+    assert::decodes!(
+        owned relaxed,
         [(1, OV::i64(1))],
         FooPlus {
             x: 1,
@@ -988,8 +1247,8 @@ fn field_clearing() {
     #[cfg(feature = "hashbrown")]
     assert!(clearable.hbset.capacity() >= 64);
 
-    assert::decodes(Clearable::default().encode_to_vec(), Clearable::default());
-    assert::decodes([], Clearable::empty());
+    assert::decodes!(owned relaxed, Clearable::default().encode_to_vec(), Clearable::default());
+    assert::decodes!(owned relaxed, [], Clearable::empty());
 }
 
 #[test]
@@ -1034,8 +1293,9 @@ fn parsing_varints() {
         isize,
     );
 
-    assert::decodes_distinguished([], Foo::empty());
-    assert::decodes_distinguished(
+    assert::decodes!(owned distinguished, [], Foo::empty());
+    assert::decodes!(
+        owned distinguished,
         (0..11).map(|tag| (tag, OV::Varint(1))),
         Foo(true, 1, -1, 1, -1, 1, -1, 1, -1, 1, -1),
     );
@@ -1047,7 +1307,7 @@ fn parsing_varints() {
         OV::string("1"),
     ]) {
         let tag = field.0;
-        assert::never_decodes::<Foo>([field], WrongWireType, &format!("Foo.{}", tag));
+        assert::decodes!(owned never decodes Foo, [field], WrongWireType, &format!("Foo.{}", tag));
     }
     for (tag, out_of_range) in [
         (0, 2),
@@ -1062,13 +1322,14 @@ fn parsing_varints() {
         #[cfg(not(target_pointer_width = "64"))]
         (10, (usize::MAX as u64) + 1),
     ] {
-        assert::never_decodes::<Foo>(
+        assert::decodes!(
+            owned never decodes Foo,
             [(tag, OV::u64(out_of_range))],
             OutOfDomainValue,
             &format!("Foo.{}", tag),
         );
         let should_fit = [(tag, OV::u64(out_of_range - 1))];
-        assert::decodes_distinguished(&should_fit, Foo::from_opaque(&should_fit));
+        assert::decodes!(owned distinguished, &should_fit, Foo::from_opaque(&should_fit));
     }
 }
 
@@ -1081,10 +1342,16 @@ fn bools() {
     assert_eq!(OV::bool(false), OV::Varint(0));
     assert_eq!(OV::bool(true), OV::Varint(1));
 
-    assert::decodes_distinguished([], Foo(false));
-    assert::decodes_non_canonically([(0, OV::bool(false))], Foo(false), NotCanonical, "Foo.0");
-    assert::decodes_distinguished([(0, OV::bool(true))], Foo(true));
-    assert::never_decodes::<Foo>([(0, OV::Varint(2))], OutOfDomainValue, "Foo.0");
+    assert::decodes!(owned distinguished, [], Foo(false));
+    assert::decodes!(
+        owned non-canonically,
+        [(0, OV::bool(false))],
+        Foo(false),
+        NotCanonical,
+        "Foo.0",
+    );
+    assert::decodes!(owned distinguished, [(0, OV::bool(true))], Foo(true));
+    assert::decodes!(owned never decodes Foo, [(0, OV::Varint(2))], OutOfDomainValue, "Foo.0");
 }
 
 #[test]
@@ -1168,8 +1435,9 @@ fn parsing_fixed_width_ints() {
         #[bilrost(encoding(fixed))] i64,
     );
 
-    assert::decodes_distinguished([], Foo::empty());
-    assert::decodes_distinguished(
+    assert::decodes!(owned distinguished, [], Foo::empty());
+    assert::decodes!(
+        owned distinguished,
         [
             (0, OV::fixed_u32(1)),
             (1, OV::fixed_u32(1)),
@@ -1180,7 +1448,8 @@ fn parsing_fixed_width_ints() {
     );
     for tag in 0..4 {
         // Currently it is not supported to parse varint values into varint fields.
-        assert::never_decodes::<Foo>(
+        assert::decodes!(
+            owned never decodes Foo,
             [(tag, OV::Varint(1))],
             WrongWireType,
             &format!("Foo.{}", tag),
@@ -1204,8 +1473,8 @@ fn parsing_floats() {
     for wrong_size_value in [(0, OV::f64(1.0)), (1, OV::f32(2.0))] {
         let tag = wrong_size_value.0;
         let msg = &[wrong_size_value];
-        assert::doesnt_decode::<Foo>(msg, WrongWireType, &format!("Foo.{}", tag));
-        assert::doesnt_decode::<Bar>(msg, WrongWireType, &format!("Bar.{}", tag));
+        assert::decodes!(owned relaxed errs for Foo, msg, WrongWireType, &format!("Foo.{}", tag));
+        assert::decodes!(owned relaxed errs for Bar, msg, WrongWireType, &format!("Bar.{}", tag));
     }
 }
 
@@ -1233,7 +1502,7 @@ fn preserves_floating_point_special_values() {
         (0x8000_0000, 0x8000_0000_0000_0000)
     );
     assert::encodes(Foo(f32::INFINITY, f64::NEG_INFINITY), &infinities);
-    assert::decodes(&infinities, Foo(f32::INFINITY, f64::NEG_INFINITY));
+    assert::decodes!(owned relaxed, &infinities, Foo(f32::INFINITY, f64::NEG_INFINITY));
     assert::encodes(
         Foo(
             f32::from_bits(0xffff_4321),
@@ -1265,7 +1534,7 @@ fn preserves_floating_point_special_values() {
         (0x8000_0000, 0x8000_0000_0000_0000)
     );
     assert::encodes(Bar(f32::INFINITY, f64::NEG_INFINITY), &infinities);
-    assert::decodes(&infinities, Bar(f32::INFINITY, f64::NEG_INFINITY));
+    assert::decodes!(owned relaxed, &infinities, Bar(f32::INFINITY, f64::NEG_INFINITY));
     assert::encodes(
         Bar(
             f32::from_bits(0xffff_4321),
@@ -1381,65 +1650,62 @@ fn bytes_for_surrogate(surrogate_codepoint: u32) -> [u8; 3] {
     ]
 }
 
-fn parsing_string_type<'a, T>()
-where
-    T: 'a
-        + Debug
-        + Eq
-        + From<&'a str>
-        + EmptyState
-        + encoding::Decoder<General>
-        + encoding::DistinguishedDecoder<General>,
-{
+#[test]
+fn parsing_strings() {
     #[derive(Debug, PartialEq, Eq, Message)]
     #[bilrost(distinguished)]
     struct Foo<T>(T);
 
-    assert::decodes_distinguished(
-        [(0, OV::string("hello world"))],
-        Foo::<T>("hello world".into()),
-    );
-    let mut invalid_strings = Vec::<Vec<u8>>::from([
-        b"bad byte: \xff can't appear in utf-8".as_slice().into(),
-        b"non-canonical representation \xc0\x80 of nul byte"
-            .as_slice()
-            .into(),
-    ]);
+    macro_rules! parsing_string_type {
+        ($ty:ty) => {{
+            assert::decodes!(
+                owned distinguished,
+                [(0, OV::string("hello world"))],
+                Foo::<$ty>("hello world".into()),
+            );
+            let mut invalid_strings = Vec::<Vec<u8>>::from([
+                b"bad byte: \xff can't appear in utf-8".as_slice().into(),
+                b"non-canonical representation \xc0\x80 of nul byte"
+                    .as_slice()
+                    .into(),
+            ]);
 
-    invalid_strings.extend((0xd800u32..=0xdfff).map(|surrogate_codepoint| {
-        let mut invalid_with_surrogate: Vec<u8> = b"string with surrogate: ".as_slice().into();
-        invalid_with_surrogate.extend(bytes_for_surrogate(surrogate_codepoint));
-        invalid_with_surrogate.extend(b" isn't valid");
-        invalid_with_surrogate
-    }));
+            invalid_strings.extend((0xd800u32..=0xdfff).map(|surrogate_codepoint| {
+                let mut invalid_with_surrogate: Vec<u8> = b"string with surrogate: "
+                    .as_slice()
+                    .into();
+                invalid_with_surrogate.extend(bytes_for_surrogate(surrogate_codepoint));
+                invalid_with_surrogate.extend(b" isn't valid");
+                invalid_with_surrogate
+            }));
 
-    let mut surrogate_pair: Vec<u8> = b"surrogate pair: ".as_slice().into();
-    surrogate_pair.extend(bytes_for_surrogate(0xd801));
-    surrogate_pair.extend(bytes_for_surrogate(0xdc02));
-    surrogate_pair.extend(b" is a valid surrogate pair");
-    invalid_strings.push(surrogate_pair);
+            let mut surrogate_pair: Vec<u8> = b"surrogate pair: ".as_slice().into();
+            surrogate_pair.extend(bytes_for_surrogate(0xd801));
+            surrogate_pair.extend(bytes_for_surrogate(0xdc02));
+            surrogate_pair.extend(b" is a valid surrogate pair");
+            invalid_strings.push(surrogate_pair);
 
-    let mut surrogate_pair: Vec<u8> = b"reversed surrogate pair: ".as_slice().into();
-    surrogate_pair.extend(bytes_for_surrogate(0xdc02));
-    surrogate_pair.extend(bytes_for_surrogate(0xd801));
-    surrogate_pair.extend(b" is a backwards surrogate pair");
-    invalid_strings.push(surrogate_pair);
+            let mut surrogate_pair: Vec<u8> = b"reversed surrogate pair: ".as_slice().into();
+            surrogate_pair.extend(bytes_for_surrogate(0xdc02));
+            surrogate_pair.extend(bytes_for_surrogate(0xd801));
+            surrogate_pair.extend(b" is a backwards surrogate pair");
+            invalid_strings.push(surrogate_pair);
 
-    for invalid_string in invalid_strings {
-        assert::never_decodes::<Foo<T>>(
-            [(0, OV::byte_slice(&invalid_string))],
-            InvalidValue,
-            "Foo.0",
-        );
+            for invalid_string in invalid_strings {
+                assert::decodes!(
+                    owned never decodes Foo<$ty>,
+                    [(0, OV::byte_slice(&invalid_string))],
+                    InvalidValue,
+                    "Foo.0",
+                );
+            }
+        }};
     }
-}
 
-#[test]
-fn parsing_strings() {
-    parsing_string_type::<String>();
-    parsing_string_type::<Cow<str>>();
+    parsing_string_type!(String);
+    parsing_string_type!(Cow<str>);
     #[cfg(feature = "bytestring")]
-    parsing_string_type::<bytestring::ByteString>();
+    parsing_string_type!(bytestring::ByteString);
 }
 
 #[test]
@@ -1461,7 +1727,7 @@ fn parsing_blob() {
     #[derive(Debug, PartialEq, Eq, Message)]
     #[bilrost(distinguished)]
     struct Foo(bilrost::Blob);
-    assert::decodes_distinguished(
+    assert::decodes!(owned distinguished,
         [(0, OV::string("hello world"))],
         Foo(b"hello world"[..].into()),
     );
@@ -1472,7 +1738,7 @@ fn parsing_vec_blob() {
     #[derive(Debug, PartialEq, Eq, Message)]
     #[bilrost(distinguished)]
     struct Foo(#[bilrost(encoding(plainbytes))] Vec<u8>);
-    assert::decodes_distinguished(
+    assert::decodes!(owned distinguished,
         [(0, OV::string("hello world"))],
         Foo(b"hello world"[..].into()),
     );
@@ -1483,7 +1749,7 @@ fn parsing_cow_blob() {
     #[derive(Debug, PartialEq, Eq, Message)]
     #[bilrost(distinguished)]
     struct Foo<'a>(#[bilrost(encoding(plainbytes))] Cow<'a, [u8]>);
-    assert::decodes_distinguished(
+    assert::decodes!(owned distinguished,
         [(0, OV::string("hello world"))],
         Foo(b"hello world"[..].into()),
     );
@@ -1494,7 +1760,7 @@ fn parsing_bytes_blob() {
     #[derive(Debug, PartialEq, Eq, Message)]
     #[bilrost(distinguished)]
     struct Foo(bytes::Bytes);
-    assert::decodes_distinguished(
+    assert::decodes!(owned distinguished,
         [(0, OV::string("hello world"))],
         Foo(b"hello world"[..].into()),
     );
@@ -1506,18 +1772,25 @@ fn parsing_byte_arrays() {
     #[bilrost(distinguished)]
     struct Foo<const N: usize>(#[bilrost(tag(1), encoding(plainbytes))] [u8; N]);
 
-    assert::decodes_distinguished([], Foo([]));
-    assert::decodes_non_canonically([(1, OV::bytes([]))], Foo([]), NotCanonical, "Foo.0");
-    assert::never_decodes::<Foo<0>>([(1, OV::bytes([1]))], InvalidValue, "Foo.0");
+    assert::decodes!(owned distinguished, [], Foo([]));
+    assert::decodes!(owned non-canonically, [(1, OV::bytes([]))], Foo([]), NotCanonical, "Foo.0");
+    assert::decodes!(owned never decodes Foo<0>, [(1, OV::bytes([1]))], InvalidValue, "Foo.0");
 
-    assert::decodes_distinguished([(1, OV::bytes([1, 2, 3, 4]))], Foo([1, 2, 3, 4]));
-    assert::decodes_non_canonically([(1, OV::bytes([0; 4]))], Foo([0; 4]), NotCanonical, "Foo.0");
-    assert::never_decodes::<Foo<4>>([(1, OV::bytes([1; 3]))], InvalidValue, "Foo.0");
-    assert::never_decodes::<Foo<4>>([(1, OV::bytes([1; 5]))], InvalidValue, "Foo.0");
-    assert::never_decodes::<Foo<4>>([(1, OV::fixed_u32(1))], WrongWireType, "Foo.0");
+    assert::decodes!(owned distinguished, [(1, OV::bytes([1, 2, 3, 4]))], Foo([1, 2, 3, 4]));
+    assert::decodes!(
+        owned non-canonically,
+        [(1, OV::bytes([0; 4]))],
+        Foo([0; 4]),
+        NotCanonical,
+        "Foo.0",
+    );
+    assert::decodes!(owned never decodes Foo<4>, [(1, OV::bytes([1; 3]))], InvalidValue, "Foo.0");
+    assert::decodes!(owned never decodes Foo<4>, [(1, OV::bytes([1; 5]))], InvalidValue, "Foo.0");
+    assert::decodes!(owned never decodes Foo<4>, [(1, OV::fixed_u32(1))], WrongWireType, "Foo.0");
 
-    assert::decodes_distinguished([(1, OV::bytes([13; 13]))], Foo([13; 13]));
-    assert::decodes_non_canonically(
+    assert::decodes!(owned distinguished, [(1, OV::bytes([13; 13]))], Foo([13; 13]));
+    assert::decodes!(
+        owned non-canonically,
         [(1, OV::bytes([0; 13]))],
         Foo([0; 13]),
         NotCanonical,
@@ -1532,16 +1805,19 @@ fn parsing_byte_arrays() {
     static_assertions::assert_not_impl_any!(Bar<0>: Message);
     static_assertions::assert_not_impl_any!(Bar<2>: Message);
     static_assertions::assert_not_impl_any!(Bar<16>: Message);
-    assert::decodes_distinguished([(1, OV::fixed_u32(0x04030201))], Bar([1, 2, 3, 4]));
-    assert::decodes_non_canonically([(1, OV::fixed_u32(0))], Bar([0; 4]), NotCanonical, "Bar.0");
-    assert::decodes_distinguished([(1, OV::SixtyFourBit([8; 8]))], Bar([8; 8]));
-    assert::decodes_non_canonically(
+    assert::decodes!(owned distinguished, [(1, OV::fixed_u32(0x04030201))], Bar([1, 2, 3, 4]));
+    assert::decodes!(
+        owned non-canonically,
+        [(1, OV::fixed_u32(0))], Bar([0; 4]), NotCanonical, "Bar.0");
+    assert::decodes!(owned distinguished, [(1, OV::SixtyFourBit([8; 8]))], Bar([8; 8]));
+    assert::decodes!(
+        owned non-canonically,
         [(1, OV::SixtyFourBit([0; 8]))],
         Bar([0; 8]),
         NotCanonical,
         "Bar.0",
     );
-    assert::never_decodes::<Bar<8>>([(1, OV::bytes([8; 8]))], WrongWireType, "Bar.0");
+    assert::decodes!(owned never decodes Bar<8>, [(1, OV::bytes([8; 8]))], WrongWireType, "Bar.0");
 }
 
 // Repeated field tests
@@ -1552,14 +1828,16 @@ fn duplicated_field_decoding() {
     #[bilrost(distinguished)]
     struct Foo(Option<bool>, bool);
 
-    assert::decodes_distinguished([(0, OV::bool(false))], Foo(Some(false), false));
-    assert::never_decodes::<Foo>(
+    assert::decodes!(owned distinguished, [(0, OV::bool(false))], Foo(Some(false), false));
+    assert::decodes!(
+        owned never decodes Foo,
         [(0, OV::bool(false)), (0, OV::bool(true))],
         UnexpectedlyRepeated,
         "Foo.0",
     );
-    assert::decodes_distinguished([(1, OV::bool(true))], Foo(None, true));
-    assert::never_decodes::<Foo>(
+    assert::decodes!(owned distinguished, [(1, OV::bool(true))], Foo(None, true));
+    assert::decodes!(
+        owned never decodes Foo,
         [(1, OV::bool(true)), (1, OV::bool(false))],
         UnexpectedlyRepeated,
         "Foo.1",
@@ -1575,19 +1853,21 @@ fn duplicated_packed_decoding() {
     #[bilrost(distinguished)]
     struct Bar(#[bilrost(encoding = "unpacked")] Vec<bool>);
 
-    assert::decodes_distinguished([(0, OV::packed([OV::bool(true)]))], Foo(vec![true]));
-    assert::decodes_non_canonically(
+    assert::decodes!(owned distinguished, [(0, OV::packed([OV::bool(true)]))], Foo(vec![true]));
+    assert::decodes!(
+        owned non-canonically,
         [(0, OV::packed([OV::bool(true)]))],
         Bar(vec![true]),
         NotCanonical,
         "Bar.0",
     );
 
-    assert::decodes_distinguished(
+    assert::decodes!(owned distinguished,
         [(0, OV::packed([OV::bool(true), OV::bool(false)]))],
         Foo(vec![true, false]),
     );
-    assert::decodes_non_canonically(
+    assert::decodes!(
+        owned non-canonically,
         [(0, OV::packed([OV::bool(true), OV::bool(false)]))],
         Bar(vec![true, false]),
         NotCanonical,
@@ -1595,7 +1875,8 @@ fn duplicated_packed_decoding() {
     );
 
     // Two packed fields should never decode
-    assert::never_decodes::<Foo>(
+    assert::decodes!(
+        owned never decodes Foo,
         [
             (0, OV::packed([OV::bool(true), OV::bool(false)])),
             (0, OV::packed([OV::bool(false)])),
@@ -1603,7 +1884,8 @@ fn duplicated_packed_decoding() {
         UnexpectedlyRepeated,
         "Foo.0",
     );
-    assert::never_decodes::<Bar>(
+    assert::decodes!(
+        owned never decodes Bar,
         [
             (0, OV::packed([OV::bool(true), OV::bool(false)])),
             (0, OV::packed([OV::bool(false)])),
@@ -1613,7 +1895,8 @@ fn duplicated_packed_decoding() {
     );
 
     // Packed followed by unpacked should never decode
-    assert::never_decodes::<Foo>(
+    assert::decodes!(
+        owned never decodes Foo,
         [
             (0, OV::packed([OV::bool(true), OV::bool(false)])),
             (0, OV::bool(false)),
@@ -1621,7 +1904,8 @@ fn duplicated_packed_decoding() {
         UnexpectedlyRepeated,
         "Foo.0",
     );
-    assert::never_decodes::<Bar>(
+    assert::decodes!(
+        owned never decodes Bar,
         [
             (0, OV::packed([OV::bool(true), OV::bool(false)])),
             (0, OV::bool(false)),
@@ -1631,7 +1915,8 @@ fn duplicated_packed_decoding() {
     );
 
     // Unpacked followed by packed should never decode
-    assert::never_decodes::<Foo>(
+    assert::decodes!(
+        owned never decodes Foo,
         [
             (0, OV::bool(true)),
             (0, OV::bool(false)),
@@ -1640,7 +1925,8 @@ fn duplicated_packed_decoding() {
         WrongWireType,
         "Foo.0",
     );
-    assert::never_decodes::<Bar>(
+    assert::decodes!(
+        owned never decodes Bar,
         [
             (0, OV::bool(true)),
             (0, OV::bool(false)),
@@ -1689,14 +1975,16 @@ fn decoding_maps() {
 
     {
         use std::collections::BTreeMap;
-        assert::decodes_distinguished(
+        assert::decodes!(
+            owned distinguished,
             valid_map,
             Foo(BTreeMap::from([
                 (false, "no".to_string()),
                 (true, "yes".to_string()),
             ])),
         );
-        assert::decodes_non_canonically(
+        assert::decodes!(
+            owned non-canonically,
             disordered_map,
             Foo(BTreeMap::from([
                 (false, "no".to_string()),
@@ -1705,7 +1993,8 @@ fn decoding_maps() {
             NotCanonical,
             "Foo.0",
         );
-        assert::never_decodes::<Foo<BTreeMap<bool, String>>>(
+        assert::decodes!(
+            owned never decodes Foo<BTreeMap<bool, String>>,
             repeated_map,
             UnexpectedlyRepeated,
             "Foo.0",
@@ -1715,7 +2004,8 @@ fn decoding_maps() {
     macro_rules! test_hash {
         ($ty:ident) => {
             for map_value in [valid_map, disordered_map] {
-                assert::decodes(
+                assert::decodes!(
+                    owned relaxed,
                     map_value,
                     Foo($ty::from([
                         (false, "no".to_string()),
@@ -1723,7 +2013,8 @@ fn decoding_maps() {
                     ])),
                 );
             }
-            assert::doesnt_decode::<Foo<$ty<bool, String>>>(
+            assert::decodes!(
+                owned relaxed errs for Foo<$ty<bool, String>>,
                 repeated_map,
                 UnexpectedlyRepeated,
                 "Foo.0",
@@ -1770,7 +2061,8 @@ fn custom_hashers_std() {
         set: SetType,
     }
 
-    assert::decodes(
+    assert::decodes!(
+        owned relaxed,
         [
             (
                 1,
@@ -1824,7 +2116,8 @@ fn custom_hashers_hashbrown() {
         set: SetType,
     }
 
-    assert::decodes(
+    assert::decodes!(
+        owned relaxed,
         [
             (
                 1,
@@ -1842,10 +2135,8 @@ fn custom_hashers_hashbrown() {
     );
 }
 
-fn truncated_bool_string_map<T>()
-where
-    T: Debug + EmptyState + Mapping<Key = bool, Value = String> + encoding::Decoder<General>,
-{
+#[test]
+fn truncated_map() {
     #[derive(Debug, PartialEq, Message)]
     struct Foo<T>(T, String);
 
@@ -1857,22 +2148,7 @@ where
     ]) else {
         unreachable!()
     };
-    assert::doesnt_decode::<Foo<T>>(
-        [
-            (0, OV::byte_slice(&map_value[..map_value.len() - 1])),
-            (1, OV::string("another field after that")),
-        ],
-        Truncated,
-        "Foo.0",
-    );
-}
-
-fn truncated_string_int_map<T>()
-where
-    T: Debug + EmptyState + Mapping<Key = String, Value = u64> + encoding::Decoder<General>,
-{
-    #[derive(Debug, PartialEq, Message)]
-    struct Foo<T>(T, String);
+    let truncated_bool_string_map = &map_value[..map_value.len() - 1];
 
     let OV::LengthDelimited(map_value) = OV::packed([
         OV::string("zero"),
@@ -1882,35 +2158,44 @@ where
     ]) else {
         unreachable!()
     };
-    assert::doesnt_decode::<Foo<T>>(
-        [
-            (0, OV::byte_slice(&map_value[..map_value.len() - 1])),
-            (1, OV::string("another field after that")),
-        ],
-        Truncated,
-        "Foo.0",
-    );
-}
+    let truncated_string_int_map = &map_value[..map_value.len() - 1];
 
-#[test]
-fn truncated_map() {
-    {
-        use std::collections::BTreeMap;
-        truncated_bool_string_map::<BTreeMap<bool, String>>();
-        truncated_string_int_map::<BTreeMap<String, u64>>();
+    macro_rules! truncated_map_t {
+        (relaxed $($ty:tt)*) => {
+            truncated_map_t!(($($ty)*) relaxed errs for);
+        };
+        (distinguished $($ty:tt)*) => {
+            truncated_map_t!(($($ty)*) never decodes);
+        };
+        (($($ty:tt)*) $($mode_words:tt)*) => {
+            assert::decodes!(
+                owned relaxed errs for Foo<$($ty)*<bool, String>>,
+                [
+                    (0, OV::byte_slice(truncated_bool_string_map)),
+                    (1, OV::string("another field after that")),
+                ],
+                Truncated,
+                "Foo.0",
+            );
+            assert::decodes!(
+                owned relaxed errs for Foo<$($ty)*<String, u64>>,
+                [
+                    (0, OV::byte_slice(truncated_string_int_map)),
+                    (1, OV::string("another field after that")),
+                ],
+                Truncated,
+                "Foo.0",
+            );
+        };
     }
+
+    truncated_map_t!(distinguished std::collections::BTreeMap);
     #[cfg(feature = "std")]
-    {
-        use std::collections::HashMap;
-        truncated_bool_string_map::<HashMap<bool, String>>();
-        truncated_string_int_map::<HashMap<String, u64>>();
-    }
+    truncated_map_t!(relaxed std::collections::HashMap);
     #[cfg(feature = "hashbrown")]
-    {
-        use hashbrown::HashMap;
-        truncated_bool_string_map::<HashMap<bool, String>>();
-        truncated_string_int_map::<HashMap<String, u64>>();
-    }
+    truncated_map_t!(relaxed hashbrown::HashMap);
+    // TODO(widders): here, and in truncated_collection_t, when borrowed switching is added we can
+    //  add borrowing string checks
 }
 
 // Vec tests
@@ -1947,42 +2232,48 @@ fn decoding_vecs() {
             expected.into_iter().map(str::to_string).collect::<Vec<_>>(),
         )
     }) {
-        assert::decodes_distinguished(
+        assert::decodes!(
+            owned distinguished,
             packed,
             Foo {
                 packed: expected.clone(),
                 unpacked: vec![],
             },
         );
-        assert::decodes_distinguished(
+        assert::decodes!(
+            owned distinguished,
             unpacked,
             Foo {
                 packed: vec![],
                 unpacked: expected.clone(),
             },
         );
-        assert::decodes_distinguished(
+        assert::decodes!(
+            owned distinguished,
             packed,
             Foo {
                 packed: Cow::Borrowed(expected.as_slice()),
                 unpacked: Cow::default(),
             },
         );
-        assert::decodes_distinguished(
+        assert::decodes!(
+            owned distinguished,
             unpacked,
             Foo {
                 packed: Cow::default(),
                 unpacked: Cow::Borrowed(expected.as_slice()),
             },
         );
-        assert::decodes_distinguished(
+        assert::decodes!(
+            owned distinguished,
             packed,
             Foo {
                 packed: Cow::Owned(expected.clone()),
                 unpacked: Cow::default(),
             },
         );
-        assert::decodes_distinguished(
+        assert::decodes!(
+            owned distinguished,
             unpacked,
             Foo {
                 packed: Cow::default(),
@@ -1992,14 +2283,16 @@ fn decoding_vecs() {
         #[allow(unused_macros)]
         macro_rules! test_vec {
             ($vec_ty:ty) => {
-                assert::decodes_distinguished(
+                assert::decodes!(
+                    owned distinguished,
                     packed,
                     Foo {
                         packed: expected.iter().cloned().collect(),
                         unpacked: <$vec_ty>::new(),
                     },
                 );
-                assert::decodes_distinguished(
+                assert::decodes!(
+                    owned distinguished,
                     unpacked,
                     Foo {
                         packed: <$vec_ty>::new(),
@@ -2059,7 +2352,8 @@ fn decoding_vecs_with_swapped_packedness() {
             expected,
         )
     }) {
-        assert::decodes_non_canonically(
+        assert::decodes!(
+            owned non-canonically,
             packed,
             Oof {
                 unpacked: expected.clone(),
@@ -2068,7 +2362,8 @@ fn decoding_vecs_with_swapped_packedness() {
             NotCanonical,
             "Oof.unpacked",
         );
-        assert::decodes_non_canonically(
+        assert::decodes!(
+            owned non-canonically,
             unpacked,
             Oof {
                 unpacked: vec![],
@@ -2077,7 +2372,8 @@ fn decoding_vecs_with_swapped_packedness() {
             NotCanonical,
             "Oof.packed",
         );
-        assert::decodes_non_canonically(
+        assert::decodes!(
+            owned non-canonically,
             packed,
             Oof {
                 unpacked: Cow::Borrowed(expected.as_slice()),
@@ -2086,7 +2382,8 @@ fn decoding_vecs_with_swapped_packedness() {
             NotCanonical,
             "Oof.unpacked",
         );
-        assert::decodes_non_canonically(
+        assert::decodes!(
+            owned non-canonically,
             unpacked,
             Oof {
                 unpacked: Cow::default(),
@@ -2095,7 +2392,8 @@ fn decoding_vecs_with_swapped_packedness() {
             NotCanonical,
             "Oof.packed",
         );
-        assert::decodes_non_canonically(
+        assert::decodes!(
+            owned non-canonically,
             packed,
             Oof {
                 unpacked: Cow::Owned(expected.clone()),
@@ -2104,7 +2402,8 @@ fn decoding_vecs_with_swapped_packedness() {
             NotCanonical,
             "Oof.unpacked",
         );
-        assert::decodes_non_canonically(
+        assert::decodes!(
+            owned non-canonically,
             unpacked,
             Oof {
                 unpacked: Cow::default(),
@@ -2116,7 +2415,8 @@ fn decoding_vecs_with_swapped_packedness() {
         #[allow(unused_macros)]
         macro_rules! test_vec {
             ($vec_ty:ty) => {
-                assert::decodes_non_canonically(
+                assert::decodes!(
+                    owned non-canonically,
                     packed,
                     Oof {
                         unpacked: expected.iter().cloned().collect(),
@@ -2125,7 +2425,8 @@ fn decoding_vecs_with_swapped_packedness() {
                     NotCanonical,
                     "Oof.unpacked",
                 );
-                assert::decodes_non_canonically(
+                assert::decodes!(
+                    owned non-canonically,
                     unpacked,
                     Oof {
                         unpacked: <$vec_ty>::new(),
@@ -2166,28 +2467,32 @@ fn decoding_arrays_of_size<const N: usize>() {
     let mut almost_empty = [""; N].map(String::from); // almost_empty has 1 non-empty value, last
     almost_empty[N - 1] = "foo".to_string();
     let almost_empty = almost_empty;
-    assert::decodes_distinguished(
+    assert::decodes!(
+        owned distinguished,
         [(1, OV::packed(vec![OV::str("foo"); N]))],
         Foo {
             packed: with_values.clone(),
             unpacked: empty.clone(),
         },
     );
-    assert::decodes_distinguished(
+    assert::decodes!(
+        owned distinguished,
         vec![(2, OV::str("foo")); N].as_slice(),
         Foo {
             packed: empty.clone(),
             unpacked: with_values.clone(),
         },
     );
-    assert::decodes_distinguished(
+    assert::decodes!(
+        owned distinguished,
         [(1, OV::packed(almost_empty.iter().map(|s| OV::str(s))))],
         Foo {
             packed: almost_empty.clone(),
             unpacked: empty.clone(),
         },
     );
-    assert::decodes_distinguished(
+    assert::decodes!(
+        owned distinguished,
         almost_empty.iter().map(|s| (2, OV::str(s))),
         Foo {
             packed: empty.clone(),
@@ -2214,7 +2519,8 @@ fn decoding_arrays_with_swapped_packedness_of_size<const N: usize>() {
 
     // In relaxed mode, packed arrays will decode unpacked values and vice versa, but this is
     // only detectable when the values are not length-delimited.
-    assert::decodes_non_canonically(
+    assert::decodes!(
+        owned non-canonically,
         [(1, OV::packed(vec![OV::i32(5); N]))],
         Oof {
             unpacked: with_values,
@@ -2223,7 +2529,8 @@ fn decoding_arrays_with_swapped_packedness_of_size<const N: usize>() {
         NotCanonical,
         "Oof.unpacked",
     );
-    assert::decodes_non_canonically(
+    assert::decodes!(
+        owned non-canonically,
         with_values.iter().map(|&i| (2, OV::i32(i))),
         Oof {
             unpacked: empty,
@@ -2232,7 +2539,8 @@ fn decoding_arrays_with_swapped_packedness_of_size<const N: usize>() {
         NotCanonical,
         "Oof.packed",
     );
-    assert::decodes_non_canonically(
+    assert::decodes!(
+        owned non-canonically,
         [(1, OV::packed(almost_empty.iter().map(|&i| OV::i32(i))))],
         Oof {
             unpacked: almost_empty,
@@ -2241,7 +2549,8 @@ fn decoding_arrays_with_swapped_packedness_of_size<const N: usize>() {
         NotCanonical,
         "Oof.unpacked",
     );
-    assert::decodes_non_canonically(
+    assert::decodes!(
+        owned non-canonically,
         almost_empty.iter().map(|&i| (2, OV::i32(i))),
         Oof {
             unpacked: empty,
@@ -2284,28 +2593,33 @@ fn decoding_arrays() {
 
     // Packed with wrong numbers of values:
     // Too few values
-    assert::never_decodes::<FooGeneral<[String; 2]>>(
+    assert::decodes!(
+        owned never decodes FooGeneral<[String; 2]>,
         [(1, OV::packed([OV::str("foo")]))],
         InvalidValue,
         "FooGeneral.packed",
     );
-    assert::never_decodes::<FooGeneral<[i32; 2]>>(
+    assert::decodes!(
+        owned never decodes FooGeneral<[i32; 2]>,
         [(1, OV::packed([OV::i32(1)]))],
         InvalidValue,
         "FooGeneral.packed",
     );
-    assert::never_decodes::<FooFixed<[u64; 2]>>(
+    assert::decodes!(
+        owned never decodes FooFixed<[u64; 2]>,
         [(1, OV::packed([OV::fixed_u64(1)]))],
         InvalidValue,
         "FooFixed.packed",
     );
-    assert::never_decodes::<FooGeneral<Option<[i32; 2]>>>(
+    assert::decodes!(
+        owned never decodes FooGeneral<Option<[i32; 2]>>,
         [(1, OV::packed([OV::i32(1)]))],
         InvalidValue,
         "FooGeneral.packed",
     );
     // Too many values
-    assert::never_decodes::<FooGeneral<[String; 2]>>(
+    assert::decodes!(
+        owned never decodes FooGeneral<[String; 2]>,
         [(
             1,
             OV::packed([OV::str("foo"), OV::str("bar"), OV::str("baz")]),
@@ -2313,12 +2627,14 @@ fn decoding_arrays() {
         InvalidValue,
         "FooGeneral.packed",
     );
-    assert::never_decodes::<FooGeneral<[i32; 2]>>(
+    assert::decodes!(
+        owned never decodes FooGeneral<[i32; 2]>,
         [(1, OV::packed([OV::i32(3), OV::i32(4), OV::i32(5)]))],
         InvalidValue,
         "FooGeneral.packed",
     );
-    assert::never_decodes::<FooFixed<[u64; 2]>>(
+    assert::decodes!(
+        owned never decodes FooFixed<[u64; 2]>,
         [(
             1,
             OV::packed([OV::fixed_u64(3), OV::fixed_u64(4), OV::fixed_u64(5)]),
@@ -2326,27 +2642,31 @@ fn decoding_arrays() {
         InvalidValue,
         "FooFixed.packed",
     );
-    assert::never_decodes::<FooGeneral<Option<[i32; 2]>>>(
+    assert::decodes!(
+        owned never decodes FooGeneral<Option<[i32; 2]>>,
         [(1, OV::packed([OV::i32(3), OV::i32(4), OV::i32(5)]))],
         InvalidValue,
         "FooGeneral.packed",
     );
     // Just right
-    assert::decodes_distinguished(
+    assert::decodes!(
+        owned distinguished,
         [(1, OV::packed([OV::str("foo"), OV::str("bar")]))],
         FooGeneral {
             packed: ["foo".to_string(), "bar".to_string()],
             unpacked: ["".to_string(), "".to_string()],
         },
     );
-    assert::decodes_distinguished(
+    assert::decodes!(
+        owned distinguished,
         [(1, OV::packed([OV::i32(3), OV::i32(4)]))],
         FooGeneral {
             packed: [3i32, 4],
             unpacked: [0, 0],
         },
     );
-    assert::decodes_non_canonically(
+    assert::decodes!(
+        owned non-canonically,
         [(1, OV::packed([OV::i32(0), OV::i32(0)]))],
         FooGeneral {
             packed: [0i32, 0],
@@ -2355,21 +2675,24 @@ fn decoding_arrays() {
         NotCanonical,
         "FooGeneral.packed",
     );
-    assert::decodes_distinguished(
+    assert::decodes!(
+        owned distinguished,
         [(1, OV::packed([OV::fixed_u64(3), OV::fixed_u64(4)]))],
         FooFixed {
             packed: [3u64, 4],
             unpacked: [0, 0],
         },
     );
-    assert::decodes_distinguished(
+    assert::decodes!(
+        owned distinguished,
         [(1, OV::packed([OV::i32(3), OV::i32(4)]))],
         FooGeneral {
             packed: Some([3i32, 4]),
             unpacked: None,
         },
     );
-    assert::decodes_distinguished(
+    assert::decodes!(
+        owned distinguished,
         [(1, OV::packed([OV::i32(0), OV::i32(0)]))],
         FooGeneral {
             packed: Some([0i32, 0]),
@@ -2379,28 +2702,33 @@ fn decoding_arrays() {
 
     // Unpacked with wrong numbers of values:
     // Too few values
-    assert::never_decodes::<FooGeneral<[String; 2]>>(
+    assert::decodes!(
+        owned never decodes FooGeneral<[String; 2]>,
         [(2, OV::str("foo"))],
         InvalidValue,
         "FooGeneral.unpacked",
     );
-    assert::never_decodes::<FooGeneral<[i32; 2]>>(
+    assert::decodes!(
+        owned never decodes FooGeneral<[i32; 2]>,
         [(2, OV::i32(1))],
         InvalidValue,
         "FooGeneral.unpacked",
     );
-    assert::never_decodes::<FooFixed<[u64; 2]>>(
+    assert::decodes!(
+        owned never decodes FooFixed<[u64; 2]>,
         [(2, OV::fixed_u64(1))],
         InvalidValue,
         "FooFixed.unpacked",
     );
-    assert::never_decodes::<FooGeneral<Option<[i32; 2]>>>(
+    assert::decodes!(
+        owned never decodes FooGeneral<Option<[i32; 2]>>,
         [(2, OV::i32(1))],
         InvalidValue,
         "FooGeneral.unpacked",
     );
     // Too many values
-    assert::never_decodes::<FooGeneral<[String; 2]>>(
+    assert::decodes!(
+        owned never decodes FooGeneral<[String; 2]>,
         [
             (2, OV::str("foo")),
             (2, OV::str("bar")),
@@ -2409,12 +2737,14 @@ fn decoding_arrays() {
         InvalidValue,
         "FooGeneral.unpacked",
     );
-    assert::never_decodes::<FooGeneral<[i32; 2]>>(
+    assert::decodes!(
+        owned never decodes FooGeneral<[i32; 2]>,
         [(2, OV::i32(3)), (2, OV::i32(4)), (2, OV::i32(5))],
         InvalidValue,
         "FooGeneral.unpacked",
     );
-    assert::never_decodes::<FooFixed<[u64; 2]>>(
+    assert::decodes!(
+        owned never decodes FooFixed<[u64; 2]>,
         [
             (2, OV::fixed_u64(3)),
             (2, OV::fixed_u64(4)),
@@ -2423,27 +2753,31 @@ fn decoding_arrays() {
         InvalidValue,
         "FooFixed.unpacked",
     );
-    assert::never_decodes::<FooGeneral<Option<[i32; 2]>>>(
+    assert::decodes!(
+        owned never decodes FooGeneral<Option<[i32; 2]>>,
         [(2, OV::i32(3)), (2, OV::i32(4)), (2, OV::i32(5))],
         InvalidValue,
         "FooGeneral.unpacked",
     );
     // Just right
-    assert::decodes_distinguished(
+    assert::decodes!(
+        owned distinguished,
         [(2, OV::str("foo")), (2, OV::str("bar"))],
         FooGeneral {
             packed: ["".to_string(), "".to_string()],
             unpacked: ["foo".to_string(), "bar".to_string()],
         },
     );
-    assert::decodes_distinguished(
+    assert::decodes!(
+        owned distinguished,
         [(2, OV::i32(3)), (2, OV::i32(4))],
         FooGeneral {
             packed: [0i32, 0],
             unpacked: [3, 4],
         },
     );
-    assert::decodes_non_canonically(
+    assert::decodes!(
+        owned non-canonically,
         [(2, OV::i32(0)), (2, OV::i32(0))],
         FooGeneral {
             packed: [0i32, 0],
@@ -2452,21 +2786,24 @@ fn decoding_arrays() {
         NotCanonical,
         "FooGeneral.unpacked",
     );
-    assert::decodes_distinguished(
+    assert::decodes!(
+        owned distinguished,
         [(2, OV::fixed_u64(3)), (2, OV::fixed_u64(4))],
         FooFixed {
             packed: [0u64, 0],
             unpacked: [3, 4],
         },
     );
-    assert::decodes_distinguished(
+    assert::decodes!(
+        owned distinguished,
         [(2, OV::i32(3)), (2, OV::i32(4))],
         FooGeneral {
             packed: None,
             unpacked: Some([3i32, 4]),
         },
     );
-    assert::decodes_distinguished(
+    assert::decodes!(
+        owned distinguished,
         [(2, OV::i32(0)), (2, OV::i32(0))],
         FooGeneral {
             packed: None,
@@ -2519,21 +2856,24 @@ fn decoding_sets() {
 
     {
         use std::collections::BTreeSet;
-        assert::decodes_distinguished(
+        assert::decodes!(
+            owned distinguished,
             valid_set_packed,
             Foo {
                 packed: BTreeSet::from(expected_items.clone()),
                 unpacked: BTreeSet::new(),
             },
         );
-        assert::decodes_distinguished(
+        assert::decodes!(
+            owned distinguished,
             valid_set_unpacked,
             Foo {
                 packed: BTreeSet::new(),
                 unpacked: BTreeSet::from(expected_items.clone()),
             },
         );
-        assert::decodes_non_canonically(
+        assert::decodes!(
+            owned non-canonically,
             disordered_set_packed,
             Foo {
                 packed: BTreeSet::from(expected_items.clone()),
@@ -2542,7 +2882,8 @@ fn decoding_sets() {
             NotCanonical,
             "Foo.packed",
         );
-        assert::decodes_non_canonically(
+        assert::decodes!(
+            owned non-canonically,
             disordered_set_unpacked,
             Foo {
                 packed: BTreeSet::new(),
@@ -2551,12 +2892,14 @@ fn decoding_sets() {
             NotCanonical,
             "Foo.unpacked",
         );
-        assert::never_decodes::<Foo<BTreeSet<String>>>(
+        assert::decodes!(
+            owned never decodes Foo<BTreeSet<String>>,
             &repeated_set_packed,
             UnexpectedlyRepeated,
             "Foo.packed",
         );
-        assert::never_decodes::<Foo<BTreeSet<String>>>(
+        assert::decodes!(
+            owned never decodes Foo<BTreeSet<String>>,
             &repeated_set_unpacked,
             UnexpectedlyRepeated,
             "Foo.unpacked",
@@ -2566,14 +2909,16 @@ fn decoding_sets() {
     macro_rules! test_hash {
         ($ty:ident) => {
             for (set_value_packed, set_value_unpacked) in [&valid, &disordered] {
-                assert::decodes(
+                assert::decodes!(
+                    owned relaxed,
                     set_value_packed,
                     Foo {
                         packed: $ty::from(expected_items.clone()),
                         unpacked: $ty::new(),
                     },
                 );
-                assert::decodes(
+                assert::decodes!(
+                    owned relaxed,
                     set_value_unpacked,
                     Foo {
                         packed: $ty::new(),
@@ -2581,12 +2926,14 @@ fn decoding_sets() {
                     },
                 );
             }
-            assert::doesnt_decode::<Foo<$ty<String>>>(
+            assert::decodes!(
+                owned relaxed errs for Foo<$ty<String>>,
                 repeated_set_packed,
                 UnexpectedlyRepeated,
                 "Foo.packed",
             );
-            assert::doesnt_decode::<Foo<$ty<String>>>(
+            assert::decodes!(
+                owned relaxed errs for Foo<$ty<String>>,
                 repeated_set_unpacked,
                 UnexpectedlyRepeated,
                 "Foo.unpacked",
@@ -2642,7 +2989,8 @@ fn decoding_sets_with_swapped_packedness() {
     {
         use std::collections::BTreeSet;
         for (unmatching_packed, unmatching_unpacked) in [&valid, &disordered] {
-            assert::decodes_non_canonically(
+            assert::decodes!(
+                owned non-canonically,
                 unmatching_packed,
                 Oof {
                     unpacked: BTreeSet::from(expected_items),
@@ -2651,7 +2999,8 @@ fn decoding_sets_with_swapped_packedness() {
                 NotCanonical,
                 "Oof.unpacked",
             );
-            assert::decodes_non_canonically(
+            assert::decodes!(
+                owned non-canonically,
                 unmatching_unpacked,
                 Oof {
                     unpacked: BTreeSet::new(),
@@ -2661,12 +3010,14 @@ fn decoding_sets_with_swapped_packedness() {
                 "Oof.packed",
             );
         }
-        assert::never_decodes::<Oof<BTreeSet<u32>>>(
+        assert::decodes!(
+            owned never decodes Oof<BTreeSet<u32>>,
             &repeated_set_packed,
             UnexpectedlyRepeated,
             "Oof.unpacked",
         );
-        assert::never_decodes::<Oof<BTreeSet<u32>>>(
+        assert::decodes!(
+            owned never decodes Oof<BTreeSet<u32>>,
             &repeated_set_unpacked,
             UnexpectedlyRepeated,
             "Oof.packed",
@@ -2676,14 +3027,16 @@ fn decoding_sets_with_swapped_packedness() {
     macro_rules! test_hash {
         ($ty:ident) => {
             for (set_value_packed, set_value_unpacked) in [&valid, &disordered] {
-                assert::decodes(
+                assert::decodes!(
+                    owned relaxed,
                     set_value_packed,
                     Oof {
                         unpacked: $ty::from(expected_items.clone()),
                         packed: $ty::new(),
                     },
                 );
-                assert::decodes(
+                assert::decodes!(
+                    owned relaxed,
                     set_value_unpacked,
                     Oof {
                         unpacked: $ty::new(),
@@ -2691,12 +3044,14 @@ fn decoding_sets_with_swapped_packedness() {
                     },
                 );
             }
-            assert::doesnt_decode::<Oof<$ty<u32>>>(
+            assert::decodes!(
+                owned relaxed errs for Oof<$ty<u32>>,
                 repeated_set_packed,
                 UnexpectedlyRepeated,
                 "Oof.unpacked",
             );
-            assert::doesnt_decode::<Oof<$ty<u32>>>(
+            assert::decodes!(
+                owned relaxed errs for Oof<$ty<u32>>,
                 repeated_set_unpacked,
                 UnexpectedlyRepeated,
                 "Oof.packed",
@@ -2715,110 +3070,75 @@ fn decoding_sets_with_swapped_packedness() {
     }
 }
 
-fn truncated_packed_string<T>()
-where
-    T: Debug
-        + EmptyState
-        + Collection<Item = String>
-        + encoding::Encoder<General>
-        + encoding::Encoder<Packed>,
-{
-    #[derive(Debug, PartialEq, Message)]
+#[test]
+fn truncated_packed_collection() {
+    #[derive(Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
     struct Foo<T>(#[bilrost(encoding(packed))] T, String);
 
     let OV::LengthDelimited(set_value) = OV::packed([OV::string("fooble"), OV::string("barbaz")])
     else {
         unreachable!()
     };
-    assert::doesnt_decode::<Foo<T>>(
-        [
-            (0, OV::byte_slice(&set_value[..set_value.len() - 1])),
-            (1, OV::string("another field after that")),
-        ],
-        Truncated,
-        "Foo.0",
-    );
-}
+    let truncated_packed_string_val = &set_value[..set_value.len() - 1];
 
-fn truncated_packed_int<T>()
-where
-    T: Debug + EmptyState + Collection<Item = u64> + encoding::Decoder<General>,
-{
-    #[derive(Debug, PartialEq, Message)]
-    struct Foo<T>(T, String);
-
-    let packed = OV::packed([OV::u64(0), OV::u64(999999999999999)]);
-    let OV::LengthDelimited(map_value) = packed else {
+    let OV::LengthDelimited(set_value) = OV::packed([OV::u64(0), OV::u64(999999999999999)]) else {
         unreachable!()
     };
-    assert::doesnt_decode::<Foo<T>>(
-        [
-            (0, OV::byte_slice(&map_value[..map_value.len() - 1])),
-            (1, OV::string("another field after that")),
-        ],
-        Truncated,
-        "Foo.0",
-    );
-}
+    let truncated_packed_int_val = &set_value[..set_value.len() - 1];
 
-#[test]
-fn truncated_packed_collection() {
-    {
-        use std::vec::Vec;
-        truncated_packed_string::<Vec<String>>();
-        truncated_packed_int::<Vec<u64>>();
+    macro_rules! truncated_collection_t {
+        (relaxed $($ty:tt)*) => {
+            truncated_collection_t!(($($ty)*) relaxed errs for);
+        };
+        (distinguished $($ty:tt)*) => {
+            truncated_collection_t!(($($ty)*) never decodes);
+        };
+        (($($ty:tt)*) $($mode_words:tt)*) => {
+            {
+                type T = String;
+                assert::decodes!(
+                    owned $($mode_words)* Foo<$($ty)*>,
+                    [
+                        (0, OV::byte_slice(truncated_packed_string_val)),
+                        (1, OV::string("another field after that")),
+                    ],
+                    Truncated,
+                    "Foo.0",
+                );
+            }
+            {
+                type T = u64;
+                assert::decodes!(
+                    owned $($mode_words)* Foo<$($ty)*>,
+                    [
+                        (0, OV::byte_slice(truncated_packed_int_val)),
+                        (1, OV::string("another field after that")),
+                    ],
+                    Truncated,
+                    "Foo.0",
+                );
+            }
+        };
     }
-    {
-        truncated_packed_string::<Cow<[String]>>();
-        truncated_packed_int::<Cow<[u64]>>();
-    }
+
+    truncated_collection_t!(distinguished Vec<T>);
+    truncated_collection_t!(distinguished Cow<[T]>);
     #[cfg(feature = "arrayvec")]
-    {
-        use arrayvec::ArrayVec;
-        truncated_packed_string::<ArrayVec<String, 2>>();
-        truncated_packed_int::<ArrayVec<u64, 2>>();
-    }
+    truncated_collection_t!(distinguished arrayvec::ArrayVec<T, 2>);
     #[cfg(feature = "smallvec")]
-    {
-        use smallvec::SmallVec;
-        truncated_packed_string::<SmallVec<[String; 2]>>();
-        truncated_packed_int::<SmallVec<[u64; 2]>>();
-    }
+    truncated_collection_t!(distinguished smallvec::SmallVec<[T; 2]>);
     #[cfg(feature = "thin-vec")]
-    {
-        use thin_vec::ThinVec;
-        truncated_packed_string::<ThinVec<String>>();
-        truncated_packed_int::<ThinVec<u64>>();
-    }
+    truncated_collection_t!(distinguished thin_vec::ThinVec<T>);
     #[cfg(feature = "tinyvec")]
-    {
-        use tinyvec::ArrayVec;
-        truncated_packed_string::<ArrayVec<[String; 2]>>();
-        truncated_packed_int::<ArrayVec<[u64; 2]>>();
-    }
+    truncated_collection_t!(distinguished tinyvec::ArrayVec<[T; 2]>);
     #[cfg(feature = "tinyvec")]
-    {
-        use tinyvec::TinyVec;
-        truncated_packed_string::<TinyVec<[String; 2]>>();
-        truncated_packed_int::<TinyVec<[u64; 2]>>();
-    }
-    {
-        use std::collections::BTreeSet;
-        truncated_packed_string::<BTreeSet<String>>();
-        truncated_packed_int::<BTreeSet<u64>>();
-    }
+    truncated_collection_t!(distinguished tinyvec::TinyVec<[T; 2]>);
+    truncated_collection_t!(distinguished std::collections::BTreeSet<T>);
     #[cfg(feature = "std")]
-    {
-        use std::collections::HashSet;
-        truncated_packed_string::<HashSet<String>>();
-        truncated_packed_int::<HashSet<u64>>();
-    }
+    truncated_collection_t!(relaxed std::collections::HashSet<T>);
     #[cfg(feature = "hashbrown")]
-    {
-        use hashbrown::HashSet;
-        truncated_packed_string::<HashSet<String>>();
-        truncated_packed_int::<HashSet<u64>>();
-    }
+    truncated_collection_t!(relaxed hashbrown::HashSet<T>);
 }
 
 // Oneof tests
@@ -2826,81 +3146,96 @@ fn truncated_packed_collection() {
 // Oneofs can be nested in Box, whether or not they are non-empty typed.
 #[test]
 fn oneof_field_decoding() {
-    fn do_oneof_field_decoding<T>(expected_a: T, expected_b: T)
-    where
-        T: Debug + Eq + OneofDecoder + DistinguishedOneofDecoder,
-    {
-        #[derive(Debug, PartialEq, Eq, Message)]
+    #[derive(Debug, PartialEq, Eq, Message)]
     #[bilrost(distinguished)]
-        struct Foo<T>(#[bilrost(oneof = "1, 2")] T);
+    struct Foo<T>(#[bilrost(oneof = "1, 2")] T);
 
-        assert::decodes_distinguished([(1, OV::bool(true))], Foo(expected_a));
-        assert::decodes_distinguished([(2, OV::bool(false))], Foo(expected_b));
-        assert::never_decodes::<Foo<T>>(
-            [(1, OV::bool(false)), (2, OV::bool(true))],
-            ConflictingFields,
-            "Foo.0/AB.B",
-        );
-        assert::never_decodes::<Foo<T>>(
-            [(1, OV::bool(true)), (1, OV::bool(false))],
-            UnexpectedlyRepeated,
-            "Foo.0/AB.A",
-        );
+    macro_rules! do_oneof_field_decoding {
+        ($ty:ty, $expected_a:expr, $expected_b:expr, $oneof_name:expr $(,)?) => {{
+            let oneof_name: &str = $oneof_name;
+            assert::decodes!(owned distinguished, [(1, OV::bool(true))], Foo($expected_a));
+            assert::decodes!(owned distinguished, [(2, OV::bool(false))], Foo($expected_b));
+            assert::decodes!(
+                owned never decodes Foo<$ty>,
+                [(1, OV::bool(false)), (2, OV::bool(true))],
+                ConflictingFields,
+                &format!("Foo.0/{oneof_name}.B"),
+            );
+            assert::decodes!(
+                owned never decodes Foo<$ty>,
+                [(1, OV::bool(true)), (1, OV::bool(false))],
+                UnexpectedlyRepeated,
+                &format!("Foo.0/{oneof_name}.A"),
+            );
+        }};
     }
 
     // tests for non-empty oneof
-    let _: () = {
-        #[derive(Debug, PartialEq, Eq, Oneof)]
+    #[derive(Clone, Debug, PartialEq, Eq, Oneof)]
     #[bilrost(distinguished)]
-        enum AB {
-            #[bilrost(1)]
-            A(bool),
-            #[bilrost(2)]
-            B(bool),
-        }
+    enum AB {
+        #[bilrost(1)]
+        A(bool),
+        #[bilrost(2)]
+        B(bool),
+    }
 
-        do_oneof_field_decoding::<Option<AB>>(Some(AB::A(true)), Some(AB::B(false)));
-        do_oneof_field_decoding::<Option<Box<AB>>>(
-            Some(Box::new(AB::A(true))),
-            Some(Box::new(AB::B(false))),
-        );
-        do_oneof_field_decoding::<Option<Box<Box<AB>>>>(
-            Some(Box::new(Box::new(AB::A(true)))),
-            Some(Box::new(Box::new(AB::B(false)))),
-        );
-        do_oneof_field_decoding::<Box<Option<Box<AB>>>>(
-            Box::new(Some(Box::new(AB::A(true)))),
-            Box::new(Some(Box::new(AB::B(false)))),
-        );
-        do_oneof_field_decoding::<Box<Option<Box<AB>>>>(
-            Box::new(Some(Box::new(AB::A(true)))),
-            Box::new(Some(Box::new(AB::B(false)))),
-        );
-    };
+    do_oneof_field_decoding!(Option<AB>, Some(AB::A(true)), Some(AB::B(false)), "AB");
+    do_oneof_field_decoding!(
+        Option<Box<AB>>,
+        Some(Box::new(AB::A(true))),
+        Some(Box::new(AB::B(false))),
+        "AB",
+    );
+    do_oneof_field_decoding!(
+        Option<Box<Box<AB>>>,
+        Some(Box::new(Box::new(AB::A(true)))),
+        Some(Box::new(Box::new(AB::B(false)))),
+        "AB",
+    );
+    do_oneof_field_decoding!(
+        Box<Option<Box<AB>>>,
+        Box::new(Some(Box::new(AB::A(true)))),
+        Box::new(Some(Box::new(AB::B(false)))),
+        "AB",
+    );
+    do_oneof_field_decoding!(
+        Box<Option<Box<AB>>>,
+        Box::new(Some(Box::new(AB::A(true)))),
+        Box::new(Some(Box::new(AB::B(false)))),
+        "AB",
+    );
 
     // tests for oneof with natural empty state
-    let _: () = {
-        #[derive(Debug, PartialEq, Eq, Oneof)]
+    #[derive(Clone, Debug, PartialEq, Eq, Oneof)]
     #[bilrost(distinguished)]
-        enum AB {
-            None,
-            #[bilrost(1)]
-            A(bool),
-            #[bilrost(2)]
-            B(bool),
-        }
+    enum ABNone {
+        None,
+        #[bilrost(1)]
+        A(bool),
+        #[bilrost(2)]
+        B(bool),
+    }
 
-        do_oneof_field_decoding::<AB>(AB::A(true), AB::B(false));
-        do_oneof_field_decoding::<Box<AB>>(Box::new(AB::A(true)), Box::new(AB::B(false)));
-        do_oneof_field_decoding::<Box<Box<AB>>>(
-            Box::new(Box::new(AB::A(true))),
-            Box::new(Box::new(AB::B(false))),
-        );
-        do_oneof_field_decoding::<Box<Box<Box<AB>>>>(
-            Box::new(Box::new(Box::new(AB::A(true)))),
-            Box::new(Box::new(Box::new(AB::B(false)))),
-        );
-    };
+    do_oneof_field_decoding!(ABNone, ABNone::A(true), ABNone::B(false), "ABNone");
+    do_oneof_field_decoding!(
+        Box<ABNone>,
+        Box::new(ABNone::A(true)),
+        Box::new(ABNone::B(false)),
+        "ABNone",
+    );
+    do_oneof_field_decoding!(
+        Box<Box<ABNone>>,
+        Box::new(Box::new(ABNone::A(true))),
+        Box::new(Box::new(ABNone::B(false))),
+        "ABNone",
+    );
+    do_oneof_field_decoding!(
+        Box<Box<Box<ABNone>>>,
+        Box::new(Box::new(Box::new(ABNone::A(true)))),
+        Box::new(Box::new(Box::new(ABNone::B(false)))),
+        "ABNone",
+    );
 }
 
 #[test]
@@ -2919,35 +3254,40 @@ fn oneof_with_errors_inside() {
         B(String),
     }
 
-    fn do_test_oneof_with_errors_inside<OneofType>(child_field: &str)
-    where
-        OneofType: Debug + Eq + OneofDecoder + DistinguishedOneofDecoder,
-    {
-        #[derive(Clone, Debug, PartialEq, Eq, Message)]
+    #[derive(Clone, Debug, PartialEq, Eq, Message)]
     #[bilrost(distinguished)]
-        struct Foo<O> {
-            #[bilrost(oneof(1))]
-            a: O,
-        }
-        assert::never_decodes::<Foo<OneofType>>(
-            [(1, OV::bytes(*b"\xff"))],
-            InvalidValue,
-            &format!("Foo.a/{child_field}"),
-        );
-        assert::never_decodes::<Foo<OneofType>>(
-            [(1, OV::str("abc")), (1, OV::str("def"))],
-            UnexpectedlyRepeated,
-            &format!("Foo.a/{child_field}"),
-        );
+    struct Foo<O> {
+        #[bilrost(oneof(1))]
+        a: O,
     }
 
-    do_test_oneof_with_errors_inside::<Natural>("Natural.A");
-    do_test_oneof_with_errors_inside::<Option<Optioned>>("Optioned.B");
-    do_test_oneof_with_errors_inside::<Box<Natural>>("Natural.A");
-    do_test_oneof_with_errors_inside::<Box<Box<Box<Natural>>>>("Natural.A");
-    do_test_oneof_with_errors_inside::<Box<Option<Optioned>>>("Optioned.B");
-    do_test_oneof_with_errors_inside::<Option<Box<Optioned>>>("Optioned.B");
-    do_test_oneof_with_errors_inside::<Box<Option<Box<Optioned>>>>("Optioned.B");
+    macro_rules! test_oneof_with_errors_inside {
+        ($oneof_ty:ty, $child_field:expr) => {
+            {
+                let child_field: &str = $child_field;
+                assert::decodes!(
+                    owned never decodes Foo<$oneof_ty>,
+                    [(1, OV::bytes(*b"\xff"))],
+                    InvalidValue,
+                    &format!("Foo.a/{child_field}"),
+                );
+                assert::decodes!(
+                    owned never decodes Foo<$oneof_ty>,
+                    [(1, OV::str("abc")), (1, OV::str("def"))],
+                    UnexpectedlyRepeated,
+                    &format!("Foo.a/{child_field}"),
+                );
+            }
+        };
+    }
+
+    test_oneof_with_errors_inside!(Natural, "Natural.A");
+    test_oneof_with_errors_inside!(Option<Optioned>, "Optioned.B");
+    test_oneof_with_errors_inside!(Box<Natural>, "Natural.A");
+    test_oneof_with_errors_inside!(Box<Box<Box<Natural>>>, "Natural.A");
+    test_oneof_with_errors_inside!(Box<Option<Optioned>>, "Optioned.B");
+    test_oneof_with_errors_inside!(Option<Box<Optioned>>, "Optioned.B");
+    test_oneof_with_errors_inside!(Box<Option<Box<Optioned>>>, "Optioned.B");
 }
 
 #[test]
@@ -2968,7 +3308,7 @@ fn oneof_optioned_fields_encode_empty() {
     #[bilrost(distinguished)]
     struct Foo(#[bilrost(oneof(1, 2, 3))] Option<Abc>);
 
-    assert::decodes_distinguished([], Foo(None));
+    assert::decodes!(owned distinguished, [], Foo(None));
 
     for (opaque, value) in &[
         ([(1, OV::string(""))], Foo(Some(A(Default::default())))),
@@ -2989,7 +3329,7 @@ fn oneof_optioned_fields_encode_empty() {
             Foo(Some(C(vec![false, true]))),
         ),
     ] {
-        assert::decodes_distinguished(opaque, value.clone());
+        assert::decodes!(owned distinguished, opaque, value.clone());
     }
 }
 
@@ -3015,7 +3355,7 @@ fn oneof_plain_fields_encode_empty() {
     #[bilrost(distinguished)]
     struct Foo(#[bilrost(oneof(1, 2, 3))] Abc);
 
-    assert::decodes_distinguished([], Foo(Empty));
+    assert::decodes!(owned distinguished, [], Foo(Empty));
 
     for (opaque, value) in &[
         ([(1, OV::string(""))], Foo(A(Default::default()))),
@@ -3036,7 +3376,7 @@ fn oneof_plain_fields_encode_empty() {
             Foo(C(vec![false, true])),
         ),
     ] {
-        assert::decodes_distinguished(opaque, value.clone());
+        assert::decodes!(owned distinguished, opaque, value.clone());
     }
 }
 
@@ -3052,21 +3392,24 @@ fn oneof_as_message() {
         B(bool),
     }
 
-    assert::decodes_distinguished([], AB::Nothing);
-    assert::decodes_distinguished([(1, OV::bool(false))], AB::A(false));
-    assert::decodes_distinguished([(2, OV::bool(true))], AB::B(true));
-    assert::decodes_non_canonically(
+    assert::decodes!(owned distinguished, [], AB::Nothing);
+    assert::decodes!(owned distinguished, [(1, OV::bool(false))], AB::A(false));
+    assert::decodes!(owned distinguished, [(2, OV::bool(true))], AB::B(true));
+    assert::decodes!(
+        owned non-canonically,
         [(1, OV::bool(true)), (4, OV::str("extension"))],
         AB::A(true),
         HasExtensions,
         "",
     );
-    assert::never_decodes::<AB>(
+    assert::decodes!(
+        owned never decodes AB,
         [(1, OV::bool(false)), (2, OV::bool(true))],
         ConflictingFields,
         "AB.B",
     );
-    assert::never_decodes::<AB>(
+    assert::decodes!(
+        owned never decodes AB,
         [(1, OV::bool(true)), (1, OV::bool(false))],
         UnexpectedlyRepeated,
         "AB.A",
@@ -3084,9 +3427,9 @@ fn oneof_as_message() {
         Late(bool),
     }
 
-    assert::decodes_distinguished([], EarlyLate::Nothing);
-    assert::decodes_distinguished([(0, OV::bool(false))], EarlyLate::Early(false));
-    assert::decodes_distinguished([(999999999, OV::bool(true))], EarlyLate::Late(true));
+    assert::decodes!(owned distinguished, [], EarlyLate::Nothing);
+    assert::decodes!(owned distinguished, [(0, OV::bool(false))], EarlyLate::Early(false));
+    assert::decodes!(owned distinguished, [(999999999, OV::bool(true))], EarlyLate::Late(true));
 }
 
 #[test]
@@ -3157,13 +3500,19 @@ fn enumeration_decoding() {
     #[bilrost(distinguished)]
     struct Foo(Option<DefaultButNoZero>, HasZero);
 
-    assert::decodes_distinguished([], Foo(None, Zero));
-    assert::decodes_distinguished([(0, OV::u32(5))], Foo(Some(Five), Zero));
-    assert::decodes_distinguished([(0, OV::u32(10))], Foo(Some(Ten), Zero));
-    assert::decodes_distinguished([(0, OV::u32(15))], Foo(Some(Fifteen), Zero));
-    assert::decodes_non_canonically([(1, OV::u32(0))], Foo(None, Zero), NotCanonical, "Foo.1");
-    assert::decodes_distinguished([(1, OV::u32(1_000))], Foo(None, Big));
-    assert::decodes_distinguished([(1, OV::u32(1_000_000))], Foo(None, Bigger));
+    assert::decodes!(owned distinguished, [], Foo(None, Zero));
+    assert::decodes!(owned distinguished, [(0, OV::u32(5))], Foo(Some(Five), Zero));
+    assert::decodes!(owned distinguished, [(0, OV::u32(10))], Foo(Some(Ten), Zero));
+    assert::decodes!(owned distinguished, [(0, OV::u32(15))], Foo(Some(Fifteen), Zero));
+    assert::decodes!(
+        owned non-canonically,
+        [(1, OV::u32(0))],
+        Foo(None, Zero),
+        NotCanonical,
+        "Foo.1",
+    );
+    assert::decodes!(owned distinguished, [(1, OV::u32(1_000))], Foo(None, Big));
+    assert::decodes!(owned distinguished, [(1, OV::u32(1_000_000))], Foo(None, Bigger));
 
     #[allow(dead_code)]
     #[derive(Clone, Debug, PartialEq, Eq, Message)]
@@ -3213,7 +3562,8 @@ fn nonempty_enumeration_nesting() {
     #[bilrost(distinguished)]
     struct Foo(#[bilrost(encoding(packed<packed>))] Vec<[DefaultButNoZero; 5]>);
 
-    assert::decodes_distinguished(
+    assert::decodes!(
+        owned distinguished,
         [(
             0,
             OV::packed([
@@ -3263,7 +3613,7 @@ fn enumeration_helpers() {
         regular: 222,
         optional: Some(222),
     };
-    assert::decodes_distinguished([(1, OV::u32(222)), (2, OV::u32(222))], val.clone());
+    assert::decodes!(owned distinguished, [(1, OV::u32(222)), (2, OV::u32(222))], val.clone());
     val.regular()
         .expect_err("bad enumeration value parsed successfully");
     val.optional()
@@ -3282,7 +3632,8 @@ fn enumeration_helpers() {
         second: Option<E>,
     }
 
-    assert::never_decodes::<StrictStruct>(
+    assert::decodes!(
+        owned never decodes StrictStruct,
         HelpedStruct {
             regular: 222,
             optional: None,
@@ -3291,7 +3642,8 @@ fn enumeration_helpers() {
         OutOfDomainValue,
         "StrictStruct.first",
     );
-    assert::never_decodes::<StrictStruct>(
+    assert::decodes!(
+        owned never decodes StrictStruct,
         HelpedStruct {
             regular: 5,
             optional: Some(222),
@@ -3331,12 +3683,12 @@ fn enumeration_value_limits() {
     assert_eq!(Foo::Z.to_number(), u32::MAX);
     assert_eq!(Foo::try_from_number(u32::MAX), Ok(Foo::Z));
     assert_eq!(Foo::Z as u8, 255);
-    assert::decodes_distinguished([], Bar(Foo::A));
-    assert::decodes_non_canonically([(0, OV::u32(0))], Bar(Foo::A), NotCanonical, "Bar.0");
-    assert::decodes_distinguished([(0, OV::u32(5))], Bar(Foo::D));
-    assert::decodes_distinguished([(0, OV::u32(10))], Bar(Foo::T));
-    assert::decodes_distinguished([(0, OV::u32(11))], Bar(Foo::E));
-    assert::decodes_distinguished([(0, OV::u32(u32::MAX))], Bar(Foo::Z));
+    assert::decodes!(owned distinguished, [], Bar(Foo::A));
+    assert::decodes!(owned non-canonically, [(0, OV::u32(0))], Bar(Foo::A), NotCanonical, "Bar.0");
+    assert::decodes!(owned distinguished, [(0, OV::u32(5))], Bar(Foo::D));
+    assert::decodes!(owned distinguished, [(0, OV::u32(10))], Bar(Foo::T));
+    assert::decodes!(owned distinguished, [(0, OV::u32(11))], Bar(Foo::E));
+    assert::decodes!(owned distinguished, [(0, OV::u32(u32::MAX))], Bar(Foo::Z));
 }
 
 // Nested message tests
@@ -3368,14 +3720,16 @@ fn directly_included_message() {
     // empty.
 
     // When the inner message is empty, it doesn't encode.
-    assert::decodes_distinguished(
+    assert::decodes!(
+        owned distinguished,
         [(2, OV::string("abc"))],
         OuterDirect {
             inner: EmptyState::empty(),
             also: "abc".into(),
         },
     );
-    assert::decodes_distinguished(
+    assert::decodes!(
+        owned distinguished,
         [(2, OV::string("abc"))],
         OuterOptional {
             inner: None,
@@ -3385,13 +3739,15 @@ fn directly_included_message() {
 
     // When the inner message is present in the encoding but empty, it's only canonical when
     // the field is optioned.
-    assert::decodes_non_canonically(
+    assert::decodes!(
+        owned non-canonically,
         [(1, OV::message(&[].into_opaque_message()))],
         OuterDirect::empty(),
         NotCanonical,
         "OuterDirect.inner",
     );
-    assert::decodes_distinguished(
+    assert::decodes!(
+        owned distinguished,
         [(1, OV::message(&[].into_opaque_message()))],
         OuterOptional {
             inner: Some(EmptyState::empty()),
@@ -3400,7 +3756,8 @@ fn directly_included_message() {
     );
 
     // The inner message is included when it is not fully empty
-    assert::decodes_distinguished(
+    assert::decodes!(
+        owned distinguished,
         [
             (
                 1,
@@ -3416,7 +3773,8 @@ fn directly_included_message() {
             also: "abc".into(),
         },
     );
-    assert::decodes_distinguished(
+    assert::decodes!(
+        owned distinguished,
         [
             (
                 1,
@@ -3433,28 +3791,38 @@ fn directly_included_message() {
         },
     );
 
-    assert::never_decodes::<OuterDirect>([(1, OV::Varint(1))], WrongWireType, "OuterDirect.inner");
-    assert::never_decodes::<OuterOptional>(
+    assert::decodes!(
+        owned never decodes OuterDirect,
+        [(1, OV::Varint(1))],
+        WrongWireType,
+        "OuterDirect.inner",
+    );
+    assert::decodes!(
+        owned never decodes OuterOptional,
         [(1, OV::Varint(1))],
         WrongWireType,
         "OuterOptional.inner",
     );
-    assert::never_decodes::<OuterDirect>(
+    assert::decodes!(
+        owned never decodes OuterDirect,
         [(1, OV::ThirtyTwoBit([1; 4]))],
         WrongWireType,
         "OuterDirect.inner",
     );
-    assert::never_decodes::<OuterOptional>(
+    assert::decodes!(
+        owned never decodes OuterOptional,
         [(1, OV::ThirtyTwoBit([1; 4]))],
         WrongWireType,
         "OuterOptional.inner",
     );
-    assert::never_decodes::<OuterDirect>(
+    assert::decodes!(
+        owned never decodes OuterDirect,
         [(1, OV::SixtyFourBit([1; 8]))],
         WrongWireType,
         "OuterDirect.inner",
     );
-    assert::never_decodes::<OuterOptional>(
+    assert::decodes!(
+        owned never decodes OuterOptional,
         [(1, OV::SixtyFourBit([1; 8]))],
         WrongWireType,
         "OuterOptional.inner",
@@ -3473,7 +3841,8 @@ fn truncated_submessage() {
     let inner = [(0, OV::string("interrupting cow says"))]
         .into_opaque_message()
         .encode_to_vec();
-    assert::never_decodes::<Foo>(
+    assert::decodes!(
+        owned never decodes Foo,
         [
             (0, OV::byte_slice(&inner[..inner.len() - 1])),
             (1, OV::string("moo")),
@@ -3506,11 +3875,13 @@ fn tuples() {
         FooTuple((1i8, "foo".to_string())).encode_to_vec(),
         Foo(Pair(1i8, "foo".to_string())).encode_to_vec(),
     );
-    assert::decodes_distinguished(
+    assert::decodes!(
+        owned distinguished,
         Foo(Pair(1i8, "foo".to_string())).encode_to_vec(),
         FooTuple((1i8, "foo".to_string())),
     );
-    assert::decodes_non_canonically(
+    assert::decodes!(
+        owned non-canonically,
         [(
             0,
             OV::message(&[(0, OV::i8(0)), (1, OV::str("bar"))].into_opaque_message()),
@@ -3519,7 +3890,8 @@ fn tuples() {
         NotCanonical,
         "FooTuple.0/(2-tuple).0",
     );
-    assert::decodes_non_canonically(
+    assert::decodes!(
+        owned non-canonically,
         [(
             0,
             OV::message(&[(0, OV::i8(2)), (1, OV::str(""))].into_opaque_message()),
@@ -3528,7 +3900,8 @@ fn tuples() {
         NotCanonical,
         "FooTuple.0/(2-tuple).1",
     );
-    assert::decodes_non_canonically(
+    assert::decodes!(
+        owned non-canonically,
         [(
             0,
             OV::message(
@@ -3539,13 +3912,15 @@ fn tuples() {
         HasExtensions,
         "FooTuple.0",
     );
-    assert::decodes_non_canonically(
+    assert::decodes!(
+        owned non-canonically,
         [(0, OV::message(&[(2, OV::bool(true))].into_opaque_message()))],
         FooTuple((0, "".to_string())),
         HasExtensions,
         "FooTuple.0",
     );
-    assert::decodes_non_canonically(
+    assert::decodes!(
+        owned non-canonically,
         [(0, OV::message(&()))],
         FooTuple((0, "".to_string())),
         NotCanonical,
@@ -3585,7 +3960,8 @@ fn unknown_fields_distinguished() {
         oneof: InnerOneof,
     }
 
-    assert::decodes_distinguished(
+    assert::decodes!(
+        owned distinguished,
         [
             (0, OV::string("hello")),
             (3, OV::message(&[(1, OV::i64(301))].into_opaque_message())),
@@ -3598,7 +3974,8 @@ fn unknown_fields_distinguished() {
             ..EmptyState::empty()
         },
     );
-    assert::decodes_non_canonically(
+    assert::decodes!(
+        owned non-canonically,
         [
             (0, OV::string("hello")),
             (2, OV::u32(123)), // Unknown field
@@ -3614,7 +3991,8 @@ fn unknown_fields_distinguished() {
         HasExtensions,
         "",
     );
-    assert::decodes_non_canonically(
+    assert::decodes!(
+        owned non-canonically,
         [
             (0, OV::string("hello")),
             (3, OV::message(&[(1, OV::i64(301))].into_opaque_message())),
@@ -3638,7 +4016,8 @@ fn unknown_fields_distinguished() {
         HasExtensions,
         "Foo.four",
     );
-    assert::decodes_non_canonically(
+    assert::decodes!(
+        owned non-canonically,
         [
             (0, OV::string("hello")),
             (
@@ -3664,7 +4043,8 @@ fn unknown_fields_distinguished() {
     );
 
     // We should be sensitive to multiple tiers of non-canonicity
-    assert::decodes_distinguished(
+    assert::decodes!(
+        owned distinguished,
         [
             (1, OV::u64(1)),
             (3, OV::message(&[(1, OV::i64(1))].into_opaque_message())),
@@ -3676,7 +4056,8 @@ fn unknown_fields_distinguished() {
         },
     );
     // We can see when there are extensions in both the inner and outer message...
-    assert::decodes_non_canonically(
+    assert::decodes!(
+        owned non-canonically,
         [
             (1, OV::u64(1)),
             (
@@ -3692,7 +4073,8 @@ fn unknown_fields_distinguished() {
         HasExtensions,
         "Foo.oneof/InnerOneof.Three",
     );
-    assert::decodes_non_canonically(
+    assert::decodes!(
+        owned non-canonically,
         [
             (1, OV::u64(1)),
             (2, OV::string("unknown")),
@@ -3708,7 +4090,8 @@ fn unknown_fields_distinguished() {
     );
     // and a non-canonical field that occurs later in the message overrides the canonicity to
     // the worse `NotCanonical`
-    assert::decodes_non_canonically(
+    assert::decodes!(
+        owned non-canonically,
         [
             (1, OV::u64(1)),
             (2, OV::string("unknown")),
