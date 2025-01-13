@@ -2424,4 +2424,123 @@ mod test {
             "Enumeration must have at least one variant"
         );
     }
+
+    #[test]
+    fn test_accepts_distinguished_and_borrowed_messages() {
+        _ = try_message(quote!(
+            #[bilrost(distinguished, borrowed)]
+            struct DistinguishedBorrowedMessage {
+                name: &str,
+            }
+        ))
+        .unwrap();
+        _ = try_message(quote!(
+            #[bilrost(distinguished, borrowed)]
+            enum DistinguishedBorrowedOneof {
+                Empty,
+                #[bilrost(1)]
+                Name(&str),
+            }
+        ))
+        .unwrap();
+    }
+
+    #[test]
+    fn test_accepts_distinguished_and_borrowed_oneofs() {
+        _ = try_oneof(quote!(
+            #[bilrost(distinguished, borrowed)]
+            enum DistinguishedBorrowedOneof {
+                #[bilrost(1)]
+                Name(&str),
+            }
+        ))
+        .unwrap();
+    }
+
+    #[test]
+    fn test_rejects_duplicated_message_attrs() {
+        let output = try_message(quote!(
+            #[bilrost(distinguished, distinguished)]
+            struct DistinguishedBorrowedMessage {
+                name: &str,
+            }
+        ));
+        assert_eq!(
+            output
+                .expect_err("message with duplicated distinguished attrs not detected")
+                .to_string(),
+            "duplicate distinguished attributes"
+        );
+        let output = try_message(quote!(
+            #[bilrost(borrowed, distinguished, borrowed)]
+            struct DistinguishedBorrowedMessage {
+                name: &str,
+            }
+        ));
+        assert_eq!(
+            output
+                .expect_err("message with duplicated borrowed attrs not detected")
+                .to_string(),
+            "duplicate borrowed attributes"
+        );
+        
+        let output = try_message(quote!(
+            #[bilrost(distinguished, distinguished)]
+            enum DistinguishedBorrowedOneof {
+                Empty,
+                #[bilrost(1)]
+                Name(&str),
+            }
+        ));
+        assert_eq!(
+            output
+                .expect_err("message with duplicated distinguished attrs not detected")
+                .to_string(),
+            "duplicate distinguished attributes"
+        );
+        let output = try_message(quote!(
+            #[bilrost(borrowed, distinguished, borrowed)]
+            enum DistinguishedBorrowedOneof {
+                Empty,
+                #[bilrost(1)]
+                Name(&str),
+            }
+        ));
+        assert_eq!(
+            output
+                .expect_err("message with duplicated borrowed attrs not detected")
+                .to_string(),
+            "duplicate borrowed attributes"
+        );
+    }
+
+    #[test]
+    fn test_rejects_duplicated_oneof_attrs() {
+        let output = try_message(quote!(
+            #[bilrost(distinguished, distinguished)]
+            enum DistinguishedBorrowedOneof {
+                #[bilrost(1)]
+                Name(&str),
+            }
+        ));
+        assert_eq!(
+            output
+                .expect_err("message with duplicated distinguished attrs not detected")
+                .to_string(),
+            "duplicate distinguished attributes"
+        );
+        let output = try_message(quote!(
+            #[bilrost(borrowed, distinguished, borrowed)]
+            enum DistinguishedBorrowedOneof {
+                #[bilrost(1)]
+                Name(&str),
+            }
+        ));
+        assert_eq!(
+            output
+                .expect_err("message with duplicated borrowed attrs not detected")
+                .to_string(),
+            "duplicate borrowed attributes"
+        );
+    }
 }
