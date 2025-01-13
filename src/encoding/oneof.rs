@@ -411,6 +411,44 @@ mod generic_boxed_oneof_impls {
         }
     }
 
+    impl<'a, T> OneofBorrowDecoder<'a> for Box<T>
+    where
+        T: OneofBorrowDecoder<'a>,
+    {
+        #[inline]
+        fn oneof_borrow_decode_field(
+            value: &mut Self,
+            tag: u32,
+            wire_type: WireType,
+            buf: Capped<&'a [u8]>,
+            ctx: DecodeContext,
+        ) -> Result<(), DecodeError> {
+            OneofBorrowDecoder::oneof_borrow_decode_field(&mut **value, tag, wire_type, buf, ctx)
+        }
+    }
+
+    impl<'a, T> DistinguishedOneofBorrowDecoder<'a> for Box<T>
+    where
+        T: DistinguishedOneofBorrowDecoder<'a>,
+    {
+        #[inline]
+        fn oneof_borrow_decode_field_distinguished(
+            value: &mut Self,
+            tag: u32,
+            wire_type: WireType,
+            buf: Capped<&'a [u8]>,
+            ctx: RestrictedDecodeContext,
+        ) -> Result<Canonicity, DecodeError> {
+            DistinguishedOneofBorrowDecoder::oneof_borrow_decode_field_distinguished(
+                &mut **value,
+                tag,
+                wire_type,
+                buf,
+                ctx,
+            )
+        }
+    }
+
     impl<T> NonEmptyOneof for Box<T>
     where
         T: NonEmptyOneof,
