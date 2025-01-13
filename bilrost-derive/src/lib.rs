@@ -11,9 +11,9 @@
 
 extern crate alloc;
 
-use crate::attrs::{tag_list_attr, TagList};
+use crate::attrs::{tag_list_attr, word_attr, TagList};
 use crate::field::{
-    bilrost_attrs, set_option,
+    bilrost_attrs, set_bool, set_option,
     DecodeLifetime::{self, Borrowed, Owned},
     DecodeMode::{self, Distinguished, Relaxed},
     Field,
@@ -105,12 +105,15 @@ enum FieldChunk {
 }
 use FieldChunk::*;
 
+#[derive(Clone)]
 struct PreprocessedMessage<'a> {
     ident: Ident,
     impl_generics: &'a Generics,
     ty_generics: TypeGenerics<'a>,
     where_clause: Option<&'a WhereClause>,
     unsorted_fields: Vec<(TokenStream, Field)>,
+    distinguished: bool,
+    borrow_only: bool,
     has_ignored_fields: bool,
     tag_range: Option<RangeInclusive<u32>>,
 }
@@ -126,6 +129,8 @@ fn preprocess_message(input: &DeriveInput) -> Result<PreprocessedMessage, Error>
 
     let mut reserved_tags: Option<TagList> = None;
     let mut unknown_attrs = Vec::new();
+    let mut distinguished = false;
+    let mut borrow_only = false;
     for attr in bilrost_attrs(input.attrs.clone())? {
         if let Some(tags) = tag_list_attr(&attr, "reserved_tags", None)? {
             set_option(
@@ -133,6 +138,10 @@ fn preprocess_message(input: &DeriveInput) -> Result<PreprocessedMessage, Error>
                 tags,
                 "duplicate reserved_tags attributes",
             )?;
+        } else if word_attr(&attr, "distinguished") {
+            set_bool(&mut distinguished, "duplicate distinguished attributes")?;
+        } else if word_attr(&attr, "borrowed") {
+            set_bool(&mut borrow_only, "duplicate borrowed attributes")?;
         } else {
             unknown_attrs.push(attr);
         }
@@ -232,6 +241,8 @@ fn preprocess_message(input: &DeriveInput) -> Result<PreprocessedMessage, Error>
         ty_generics,
         where_clause,
         unsorted_fields,
+        distinguished,
+        borrow_only,
         has_ignored_fields,
         tag_range,
     })
@@ -410,9 +421,16 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         ty_generics,
         where_clause,
         unsorted_fields,
+        distinguished,
+        borrow_only: _, // TODO(widders): impl borrow only
         has_ignored_fields,
         tag_range,
     } = preprocess_message(&input)?;
+
+    if distinguished && has_ignored_fields {
+        bail!("messages with ignored fields cannot be distinguished");
+    }
+
     let fields = sort_fields(unsorted_fields.clone());
     let self_where = if has_ignored_fields {
         // When there are ignored fields, the whole message impl should be bounded by
@@ -669,7 +687,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     //
     // Even in rust 1.79 nightly, if the constant is never named anywhere the assertions won't
     // actually run.
-    let expanded = quote! {
+    let impls = quote! {
         impl #impl_generics ::bilrost::encoding::RawMessage
         for #ident #ty_generics #encoder_where_clause {
             const __ASSERTIONS: () = { #(#static_guards)* };
@@ -770,135 +788,104 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         }
     };
 
-    let aliases = encoder_alias_header();
-    let expanded = quote! {
-        const _: () = {
-            #aliases
+    let distinguished_impls = distinguished.then(|| {
+        let [owned_decoder_where_clause, borrowed_decoder_where_clause] =
+            [Owned, Borrowed].map(|lifetime| {
+                append_wheres(
+                    where_clause,
+                    Some(quote!(Self: ::core::cmp::Eq)),
+                    &unsorted_fields,
+                    Decode(lifetime, Distinguished),
+                )
+            });
 
-            #expanded
+        let [decode_owned, decode_borrowed] = [Owned, Borrowed].map(|lifetime| {
+            let ident = ident.clone();
+            unsorted_fields.iter().map(move |(field_ident, field)| {
+                let decode = field.decode(quote!(&mut self.#field_ident), lifetime, Distinguished);
+                let tags = field.tags().into_iter().map(|tag| quote!(#tag));
+                let tags = Itertools::intersperse(tags, quote!(|));
 
-            #methods
-        };
-    };
-
-    Ok(expanded)
-}
-
-fn try_distinguished_message(input: TokenStream) -> Result<TokenStream, Error> {
-    let input: DeriveInput = parse2(input)?;
-
-    if let Data::Enum(..) = input.data {
-        return distinguished_message_via_oneof(input);
-    }
-
-    let PreprocessedMessage {
-        ident,
-        impl_generics,
-        ty_generics,
-        where_clause,
-        unsorted_fields,
-        has_ignored_fields,
-        tag_range: _,
-    } = preprocess_message(&input)?;
-
-    if has_ignored_fields {
-        bail!("messages with ignored fields cannot be distinguished");
-    }
-
-    let borrow_generics = append_generic(impl_generics, quote!('__a));
-
-    let [owned_decoder_where_clause, borrowed_decoder_where_clause] =
-        [Owned, Borrowed].map(|lifetime| {
-            append_wheres(
-                where_clause,
-                Some(quote!(Self: ::core::cmp::Eq)),
-                &unsorted_fields,
-                Decode(lifetime, Distinguished),
-            )
+                quote! {
+                    #(#tags)* => {
+                        match #decode {
+                            ::core::result::Result::Ok(new_canon) => {
+                                canon.update(new_canon);
+                            }
+                            ::core::result::Result::Err(mut error) => {
+                                error.push(stringify!(#ident), stringify!(#field_ident));
+                                return ::core::result::Result::Err(error);
+                            }
+                        }
+                    }
+                }
+            })
         });
 
-    let [decode_owned, decode_borrowed] = [Owned, Borrowed].map(|lifetime| {
-        let ident = ident.clone();
-        unsorted_fields.iter().map(move |(field_ident, field)| {
-            let decode = field.decode(quote!(&mut self.#field_ident), lifetime, Distinguished);
-            let tags = field.tags().into_iter().map(|tag| quote!(#tag));
-            let tags = Itertools::intersperse(tags, quote!(|));
-
-            quote! {
-                #(#tags)* => {
-                    match #decode {
-                        ::core::result::Result::Ok(new_canon) => {
-                            canon.update(new_canon);
-                        }
-                        ::core::result::Result::Err(mut error) => {
-                            error.push(stringify!(#ident), stringify!(#field_ident));
-                            return ::core::result::Result::Err(error);
+        quote! {
+            impl #impl_generics ::bilrost::encoding::RawDistinguishedMessageDecoder
+            for #ident #ty_generics #owned_decoder_where_clause {
+                #[allow(unused_variables)]
+                #[inline]
+                fn raw_decode_field_distinguished<__B>(
+                    &mut self,
+                    tag: u32,
+                    wire_type: ::bilrost::encoding::WireType,
+                    duplicated: bool,
+                    buf: ::bilrost::encoding::Capped<__B>,
+                    ctx: ::bilrost::encoding::RestrictedDecodeContext,
+                ) -> ::core::result::Result<::bilrost::Canonicity, ::bilrost::DecodeError>
+                where
+                    __B: ::bilrost::bytes::Buf + ?Sized,
+                {
+                    let canon = &mut ::bilrost::Canonicity::Canonical;
+                    match tag {
+                        #(#decode_owned)*
+                        _ => {
+                            ctx.update(canon, ::bilrost::Canonicity::HasExtensions)?;
+                            ::bilrost::encoding::skip_field(wire_type, buf)?;
                         }
                     }
+                    ::core::result::Result::Ok(*canon)
                 }
             }
-        })
+
+            impl #borrow_generics ::bilrost::encoding::RawDistinguishedMessageBorrowDecoder<'__a>
+            for #ident #ty_generics #borrowed_decoder_where_clause {
+                #[allow(unused_variables)]
+                #[inline]
+                fn raw_borrow_decode_field_distinguished(
+                    &mut self,
+                    tag: u32,
+                    wire_type: ::bilrost::encoding::WireType,
+                    duplicated: bool,
+                    buf: ::bilrost::encoding::Capped<&'__a [u8]>,
+                    ctx: ::bilrost::encoding::RestrictedDecodeContext,
+                ) -> ::core::result::Result<::bilrost::Canonicity, ::bilrost::DecodeError> {
+                    let canon = &mut ::bilrost::Canonicity::Canonical;
+                    match tag {
+                        #(#decode_borrowed)*
+                        _ => {
+                            ctx.update(canon, ::bilrost::Canonicity::HasExtensions)?;
+                            ::bilrost::encoding::skip_field(wire_type, buf)?;
+                        }
+                    }
+                    ::core::result::Result::Ok(*canon)
+                }
+            }
+        }
     });
-
-    let expanded = quote! {
-        impl #impl_generics ::bilrost::encoding::RawDistinguishedMessageDecoder
-        for #ident #ty_generics #owned_decoder_where_clause {
-            #[allow(unused_variables)]
-            #[inline]
-            fn raw_decode_field_distinguished<__B>(
-                &mut self,
-                tag: u32,
-                wire_type: ::bilrost::encoding::WireType,
-                duplicated: bool,
-                buf: ::bilrost::encoding::Capped<__B>,
-                ctx: ::bilrost::encoding::RestrictedDecodeContext,
-            ) -> ::core::result::Result<::bilrost::Canonicity, ::bilrost::DecodeError>
-            where
-                __B: ::bilrost::bytes::Buf + ?Sized,
-            {
-                let canon = &mut ::bilrost::Canonicity::Canonical;
-                match tag {
-                    #(#decode_owned)*
-                    _ => {
-                        ctx.update(canon, ::bilrost::Canonicity::HasExtensions)?;
-                        ::bilrost::encoding::skip_field(wire_type, buf)?;
-                    }
-                }
-                ::core::result::Result::Ok(*canon)
-            }
-        }
-
-        impl #borrow_generics ::bilrost::encoding::RawDistinguishedMessageBorrowDecoder<'__a>
-        for #ident #ty_generics #borrowed_decoder_where_clause {
-            #[allow(unused_variables)]
-            #[inline]
-            fn raw_borrow_decode_field_distinguished(
-                &mut self,
-                tag: u32,
-                wire_type: ::bilrost::encoding::WireType,
-                duplicated: bool,
-                buf: ::bilrost::encoding::Capped<&'__a [u8]>,
-                ctx: ::bilrost::encoding::RestrictedDecodeContext,
-            ) -> ::core::result::Result<::bilrost::Canonicity, ::bilrost::DecodeError> {
-                let canon = &mut ::bilrost::Canonicity::Canonical;
-                match tag {
-                    #(#decode_borrowed)*
-                    _ => {
-                        ctx.update(canon, ::bilrost::Canonicity::HasExtensions)?;
-                        ::bilrost::encoding::skip_field(wire_type, buf)?;
-                    }
-                }
-                ::core::result::Result::Ok(*canon)
-            }
-        }
-    };
 
     let aliases = encoder_alias_header();
     let expanded = quote! {
         const _: () = {
             #aliases
 
-            #expanded
+            #impls
+
+            #distinguished_impls
+
+            #methods
         };
     };
 
@@ -1127,11 +1114,6 @@ fn distinguished_message_via_oneof(input: DeriveInput) -> Result<TokenStream, Er
 #[proc_macro_derive(Message, attributes(bilrost))]
 pub fn message(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     try_message(input.into()).unwrap().into()
-}
-
-#[proc_macro_derive(DistinguishedMessage, attributes(bilrost))]
-pub fn distinguished_message(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    try_distinguished_message(input.into()).unwrap().into()
 }
 
 fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
