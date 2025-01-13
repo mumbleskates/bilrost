@@ -960,6 +960,27 @@ mod test {
     }
 
     #[test]
+    fn fully_advancing_keep_back_reversebuffer_does_not_drop_back() {
+        let mut buf = ReverseBuffer::with_capacity(4);
+        buf.prepend_slice(b"asdfa");
+        assert_eq!(buf.chunks.len(), 2);
+        assert!(buf.capacity() > 5);
+        assert_eq!(buf.remaining(), 5);
+        compare_buf(&mut buf, b"asdfa");
+        assert_eq!(buf.capacity(), 4); // this buffer retained the back chunk
+
+        buf = ReverseBuffer::new();
+        buf.plan_reservation_exact(4);
+        buf.prepend_slice(b"as");
+        buf.prepend_slice(b"dfa");
+        assert_eq!(buf.chunks.len(), 2);
+        assert!(buf.capacity() > 5);
+        assert_eq!(buf.remaining(), 5);
+        compare_buf(&mut buf, b"dfaas");
+        assert_eq!(buf.capacity(), 0); // this buffer doesn't retain its back chunk
+    }
+
+    #[test]
     fn prepending_small_bufs() {
         let mut buf = ReverseBuffer::new();
         buf.prepend("hello".as_bytes());
