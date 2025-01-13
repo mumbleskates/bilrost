@@ -667,14 +667,13 @@ impl From<ReverseBuffer> for Vec<u8> {
 
 impl From<Box<[u8]>> for ReverseBuffer {
     fn from(value: Box<[u8]>) -> Self {
-        let capacity = value.len();
         Self {
+            capacity: value.len(),
             // SAFETY: we are actually marking the data as LESS initialized, in a transparent
             // representation. This is trivial to do and completely safe, but there's no safe method
             // available to call that does this for you itemwise when it's in a Box like this.
             chunks: vec![unsafe { transmute::<Box<[u8]>, Box<[MaybeUninit<u8>]>>(value) }],
             front: 0, // front chunk is full
-            capacity,
             ..Self::new()
         }
     }
