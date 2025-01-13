@@ -9,7 +9,7 @@ use alloc::boxed::Box;
 use alloc::vec::Vec;
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 
-/// Merges fields from the given buffer, to its cap, into the given `TaggedDecodable` value.
+/// Merges fields from the given buffer, to its cap, into the given owned message value.
 /// Implemented as a private standalone method to discourage "merging" as a usage pattern.
 #[inline]
 pub(crate) fn merge<T: RawMessageDecoder, B: Buf + ?Sized>(
@@ -28,7 +28,7 @@ pub(crate) fn merge<T: RawMessageDecoder, B: Buf + ?Sized>(
     Ok(())
 }
 
-/// Merges fields from the given buffer, to its cap, into the given `DistinguishedTaggedDecodable`
+/// Merges fields from the given buffer, to its cap, into the given distinguished owned message
 /// value. Implemented as a private standalone method to discourage "merging" as a usage pattern.
 #[inline]
 pub(crate) fn merge_distinguished<T: RawDistinguishedMessageDecoder, B: Buf + ?Sized>(
@@ -54,7 +54,7 @@ pub(crate) fn merge_distinguished<T: RawDistinguishedMessageDecoder, B: Buf + ?S
     Ok(canon)
 }
 
-/// Merges fields from the given buffer, to its cap, into the given `TaggedDecodable` value.
+/// Merges fields from the given buffer, to its cap, into the given borrowed message value.
 /// Implemented as a private standalone method to discourage "merging" as a usage pattern.
 #[inline]
 pub(crate) fn borrow_merge<'a, T: RawMessageBorrowDecoder<'a>>(
@@ -73,7 +73,7 @@ pub(crate) fn borrow_merge<'a, T: RawMessageBorrowDecoder<'a>>(
     Ok(())
 }
 
-/// Merges fields from the given buffer, to its cap, into the given `DistinguishedTaggedDecodable`
+/// Merges fields from the given buffer, to its cap, into the given distinguished borrowed message
 /// value. Implemented as a private standalone method to discourage "merging" as a usage pattern.
 #[inline]
 pub(crate) fn borrow_merge_distinguished<'a, T: RawDistinguishedMessageBorrowDecoder<'a>>(
