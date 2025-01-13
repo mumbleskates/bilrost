@@ -1,7 +1,7 @@
 use alloc::collections::BTreeMap;
 use alloc::string::String;
 use alloc::vec::Vec;
-use bilrost::{DistinguishedMessage, Message, Oneof};
+use bilrost::{Message, Oneof};
 
 /// A Duration represents a signed, fixed-length span of time represented as a count of seconds and
 /// fractions of seconds at nanosecond resolution. It is independent of any calendar and concepts
@@ -49,7 +49,8 @@ use bilrost::{DistinguishedMessage, Message, Oneof};
 ///    end.nanos -= 1000000000;
 /// }
 /// ```
-#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Message, DistinguishedMessage)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Message)]
+#[bilrost(distinguished)]
 pub struct Duration {
     /// Signed seconds of the span of time. Must be from -315,576,000,000 to +315,576,000,000
     /// inclusive. Note: these bounds are computed from: 60 sec/min * 60 min/hr * 24 hr/day *
@@ -80,7 +81,8 @@ pub struct Duration {
 /// proleptic Gregorian calendar, in negative years or in positive years with more than 4 digits.
 ///
 /// Values of this type are not guaranteed to only exist in their normalized form.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Message, DistinguishedMessage)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Message)]
+#[bilrost(distinguished)]
 pub struct Timestamp {
     /// Represents seconds of UTC time since Unix epoch 1970-01-01T00:00:00Z.
     #[bilrost(1)]
