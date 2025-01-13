@@ -784,6 +784,127 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     Ok(expanded)
 }
 
+fn try_distinguished_message(input: TokenStream) -> Result<TokenStream, Error> {
+    let input: DeriveInput = parse2(input)?;
+
+    if let Data::Enum(..) = input.data {
+        return distinguished_message_via_oneof(input);
+    }
+
+    let PreprocessedMessage {
+        ident,
+        impl_generics,
+        ty_generics,
+        where_clause,
+        unsorted_fields,
+        has_ignored_fields,
+        tag_range: _,
+    } = preprocess_message(&input)?;
+
+    if has_ignored_fields {
+        bail!("messages with ignored fields cannot be distinguished");
+    }
+
+    let borrow_generics = append_generic(impl_generics, quote!('__a));
+
+    let [owned_decoder_where_clause, borrowed_decoder_where_clause] =
+        [Owned, Borrowed].map(|lifetime| {
+            append_wheres(
+                where_clause,
+                Some(quote!(Self: ::core::cmp::Eq)),
+                &unsorted_fields,
+                Decode(lifetime, Distinguished),
+            )
+        });
+
+    let [decode_owned, decode_borrowed] = [Owned, Borrowed].map(|lifetime| {
+        let ident = ident.clone();
+        unsorted_fields.iter().map(move |(field_ident, field)| {
+            let decode = field.decode(quote!(&mut self.#field_ident), lifetime, Distinguished);
+            let tags = field.tags().into_iter().map(|tag| quote!(#tag));
+            let tags = Itertools::intersperse(tags, quote!(|));
+
+            quote! {
+                #(#tags)* => {
+                    match #decode {
+                        ::core::result::Result::Ok(new_canon) => {
+                            canon.update(new_canon);
+                        }
+                        ::core::result::Result::Err(mut error) => {
+                            error.push(stringify!(#ident), stringify!(#field_ident));
+                            return ::core::result::Result::Err(error);
+                        }
+                    }
+                }
+            }
+        })
+    });
+
+    let expanded = quote! {
+        impl #impl_generics ::bilrost::encoding::RawDistinguishedMessageDecoder
+        for #ident #ty_generics #owned_decoder_where_clause {
+            #[allow(unused_variables)]
+            #[inline]
+            fn raw_decode_field_distinguished<__B>(
+                &mut self,
+                tag: u32,
+                wire_type: ::bilrost::encoding::WireType,
+                duplicated: bool,
+                buf: ::bilrost::encoding::Capped<__B>,
+                ctx: ::bilrost::encoding::RestrictedDecodeContext,
+            ) -> ::core::result::Result<::bilrost::Canonicity, ::bilrost::DecodeError>
+            where
+                __B: ::bilrost::bytes::Buf + ?Sized,
+            {
+                let canon = &mut ::bilrost::Canonicity::Canonical;
+                match tag {
+                    #(#decode_owned)*
+                    _ => {
+                        ctx.update(canon, ::bilrost::Canonicity::HasExtensions)?;
+                        ::bilrost::encoding::skip_field(wire_type, buf)?;
+                    }
+                }
+                ::core::result::Result::Ok(*canon)
+            }
+        }
+
+        impl #borrow_generics ::bilrost::encoding::RawDistinguishedMessageBorrowDecoder<'__a>
+        for #ident #ty_generics #borrowed_decoder_where_clause {
+            #[allow(unused_variables)]
+            #[inline]
+            fn raw_borrow_decode_field_distinguished(
+                &mut self,
+                tag: u32,
+                wire_type: ::bilrost::encoding::WireType,
+                duplicated: bool,
+                buf: ::bilrost::encoding::Capped<&'__a [u8]>,
+                ctx: ::bilrost::encoding::RestrictedDecodeContext,
+            ) -> ::core::result::Result<::bilrost::Canonicity, ::bilrost::DecodeError> {
+                let canon = &mut ::bilrost::Canonicity::Canonical;
+                match tag {
+                    #(#decode_borrowed)*
+                    _ => {
+                        ctx.update(canon, ::bilrost::Canonicity::HasExtensions)?;
+                        ::bilrost::encoding::skip_field(wire_type, buf)?;
+                    }
+                }
+                ::core::result::Result::Ok(*canon)
+            }
+        }
+    };
+
+    let aliases = encoder_alias_header();
+    let expanded = quote! {
+        const _: () = {
+            #aliases
+
+            #expanded
+        };
+    };
+
+    Ok(expanded)
+}
+
 fn message_via_oneof(input: DeriveInput) -> Result<TokenStream, Error> {
     let PreprocessedOneof {
         ident,
@@ -911,132 +1032,6 @@ fn message_via_oneof(input: DeriveInput) -> Result<TokenStream, Error> {
     })
 }
 
-#[proc_macro_derive(Message, attributes(bilrost))]
-pub fn message(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    try_message(input.into()).unwrap().into()
-}
-
-fn try_distinguished_message(input: TokenStream) -> Result<TokenStream, Error> {
-    let input: DeriveInput = parse2(input)?;
-
-    if let Data::Enum(..) = input.data {
-        return distinguished_message_via_oneof(input);
-    }
-
-    let PreprocessedMessage {
-        ident,
-        impl_generics,
-        ty_generics,
-        where_clause,
-        unsorted_fields,
-        has_ignored_fields,
-        tag_range: _,
-    } = preprocess_message(&input)?;
-
-    if has_ignored_fields {
-        bail!("messages with ignored fields cannot be distinguished");
-    }
-
-    let borrow_generics = append_generic(impl_generics, quote!('__a));
-
-    let [owned_decoder_where_clause, borrowed_decoder_where_clause] =
-        [Owned, Borrowed].map(|lifetime| {
-            append_wheres(
-                where_clause,
-                Some(quote!(Self: ::core::cmp::Eq)),
-                &unsorted_fields,
-                Decode(lifetime, Distinguished),
-            )
-        });
-
-    let [decode_owned, decode_borrowed] = [Owned, Borrowed].map(|lifetime| {
-        let ident = ident.clone();
-        unsorted_fields.iter().map(move |(field_ident, field)| {
-            let decode = field.decode(quote!(&mut self.#field_ident), lifetime, Distinguished);
-            let tags = field.tags().into_iter().map(|tag| quote!(#tag));
-            let tags = Itertools::intersperse(tags, quote!(|));
-
-            quote! {
-                #(#tags)* => {
-                    match #decode {
-                        ::core::result::Result::Ok(new_canon) => {
-                            canon.update(new_canon);
-                        }
-                        ::core::result::Result::Err(mut error) => {
-                            error.push(stringify!(#ident), stringify!(#field_ident));
-                            return ::core::result::Result::Err(error);
-                        }
-                    }
-                }
-            }
-        })
-    });
-
-    let expanded = quote! {
-        impl #impl_generics ::bilrost::encoding::RawDistinguishedMessageDecoder
-        for #ident #ty_generics #owned_decoder_where_clause {
-            #[allow(unused_variables)]
-            #[inline]
-            fn raw_decode_field_distinguished<__B>(
-                &mut self,
-                tag: u32,
-                wire_type: ::bilrost::encoding::WireType,
-                duplicated: bool,
-                buf: ::bilrost::encoding::Capped<__B>,
-                ctx: ::bilrost::encoding::RestrictedDecodeContext,
-            ) -> ::core::result::Result<::bilrost::Canonicity, ::bilrost::DecodeError>
-            where
-                __B: ::bilrost::bytes::Buf + ?Sized,
-            {
-                let canon = &mut ::bilrost::Canonicity::Canonical;
-                match tag {
-                    #(#decode_owned)*
-                    _ => {
-                        ctx.update(canon, ::bilrost::Canonicity::HasExtensions)?;
-                        ::bilrost::encoding::skip_field(wire_type, buf)?;
-                    }
-                }
-                ::core::result::Result::Ok(*canon)
-            }
-        }
-
-        impl #borrow_generics ::bilrost::encoding::RawDistinguishedMessageBorrowDecoder<'__a>
-        for #ident #ty_generics #borrowed_decoder_where_clause {
-            #[allow(unused_variables)]
-            #[inline]
-            fn raw_borrow_decode_field_distinguished(
-                &mut self,
-                tag: u32,
-                wire_type: ::bilrost::encoding::WireType,
-                duplicated: bool,
-                buf: ::bilrost::encoding::Capped<&'__a [u8]>,
-                ctx: ::bilrost::encoding::RestrictedDecodeContext,
-            ) -> ::core::result::Result<::bilrost::Canonicity, ::bilrost::DecodeError> {
-                let canon = &mut ::bilrost::Canonicity::Canonical;
-                match tag {
-                    #(#decode_borrowed)*
-                    _ => {
-                        ctx.update(canon, ::bilrost::Canonicity::HasExtensions)?;
-                        ::bilrost::encoding::skip_field(wire_type, buf)?;
-                    }
-                }
-                ::core::result::Result::Ok(*canon)
-            }
-        }
-    };
-
-    let aliases = encoder_alias_header();
-    let expanded = quote! {
-        const _: () = {
-            #aliases
-
-            #expanded
-        };
-    };
-
-    Ok(expanded)
-}
-
 fn distinguished_message_via_oneof(input: DeriveInput) -> Result<TokenStream, Error> {
     let PreprocessedOneof {
         ident,
@@ -1127,6 +1122,11 @@ fn distinguished_message_via_oneof(input: DeriveInput) -> Result<TokenStream, Er
             }
         }
     })
+}
+
+#[proc_macro_derive(Message, attributes(bilrost))]
+pub fn message(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    try_message(input.into()).unwrap().into()
 }
 
 #[proc_macro_derive(DistinguishedMessage, attributes(bilrost))]
@@ -1822,70 +1822,6 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
     })
 }
 
-/// Oneof decoders have four different cases they may be implemented in: implemented for either
-/// NonEmptyOneof or Oneof, and either relaxed or distinguished. The code for these should all be
-/// similarly deduplicated.
-struct DecoderForOneof<'a> {
-    /// The ident of the oneof enum itself
-    ident: &'a Ident,
-    /// The ident of this variant
-    variant_ident: &'a Ident,
-    /// The Field struct for this variant
-    field: &'a Field,
-    /// Decoded ownership lifetime
-    lifetime: DecodeLifetime,
-    /// Decoding mode
-    mode: DecodeMode,
-}
-
-impl ToTokens for DecoderForOneof<'_> {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
-        let ident = self.ident;
-        let variant_ident = self.variant_ident;
-        let field = self.field;
-        let tag = field.first_tag();
-        let with_new_value = field.with_value(quote!(new_value));
-        let decode = field.decode(quote!(&mut new_value), self.lifetime, self.mode);
-
-        // It's important that we spell the whole expression for the decoder matching for oneofs as
-        // a single Result expression that never early-returns with `?`; that way when we add guards
-        // to the Oneof trait impls (which have natural empty variants, a collision guard, and error
-        // attribution) our clause that traces the error location will see every error that occurs,
-        // including errors that bubble up from the inner decoders, and those error details can
-        // still path down through the oneof variant.
-        tokens.append_all(match self.mode {
-            Relaxed => quote! {
-                #tag => {
-                    let mut new_value = ::bilrost::encoding::ForOverwrite::for_overwrite();
-                    match #decode {
-                        ::core::result::Result::Ok(()) => {
-                            ::core::result::Result::Ok(#ident::#variant_ident #with_new_value)
-                        },
-                        ::core::result::Result::Err(error) => ::core::result::Result::Err(error),
-                    }
-                }
-            },
-            Distinguished => quote! {
-                #tag => {
-                    let mut new_value = ::bilrost::encoding::ForOverwrite::for_overwrite();
-                    match #decode {
-                        ::core::result::Result::Ok(canon) => ::core::result::Result::Ok((
-                            #ident::#variant_ident #with_new_value,
-                            canon
-                        )),
-                        ::core::result::Result::Err(error) => ::core::result::Result::Err(error),
-                    }
-                }
-            },
-        })
-    }
-}
-
-#[proc_macro_derive(Oneof, attributes(bilrost))]
-pub fn oneof(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    try_oneof(input.into()).unwrap().into()
-}
-
 fn try_distinguished_oneof(input: TokenStream) -> Result<TokenStream, Error> {
     let input: DeriveInput = parse2(input)?;
 
@@ -2033,6 +1969,70 @@ fn try_distinguished_oneof(input: TokenStream) -> Result<TokenStream, Error> {
     };
 
     Ok(expanded)
+}
+
+/// Oneof decoders have four different cases they may be implemented in: implemented for either
+/// NonEmptyOneof or Oneof, and either relaxed or distinguished. The code for these should all be
+/// similarly deduplicated.
+struct DecoderForOneof<'a> {
+    /// The ident of the oneof enum itself
+    ident: &'a Ident,
+    /// The ident of this variant
+    variant_ident: &'a Ident,
+    /// The Field struct for this variant
+    field: &'a Field,
+    /// Decoded ownership lifetime
+    lifetime: DecodeLifetime,
+    /// Decoding mode
+    mode: DecodeMode,
+}
+
+impl ToTokens for DecoderForOneof<'_> {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        let ident = self.ident;
+        let variant_ident = self.variant_ident;
+        let field = self.field;
+        let tag = field.first_tag();
+        let with_new_value = field.with_value(quote!(new_value));
+        let decode = field.decode(quote!(&mut new_value), self.lifetime, self.mode);
+
+        // It's important that we spell the whole expression for the decoder matching for oneofs as
+        // a single Result expression that never early-returns with `?`; that way when we add guards
+        // to the Oneof trait impls (which have natural empty variants, a collision guard, and error
+        // attribution) our clause that traces the error location will see every error that occurs,
+        // including errors that bubble up from the inner decoders, and those error details can
+        // still path down through the oneof variant.
+        tokens.append_all(match self.mode {
+            Relaxed => quote! {
+                #tag => {
+                    let mut new_value = ::bilrost::encoding::ForOverwrite::for_overwrite();
+                    match #decode {
+                        ::core::result::Result::Ok(()) => {
+                            ::core::result::Result::Ok(#ident::#variant_ident #with_new_value)
+                        },
+                        ::core::result::Result::Err(error) => ::core::result::Result::Err(error),
+                    }
+                }
+            },
+            Distinguished => quote! {
+                #tag => {
+                    let mut new_value = ::bilrost::encoding::ForOverwrite::for_overwrite();
+                    match #decode {
+                        ::core::result::Result::Ok(canon) => ::core::result::Result::Ok((
+                            #ident::#variant_ident #with_new_value,
+                            canon
+                        )),
+                        ::core::result::Result::Err(error) => ::core::result::Result::Err(error),
+                    }
+                }
+            },
+        })
+    }
+}
+
+#[proc_macro_derive(Oneof, attributes(bilrost))]
+pub fn oneof(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    try_oneof(input.into()).unwrap().into()
 }
 
 #[proc_macro_derive(DistinguishedOneof, attributes(bilrost))]
