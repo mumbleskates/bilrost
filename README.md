@@ -1174,13 +1174,13 @@ allows iterating over the slices in the buffer for vectored writing.
 
 ```rust,
 use bilrost::{
-    DistinguishedMessage, DistinguishedOwnedMessage, DistinguishedOneof,
-    Message, Oneof, OwnedMessage, WithCanonicity,
+    DistinguishedOwnedMessage, Message, Oneof, OwnedMessage, WithCanonicity,
 };
 use bytes::Bytes;
 use std::collections::BTreeMap;
 
-#[derive(Debug, PartialEq, Eq, Oneof, DistinguishedOneof)]
+#[derive(Debug, PartialEq, Eq, Oneof)]
+#[bilrost(distinguished)]
 enum PubKeyMaterial {
     Empty,
     #[bilrost(1)]
@@ -1191,7 +1191,8 @@ enum PubKeyMaterial {
 
 use PubKeyMaterial::*;
 
-#[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+#[derive(Debug, PartialEq, Eq, Message)]
+#[bilrost(distinguished)]
 struct PubKey {
     #[bilrost(oneof(1, 2))]
     key: PubKeyMaterial,
@@ -1199,7 +1200,8 @@ struct PubKey {
     expiry: i64, // See also: `bilrost_types::Timestamp`
 }
 
-#[derive(Debug, Default, PartialEq, Eq, Message, DistinguishedMessage)]
+#[derive(Debug, Default, PartialEq, Eq, Message)]
+#[bilrost(distinguished)]
 struct PubKeyRegistry {
     keys_by_owner: BTreeMap<String, PubKey>,
 }
