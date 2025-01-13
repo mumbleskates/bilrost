@@ -1198,7 +1198,8 @@ where
             self,
             Capped::new(&mut buf),
             RestrictedDecodeContext::new(restrict_to),
-        ).map_err(|err| {
+        )
+        .map_err(|err| {
             self.clear();
             err
         })
