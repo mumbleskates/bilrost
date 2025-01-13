@@ -411,7 +411,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     let input: DeriveInput = parse2(input)?;
 
     if let Data::Enum(..) = input.data {
-        return message_via_oneof(input);
+        return try_message_via_oneof(input);
     }
 
     let PreprocessedMessage {
@@ -891,13 +891,15 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     Ok(expanded)
 }
 
-fn message_via_oneof(input: DeriveInput) -> Result<TokenStream, Error> {
+fn try_message_via_oneof(input: DeriveInput) -> Result<TokenStream, Error> {
     let PreprocessedOneof {
         ident,
         impl_generics,
         ty_generics,
         where_clause,
         fields,
+        distinguished,
+        borrow_only: _, // TODO(widders): impl borrow only
         empty_variant,
     } = preprocess_oneof(&input)?;
 
@@ -927,7 +929,7 @@ fn message_via_oneof(input: DeriveInput) -> Result<TokenStream, Error> {
         Some(quote!(Self: ::bilrost::encoding::OneofBorrowDecoder<'__a>)),
     );
 
-    Ok(quote! {
+    let impls = quote! {
         impl #impl_generics ::bilrost::encoding::RawMessage
         for #ident #ty_generics #encoder_where_clause {
             const __ASSERTIONS: () = ();
@@ -1015,99 +1017,87 @@ fn message_via_oneof(input: DeriveInput) -> Result<TokenStream, Error> {
                 }
             }
         }
-    })
-}
+    };
 
-fn distinguished_message_via_oneof(input: DeriveInput) -> Result<TokenStream, Error> {
-    let PreprocessedOneof {
-        ident,
-        impl_generics,
-        ty_generics,
-        where_clause,
-        fields: _,
-        empty_variant,
-    } = preprocess_oneof(&input)?;
+    let distinguished_impls = distinguished.then(|| {
+        let owned_decoder_where_clause = append_self_where(
+            where_clause,
+            Some(quote!(
+                Self: ::bilrost::encoding::DistinguishedOneofDecoder + ::core::cmp::Eq
+            )),
+        );
+        let borrowed_decoder_where_clause = append_self_where(
+            where_clause,
+            Some(quote!(
+                Self: ::bilrost::encoding::DistinguishedOneofBorrowDecoder<'__a> + ::core::cmp::Eq
+            )),
+        );
 
-    if empty_variant.is_none() {
-        bail!(
-            "DistinguishedMessage can only be derived for DistinguishedOneof enums that have an \
-            empty variant."
-        )
-    }
+        quote! {
+            impl #impl_generics ::bilrost::encoding::RawDistinguishedMessageDecoder
+            for #ident #ty_generics #owned_decoder_where_clause {
+                #[inline(always)]
+                fn raw_decode_field_distinguished<__B>(
+                    &mut self,
+                    tag: u32,
+                    wire_type: ::bilrost::encoding::WireType,
+                    _duplicated: bool,
+                    buf: ::bilrost::encoding::Capped<__B>,
+                    ctx: ::bilrost::encoding::RestrictedDecodeContext,
+                ) -> ::core::result::Result<::bilrost::Canonicity, ::bilrost::DecodeError>
+                where
+                    __B: ::bilrost::bytes::Buf + ?Sized,
+                {
+                    if <Self as ::bilrost::encoding::Oneof>::FIELD_TAGS.contains(&tag) {
+                        <Self as ::bilrost::encoding::DistinguishedOneofDecoder>::
+                            oneof_decode_field_distinguished
+                        (
+                            self,
+                            tag,
+                            wire_type,
+                            buf,
+                            ctx,
+                        )
+                    } else {
+                        ctx.check(::bilrost::Canonicity::HasExtensions)
+                    }
+                }
+            }
 
-    let borrow_generics = append_generic(impl_generics, quote!('__a));
-
-    let owned_decoder_where_clause = append_self_where(
-        where_clause,
-        Some(quote!(
-            Self: ::bilrost::encoding::DistinguishedOneofDecoder + ::core::cmp::Eq
-        )),
-    );
-    let borrowed_decoder_where_clause = append_self_where(
-        where_clause,
-        Some(quote!(
-            Self: ::bilrost::encoding::DistinguishedOneofBorrowDecoder<'__a> + ::core::cmp::Eq
-        )),
-    );
-
-    Ok(quote! {
-        impl #impl_generics ::bilrost::encoding::RawDistinguishedMessageDecoder
-        for #ident #ty_generics #owned_decoder_where_clause {
-            #[inline(always)]
-            fn raw_decode_field_distinguished<__B>(
-                &mut self,
-                tag: u32,
-                wire_type: ::bilrost::encoding::WireType,
-                _duplicated: bool,
-                buf: ::bilrost::encoding::Capped<__B>,
-                ctx: ::bilrost::encoding::RestrictedDecodeContext,
-            ) -> ::core::result::Result<::bilrost::Canonicity, ::bilrost::DecodeError>
-            where
-                __B: ::bilrost::bytes::Buf + ?Sized,
-            {
-                if <Self as ::bilrost::encoding::Oneof>::FIELD_TAGS.contains(&tag) {
-                    <Self as ::bilrost::encoding::DistinguishedOneofDecoder>::
-                        oneof_decode_field_distinguished
-                    (
-                        self,
-                        tag,
-                        wire_type,
-                        buf,
-                        ctx,
-                    )
-                } else {
-                    ctx.check(::bilrost::Canonicity::HasExtensions)
+            impl #borrow_generics ::bilrost::encoding::RawDistinguishedMessageBorrowDecoder<'__a>
+            for #ident #ty_generics #borrowed_decoder_where_clause {
+                #[inline(always)]
+                fn raw_borrow_decode_field_distinguished(
+                    &mut self,
+                    tag: u32,
+                    wire_type: ::bilrost::encoding::WireType,
+                    _duplicated: bool,
+                    buf: ::bilrost::encoding::Capped<&'__a [u8]>,
+                    ctx: ::bilrost::encoding::RestrictedDecodeContext,
+                ) -> ::core::result::Result<::bilrost::Canonicity, ::bilrost::DecodeError> {
+                    if <Self as ::bilrost::encoding::Oneof>::FIELD_TAGS.contains(&tag) {
+                        <Self as ::bilrost::encoding::DistinguishedOneofBorrowDecoder>::
+                            oneof_borrow_decode_field_distinguished
+                        (
+                            self,
+                            tag,
+                            wire_type,
+                            buf,
+                            ctx,
+                        )
+                    } else {
+                        ctx.check(::bilrost::Canonicity::HasExtensions)
+                    }
                 }
             }
         }
+    });
 
-        impl #borrow_generics ::bilrost::encoding::RawDistinguishedMessageBorrowDecoder<'__a>
-        for #ident #ty_generics #borrowed_decoder_where_clause {
-            #[inline(always)]
-            fn raw_borrow_decode_field_distinguished(
-                &mut self,
-                tag: u32,
-                wire_type: ::bilrost::encoding::WireType,
-                _duplicated: bool,
-                buf: ::bilrost::encoding::Capped<&'__a [u8]>,
-                ctx: ::bilrost::encoding::RestrictedDecodeContext,
-            ) -> ::core::result::Result<::bilrost::Canonicity, ::bilrost::DecodeError> {
-                if <Self as ::bilrost::encoding::Oneof>::FIELD_TAGS.contains(&tag) {
-                    <Self as ::bilrost::encoding::DistinguishedOneofBorrowDecoder>::
-                        oneof_borrow_decode_field_distinguished
-                    (
-                        self,
-                        tag,
-                        wire_type,
-                        buf,
-                        ctx,
-                    )
-                } else {
-                    ctx.check(::bilrost::Canonicity::HasExtensions)
-                }
-            }
-        }
-    })
+    Ok(quote!(
+        #impls
+
+        #distinguished_impls
+    ))
 }
 
 #[proc_macro_derive(Message, attributes(bilrost))]
@@ -2483,7 +2473,7 @@ mod test {
                 .to_string(),
             "duplicate borrowed attributes"
         );
-        
+
         let output = try_message(quote!(
             #[bilrost(distinguished, distinguished)]
             enum DistinguishedBorrowedOneof {
