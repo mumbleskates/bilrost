@@ -13,10 +13,9 @@ use bilrost::DecodeErrorKind::{
     UnexpectedlyRepeated, WrongWireType,
 };
 use bilrost::{
-    DecodeErrorKind, DistinguishedMessage, DistinguishedOwnedMessage, Enumeration, Message, Oneof,
+    DecodeErrorKind, DistinguishedOwnedMessage, Enumeration, Message, Oneof,
     OwnedMessage,
 };
-use bilrost_derive::DistinguishedOneof;
 use core::mem::size_of;
 use itertools::{repeat_n, Itertools};
 use std::borrow::Cow;
@@ -394,7 +393,8 @@ fn derived_trait_bounds() {
     struct X; // Not encodable
 
     #[allow(dead_code)]
-    #[derive(PartialEq, Eq, Oneof, DistinguishedOneof)]
+    #[derive(PartialEq, Eq, Oneof)]
+    #[bilrost(distinguished)]
     enum A<T> {
         Empty,
         #[bilrost(1)]
@@ -408,7 +408,8 @@ fn derived_trait_bounds() {
     static_assertions::assert_not_impl_any!(A<X>: DistinguishedOneofDecoder);
 
     #[allow(dead_code)]
-    #[derive(PartialEq, Eq, Message, DistinguishedMessage)]
+    #[derive(PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
     struct Inner<U>(U);
     static_assertions::assert_impl_all!(Inner<bool>: DistinguishedOwnedMessage);
     static_assertions::assert_impl_all!(Inner<f32>: OwnedMessage);
@@ -416,7 +417,8 @@ fn derived_trait_bounds() {
     static_assertions::assert_not_impl_any!(Inner<X>: DistinguishedOwnedMessage);
 
     #[allow(dead_code)]
-    #[derive(PartialEq, Eq, Message, DistinguishedMessage)]
+    #[derive(PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
     struct Foo<T, U, V>(#[bilrost(oneof(1, 2))] A<T>, Inner<U>, V);
     static_assertions::assert_impl_all!(Foo<bool, bool, bool>: DistinguishedOwnedMessage);
     static_assertions::assert_impl_all!(Foo<f32, bool, bool>: OwnedMessage);
@@ -433,7 +435,8 @@ fn derived_trait_bounds() {
 #[test]
 fn recursive_messages() {
     #[allow(dead_code)]
-    #[derive(PartialEq, Eq, Message, DistinguishedMessage)]
+    #[derive(PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
     struct Tree {
         #[bilrost(recurses)]
         children: Vec<Tree>,
@@ -446,7 +449,8 @@ fn recursive_messages() {
 
 #[test]
 fn derived_message_field_ordering() {
-    #[derive(Clone, Debug, PartialEq, Eq, Oneof, DistinguishedOneof)]
+    #[derive(Clone, Debug, PartialEq, Eq, Oneof)]
+    #[bilrost(distinguished)]
     enum A {
         #[bilrost(1)]
         One(bool),
@@ -456,7 +460,8 @@ fn derived_message_field_ordering() {
         Twenty(bool),
     }
 
-    #[derive(Clone, Debug, PartialEq, Eq, Oneof, DistinguishedOneof)]
+    #[derive(Clone, Debug, PartialEq, Eq, Oneof)]
+    #[bilrost(distinguished)]
     enum B {
         #[bilrost(9)]
         Nine(bool),
@@ -464,7 +469,8 @@ fn derived_message_field_ordering() {
         Eleven(bool),
     }
 
-    #[derive(Clone, Debug, PartialEq, Eq, Oneof, DistinguishedOneof)]
+    #[derive(Clone, Debug, PartialEq, Eq, Oneof)]
+    #[bilrost(distinguished)]
     enum C {
         #[bilrost(13)]
         Thirteen(bool),
@@ -474,7 +480,8 @@ fn derived_message_field_ordering() {
         TwentyTwo(bool),
     }
 
-    #[derive(Clone, Debug, PartialEq, Eq, Oneof, DistinguishedOneof)]
+    #[derive(Clone, Debug, PartialEq, Eq, Oneof)]
+    #[bilrost(distinguished)]
     enum D {
         #[bilrost(18)]
         Eighteen(bool),
@@ -482,7 +489,8 @@ fn derived_message_field_ordering() {
         Nineteen(bool),
     }
 
-    #[derive(Clone, Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+    #[derive(Clone, Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
     struct Struct {
         #[bilrost(0)]
         zero: bool,
@@ -536,7 +544,8 @@ fn derived_message_field_ordering() {
 
 #[test]
 fn field_tag_limits() {
-    #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+    #[derive(Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
     struct Foo {
         #[bilrost(0)]
         minimum: Option<bool>,
@@ -635,7 +644,8 @@ fn rejects_overflowed_tags() {
 
 #[test]
 fn truncated_field_and_tag() {
-    #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+    #[derive(Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
     struct Foo(#[bilrost(100)] String, #[bilrost(1_000_000)] u64);
 
     let buf = [(100, OV::string("abc")), (1_000_000, OV::Varint(1))]
@@ -1008,7 +1018,8 @@ fn generic_encodings() {
 
 #[test]
 fn parsing_varints() {
-    #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+    #[derive(Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
     struct Foo(
         bool,
         #[bilrost(encoding(varint))] u8,
@@ -1063,7 +1074,8 @@ fn parsing_varints() {
 
 #[test]
 fn bools() {
-    #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+    #[derive(Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
     struct Foo(bool);
 
     assert_eq!(OV::bool(false), OV::Varint(0));
@@ -1077,7 +1089,8 @@ fn bools() {
 
 #[test]
 fn truncated_varint() {
-    #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+    #[derive(Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
     struct Foo<T>(#[bilrost(encoding(varint))] T);
 
     let buf = [(0, OV::Varint(2000))]
@@ -1099,12 +1112,14 @@ fn truncated_varint() {
 
 #[test]
 fn truncated_nested_varint() {
-    #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+    #[derive(Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
     struct Inner {
         val: u64,
     }
 
-    #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+    #[derive(Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
     struct Outer {
         inner: Inner,
     }
@@ -1144,7 +1159,8 @@ fn truncated_nested_varint() {
 
 #[test]
 fn parsing_fixed_width_ints() {
-    #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+    #[derive(Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
     struct Foo(
         #[bilrost(encoding(fixed))] u32,
         #[bilrost(encoding(fixed))] i32,
@@ -1288,14 +1304,16 @@ fn floating_point_zero_is_present_nested() {
 
 #[test]
 fn truncated_fixed() {
-    #[derive(Debug, PartialEq, Eq, Oneof, DistinguishedOneof)]
+    #[derive(Debug, PartialEq, Eq, Oneof)]
+    #[bilrost(distinguished)]
     enum A<T> {
         Empty,
         #[bilrost(tag(1), encoding(fixed))]
         One(T),
     }
 
-    #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+    #[derive(Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
     struct Foo<T>(
         #[bilrost(oneof(1))] A<T>,
         #[bilrost(tag(2), encoding(fixed))] T,
@@ -1322,7 +1340,8 @@ fn truncated_fixed() {
         assert::is_invalid_distinguished::<()>(&direct, Truncated, "");
         assert::is_invalid_distinguished::<()>(&in_oneof, Truncated, "");
 
-        #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+        #[derive(Debug, PartialEq, Eq, Message)]
+        #[bilrost(distinguished)]
         struct Outer<T>(Foo<T>, String);
 
         let direct_nested = [
@@ -1372,7 +1391,8 @@ where
         + encoding::Decoder<General>
         + encoding::DistinguishedDecoder<General>,
 {
-    #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+    #[derive(Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
     struct Foo<T>(T);
 
     assert::decodes_distinguished(
@@ -1438,7 +1458,8 @@ fn owned_empty_cow_str_is_still_empty() {
 
 #[test]
 fn parsing_blob() {
-    #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+    #[derive(Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
     struct Foo(bilrost::Blob);
     assert::decodes_distinguished(
         [(0, OV::string("hello world"))],
@@ -1448,7 +1469,8 @@ fn parsing_blob() {
 
 #[test]
 fn parsing_vec_blob() {
-    #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+    #[derive(Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
     struct Foo(#[bilrost(encoding(plainbytes))] Vec<u8>);
     assert::decodes_distinguished(
         [(0, OV::string("hello world"))],
@@ -1458,7 +1480,8 @@ fn parsing_vec_blob() {
 
 #[test]
 fn parsing_cow_blob() {
-    #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+    #[derive(Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
     struct Foo<'a>(#[bilrost(encoding(plainbytes))] Cow<'a, [u8]>);
     assert::decodes_distinguished(
         [(0, OV::string("hello world"))],
@@ -1468,7 +1491,8 @@ fn parsing_cow_blob() {
 
 #[test]
 fn parsing_bytes_blob() {
-    #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+    #[derive(Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
     struct Foo(bytes::Bytes);
     assert::decodes_distinguished(
         [(0, OV::string("hello world"))],
@@ -1478,7 +1502,8 @@ fn parsing_bytes_blob() {
 
 #[test]
 fn parsing_byte_arrays() {
-    #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+    #[derive(Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
     struct Foo<const N: usize>(#[bilrost(tag(1), encoding(plainbytes))] [u8; N]);
 
     assert::decodes_distinguished([], Foo([]));
@@ -1500,7 +1525,8 @@ fn parsing_byte_arrays() {
     );
 
     // Fixed-size wire types are implemented for appropriately sized u8 arrays
-    #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+    #[derive(Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
     struct Bar<const N: usize>(#[bilrost(tag(1), encoding(fixed))] [u8; N]);
 
     static_assertions::assert_not_impl_any!(Bar<0>: Message);
@@ -1522,7 +1548,8 @@ fn parsing_byte_arrays() {
 
 #[test]
 fn duplicated_field_decoding() {
-    #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+    #[derive(Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
     struct Foo(Option<bool>, bool);
 
     assert::decodes_distinguished([(0, OV::bool(false))], Foo(Some(false), false));
@@ -1541,9 +1568,11 @@ fn duplicated_field_decoding() {
 
 #[test]
 fn duplicated_packed_decoding() {
-    #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+    #[derive(Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
     struct Foo(#[bilrost(encoding = "packed")] Vec<bool>);
-    #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+    #[derive(Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
     struct Bar(#[bilrost(encoding = "unpacked")] Vec<bool>);
 
     assert::decodes_distinguished([(0, OV::packed([OV::bool(true)]))], Foo(vec![true]));
@@ -1626,7 +1655,8 @@ fn duplicated_packed_decoding() {
 
 #[test]
 fn decoding_maps() {
-    #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+    #[derive(Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
     struct Foo<T>(T);
 
     let valid_map = &[(
@@ -1887,7 +1917,8 @@ fn truncated_map() {
 
 #[test]
 fn decoding_vecs() {
-    #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+    #[derive(Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
     struct Foo<T> {
         #[bilrost(encoding(packed))]
         packed: T,
@@ -1992,7 +2023,8 @@ fn decoding_vecs() {
 
 #[test]
 fn decoding_vecs_with_swapped_packedness() {
-    #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+    #[derive(Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
     struct Oof<T> {
         // Fields have swapped packedness from `Foo` above
         #[bilrost(encoding(unpacked))]
@@ -2120,7 +2152,8 @@ fn decoding_vecs_with_swapped_packedness() {
 // Fixed-size array tests
 
 fn decoding_arrays_of_size<const N: usize>() {
-    #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+    #[derive(Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
     struct Foo<T> {
         #[bilrost(encoding(packed))]
         packed: T,
@@ -2164,7 +2197,8 @@ fn decoding_arrays_of_size<const N: usize>() {
 }
 
 fn decoding_arrays_with_swapped_packedness_of_size<const N: usize>() {
-    #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+    #[derive(Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
     struct Oof<T> {
         #[bilrost(encoding(unpacked))]
         unpacked: T,
@@ -2231,14 +2265,16 @@ fn decoding_arrays() {
     decoding_arrays_with_swapped_packedness_of_size::<5>();
     decoding_arrays_with_swapped_packedness_of_size::<8>();
 
-    #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+    #[derive(Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
     struct FooGeneral<T> {
         #[bilrost(encoding(packed))]
         packed: T,
         #[bilrost(encoding(unpacked))]
         unpacked: T,
     }
-    #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+    #[derive(Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
     struct FooFixed<T> {
         #[bilrost(encoding(packed<fixed>))]
         packed: T,
@@ -2443,7 +2479,8 @@ fn decoding_arrays() {
 
 #[test]
 fn decoding_sets() {
-    #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+    #[derive(Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
     struct Foo<T> {
         #[bilrost(encoding(packed))]
         packed: T,
@@ -2570,7 +2607,8 @@ fn decoding_sets() {
 
 #[test]
 fn decoding_sets_with_swapped_packedness() {
-    #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+    #[derive(Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
     struct Oof<T> {
         #[bilrost(encoding(unpacked))]
         unpacked: T, // Fields have swapped packedness from `Foo` above
@@ -2792,7 +2830,8 @@ fn oneof_field_decoding() {
     where
         T: Debug + Eq + OneofDecoder + DistinguishedOneofDecoder,
     {
-        #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+        #[derive(Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
         struct Foo<T>(#[bilrost(oneof = "1, 2")] T);
 
         assert::decodes_distinguished([(1, OV::bool(true))], Foo(expected_a));
@@ -2811,7 +2850,8 @@ fn oneof_field_decoding() {
 
     // tests for non-empty oneof
     let _: () = {
-        #[derive(Debug, PartialEq, Eq, Oneof, DistinguishedOneof)]
+        #[derive(Debug, PartialEq, Eq, Oneof)]
+    #[bilrost(distinguished)]
         enum AB {
             #[bilrost(1)]
             A(bool),
@@ -2840,7 +2880,8 @@ fn oneof_field_decoding() {
 
     // tests for oneof with natural empty state
     let _: () = {
-        #[derive(Debug, PartialEq, Eq, Oneof, DistinguishedOneof)]
+        #[derive(Debug, PartialEq, Eq, Oneof)]
+    #[bilrost(distinguished)]
         enum AB {
             None,
             #[bilrost(1)]
@@ -2864,13 +2905,15 @@ fn oneof_field_decoding() {
 
 #[test]
 fn oneof_with_errors_inside() {
-    #[derive(Clone, Debug, PartialEq, Eq, Oneof, DistinguishedOneof)]
+    #[derive(Clone, Debug, PartialEq, Eq, Oneof)]
+    #[bilrost(distinguished)]
     enum Natural {
         None,
         #[bilrost(1)]
         A(String),
     }
-    #[derive(Clone, Debug, PartialEq, Eq, Oneof, DistinguishedOneof)]
+    #[derive(Clone, Debug, PartialEq, Eq, Oneof)]
+    #[bilrost(distinguished)]
     enum Optioned {
         #[bilrost(1)]
         B(String),
@@ -2880,7 +2923,8 @@ fn oneof_with_errors_inside() {
     where
         OneofType: Debug + Eq + OneofDecoder + DistinguishedOneofDecoder,
     {
-        #[derive(Clone, Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+        #[derive(Clone, Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
         struct Foo<O> {
             #[bilrost(oneof(1))]
             a: O,
@@ -2908,7 +2952,8 @@ fn oneof_with_errors_inside() {
 
 #[test]
 fn oneof_optioned_fields_encode_empty() {
-    #[derive(Clone, Debug, PartialEq, Eq, Oneof, DistinguishedOneof)]
+    #[derive(Clone, Debug, PartialEq, Eq, Oneof)]
+    #[bilrost(distinguished)]
     enum Abc {
         #[bilrost(1)]
         A(String),
@@ -2919,7 +2964,8 @@ fn oneof_optioned_fields_encode_empty() {
     }
     use Abc::*;
 
-    #[derive(Clone, Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+    #[derive(Clone, Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
     struct Foo(#[bilrost(oneof(1, 2, 3))] Option<Abc>);
 
     assert::decodes_distinguished([], Foo(None));
@@ -2950,7 +2996,8 @@ fn oneof_optioned_fields_encode_empty() {
 #[test]
 fn oneof_plain_fields_encode_empty() {
     /// Oneofs that have an empty variant
-    #[derive(Clone, Debug, PartialEq, Eq, Oneof, DistinguishedOneof)]
+    #[derive(Clone, Debug, PartialEq, Eq, Oneof)]
+    #[bilrost(distinguished)]
     enum Abc {
         Empty,
         #[bilrost(1)]
@@ -2964,7 +3011,8 @@ fn oneof_plain_fields_encode_empty() {
     }
     use Abc::*;
 
-    #[derive(Clone, Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+    #[derive(Clone, Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
     struct Foo(#[bilrost(oneof(1, 2, 3))] Abc);
 
     assert::decodes_distinguished([], Foo(Empty));
@@ -2994,7 +3042,8 @@ fn oneof_plain_fields_encode_empty() {
 
 #[test]
 fn oneof_as_message() {
-    #[derive(Debug, PartialEq, Eq, Oneof, DistinguishedOneof, Message, DistinguishedMessage)]
+    #[derive(Debug, PartialEq, Eq, Oneof, Message)]
+    #[bilrost(distinguished)]
     enum AB {
         Nothing,
         #[bilrost(1)]
@@ -3025,7 +3074,8 @@ fn oneof_as_message() {
 
     // These tags are very different lengths and may use the RuntimeTagMeasurer instead of the
     // TrivialTagMeasurer, so we should test that path.
-    #[derive(Debug, PartialEq, Eq, Oneof, DistinguishedOneof, Message, DistinguishedMessage)]
+    #[derive(Debug, PartialEq, Eq, Oneof, Message)]
+    #[bilrost(distinguished)]
     enum EarlyLate {
         Nothing,
         #[bilrost(0)]
@@ -3042,7 +3092,8 @@ fn oneof_as_message() {
 #[test]
 fn oneof_as_message_unqualified() {
     #[allow(dead_code)]
-    #[derive(Debug, PartialEq, Eq, Oneof, DistinguishedOneof, Message, DistinguishedMessage)]
+    #[derive(Debug, PartialEq, Eq, Oneof, Message)]
+    #[bilrost(distinguished)]
     enum Maybe<T> {
         Nothing,
         #[bilrost(1)]
@@ -3073,7 +3124,8 @@ fn distinguished_oneof_with_nonempty_variant() {
         Five,
     }
 
-    #[derive(Debug, PartialEq, Eq, Oneof, DistinguishedOneof)]
+    #[derive(Debug, PartialEq, Eq, Oneof)]
+    #[bilrost(distinguished)]
     enum DistinguishedEnum {
         #[bilrost(1)]
         A(NonEmptyTy),
@@ -3101,7 +3153,8 @@ fn enumeration_decoding() {
     }
     use HasZero::*;
 
-    #[derive(Clone, Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+    #[derive(Clone, Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
     struct Foo(Option<DefaultButNoZero>, HasZero);
 
     assert::decodes_distinguished([], Foo(None, Zero));
@@ -3113,10 +3166,12 @@ fn enumeration_decoding() {
     assert::decodes_distinguished([(1, OV::u32(1_000_000))], Foo(None, Bigger));
 
     #[allow(dead_code)]
-    #[derive(Clone, Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+    #[derive(Clone, Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
     struct Packed<T>(#[bilrost(encoding(packed))] T);
     #[allow(dead_code)]
-    #[derive(Clone, Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+    #[derive(Clone, Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
     struct Unpacked<T>(#[bilrost(encoding(unpacked))] T);
 
     static_assertions::assert_impl_all!(Packed<[HasZero; 5]>: DistinguishedOwnedMessage);
@@ -3154,7 +3209,8 @@ fn nonempty_enumeration_nesting() {
     }
     use DefaultButNoZero::*;
 
-    #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+    #[derive(Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
     struct Foo(#[bilrost(encoding(packed<packed>))] Vec<[DefaultButNoZero; 5]>);
 
     assert::decodes_distinguished(
@@ -3187,7 +3243,8 @@ fn enumeration_helpers() {
         Fifteen = 15,
     }
 
-    #[derive(Clone, Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+    #[derive(Clone, Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
     struct HelpedStruct {
         #[bilrost(enumeration(E))]
         regular: u32,
@@ -3218,7 +3275,8 @@ fn enumeration_helpers() {
 
     // Demonstrate that the same errors happen when we decode to a struct with strict
     // enumeration fields, it just happens sooner.
-    #[derive(Clone, Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+    #[derive(Clone, Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
     struct StrictStruct {
         first: Option<E>,
         second: Option<E>,
@@ -3265,7 +3323,8 @@ fn enumeration_value_limits() {
     }
     assert_eq!(size_of::<Foo>(), 1);
 
-    #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+    #[derive(Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
     struct Bar(Foo);
 
     assert_eq!(Foo::A.to_number(), 0);
@@ -3284,19 +3343,22 @@ fn enumeration_value_limits() {
 
 #[test]
 fn directly_included_message() {
-    #[derive(Clone, Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+    #[derive(Clone, Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
     struct Inner {
         a: String,
         b: i64,
     }
 
-    #[derive(Clone, Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+    #[derive(Clone, Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
     struct OuterDirect {
         inner: Inner,
         also: String,
     }
 
-    #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+    #[derive(Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
     struct OuterOptional {
         inner: Option<Inner>,
         also: Option<String>,
@@ -3401,9 +3463,11 @@ fn directly_included_message() {
 
 #[test]
 fn truncated_submessage() {
-    #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+    #[derive(Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
     struct Nested(String);
-    #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+    #[derive(Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
     struct Foo(Nested, String);
 
     let inner = [(0, OV::string("interrupting cow says"))]
@@ -3421,12 +3485,15 @@ fn truncated_submessage() {
 
 #[test]
 fn tuples() {
-    #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+    #[derive(Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
     struct Pair<T, U>(#[bilrost(tag(0), encoding(varint))] T, #[bilrost(1)] U);
-    #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+    #[derive(Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
     struct Foo<T, U>(Pair<T, U>);
 
-    #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+    #[derive(Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
     struct FooTuple<T, U>(#[bilrost(encoding((varint, general)))] (T, U));
 
     static_assertions::assert_impl_all!(FooTuple<bool, bool>: DistinguishedOwnedMessage);
@@ -3488,10 +3555,12 @@ fn tuples() {
 
 #[test]
 fn unknown_fields_distinguished() {
-    #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+    #[derive(Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
     struct Nested(#[bilrost(1)] i64);
 
-    #[derive(Debug, PartialEq, Eq, Oneof, DistinguishedOneof)]
+    #[derive(Debug, PartialEq, Eq, Oneof)]
+    #[bilrost(distinguished)]
     enum InnerOneof {
         Empty,
         #[bilrost(3)]
@@ -3503,7 +3572,8 @@ fn unknown_fields_distinguished() {
     }
     use InnerOneof::*;
 
-    #[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+    #[derive(Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
     struct Foo {
         #[bilrost(0)]
         zero: String,
