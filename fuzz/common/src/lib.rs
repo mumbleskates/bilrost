@@ -5,7 +5,9 @@ use std::str::{from_utf8, FromStr};
 use std::sync::LazyLock;
 
 use bilrost::Canonicity::{Canonical, HasExtensions, NotCanonical};
-use bilrost::{DecodeError, DecodeErrorKind, DistinguishedMessage, Message, WithCanonicity};
+use bilrost::{
+    DecodeError, DecodeErrorKind, DistinguishedOwnedMessage, OwnedMessage, WithCanonicity,
+};
 
 pub mod test_messages;
 
@@ -153,7 +155,7 @@ impl RoundtripResult {
 
 fn roundtrip<M>(data: &[u8]) -> RoundtripResult
 where
-    M: Message,
+    M: OwnedMessage,
 {
     // Try to decode a message from the data. If decoding fails, continue.
     let message = match M::decode(data) {
@@ -220,7 +222,7 @@ where
 
 fn roundtrip_distinguished<M>(data: &[u8]) -> RoundtripResult
 where
-    M: DistinguishedMessage + Eq,
+    M: DistinguishedOwnedMessage + Eq,
 {
     // Try to decode a message from the data. If decoding fails, continue.
     let (message, canon) = match M::decode_distinguished(data) {

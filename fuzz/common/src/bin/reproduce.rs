@@ -1,5 +1,5 @@
 use bilrost::encoding::opaque::OpaqueMessage;
-use bilrost::{DistinguishedMessage, Message};
+use bilrost::{DistinguishedOwnedMessage, OwnedMessage};
 use common::test_messages::{
     TestAllTypes, TestDistinguished, TestTypeSupport, TestTypeSupportDistinguished,
 };

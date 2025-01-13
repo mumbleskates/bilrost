@@ -1,4 +1,4 @@
-use bilrost::{Blob, DistinguishedMessage, DistinguishedOneof, Enumeration, Message, Oneof};
+use bilrost::{Blob, Enumeration, Message, Oneof};
 use std::collections::{BTreeMap, BTreeSet};
 use tinyvec::ArrayVec;
 
@@ -290,7 +290,8 @@ pub mod test_message {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+#[derive(Clone, Debug, PartialEq, Eq, Message)]
+#[bilrost(distinguished)]
 pub struct TestDistinguished {
     /// Singular
     #[bilrost(encoding(varint))]
@@ -411,7 +412,8 @@ pub struct TestDistinguished {
 pub mod test_distinguished {
     use super::*;
 
-    #[derive(Clone, Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+    #[derive(Clone, Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
     pub struct NestedMessage {
         pub a: u64,
         #[bilrost(recurses)]
@@ -422,7 +424,8 @@ pub mod test_distinguished {
 
     pub use test_message::NestedEnum;
 
-    #[derive(Clone, Debug, PartialEq, Eq, Oneof, DistinguishedOneof)]
+    #[derive(Clone, Debug, PartialEq, Eq, Oneof)]
+    #[bilrost(distinguished)]
     pub enum NonEmptyOneofField {
         #[bilrost(tag = 101)]
         OneofUint32(u32),
@@ -438,9 +441,8 @@ pub mod test_distinguished {
         OneofEnum(NestedEnum),
     }
 
-    #[derive(
-        Clone, Debug, PartialEq, Eq, Oneof, DistinguishedOneof, Message, DistinguishedMessage,
-    )]
+    #[derive(Clone, Debug, PartialEq, Eq, Oneof, Message)]
+    #[bilrost(distinguished)]
     pub enum OneofField {
         Empty,
         #[bilrost(tag = 201)]
@@ -478,7 +480,8 @@ pub struct TestTypeSupport {
     std_systemtime: std::time::SystemTime,
 }
 
-#[derive(Debug, PartialEq, Eq, Message, DistinguishedMessage)]
+#[derive(Debug, PartialEq, Eq, Message)]
+#[bilrost(distinguished)]
 pub struct TestTypeSupportDistinguished {
     core_duration: core::time::Duration,
     chrono_naive_date: chrono::NaiveDate,
