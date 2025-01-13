@@ -105,7 +105,6 @@ enum FieldChunk {
 }
 use FieldChunk::*;
 
-#[derive(Clone)]
 struct PreprocessedMessage<'a> {
     ident: Ident,
     impl_generics: &'a Generics,
