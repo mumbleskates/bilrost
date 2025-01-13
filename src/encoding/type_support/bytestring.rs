@@ -1,9 +1,9 @@
 use crate::buf::ReverseBuf;
 use crate::encoding::value_traits::for_overwrite_via_default;
 use crate::encoding::{
-    encode_varint, encoded_len_varint, prepend_varint, Capped, DecodeContext,
-    DistinguishedValueDecoder, EmptyState, General, RestrictedDecodeContext, ValueDecoder,
-    ValueEncoder, WireType, Wiretyped,
+    delegate_value_encoding, encode_varint, encoded_len_varint, prepend_varint, Capped,
+    DecodeContext, DistinguishedValueDecoder, EmptyState, General, RestrictedDecodeContext,
+    ValueDecoder, ValueEncoder, WireType, Wiretyped,
 };
 use crate::DecodeErrorKind::InvalidValue;
 use crate::{Canonicity, DecodeError};
@@ -74,6 +74,10 @@ impl DistinguishedValueDecoder<General> for bytestring::ByteString {
         Ok(Canonicity::Canonical)
     }
 }
+
+delegate_value_encoding!(
+    encoding (General) borrows type (bytestring::ByteString) as owned including distinguished
+);
 
 #[cfg(test)]
 mod test {
