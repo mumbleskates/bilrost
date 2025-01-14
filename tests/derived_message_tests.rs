@@ -156,6 +156,26 @@ mod assert {
             let encoded = $from.into_opaque_message().encode_to_vec();
             $crate::assert::never_decodes_borrowed::<$ty>(&encoded, $err, $path);
         }};
+
+        (owned relaxed invalid for $ty:ty, $from:expr, $err:expr, $path:expr $(,)?) => {{
+            let encoded: Vec<u8> = $from.to_owned();
+            $crate::assert::doesnt_decode_owned::<$ty>(&encoded, $err, $path);
+            $crate::assert::doesnt_decode_borrowed::<$ty>(&encoded, $err, $path);
+        }};
+        (borrowed relaxed invalid for $ty:ty, $from:expr, $err:expr, $path:expr $(,)?) => {{
+            let encoded: Vec<u8> = $from.to_owned();
+            $crate::assert::doesnt_decode_borrowed::<$ty>(&encoded, $err, $path);
+        }};
+
+        (owned always invalid for $ty:ty, $from:expr, $err:expr, $path:expr $(,)?) => {{
+            let encoded: Vec<u8> = $from.to_owned();
+            $crate::assert::never_decodes_owned::<$ty>(&encoded, $err, $path);
+            $crate::assert::never_decodes_borrowed::<$ty>(&encoded, $err, $path);
+        }};
+        (borrowed always invalid for $ty:ty, $from:expr, $err:expr, $path:expr $(,)?) => {{
+            let encoded: Vec<u8> = $from.to_owned();
+            $crate::assert::never_decodes_borrowed::<$ty>(&encoded, $err, $path);
+        }};
     }
     pub(super) use decodes;
 
@@ -807,15 +827,15 @@ fn rejects_overflowed_tags() {
     let mut combined = maximum_tag;
     combined.extend(one_more_tag);
     // Nothing should ever be able to decode this message; it's not a valid encoding.
-    assert::never_decodes_owned::<OpaqueMessage>(&combined, TagOverflowed, "");
-    assert::never_decodes_owned::<()>(&combined, TagOverflowed, "");
+    assert::decodes!(owned always invalid for OpaqueMessage, &combined, TagOverflowed, "");
+    assert::decodes!(owned always invalid for (), &combined, TagOverflowed, "");
 
     let mut first_tag_too_big = Vec::new();
     // This is the first varint that's always an invalid field key.
     encode_varint((u32::MAX as u64 + 1) << 2, &mut first_tag_too_big);
     // Nothing should ever be able to decode this message either; it's not a valid encoding.
-    assert::never_decodes_owned::<OpaqueMessage>(&first_tag_too_big, TagOverflowed, "");
-    assert::never_decodes_owned::<()>(&first_tag_too_big, TagOverflowed, "");
+    assert::decodes!(owned always invalid for OpaqueMessage, &first_tag_too_big, TagOverflowed, "");
+    assert::decodes!(owned always invalid for (), &first_tag_too_big, TagOverflowed, "");
 }
 
 #[test]
@@ -828,13 +848,13 @@ fn truncated_field_and_tag() {
         .into_opaque_message()
         .encode_to_vec();
     // Remove the last field's value and part of its key
-    assert::never_decodes_owned::<()>(&buf[..buf.len() - 2], Truncated, "");
-    assert::never_decodes_owned::<Foo>(&buf[..buf.len() - 2], Truncated, "");
-    assert::never_decodes_owned::<OpaqueMessage>(&buf[..buf.len() - 2], Truncated, "");
+    assert::decodes!(owned always invalid for (), &buf[..buf.len() - 2], Truncated, "");
+    assert::decodes!(owned always invalid for Foo, &buf[..buf.len() - 2], Truncated, "");
+    assert::decodes!(owned always invalid for OpaqueMessage, &buf[..buf.len() - 2], Truncated, "");
     // Just remove the value from the last field
-    assert::never_decodes_owned::<()>(&buf[..buf.len() - 1], Truncated, "");
-    assert::never_decodes_owned::<Foo>(&buf[..buf.len() - 1], Truncated, "Foo.1");
-    assert::never_decodes_owned::<OpaqueMessage>(&buf[..buf.len() - 1], Truncated, "");
+    assert::decodes!(owned always invalid for (), &buf[..buf.len() - 1], Truncated, "");
+    assert::decodes!(owned always invalid for Foo, &buf[..buf.len() - 1], Truncated, "Foo.1");
+    assert::decodes!(owned always invalid for OpaqueMessage, &buf[..buf.len() - 1], Truncated, "");
 }
 
 #[test]
@@ -1283,18 +1303,22 @@ fn truncated_varint() {
     let buf = [(0, OV::Varint(2000))]
         .into_opaque_message()
         .encode_to_vec();
-    assert::never_decodes_owned::<OpaqueMessage>(&buf[..buf.len() - 1], Truncated, "");
-    assert::never_decodes_owned::<Foo<bool>>(&buf[..buf.len() - 1], Truncated, "Foo.0");
-    assert::never_decodes_owned::<Foo<u8>>(&buf[..buf.len() - 1], Truncated, "Foo.0");
-    assert::never_decodes_owned::<Foo<u16>>(&buf[..buf.len() - 1], Truncated, "Foo.0");
-    assert::never_decodes_owned::<Foo<u32>>(&buf[..buf.len() - 1], Truncated, "Foo.0");
-    assert::never_decodes_owned::<Foo<u64>>(&buf[..buf.len() - 1], Truncated, "Foo.0");
-    assert::never_decodes_owned::<Foo<usize>>(&buf[..buf.len() - 1], Truncated, "Foo.0");
-    assert::never_decodes_owned::<Foo<i8>>(&buf[..buf.len() - 1], Truncated, "Foo.0");
-    assert::never_decodes_owned::<Foo<i16>>(&buf[..buf.len() - 1], Truncated, "Foo.0");
-    assert::never_decodes_owned::<Foo<i32>>(&buf[..buf.len() - 1], Truncated, "Foo.0");
-    assert::never_decodes_owned::<Foo<i64>>(&buf[..buf.len() - 1], Truncated, "Foo.0");
-    assert::never_decodes_owned::<Foo<isize>>(&buf[..buf.len() - 1], Truncated, "Foo.0");
+    assert::decodes!(owned always invalid for OpaqueMessage, &buf[..buf.len() - 1], Truncated, "");
+    assert::decodes!(owned always invalid for Foo<bool>, &buf[..buf.len() - 1], Truncated, "Foo.0");
+    assert::decodes!(owned always invalid for Foo<u8>, &buf[..buf.len() - 1], Truncated, "Foo.0");
+    assert::decodes!(owned always invalid for Foo<u16>, &buf[..buf.len() - 1], Truncated, "Foo.0");
+    assert::decodes!(owned always invalid for Foo<u32>, &buf[..buf.len() - 1], Truncated, "Foo.0");
+    assert::decodes!(owned always invalid for Foo<u64>, &buf[..buf.len() - 1], Truncated, "Foo.0");
+    assert::decodes!(
+        owned always invalid for Foo<usize>, &buf[..buf.len() - 1], Truncated, "Foo.0"
+    );
+    assert::decodes!(owned always invalid for Foo<i8>, &buf[..buf.len() - 1], Truncated, "Foo.0");
+    assert::decodes!(owned always invalid for Foo<i16>, &buf[..buf.len() - 1], Truncated, "Foo.0");
+    assert::decodes!(owned always invalid for Foo<i32>, &buf[..buf.len() - 1], Truncated, "Foo.0");
+    assert::decodes!(owned always invalid for Foo<i64>, &buf[..buf.len() - 1], Truncated, "Foo.0");
+    assert::decodes!(
+        owned always invalid for Foo<isize>, &buf[..buf.len() - 1], Truncated, "Foo.0"
+    );
 }
 
 #[test]
@@ -1314,28 +1338,35 @@ fn truncated_nested_varint() {
     let truncated_inner_invalid =
         // \x05: field 1, length-delimited; \x04: 4 bytes; \x04: field 1, varint;
         // \xff...: data that will be greedily decoded as an invalid varint.
-        b"\x05\x04\x04\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff";
+        &b"\x05\x04\x04\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff"[..];
     let truncated_inner_valid =
         // \x05: field 1, length-delimited; \x04: 4 bytes; \x04: field 1, varint;
         // \xff...: data that will be greedily decoded as an valid varint that still runs over.
-        b"\x05\x04\x04\xff\xff\xff\xff\xff\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09";
+        &b"\x05\x04\x04\xff\xff\xff\xff\xff\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09"[..];
     let invalid_not_truncated =
         // \x05: field 1, length-delimited; \x0a: 0 bytes; \x04: field 1, varint;
         // \xff...: an invalid varint
-        b"\x05\x0a\x04\xff\xff\xff\xff\xff\xff\xff\xff\xff";
+        &b"\x05\x0a\x04\xff\xff\xff\xff\xff\xff\xff\xff\xff"[..];
 
     // The desired result is that we can tell the difference between the inner region being
     // truncated before the varint ends and finding an invalid varint fully inside the inner
     // region.
-    assert::never_decodes_owned::<Outer>(
+    assert::decodes!(
+        owned always invalid for Outer, 
         truncated_inner_invalid,
         Truncated,
         "Outer.inner/Inner.val",
     );
     // When decoding a varint succeeds but runs over, we want to detect that too.
-    assert::never_decodes_owned::<Outer>(truncated_inner_valid, Truncated, "Outer.inner");
+    assert::decodes!(
+        owned always invalid for Outer,
+        truncated_inner_valid,
+        Truncated,
+        "Outer.inner",
+    );
     // When decoding an inner varint, we do see when it is invalid.
-    assert::never_decodes_owned::<Outer>(
+    assert::decodes!(
+        owned always invalid for Outer, 
         invalid_not_truncated,
         InvalidVarint,
         "Outer.inner/Inner.val",
@@ -1519,12 +1550,22 @@ fn truncated_fixed() {
             // Truncate by 1 byte
             direct.pop();
             in_oneof.pop();
-            assert::decodes!(owned never decodes Foo<$ty>, &direct, Truncated, "Foo.1");
-            assert::decodes!(owned never decodes Foo<$ty>, &in_oneof, Truncated, "Foo.0/A.One");
-            assert::never_decodes_owned::<OpaqueMessage>(&direct, Truncated, "");
-            assert::never_decodes_owned::<OpaqueMessage>(&in_oneof, Truncated, "");
-            assert::never_decodes_owned::<()>(&direct, Truncated, "");
-            assert::never_decodes_owned::<()>(&in_oneof, Truncated, "");
+            assert::decodes!(
+                owned always invalid for Foo<$ty>,
+                &direct,
+                Truncated,
+                "Foo.1",
+            );
+            assert::decodes!(
+                owned always invalid for Foo<$ty>,
+                &in_oneof,
+                Truncated,
+                "Foo.0/A.One",
+            );
+            assert::decodes!(owned always invalid for OpaqueMessage, &direct, Truncated, "");
+            assert::decodes!(owned always invalid for OpaqueMessage, &in_oneof, Truncated, "");
+            assert::decodes!(owned always invalid for (), &direct, Truncated, "");
+            assert::decodes!(owned always invalid for (), &in_oneof, Truncated, "");
 
             let direct_nested = [
                 (0, OV::byte_slice(&direct)),
