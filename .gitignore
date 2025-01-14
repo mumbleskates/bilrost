@@ -1,6 +1,6 @@
 target/
 Cargo.lock
-coverage/
+/coverage/
 
 .DS_Store
 /.idea/
