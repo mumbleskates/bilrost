@@ -2041,12 +2041,10 @@ pub fn oneof(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
 #[cfg(test)]
 mod test {
+    use crate::{try_enumeration, try_message, try_oneof};
     use alloc::format;
     use alloc::string::ToString;
-
     use quote::quote;
-
-    use crate::{try_enumeration, try_message, try_oneof};
 
     #[test]
     fn test_rejects_colliding_message_fields() {

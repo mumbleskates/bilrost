@@ -1173,9 +1173,7 @@ allows iterating over the slices in the buffer for vectored writing.
 ### Encoding and decoding example
 
 ```rust,
-use bilrost::{
-    DistinguishedOwnedMessage, Message, Oneof, OwnedMessage, WithCanonicity,
-};
+use bilrost::{DistinguishedOwnedMessage, Message, Oneof};
 use bytes::Bytes;
 use std::collections::BTreeMap;
 
