@@ -1527,7 +1527,7 @@ fn preprocess_oneof(input: &DeriveInput) -> Result<PreprocessedOneof, Error> {
 
     Ok(PreprocessedOneof {
         ident,
-        impl_generics: &generics,
+        impl_generics: generics,
         ty_generics,
         where_clause,
         fields,
