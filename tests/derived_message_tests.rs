@@ -4,8 +4,8 @@
 
 use bilrost::encoding::opaque::{OpaqueMessage, OpaqueValue as OV};
 use bilrost::encoding::{
-    self, encode_varint, Collection, DistinguishedOneofDecoder, EmptyState, Fixed, General, Oneof,
-    OneofDecoder, Varint,
+    encode_varint, Collection, DistinguishedOneofDecoder, EmptyState, General, Oneof, OneofDecoder,
+    Varint,
 };
 use bilrost::Canonicity::{HasExtensions, NotCanonical};
 use bilrost::DecodeErrorKind::{
@@ -108,201 +108,175 @@ mod assert {
 
     macro_rules! decodes {
         (owned relaxed, $from:expr, $into:expr $(,)?) => {{
-            let encoded = $from.into_opaque_message();
+            let encoded = $from.into_opaque_message().encode_to_vec();
             $crate::assert::decodes_owned(&encoded, $into);
-            let stash = &mut vec![];
-            $crate::assert::decodes_borrowed(&encoded, $into, stash);
+            $crate::assert::decodes_borrowed(&encoded, $into);
         }};
         (borrowed relaxed, $from:expr, $into:expr $(,)?) => {{
-            let encoded = $from.into_opaque_message();
-            let stash = &mut vec![];
-            $crate::assert::decodes_borrowed(&encoded, $into, stash);
+            let encoded = $from.into_opaque_message().encode_to_vec();
+            $crate::assert::decodes_borrowed(&encoded, $into);
         }};
 
         (owned distinguished, $from:expr, $into:expr $(,)?) => {{
-            let encoded = $from.into_opaque_message();
+            let encoded = $from.into_opaque_message().encode_to_vec();
             $crate::assert::decodes_distinguished_owned(&encoded, $into);
-            let stash = &mut vec![];
-            $crate::assert::decodes_distinguished_borrowed(&encoded, $into, stash);
+            $crate::assert::decodes_distinguished_borrowed(&encoded, $into);
         }};
         (borrowed distinguished, $from:expr, $into:expr $(,)?) => {{
-            let encoded = $from.into_opaque_message();
-            let stash = &mut vec![];
-            $crate::assert::decodes_distinguished_borrowed(&encoded, $into, stash);
+            let encoded = $from.into_opaque_message().encode_to_vec();
+            $crate::assert::decodes_distinguished_borrowed(&encoded, $into);
         }};
 
         (owned non-canonically, $from:expr, $into:expr, $canon:expr, $err:expr $(,)?) => {{
-            let encoded = $from.into_opaque_message();
+            let encoded = $from.into_opaque_message().encode_to_vec();
             $crate::assert::decodes_non_canonically_owned(&encoded, $into, $canon, $err);
-            let stash = &mut vec![];
-            $crate::assert::decodes_non_canonically_borrowed(&encoded, $into, $canon, $err, stash);
+            $crate::assert::decodes_non_canonically_borrowed(&encoded, $into, $canon, $err);
         }};
         (borrowed non-canonically, $from:expr, $into:expr, $canon:expr, $err:expr $(,)?) => {{
-            let encoded = $from.into_opaque_message();
-            let stash = &mut vec![];
-            $crate::assert::decodes_non_canonically_borrowed(&encoded, $into, $canon, $err, stash);
+            let encoded = $from.into_opaque_message().encode_to_vec();
+            $crate::assert::decodes_non_canonically_borrowed(&encoded, $into, $canon, $err);
         }};
 
         (owned relaxed errs for $ty:ty, $from:expr, $err:expr, $path:expr $(,)?) => {{
-            let encoded = $from.into_opaque_message();
+            let encoded = $from.into_opaque_message().encode_to_vec();
             $crate::assert::doesnt_decode_owned::<$ty>(&encoded, $err, $path);
-            let stash = &mut vec![];
-            $crate::assert::doesnt_decode_borrowed::<$ty>(&encoded, $err, $path, stash);
+            $crate::assert::doesnt_decode_borrowed::<$ty>(&encoded, $err, $path);
         }};
         (borrowed relaxed errs for $ty:ty, $from:expr, $err:expr, $path:expr $(,)?) => {{
-            let encoded = $from.into_opaque_message();
-            let stash = &mut vec![];
-            $crate::assert::doesnt_decode_borrowed::<$ty>(&encoded, $err, $path, stash);
+            let encoded = $from.into_opaque_message().encode_to_vec();
+            $crate::assert::doesnt_decode_borrowed::<$ty>(&encoded, $err, $path);
         }};
 
         (owned never decodes $ty:ty, $from:expr, $err:expr, $path:expr $(,)?) => {{
-            let encoded = $from.into_opaque_message();
+            let encoded = $from.into_opaque_message().encode_to_vec();
             $crate::assert::never_decodes_owned::<$ty>(&encoded, $err, $path);
-            let stash = &mut vec![];
-            $crate::assert::never_decodes_borrowed::<$ty>(&encoded, $err, $path, stash);
+            $crate::assert::never_decodes_borrowed::<$ty>(&encoded, $err, $path);
         }};
         (borrowed never decodes $ty:ty, $from:expr, $err:expr, $path:expr $(,)?) => {{
-            let encoded = $from.into_opaque_message();
-            let stash = &mut vec![];
-            $crate::assert::never_decodes_borrowed::<$ty>(&encoded, $err, $path, stash);
+            let encoded = $from.into_opaque_message().encode_to_vec();
+            $crate::assert::never_decodes_borrowed::<$ty>(&encoded, $err, $path);
         }};
     }
     pub(super) use decodes;
 
-    pub(super) fn decodes_owned<'a, M>(from: impl IntoOpaqueMessage<'a>, into: M)
+    pub(super) fn decodes_owned<'a, M>(from: &'a [u8], into: M)
     where
         M: OwnedMessage + BorrowedMessage<'a> + Debug + PartialEq + EmptyState,
     {
-        let encoded = from.into_opaque_message().encode_to_vec();
-        assert_eq!(M::decode(encoded.as_slice()).as_ref(), Ok(&into));
+        assert_eq!(M::decode(from).as_ref(), Ok(&into));
         let mut to_replace = M::empty();
-        to_replace.replace_from(encoded.as_slice()).unwrap();
+        to_replace.replace_from(from).unwrap();
         assert_eq!(&to_replace, &into);
+        decodes_borrowed(from, into);
     }
 
-    pub(super) fn decodes_borrowed<'a, M>(
-        from: impl IntoOpaqueMessage<'a>,
-        into: M,
-        lifetime_stash: &'a mut Vec<u8>,
-    ) where
+    pub(super) fn decodes_borrowed<'a, M>(from: &'a [u8], into: M)
+    where
         M: BorrowedMessage<'a> + PartialEq + Debug,
     {
-        *lifetime_stash = from.into_opaque_message().encode_to_vec();
-        assert_eq!(M::decode_borrowed(lifetime_stash).as_ref(), Ok(&into));
+        assert_eq!(M::decode_borrowed(from).as_ref(), Ok(&into));
         let mut to_replace = M::empty();
-        to_replace.replace_borrowed_from(lifetime_stash).unwrap();
+        to_replace.replace_borrowed_from(from).unwrap();
         assert_eq!(&to_replace, &into);
     }
 
-    pub(super) fn doesnt_decode_owned<'a, M>(
-        from: impl IntoOpaqueMessage<'a>,
-        err: DecodeErrorKind,
-        err_path: &str,
-    ) where
-        M: OwnedMessage + Debug + EmptyState,
+    pub(super) fn doesnt_decode_owned<'a, M>(from: &'a [u8], err: DecodeErrorKind, err_path: &str)
+    where
+        M: OwnedMessage + BorrowedMessage<'a> + Debug + EmptyState,
     {
-        let encoded = from.into_opaque_message().encode_to_vec();
         assert_error(
-            M::decode(encoded.as_slice()).expect_err("unexpectedly decoded without error"),
+            M::decode(from).expect_err("unexpectedly decoded without error"),
             err,
             err_path,
         );
         let mut to_replace = M::empty();
         assert_error(
             to_replace
-                .replace_from(encoded.as_slice())
+                .replace_from(from)
                 .expect_err("unexpectedly replaced without error"),
             err,
             err_path,
         );
+        doesnt_decode_borrowed::<M>(from, err, err_path);
     }
 
     pub(super) fn doesnt_decode_borrowed<'a, M>(
-        from: impl IntoOpaqueMessage<'a>,
+        from: &'a [u8],
         err: DecodeErrorKind,
         err_path: &str,
-        lifetime_stash: &'a mut Vec<u8>,
     ) where
         M: BorrowedMessage<'a> + Debug + EmptyState,
     {
-        *lifetime_stash = from.into_opaque_message().encode_to_vec();
         assert_error(
-            M::decode_borrowed(lifetime_stash).expect_err("unexpectedly decoded without error"),
+            M::decode_borrowed(from).expect_err("unexpectedly decoded without error"),
             err,
             err_path,
         );
         let mut to_replace = M::empty();
         assert_error(
             to_replace
-                .replace_borrowed_from(lifetime_stash)
+                .replace_borrowed_from(from)
                 .expect_err("unexpectedly replaced without error"),
             err,
             err_path,
         );
     }
 
-    pub(super) fn decodes_distinguished_owned<'a, M>(from: impl IntoOpaqueMessage<'a>, into: M)
+    pub(super) fn decodes_distinguished_owned<'a, M>(from: &'a [u8], into: M)
     where
-        M: DistinguishedOwnedMessage + Debug + Eq + EmptyState,
+        M: DistinguishedOwnedMessage + DistinguishedBorrowedMessage<'a> + Debug + Eq + EmptyState,
     {
-        let encoded = from.into_opaque_message().encode_to_vec();
-        assert_eq!(M::decode(encoded.as_slice()).as_ref(), Ok(&into));
+        assert_eq!(M::decode(from).as_ref(), Ok(&into));
         let (decoded, canon) =
-            M::decode_distinguished(encoded.as_slice()).expect("distinguished decoding failed");
+            M::decode_distinguished(from).expect("distinguished decoding failed");
         assert_eq!(&decoded, &into, "distinguished decoded doesn't match");
         assert_eq!(canon, Canonical);
         let mut to_replace = M::empty();
-        to_replace.replace_from(encoded.as_slice()).unwrap();
+        to_replace.replace_from(from).unwrap();
         assert_eq!(&to_replace, &into, "doesn't match after relaxed replace");
         to_replace = M::empty();
-        assert_eq!(
-            to_replace.replace_distinguished_from(encoded.as_slice()),
-            Ok(Canonical)
-        );
+        assert_eq!(to_replace.replace_distinguished_from(from), Ok(Canonical));
         assert_eq!(
             &to_replace, &into,
             "doesn't match after distinguished replace"
         );
         assert_eq!(
-            encoded,
+            from,
             into.encode_to_vec(),
             "distinguished encoding does not round trip"
         );
-        assert_eq!(into.encoded_len(), encoded.len(), "encoded_len was wrong");
+        assert_eq!(into.encoded_len(), from.len(), "encoded_len was wrong");
         let mut prepend_round_trip = Vec::new();
         prepend_round_trip.put(into.encode_fast());
         assert_eq!(
-            encoded, prepend_round_trip,
+            from, prepend_round_trip,
             "distinguished encoding does not round trip with prepend",
         );
-        assert_eq!(encoded, into.encode_contiguous().into_vec());
+        assert_eq!(from, into.encode_contiguous().into_vec());
+        decodes_distinguished_borrowed(from, into);
     }
 
-    pub(super) fn decodes_distinguished_borrowed<'a, M>(
-        from: impl IntoOpaqueMessage<'a>,
-        into: M,
-        lifetime_stash: &'a mut Vec<u8>,
-    ) where
+    pub(super) fn decodes_distinguished_borrowed<'a, M>(from: &'a [u8], into: M)
+    where
         M: DistinguishedBorrowedMessage<'a> + Debug + Eq + EmptyState,
     {
-        *lifetime_stash = from.into_opaque_message().encode_to_vec();
-        assert_eq!(M::decode_borrowed(lifetime_stash).as_ref(), Ok(&into));
-        let (decoded, canon) = M::decode_distinguished_borrowed(lifetime_stash)
-            .expect("distinguished borrowed decoding failed");
+        assert_eq!(M::decode_borrowed(from).as_ref(), Ok(&into));
+        let (decoded, canon) =
+            M::decode_distinguished_borrowed(from).expect("distinguished borrowed decoding failed");
         assert_eq!(
             &decoded, &into,
             "distinguished borrowed decoded doesn't match"
         );
         assert_eq!(canon, Canonical);
         let mut to_replace = M::empty();
-        to_replace.replace_borrowed_from(lifetime_stash).unwrap();
+        to_replace.replace_borrowed_from(from).unwrap();
         assert_eq!(
             &to_replace, &into,
             "doesn't match after relaxed borrowed replace"
         );
         to_replace = M::empty();
         assert_eq!(
-            to_replace.replace_distinguished_borrowed_from(lifetime_stash),
+            to_replace.replace_distinguished_borrowed_from(from),
             Ok(Canonical)
         );
         assert_eq!(
@@ -310,22 +284,18 @@ mod assert {
             "doesn't match after distinguished borrowed replace"
         );
         assert_eq!(
-            lifetime_stash,
-            &into.encode_to_vec(),
+            from,
+            into.encode_to_vec(),
             "distinguished encoding does not round trip"
         );
-        assert_eq!(
-            into.encoded_len(),
-            lifetime_stash.len(),
-            "encoded_len was wrong"
-        );
+        assert_eq!(into.encoded_len(), from.len(), "encoded_len was wrong");
         let mut prepend_round_trip = Vec::new();
         prepend_round_trip.put(into.encode_fast());
         assert_eq!(
-            lifetime_stash, &prepend_round_trip,
+            from, prepend_round_trip,
             "distinguished encoding does not round trip with prepend",
         );
-        assert_eq!(lifetime_stash, &into.encode_contiguous().into_vec());
+        assert_eq!(from, into.encode_contiguous().into_vec());
     }
 
     /// Trait for easily passing expectations for restricted decoding results to
@@ -362,23 +332,22 @@ mod assert {
     }
 
     pub(super) fn decodes_non_canonically_owned<'a, M>(
-        from: impl IntoOpaqueMessage<'a>,
+        from: &'a [u8],
         into: M,
         expected_canon: Canonicity,
         err_expectations: impl RestrictedExpectations,
     ) where
-        M: DistinguishedOwnedMessage + Debug + Eq + EmptyState,
+        M: DistinguishedOwnedMessage + DistinguishedBorrowedMessage<'a> + Debug + Eq + EmptyState,
     {
         assert_ne!(expected_canon, Canonical); // otherwise why call this function
-        let encoded = from.into_opaque_message().encode_to_vec();
 
-        assert_eq!(M::decode(encoded.as_slice()).as_ref(), Ok(&into));
+        assert_eq!(M::decode(from).as_ref(), Ok(&into));
 
         let mut to_replace = M::empty();
-        to_replace.replace_from(encoded.as_slice()).unwrap();
+        to_replace.replace_from(from).unwrap();
         assert_eq!(&to_replace, &into);
 
-        let (decoded, canon) = M::decode_distinguished(encoded.as_slice())
+        let (decoded, canon) = M::decode_distinguished(from)
             .expect("error decoding in distinguished mode with non-canonical data");
         assert_eq!(&decoded, &into, "distinguished decoded doesn't match");
         assert_eq!(canon, expected_canon);
@@ -386,7 +355,7 @@ mod assert {
         let mut to_replace = M::empty();
         assert_eq!(
             to_replace
-                .replace_distinguished_from(encoded.as_slice())
+                .replace_distinguished_from(from)
                 .expect("error replacing in distinguished mode with non-canonical data"),
             expected_canon
         );
@@ -406,7 +375,7 @@ mod assert {
             };
             let expected_canon_err = restricted_canon.canonical().unwrap_err();
             assert_error(
-                M::decode_restricted(encoded.as_slice(), more_strict).expect_err(
+                M::decode_restricted(from, more_strict).expect_err(
                     "decoded non-distinguished data in restricted mode but got no error",
                 ),
                 expected_canon_err,
@@ -414,7 +383,7 @@ mod assert {
             );
             assert_error(
                 to_replace
-                    .replace_restricted_from(encoded.as_slice(), more_strict)
+                    .replace_restricted_from(from, more_strict)
                     .expect_err(
                         "replaced non-distinguished data in restricted mode but got no error",
                     ),
@@ -422,27 +391,26 @@ mod assert {
                 error_path,
             );
         }
+        decodes_non_canonically_borrowed(from, into, expected_canon, err_expectations);
     }
 
     pub(super) fn decodes_non_canonically_borrowed<'a, M>(
-        from: impl IntoOpaqueMessage<'a>,
+        from: &'a [u8],
         into: M,
         expected_canon: Canonicity,
         err_expectations: impl RestrictedExpectations,
-        lifetime_stash: &'a mut Vec<u8>,
     ) where
         M: DistinguishedBorrowedMessage<'a> + Debug + Eq + EmptyState,
     {
         assert_ne!(expected_canon, Canonical); // otherwise why call this function
-        *lifetime_stash = from.into_opaque_message().encode_to_vec();
 
-        assert_eq!(M::decode_borrowed(lifetime_stash).as_ref(), Ok(&into));
+        assert_eq!(M::decode_borrowed(from).as_ref(), Ok(&into));
 
         let mut to_replace = M::empty();
-        to_replace.replace_borrowed_from(lifetime_stash).unwrap();
+        to_replace.replace_borrowed_from(from).unwrap();
         assert_eq!(&to_replace, &into);
 
-        let (decoded, canon) = M::decode_distinguished_borrowed(lifetime_stash)
+        let (decoded, canon) = M::decode_distinguished_borrowed(from)
             .expect("error decoding in distinguished mode with non-canonical data");
         assert_eq!(&decoded, &into, "distinguished decoded doesn't match");
         assert_eq!(canon, expected_canon);
@@ -450,7 +418,7 @@ mod assert {
         let mut to_replace = M::empty();
         assert_eq!(
             to_replace
-                .replace_distinguished_borrowed_from(lifetime_stash)
+                .replace_distinguished_borrowed_from(from)
                 .expect("error replacing in distinguished mode with non-canonical data"),
             expected_canon
         );
@@ -470,7 +438,7 @@ mod assert {
             };
             let expected_canon_err = restricted_canon.canonical().unwrap_err();
             assert_error(
-                M::decode_restricted_borrowed(lifetime_stash, more_strict).expect_err(
+                M::decode_restricted_borrowed(from, more_strict).expect_err(
                     "decoded non-distinguished data in restricted mode but got no error",
                 ),
                 expected_canon_err,
@@ -478,7 +446,7 @@ mod assert {
             );
             assert_error(
                 to_replace
-                    .replace_restricted_borrowed_from(lifetime_stash, more_strict)
+                    .replace_restricted_borrowed_from(from, more_strict)
                     .expect_err(
                         "replaced non-distinguished data in restricted mode but got no error",
                     ),
@@ -489,7 +457,7 @@ mod assert {
 
         let round_tripped = into.encode_to_vec();
         assert_ne!(
-            &round_tripped, lifetime_stash,
+            round_tripped, from,
             "encoding round tripped, but did not decode distinguished"
         );
         assert_eq!(
@@ -499,30 +467,25 @@ mod assert {
         );
     }
 
-    pub(super) fn never_decodes_owned<'a, M>(
-        from: impl IntoOpaqueMessage<'a>,
-        err: DecodeErrorKind,
-        err_path: &str,
-    ) where
-        M: DistinguishedOwnedMessage + Debug + EmptyState,
+    pub(super) fn never_decodes_owned<'a, M>(from: &'a [u8], err: DecodeErrorKind, err_path: &str)
+    where
+        M: DistinguishedOwnedMessage + DistinguishedBorrowedMessage<'a> + Debug + EmptyState,
     {
-        let encoded = from.into_opaque_message().encode_to_vec();
         assert_error(
-            M::decode(encoded.as_slice())
-                .expect_err("unepectedly decoded in relaxed mode without error"),
+            M::decode(from).expect_err("unepectedly decoded in relaxed mode without error"),
             err,
             err_path,
         );
         let mut to_replace = M::empty();
         assert_error(
             to_replace
-                .replace_from(encoded.as_slice())
+                .replace_from(from)
                 .expect_err("unexpectedly replaced in relaxed mode without error"),
             err,
             err_path,
         );
         assert_error(
-            M::decode_distinguished(encoded.as_slice())
+            M::decode_distinguished(from)
                 .expect_err("unexpectedly decoded in distinguished mode without error"),
             err,
             err_path,
@@ -530,24 +493,23 @@ mod assert {
         let mut to_replace = M::empty();
         assert_error(
             to_replace
-                .replace_distinguished_from(encoded.as_slice())
+                .replace_distinguished_from(from)
                 .expect_err("unexpectedly replaced in distinguished mode without error"),
             err,
             err_path,
         );
+        never_decodes_borrowed::<M>(from, err, err_path);
     }
 
     pub(super) fn never_decodes_borrowed<'a, M>(
-        from: impl IntoOpaqueMessage<'a>,
+        from: &'a [u8],
         err: DecodeErrorKind,
         err_path: &str,
-        lifetime_stash: &'a mut Vec<u8>,
     ) where
         M: DistinguishedBorrowedMessage<'a> + Debug + EmptyState,
     {
-        *lifetime_stash = from.into_opaque_message().encode_to_vec();
         assert_error(
-            M::decode_borrowed(lifetime_stash)
+            M::decode_borrowed(from)
                 .expect_err("unepectedly decoded in relaxed mode without error"),
             err,
             err_path,
@@ -555,13 +517,13 @@ mod assert {
         let mut to_replace = M::empty();
         assert_error(
             to_replace
-                .replace_borrowed_from(lifetime_stash)
+                .replace_borrowed_from(from)
                 .expect_err("unexpectedly replaced in relaxed mode without error"),
             err,
             err_path,
         );
         assert_error(
-            M::decode_distinguished_borrowed(lifetime_stash)
+            M::decode_distinguished_borrowed(from)
                 .expect_err("unexpectedly decoded in distinguished mode without error"),
             err,
             err_path,
@@ -569,7 +531,7 @@ mod assert {
         let mut to_replace = M::empty();
         assert_error(
             to_replace
-                .replace_distinguished_borrowed_from(lifetime_stash)
+                .replace_distinguished_borrowed_from(from)
                 .expect_err("unexpectedly replaced in distinguished mode without error"),
             err,
             err_path,
@@ -592,48 +554,6 @@ mod assert {
         prepend_encoded.put(prepended);
         assert_eq!(forward_encoded, prepend_encoded);
         assert_eq!(forward_encoded, value.encode_contiguous().into_vec());
-    }
-
-    pub(super) fn is_invalid<M>(value: impl AsRef<[u8]>, err: DecodeErrorKind, err_path: &str)
-    where
-        M: OwnedMessage + Debug + EmptyState,
-    {
-        assert_error(
-            M::decode(value.as_ref()).expect_err("decoded without error"),
-            err,
-            err_path,
-        );
-        let mut to_replace = M::empty();
-        assert_error(
-            to_replace
-                .replace_from(value.as_ref())
-                .expect_err("replaced without error"),
-            err,
-            err_path,
-        );
-    }
-
-    pub(super) fn is_invalid_distinguished<M>(
-        value: impl AsRef<[u8]>,
-        err: DecodeErrorKind,
-        err_path: &str,
-    ) where
-        M: DistinguishedOwnedMessage + Debug + EmptyState,
-    {
-        assert_error(
-            M::decode_distinguished(value.as_ref()).expect_err("decoded without error"),
-            err,
-            err_path,
-        );
-        let mut to_replace = M::empty();
-        assert_error(
-            to_replace
-                .replace_distinguished_from(value.as_ref())
-                .expect_err("replaced without error"),
-            err,
-            err_path,
-        );
-        is_invalid::<M>(value, err, err_path);
     }
 }
 
@@ -887,15 +807,15 @@ fn rejects_overflowed_tags() {
     let mut combined = maximum_tag;
     combined.extend(one_more_tag);
     // Nothing should ever be able to decode this message; it's not a valid encoding.
-    assert::is_invalid_distinguished::<OpaqueMessage>(&combined, TagOverflowed, "");
-    assert::is_invalid_distinguished::<()>(&combined, TagOverflowed, "");
+    assert::never_decodes_owned::<OpaqueMessage>(&combined, TagOverflowed, "");
+    assert::never_decodes_owned::<()>(&combined, TagOverflowed, "");
 
     let mut first_tag_too_big = Vec::new();
     // This is the first varint that's always an invalid field key.
     encode_varint((u32::MAX as u64 + 1) << 2, &mut first_tag_too_big);
     // Nothing should ever be able to decode this message either; it's not a valid encoding.
-    assert::is_invalid_distinguished::<OpaqueMessage>(&first_tag_too_big, TagOverflowed, "");
-    assert::is_invalid_distinguished::<()>(&first_tag_too_big, TagOverflowed, "");
+    assert::never_decodes_owned::<OpaqueMessage>(&first_tag_too_big, TagOverflowed, "");
+    assert::never_decodes_owned::<()>(&first_tag_too_big, TagOverflowed, "");
 }
 
 #[test]
@@ -908,13 +828,13 @@ fn truncated_field_and_tag() {
         .into_opaque_message()
         .encode_to_vec();
     // Remove the last field's value and part of its key
-    assert::is_invalid_distinguished::<()>(&buf[..buf.len() - 2], Truncated, "");
-    assert::is_invalid_distinguished::<Foo>(&buf[..buf.len() - 2], Truncated, "");
-    assert::is_invalid_distinguished::<OpaqueMessage>(&buf[..buf.len() - 2], Truncated, "");
+    assert::never_decodes_owned::<()>(&buf[..buf.len() - 2], Truncated, "");
+    assert::never_decodes_owned::<Foo>(&buf[..buf.len() - 2], Truncated, "");
+    assert::never_decodes_owned::<OpaqueMessage>(&buf[..buf.len() - 2], Truncated, "");
     // Just remove the value from the last field
-    assert::is_invalid_distinguished::<()>(&buf[..buf.len() - 1], Truncated, "");
-    assert::is_invalid_distinguished::<Foo>(&buf[..buf.len() - 1], Truncated, "Foo.1");
-    assert::is_invalid_distinguished::<OpaqueMessage>(&buf[..buf.len() - 1], Truncated, "");
+    assert::never_decodes_owned::<()>(&buf[..buf.len() - 1], Truncated, "");
+    assert::never_decodes_owned::<Foo>(&buf[..buf.len() - 1], Truncated, "Foo.1");
+    assert::never_decodes_owned::<OpaqueMessage>(&buf[..buf.len() - 1], Truncated, "");
 }
 
 #[test]
@@ -1363,18 +1283,18 @@ fn truncated_varint() {
     let buf = [(0, OV::Varint(2000))]
         .into_opaque_message()
         .encode_to_vec();
-    assert::is_invalid_distinguished::<OpaqueMessage>(&buf[..buf.len() - 1], Truncated, "");
-    assert::is_invalid_distinguished::<Foo<bool>>(&buf[..buf.len() - 1], Truncated, "Foo.0");
-    assert::is_invalid_distinguished::<Foo<u8>>(&buf[..buf.len() - 1], Truncated, "Foo.0");
-    assert::is_invalid_distinguished::<Foo<u16>>(&buf[..buf.len() - 1], Truncated, "Foo.0");
-    assert::is_invalid_distinguished::<Foo<u32>>(&buf[..buf.len() - 1], Truncated, "Foo.0");
-    assert::is_invalid_distinguished::<Foo<u64>>(&buf[..buf.len() - 1], Truncated, "Foo.0");
-    assert::is_invalid_distinguished::<Foo<usize>>(&buf[..buf.len() - 1], Truncated, "Foo.0");
-    assert::is_invalid_distinguished::<Foo<i8>>(&buf[..buf.len() - 1], Truncated, "Foo.0");
-    assert::is_invalid_distinguished::<Foo<i16>>(&buf[..buf.len() - 1], Truncated, "Foo.0");
-    assert::is_invalid_distinguished::<Foo<i32>>(&buf[..buf.len() - 1], Truncated, "Foo.0");
-    assert::is_invalid_distinguished::<Foo<i64>>(&buf[..buf.len() - 1], Truncated, "Foo.0");
-    assert::is_invalid_distinguished::<Foo<isize>>(&buf[..buf.len() - 1], Truncated, "Foo.0");
+    assert::never_decodes_owned::<OpaqueMessage>(&buf[..buf.len() - 1], Truncated, "");
+    assert::never_decodes_owned::<Foo<bool>>(&buf[..buf.len() - 1], Truncated, "Foo.0");
+    assert::never_decodes_owned::<Foo<u8>>(&buf[..buf.len() - 1], Truncated, "Foo.0");
+    assert::never_decodes_owned::<Foo<u16>>(&buf[..buf.len() - 1], Truncated, "Foo.0");
+    assert::never_decodes_owned::<Foo<u32>>(&buf[..buf.len() - 1], Truncated, "Foo.0");
+    assert::never_decodes_owned::<Foo<u64>>(&buf[..buf.len() - 1], Truncated, "Foo.0");
+    assert::never_decodes_owned::<Foo<usize>>(&buf[..buf.len() - 1], Truncated, "Foo.0");
+    assert::never_decodes_owned::<Foo<i8>>(&buf[..buf.len() - 1], Truncated, "Foo.0");
+    assert::never_decodes_owned::<Foo<i16>>(&buf[..buf.len() - 1], Truncated, "Foo.0");
+    assert::never_decodes_owned::<Foo<i32>>(&buf[..buf.len() - 1], Truncated, "Foo.0");
+    assert::never_decodes_owned::<Foo<i64>>(&buf[..buf.len() - 1], Truncated, "Foo.0");
+    assert::never_decodes_owned::<Foo<isize>>(&buf[..buf.len() - 1], Truncated, "Foo.0");
 }
 
 #[test]
@@ -1407,15 +1327,15 @@ fn truncated_nested_varint() {
     // The desired result is that we can tell the difference between the inner region being
     // truncated before the varint ends and finding an invalid varint fully inside the inner
     // region.
-    assert::is_invalid_distinguished::<Outer>(
+    assert::never_decodes_owned::<Outer>(
         truncated_inner_invalid,
         Truncated,
         "Outer.inner/Inner.val",
     );
     // When decoding a varint succeeds but runs over, we want to detect that too.
-    assert::is_invalid_distinguished::<Outer>(truncated_inner_valid, Truncated, "Outer.inner");
+    assert::never_decodes_owned::<Outer>(truncated_inner_valid, Truncated, "Outer.inner");
     // When decoding an inner varint, we do see when it is invalid.
-    assert::is_invalid_distinguished::<Outer>(
+    assert::never_decodes_owned::<Outer>(
         invalid_not_truncated,
         InvalidVarint,
         "Outer.inner/Inner.val",
@@ -1588,55 +1508,55 @@ fn truncated_fixed() {
         #[bilrost(tag(2), encoding(fixed))] T,
     );
 
-    fn check_fixed_truncation<T>(val: OV)
-    where
-        T: Debug
-            + Eq
-            + EmptyState
-            + encoding::DistinguishedDecoder<Fixed>
-            + encoding::DistinguishedValueDecoder<Fixed>
-            + encoding::ValueDecoder<Fixed>,
-    {
-        let mut direct = [(2, val.clone())].into_opaque_message().encode_to_vec();
-        let mut in_oneof = [(1, val.clone())].into_opaque_message().encode_to_vec();
-        // Truncate by 1 byte
-        direct.pop();
-        in_oneof.pop();
-        assert::is_invalid_distinguished::<Foo<T>>(&direct, Truncated, "Foo.1");
-        assert::is_invalid_distinguished::<Foo<T>>(&in_oneof, Truncated, "Foo.0/A.One");
-        assert::is_invalid_distinguished::<OpaqueMessage>(&direct, Truncated, "");
-        assert::is_invalid_distinguished::<OpaqueMessage>(&in_oneof, Truncated, "");
-        assert::is_invalid_distinguished::<()>(&direct, Truncated, "");
-        assert::is_invalid_distinguished::<()>(&in_oneof, Truncated, "");
+    #[derive(Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
+    struct Outer<T>(Foo<T>, String);
 
-        #[derive(Debug, PartialEq, Eq, Message)]
-        #[bilrost(distinguished)]
-        struct Outer<T>(Foo<T>, String);
+    macro_rules! check_fixed_truncation {
+        ($ty:ty, $val:expr) => {
+            let mut direct = [(2, $val.clone())].into_opaque_message().encode_to_vec();
+            let mut in_oneof = [(1, $val.clone())].into_opaque_message().encode_to_vec();
+            // Truncate by 1 byte
+            direct.pop();
+            in_oneof.pop();
+            assert::decodes!(owned never decodes Foo<$ty>, &direct, Truncated, "Foo.1");
+            assert::decodes!(owned never decodes Foo<$ty>, &in_oneof, Truncated, "Foo.0/A.One");
+            assert::never_decodes_owned::<OpaqueMessage>(&direct, Truncated, "");
+            assert::never_decodes_owned::<OpaqueMessage>(&in_oneof, Truncated, "");
+            assert::never_decodes_owned::<()>(&direct, Truncated, "");
+            assert::never_decodes_owned::<()>(&in_oneof, Truncated, "");
 
-        let direct_nested = [
-            (0, OV::byte_slice(&direct)),
-            (1, OV::string("more data after that")),
-        ]
-        .into_opaque_message()
-        .encode_to_vec();
-        let in_oneof_nested = [
-            (0, OV::byte_slice(&in_oneof)),
-            (1, OV::string("more data after that")),
-        ]
-        .into_opaque_message()
-        .encode_to_vec();
-        assert::is_invalid_distinguished::<Outer<T>>(&direct_nested, Truncated, "Outer.0/Foo.1");
-        assert::is_invalid_distinguished::<Outer<T>>(
-            &in_oneof_nested,
-            Truncated,
-            "Outer.0/Foo.0/A.One",
-        );
+            let direct_nested = [
+                (0, OV::byte_slice(&direct)),
+                (1, OV::string("more data after that")),
+            ]
+            .into_opaque_message()
+            .encode_to_vec();
+            let in_oneof_nested = [
+                (0, OV::byte_slice(&in_oneof)),
+                (1, OV::string("more data after that")),
+            ]
+            .into_opaque_message()
+            .encode_to_vec();
+            assert::decodes!(
+                owned never decodes Outer<$ty>,
+                &direct_nested,
+                Truncated,
+                "Outer.0/Foo.1",
+            );
+            assert::decodes!(
+                owned never decodes Outer<$ty>,
+                &in_oneof_nested,
+                Truncated,
+                "Outer.0/Foo.0/A.One",
+            );
+        };
     }
 
-    check_fixed_truncation::<u32>(OV::fixed_u32(0x1234abcd));
-    check_fixed_truncation::<i32>(OV::fixed_u32(0x1234abcd));
-    check_fixed_truncation::<u64>(OV::fixed_u64(0x1234deadbeefcafe));
-    check_fixed_truncation::<i64>(OV::fixed_u64(0x1234deadbeefcafe));
+    check_fixed_truncation!(u32, OV::fixed_u32(0x1234abcd));
+    check_fixed_truncation!(i32, OV::fixed_u32(0x1234abcd));
+    check_fixed_truncation!(u64, OV::fixed_u64(0x1234deadbeefcafe));
+    check_fixed_truncation!(i64, OV::fixed_u64(0x1234deadbeefcafe));
 }
 
 // String tests
