@@ -157,16 +157,6 @@ mod assert {
             $crate::assert::never_decodes_borrowed::<$ty>(&encoded, $err, $path);
         }};
 
-        (owned relaxed invalid for $ty:ty, $from:expr, $err:expr, $path:expr $(,)?) => {{
-            let encoded: Vec<u8> = $from.to_owned();
-            $crate::assert::doesnt_decode_owned::<$ty>(&encoded, $err, $path);
-            $crate::assert::doesnt_decode_borrowed::<$ty>(&encoded, $err, $path);
-        }};
-        (borrowed relaxed invalid for $ty:ty, $from:expr, $err:expr, $path:expr $(,)?) => {{
-            let encoded: Vec<u8> = $from.to_owned();
-            $crate::assert::doesnt_decode_borrowed::<$ty>(&encoded, $err, $path);
-        }};
-
         (owned always invalid for $ty:ty, $from:expr, $err:expr, $path:expr $(,)?) => {{
             let encoded: Vec<u8> = $from.to_owned();
             $crate::assert::never_decodes_owned::<$ty>(&encoded, $err, $path);
@@ -844,17 +834,17 @@ fn truncated_field_and_tag() {
     #[bilrost(distinguished)]
     struct Foo(#[bilrost(100)] String, #[bilrost(1_000_000)] u64);
 
-    let buf = [(100, OV::string("abc")), (1_000_000, OV::Varint(1))]
+    let mut buf = [(100, OV::string("abc")), (1_000_000, OV::Varint(1))]
         .into_opaque_message()
         .encode_to_vec();
-    // Remove the last field's value and part of its key
-    assert::decodes!(owned always invalid for (), &buf[..buf.len() - 2], Truncated, "");
-    assert::decodes!(owned always invalid for Foo, &buf[..buf.len() - 2], Truncated, "");
-    assert::decodes!(owned always invalid for OpaqueMessage, &buf[..buf.len() - 2], Truncated, "");
-    // Just remove the value from the last field
-    assert::decodes!(owned always invalid for (), &buf[..buf.len() - 1], Truncated, "");
-    assert::decodes!(owned always invalid for Foo, &buf[..buf.len() - 1], Truncated, "Foo.1");
-    assert::decodes!(owned always invalid for OpaqueMessage, &buf[..buf.len() - 1], Truncated, "");
+    buf.pop(); // Remove the value from the last field
+    assert::decodes!(owned always invalid for (), buf, Truncated, "");
+    assert::decodes!(owned always invalid for Foo, buf, Truncated, "Foo.1");
+    assert::decodes!(owned always invalid for OpaqueMessage, buf, Truncated, "");
+    buf.pop(); // Remove part of the key for the last field as well
+    assert::decodes!(owned always invalid for (), buf, Truncated, "");
+    assert::decodes!(owned always invalid for Foo, buf, Truncated, "");
+    assert::decodes!(owned always invalid for OpaqueMessage, buf, Truncated, "");
 }
 
 #[test]
@@ -1300,25 +1290,22 @@ fn truncated_varint() {
     #[bilrost(distinguished)]
     struct Foo<T>(#[bilrost(encoding(varint))] T);
 
-    let buf = [(0, OV::Varint(2000))]
+    let mut buf = [(0, OV::Varint(2000))]
         .into_opaque_message()
         .encode_to_vec();
-    assert::decodes!(owned always invalid for OpaqueMessage, &buf[..buf.len() - 1], Truncated, "");
-    assert::decodes!(owned always invalid for Foo<bool>, &buf[..buf.len() - 1], Truncated, "Foo.0");
-    assert::decodes!(owned always invalid for Foo<u8>, &buf[..buf.len() - 1], Truncated, "Foo.0");
-    assert::decodes!(owned always invalid for Foo<u16>, &buf[..buf.len() - 1], Truncated, "Foo.0");
-    assert::decodes!(owned always invalid for Foo<u32>, &buf[..buf.len() - 1], Truncated, "Foo.0");
-    assert::decodes!(owned always invalid for Foo<u64>, &buf[..buf.len() - 1], Truncated, "Foo.0");
-    assert::decodes!(
-        owned always invalid for Foo<usize>, &buf[..buf.len() - 1], Truncated, "Foo.0"
-    );
-    assert::decodes!(owned always invalid for Foo<i8>, &buf[..buf.len() - 1], Truncated, "Foo.0");
-    assert::decodes!(owned always invalid for Foo<i16>, &buf[..buf.len() - 1], Truncated, "Foo.0");
-    assert::decodes!(owned always invalid for Foo<i32>, &buf[..buf.len() - 1], Truncated, "Foo.0");
-    assert::decodes!(owned always invalid for Foo<i64>, &buf[..buf.len() - 1], Truncated, "Foo.0");
-    assert::decodes!(
-        owned always invalid for Foo<isize>, &buf[..buf.len() - 1], Truncated, "Foo.0"
-    );
+    buf.pop(); // shorten by 1 byte
+    assert::decodes!(owned always invalid for OpaqueMessage, buf, Truncated, "");
+    assert::decodes!(owned always invalid for Foo<bool>, buf, Truncated, "Foo.0");
+    assert::decodes!(owned always invalid for Foo<u8>, buf, Truncated, "Foo.0");
+    assert::decodes!(owned always invalid for Foo<u16>, buf, Truncated, "Foo.0");
+    assert::decodes!(owned always invalid for Foo<u32>, buf, Truncated, "Foo.0");
+    assert::decodes!(owned always invalid for Foo<u64>, buf, Truncated, "Foo.0");
+    assert::decodes!(owned always invalid for Foo<usize>, buf, Truncated, "Foo.0");
+    assert::decodes!(owned always invalid for Foo<i8>, buf, Truncated, "Foo.0");
+    assert::decodes!(owned always invalid for Foo<i16>, buf, Truncated, "Foo.0");
+    assert::decodes!(owned always invalid for Foo<i32>, buf, Truncated, "Foo.0");
+    assert::decodes!(owned always invalid for Foo<i64>, buf, Truncated, "Foo.0");
+    assert::decodes!(owned always invalid for Foo<isize>, buf, Truncated, "Foo.0");
 }
 
 #[test]
@@ -1352,7 +1339,7 @@ fn truncated_nested_varint() {
     // truncated before the varint ends and finding an invalid varint fully inside the inner
     // region.
     assert::decodes!(
-        owned always invalid for Outer, 
+        owned always invalid for Outer,
         truncated_inner_invalid,
         Truncated,
         "Outer.inner/Inner.val",
@@ -1366,7 +1353,7 @@ fn truncated_nested_varint() {
     );
     // When decoding an inner varint, we do see when it is invalid.
     assert::decodes!(
-        owned always invalid for Outer, 
+        owned always invalid for Outer,
         invalid_not_truncated,
         InvalidVarint,
         "Outer.inner/Inner.val",
