@@ -248,23 +248,23 @@ guaranteed-canonical form, and to be able to decode that message type while
 provide this, and does so with less complexity and overhead than [many other
 encodings](#comparisons-to-other-encodings).
 
-It is possible in `bilrost` to derive an extended trait, `DistinguishedMessage`,
-which provides a distinguished decoding mode. Decoding in distinguished mode
+It is possible in `bilrost` to derive extended decoding traits which provide
+distinguished and canonical decoding. Decoding in distinguished mode
 comes with an additional canonicity check: the decoding result makes it possible
 to know whether the decoded message data was canonical. Any message type that
 *can* implement distinguished decoding *will* always encode in its fully
 canonical form; there is not an alternate encoding mode that is "more
 canonical".
 
-Formally, when a message type implements `DistinguishedMessage`, values of
-the message type are *bijective* to a subset of all byte strings, each of which
-is considered to be a canonical encoding for that message value. Each different
-possible byte string decodes in distinguished mode to a message value that is
-distinct from the message values decoded from every other such byte string, or
-will produce an error or non-canonical result when decoded in this mode. If a
-message is successfully and canonically decoded from a byte string in
-distinguished mode, is not modified, and is then re-encoded, it will emit the
-exact same byte string.
+Formally, when a message type implements distinguished decoding, values of the
+message type are *bijective* to a subset of all byte strings, each of which is
+considered to be a canonical encoding for that message value. Each different
+possible byte string canonically decodes to a message value that is distinct
+from the message values decoded from every other such byte string, or will
+produce an error or non-canonical result when decoded in this mode. If a message
+is successfully and canonically decoded from a byte string with a distinguished
+message decoding trait, is not modified, and is then re-encoded, it will emit
+the exact same byte string.
 
 The best proxy of this expectation of an [equivalence relation][equiv] in Rust
 is the [`Eq`][eq] trait, which denotes that there is an equivalence relation
@@ -272,7 +272,7 @@ between all values of any type that implements it. Therefore, this trait is
 required of all field and message types in order to implement distinguished
 decoding in `bilrost`.
 
-For this reason, `bilrost` will refuse to derive `DistinguishedMessage` if there
+For this reason, `bilrost` will refuse to derive distinguished decoding if there
 are any ignored fields, as they may also participate in the type's equality.
 
 `bilrost` distinguishes between canonical values of the type in a way that
@@ -514,6 +514,13 @@ We can now import and use its traits and derive macros. The main three are:
   except when they are included in a `Message` struct (or [have `Message`
   derived themselves](#deriving-message-for-enums)).
 
+And then there are the four traits for the different message decoding
+capabilities:
+* `OwnedMessage`
+* `BorrowedMessage`
+* `DistinguishedOwnedMessage`
+* `DistinguishedBorrowedMessage`
+
 #### Deriving `Message`
 
 The `Message` trait can be derived to allow encoding just about any struct as a
@@ -552,29 +559,23 @@ use bilrost::{Enumeration, Message};
 #[derive(Clone, PartialEq, Message)]
 struct Person {
     #[bilrost(tag = 1)]
-    pub id: String, // tag=1
+    pub id: String, //             has tag 1
     // NOTE: Old "name" field has been removed
     // pub name: String,
-    // given_name has tag 6
     #[bilrost(6)]
-    pub given_name: String,
-    // family_name has tag 7
-    pub family_name: String,
-    // formatted_name has tag 8
-    pub formatted_name: String,
-    // age has tag 3
+    pub given_name: String, //     has tag 6
+    pub family_name: String,    // has tag 7
+    pub formatted_name: String, // has tag 8
     #[bilrost(tag = "3")]
-    pub age: u32,
-    // height has tag 4
-    pub height: u32,
-    // gender has tag 5
+    pub age: u32, //               has tag 3
+    pub height: u32,            // has tag 4
     #[bilrost(enumeration(Gender))]
-    pub gender: u32,
+    pub gender: u32, //            has tag 5
     // NOTE: Skip to less commonly occurring fields
     #[bilrost(tag(16))]
-    pub name_prefix: String, // has tag 16  (eg. mr/mrs/ms)
-    pub name_suffix: String, // has tag 17  (eg. jr/esq)
-    pub maiden_name: String, // has tag 18
+    pub name_prefix: String, //    has tag 16  (eg. mr/mrs/ms)
+    pub name_suffix: String, //    has tag 17  (eg. jr/esq)
+    pub maiden_name: String, //    has tag 18
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Enumeration)]
@@ -737,10 +738,10 @@ struct Tiny {
 
 #### Deriving `Message` for enums
 
-`Message` and `DistinguishedMessage` can also be derived for enums that have a
-corresponding oneof implementation derived. They encode and decode as messages
-that only have up to one field, as if the type was a message that only contains
-the enum with an appropriate `#[bilrost(oneof(..))]` attribute.
+`Message` can also be derived for enums that have a corresponding oneof
+implementation derived. They encode and decode as messages that only have up to
+one field, as if the type was a message that only contains the enum with an
+appropriate `#[bilrost(oneof(..))]` attribute.
 
 <details><summary>
 
@@ -771,8 +772,7 @@ struct WrappedMaybe {
 
 </details>
 
-`Message` and `DistinguishedMessage` can only be implemented for oneof types
-that have "empty" variants.
+`Message` can only be implemented for oneof types that have "empty" variants.
 
 <details><summary>Examples for using non-empty oneof enums as messages</summary>
 
@@ -947,27 +947,144 @@ struct Tree {
 }
 ```
 
-### Distinguished derive macros
+### Deriving distinguished decoding
 
-There are two derivable companion derives, `DistinguishedMessage`
-and `DistinguishedOneof`, that implement the extended traits for distinguished
-decoding when possible. Both messages and oneofs must contain only fields that
-support distinguished decoding in order to support it themselves. Distinguished
-encoding requires `Eq` be implemented for each field, oneof, and message type;
-the trait is not used directly, but is trivial to derive for any compatible
-type.
+Deriving distinguished decoding traits for messages and oneofs in addition to
+the relaxed decoding traits is very simple: just add a
+`#[bilrost(distinguished)]` attribute to the type.
+
+This functionality is not provided by default, as certain common types (like
+floating point numbers and hash maps) are not supported in distinguished
+decoding.
+
+For canonical encoding guarantees, `bilrost` requires that `Eq` be implemented
+for each field, oneof, and message type; the trait is not used directly, but is
+trivial to derive for any compatible type.
+
+```rust,
+use bilrost::{Message, Oneof};
+#[derive(Debug, PartialEq, Eq, Message)]
+#[bilrost(distinguished)] // <---- Add this attribute to the type!
+struct DistinguishedFoo {
+    #[bilrost(1)]
+    bar: i64,
+    #[bilrost(2)]
+    baz: String,
+    #[bilrost(oneof(3, 4))]
+    designation: Designation,
+}
+
+#[derive(Debug, PartialEq, Eq, Oneof)]
+#[bilrost(distinguished)] // <---- Add this attribute to the type!
+enum Designation {
+    None,
+    #[bilrost(3)]
+    Name(String),
+    #[bilrost(4)]
+    Id(u64),
+}
+
+let original = DistinguishedFoo {
+    bar: 100020003,
+    baz: "bear".to_owned(),
+    designation: Designation::Id(555),
+};
+
+let buf = original.encode_to_vec();
+let encoded = buf.as_slice();
+
+// All four decoding mode traits:
+use bilrost::{
+    BorrowedMessage, DistinguishedBorrowedMessage,
+    DistinguishedOwnedMessage, OwnedMessage,
+};
+
+// This type now supports every kind of decoding:
+assert_eq!(DistinguishedFoo::decode(encoded).as_ref(), Ok(&original));
+assert_eq!(
+    DistinguishedFoo::decode_canonical(encoded).as_ref(),
+    Ok(&original),
+);
+assert_eq!(
+    DistinguishedFoo::decode_borrowed(encoded).as_ref(),
+    Ok(&original),
+);
+assert_eq!(
+    DistinguishedFoo::decode_canonical_borrowed(encoded).as_ref(),
+    Ok(&original),
+);
+```
+
+Distinguished decoding traits can be added to any type that *does* or *might*
+be supported, and they will be available when possible; for example, when a type
+has generic fields. If a struct has fields that cannot ever be distinguished,
+trying to implement the traits is currently an error (as implementing a trait
+with bounds that are never satisfiable is not allowed today in rust).
+
+### Borrowed messages
+
+It may be desirable to have messages that don't copy all the data they decode.
+For data that takes the form `str`, `[u8]`, and `[u8; N]`, `bilrost` can skip
+that part. These values can be represented in a message struct as references
+that will refer to the original, uncopied data in the slice that was decoded.
+
+When a message or oneof has one of these reference fields, it can no longer
+decode owned data from any buffer, and won't implement the "owned" message
+decoding traits.
+
+```rust,
+# use bilrost::{Message, OwnedMessage};
+#[derive(Message)]
+struct Borrowed<'a> {
+    val: &'a str,
+    uuid: &'a [u8; 16],
+}
+
+static_assertions::assert_not_impl_any!(Borrowed: OwnedMessage);
+```
+
+It's also possible to have fields that *optionally* borrow zero-copied data when
+decoding, by using [`Cow`][cow]. Borrowed decoding will (promises to) always
+produce `Cow::Borrowed` values, and "regular" decoding will always (can only!)
+produce `Cow::Owned`:
+
+```rust,
+use bilrost::{BorrowedMessage, Message, OwnedMessage};
+use std::borrow::Cow;
+
+#[derive(Debug, PartialEq, Message)]
+struct Dm<'a> {
+    message: Cow<'a, str>,
+}
+
+let original = Dm {
+    message: "almost done with my chicken".into(),
+};
+let buf = original.encode_to_vec();
+let encoded = buf.as_slice();
+
+let owned = Dm::decode(encoded).unwrap();
+assert_eq!(owned, original);
+assert!(matches!(owned.message, Cow::Owned(..)));
+
+let borrowed = Dm::decode_borrowed(encoded).unwrap();
+assert_eq!(borrowed, original);
+assert!(matches!(borrowed.message, Cow::Borrowed(..)));
+```
 
 ### Encoding and decoding messages
 
 There are a variety of methods and associated functions available for encoding
 and decoding data in `Message` implementations.
 
-The most straightforward ways to encode and decode a message are `encode_fast`,
-`encode_to_vec`, and `decode`. Methods are available for encoding and decoding
-messages to and from several types and traits, both with and without prefixed
-length delimiters. (Length delimiters for encoded messages always take the form
-of a normal Bilrost varint.)
+The most straightforward ways to encode and decode a message are
+`Message::encode_fast`, `Message::encode_to_vec` and `OwnedMessage::decode`.
+Methods are available for encoding and decoding messages to and from several
+types and traits, both with and without prefixed length delimiters. (Length
+delimiters for encoded messages always take the form of a normal Bilrost varint
+which prefixes the message's data.)
 
+Trait `Message`: encoding (implemented by every message)
 * `encode_fast`, `encode_length_delimited_fast`: encodes the message into a
   `ReverseBuffer` and returns it. See the section on [that type](#reversebuffer)
   for more information. The `..length_delimited..` variant likewise encodes the
@@ -988,6 +1105,8 @@ of a normal Bilrost varint.)
   `&mut bytes::BufMut`, appending it after any data that is already there.
 * `prepend`: encodes the message into a `&mut bilrost::buf::ReverseBuf`,
   *before* any data that is already there.
+
+Trait `OwnedMessage`: decoding a fully owned message value from any `bytes::Buf`
 * `decode`, `decode_length_delimited`: decodes the message type from a
   `bytes::Buf`. The length-delimited version of the call will consume only as
   many bytes as the length delimiter (read from the front of the `Buf`)
@@ -1001,10 +1120,21 @@ of a normal Bilrost varint.)
   methods for encoding and decoding that do not provide anything the above
   methods do not, but are callable from a trait object.
 
+Trait `BorrowedMessage<'a>`: decoding by borrowing data from a `&'a [u8]` slice
+* `decode_borrowed`, `decode_borrowed_length_delimited`: decodes the message
+  type from a byte slice. The length delimited version of the call accepts a
+  `&mut &'a [u8]` and after returning will have consumed the bytes that
+  encoded the message from the front of the slice, leaving only the left-over
+  data (if any); the versions that are not length-delineated consume the entire
+  slice by value.
+* `replace_borrowed_from`, `replace_borrowed_from_length_delimited`: exactly
+  what you would expect based on `replace_from` and `decode_borrowed` -- this
+  replaces the value in-place as a mutating method, and is dyn-compatible.
+
 #### Decoding in distinguished mode
 
-`DistinguishedMessage` has corresponding methods for decoding and replacing in
-three related modes:
+The `DistinguishedOwnedMessage` and `DistinguishedBorrowedMessage` traits have
+corresponding methods for decoding and replacing in three related modes:
 
 * "distinguished" mode: Decoding succeeds whenever the encoding is valid even if
   it is not canonical, and extra information is returned indicating whether any
@@ -1067,15 +1197,16 @@ before the canonicity error.
 
 #### Using `dyn` with message traits
 
-The `Message` and `DistinguishedMessage` traits are [dyn-compatible][dyncompat]
+The `Message` trait and the four decoding traits are [dyn-compatible][dyncompat]
 (a term formerly phrased ["object-safe"][objsafe]) and can be used via
 [trait objects][traitobj]. All of their functionality (except the `decode`
 methods for creating a message value from data *ex nihilo*) is available via
 dyn-compatible alternatives. Messages can be cleared (reset to empty values);
 measured for their encoded byte length; encoded to
 [`ReverseBuffer`](#reversebuffer), [`Vec<u8>`][vec], [`Bytes`][bytes], or into a
-[`&mut dyn BufMut`][bufmut]; or decoded (replacing the value) from
-[`&[u8]` slice][slice] or a [`&mut dyn Buf`][buf].
+[`&mut dyn BufMut`][bufmut], or decoded (replacing the value). Owned messages
+can be replaced from [`&[u8]` slice][slice] or a [`&mut dyn Buf`][buf], while
+borrowed messages can only be replaced from a slice.
 
 [buf]: https://docs.rs/bytes/latest/bytes/buf/trait.Buf.html
 
@@ -1610,7 +1741,7 @@ can also be changed between `unpacked` and `packed` encoding, as long as the
 inner value type `T` does not have a length-delimited representation. This will
 break compatibility with distinguished decoding in both directions whenever the
 field is present and not [empty](#empty-values) because it will also change the
-encoded representation, but expedient decoding will still work.
+encoded representation, but relaxed decoding will still work.
 
 ## Strengths, Aims, and Advantages
 
@@ -1934,7 +2065,7 @@ every byte of the value.
 Collections of items (such as `Vec<String>`) encoded in the unpacked
 representation consist of one field for each item. Collections encoded in the
 packed representation consist of a single length-delimited value, containing
-each item's value encoded one after the other. In expedient decoding mode,
+each item's value encoded one after the other. In relaxed decoding mode,
 decoding should succeed when expecting a packed representation but detecting an
 unpacked representation, or vice versa (though the encoding must be considered
 non-canonical). Detecting this situation is only possible when the values
@@ -1968,7 +2099,7 @@ present in the encoding. If they do, the message must be rejected with an error
 in any decoding mode.
 
 If a field whose tag that is not known/specified in the message is encountered
-in expedient decoding mode, it should be ignored for purposes of decoding.
+in relaxed decoding mode, it should be ignored for purposes of decoding.
 
 #### Distinguished constraints
 
@@ -2074,12 +2205,11 @@ but it might be a significant API break.)
 * message fields can be [ignored via attribute](#ignoring-fields)
 * implementations are available for `no_std`-compatible hash maps, vecs that
   inline short values, `ByteString`, etc.
-* `Message` and `DistinguishedMessage` traits are dyn-compatible and provide
-  [full functionality as trait objects](
-  #using-dyn-with-message-traits). At time of writing, `prost 0.13.4` has very
-  little functionality exposed in a dyn-compatible way; the only methods usable
-  via a `&dyn Trait` object compute the encoded length of the message and clear
-  its fields.
+* message traits are dyn-compatible and provide [full functionality as trait
+  objects](#using-dyn-with-message-traits). At time of writing, `prost 0.13.4`
+  has very little functionality exposed in a dyn-compatible way; the only
+  methods usable via a `&dyn Trait` object compute the encoded length of the
+  message and clear its fields.
 
 ## Differences from Protobuf
 
@@ -2290,8 +2420,8 @@ complications with trying to serialize Bilrost messages with Serde:
 - Bilrost messages must encode their fields in tag order, which may (in the case
   of `oneof` fields) vary depending on their value, and it's not clear how or if
   this could be solved in `serde`.
-- Bilrost has both expedient and distinguished decoding modes, and promises that
-  encoding a message that implements `DistinguishedMessage` always produces
+- Bilrost has both relaxed and distinguished decoding modes, and promises that
+  encoding a message that implements distinguished decoding always produces
   canonical output. This may be beyond what is practical to implement.
 
 Despite all this, it is possible to place `serde` derive tags onto the generated
