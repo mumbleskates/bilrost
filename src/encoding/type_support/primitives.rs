@@ -1,4 +1,4 @@
-use crate::encoding::value_traits::empty_state_via_default;
+use crate::encoding::value_traits::{empty_state_via_default, for_overwrite_via_default};
 use crate::encoding::{EmptyState, ForOverwrite};
 
 empty_state_via_default!(bool);
@@ -40,7 +40,18 @@ empty_state_for_float!(f32);
 empty_state_for_float!(f64);
 
 empty_state_via_default!(&str);
-empty_state_via_default!(&[u8]);
+
+for_overwrite_via_default!(&[T], with generics (T));
+
+impl<T> EmptyState for &[T] {
+    fn is_empty(&self) -> bool {
+        <[T]>::is_empty(self)
+    }
+
+    fn clear(&mut self) {
+        *self = &[];
+    }
+}
 
 impl<const N: usize> ForOverwrite for &[u8; N] {
     fn for_overwrite() -> Self {

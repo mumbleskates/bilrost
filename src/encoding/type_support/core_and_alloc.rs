@@ -6,7 +6,7 @@ use crate::encoding::{
 };
 use crate::DecodeErrorKind::UnexpectedlyRepeated;
 use crate::{Canonicity, DecodeErrorKind};
-use alloc::borrow::Cow;
+use alloc::borrow::{Cow, ToOwned};
 use alloc::boxed::Box;
 use alloc::collections::{btree_map, btree_set, BTreeMap, BTreeSet};
 use alloc::string::String;
@@ -27,19 +27,36 @@ impl EmptyState for String {
     }
 }
 
-for_overwrite_via_default!(Cow<'_, str>);
+for_overwrite_via_default!(
+    Cow<'a, T>,
+    with generics ('a, T),
+    with where clause (
+        T: 'a + ?Sized + ToOwned,
+        &'a T: ForOverwrite,
+        T::Owned: ForOverwrite
+    )
+);
 
-impl EmptyState for Cow<'_, str> {
+impl<'a, T> EmptyState for Cow<'a, T>
+where
+    Self: ForOverwrite,
+    T: 'a + ?Sized + ToOwned,
+    &'a T: EmptyState,
+    T::Owned: EmptyState,
+{
     #[inline]
     fn is_empty(&self) -> bool {
-        str::is_empty(self)
+        match self {
+            Cow::Borrowed(b) => b.is_empty(),
+            Cow::Owned(o) => o.is_empty(),
+        }
     }
 
     #[inline]
     fn clear(&mut self) {
         match self {
             Cow::Borrowed(_) => {
-                *self = Cow::default();
+                *self = Cow::Owned(T::Owned::empty());
             }
             Cow::Owned(owned) => {
                 owned.clear();
@@ -149,30 +166,6 @@ impl<T> Collection for Vec<T> {
 }
 
 impl<T> TriviallyDistinguishedCollection for Vec<T> {}
-
-for_overwrite_via_default!(Cow<'_, [T]>, with generics (T), with where clause (T: Clone));
-
-impl<T> EmptyState for Cow<'_, [T]>
-where
-    T: Clone,
-{
-    #[inline]
-    fn is_empty(&self) -> bool {
-        <[T]>::is_empty(self)
-    }
-
-    #[inline]
-    fn clear(&mut self) {
-        match self {
-            Cow::Borrowed(_) => {
-                *self = Cow::default();
-            }
-            Cow::Owned(owned) => {
-                owned.clear();
-            }
-        }
-    }
-}
 
 impl<T> Collection for Cow<'_, [T]>
 where
