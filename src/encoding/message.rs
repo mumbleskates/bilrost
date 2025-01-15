@@ -520,7 +520,7 @@ pub trait BorrowedMessage<'a>: Message {
         Self: Sized;
 
     /// Decodes a length-delimited instance of the message from the buffer.
-    fn decode_borrowed_length_delimited(buf: &'a [u8]) -> Result<Self, DecodeError>
+    fn decode_borrowed_length_delimited(buf: &mut &'a [u8]) -> Result<Self, DecodeError>
     where
         Self: Sized;
 
@@ -531,7 +531,10 @@ pub trait BorrowedMessage<'a>: Message {
 
     /// Decodes the non-ignored fields of this message, replacing their values from a
     /// length-delimited value encoded in the buffer.
-    fn replace_borrowed_from_length_delimited(&mut self, buf: &'a [u8]) -> Result<(), DecodeError>;
+    fn replace_borrowed_from_length_delimited(
+        &mut self,
+        buf: &mut &'a [u8],
+    ) -> Result<(), DecodeError>;
 }
 
 /// An enhanced trait for borrowed Bilrost messages that promise a distinguished representation.
@@ -571,7 +574,7 @@ pub trait DistinguishedBorrowedMessage<'a>: BorrowedMessage<'a> {
 
     /// Decodes a length-delimited instance of the message from the buffer in distinguished mode.
     fn decode_distinguished_borrowed_length_delimited(
-        buf: &'a [u8],
+        buf: &mut &'a [u8],
     ) -> Result<(Self, Canonicity), DecodeError>
     where
         Self: Sized;
@@ -589,7 +592,7 @@ pub trait DistinguishedBorrowedMessage<'a>: BorrowedMessage<'a> {
     /// from a length-delimited value encoded in the buffer.
     fn replace_distinguished_borrowed_from_length_delimited(
         &mut self,
-        buf: &'a [u8],
+        buf: &mut &'a [u8],
     ) -> Result<Canonicity, DecodeError>;
 
     // ------------ Restricted mode ------------
@@ -606,7 +609,7 @@ pub trait DistinguishedBorrowedMessage<'a>: BorrowedMessage<'a> {
 
     /// Decodes a length-delimited instance of the message from the buffer in restricted mode.
     fn decode_restricted_borrowed_length_delimited(
-        buf: &'a [u8],
+        buf: &mut &'a [u8],
         restrict_to: Canonicity,
     ) -> Result<(Self, Canonicity), DecodeError>
     where
@@ -626,7 +629,7 @@ pub trait DistinguishedBorrowedMessage<'a>: BorrowedMessage<'a> {
     /// from a length-delimited value encoded in the buffer.
     fn replace_restricted_borrowed_from_length_delimited(
         &mut self,
-        buf: &'a [u8],
+        buf: &mut &'a [u8],
         restrict_to: Canonicity,
     ) -> Result<Canonicity, DecodeError>;
 
@@ -640,7 +643,7 @@ pub trait DistinguishedBorrowedMessage<'a>: BorrowedMessage<'a> {
         Self: Sized;
 
     /// Decodes a length-delimited instance of the message from the buffer in canonical mode.
-    fn decode_canonical_borrowed_length_delimited(buf: &'a [u8]) -> Result<Self, DecodeError>
+    fn decode_canonical_borrowed_length_delimited(buf: &mut &'a [u8]) -> Result<Self, DecodeError>
     where
         Self: Sized;
 
@@ -654,7 +657,7 @@ pub trait DistinguishedBorrowedMessage<'a>: BorrowedMessage<'a> {
     /// from a length-delimited value encoded in the buffer.
     fn replace_canonical_borrowed_from_length_delimited(
         &mut self,
-        buf: &'a [u8],
+        buf: &mut &'a [u8],
     ) -> Result<(), DecodeError>;
 }
 
@@ -1108,8 +1111,9 @@ where
         Ok(message)
     }
 
-    fn decode_borrowed_length_delimited(mut buf: &'a [u8]) -> Result<Self, DecodeError> {
-        Self::decode_borrowed(Capped::new(&mut buf).take_borrowed_length_delimited()?)
+    // TODO(widders): test that this shortens the slice. canonical call versions too; 8 total
+    fn decode_borrowed_length_delimited(buf: &mut &'a [u8]) -> Result<Self, DecodeError> {
+        Self::decode_borrowed(Capped::new(buf).take_borrowed_length_delimited()?)
     }
 
     fn replace_borrowed_from(&mut self, mut buf: &'a [u8]) -> Result<(), DecodeError> {
@@ -1122,9 +1126,9 @@ where
 
     fn replace_borrowed_from_length_delimited(
         &mut self,
-        mut buf: &'a [u8],
+        buf: &mut &'a [u8],
     ) -> Result<(), DecodeError> {
-        self.replace_borrowed_from(Capped::new(&mut buf).take_borrowed_length_delimited()?)
+        self.replace_borrowed_from(Capped::new(buf).take_borrowed_length_delimited()?)
     }
 }
 
@@ -1137,7 +1141,7 @@ where
     }
 
     fn decode_distinguished_borrowed_length_delimited(
-        buf: &'a [u8],
+        buf: &mut &'a [u8],
     ) -> Result<(Self, Canonicity), DecodeError> {
         Self::decode_restricted_borrowed_length_delimited(buf, NotCanonical)
     }
@@ -1151,7 +1155,7 @@ where
 
     fn replace_distinguished_borrowed_from_length_delimited(
         &mut self,
-        buf: &'a [u8],
+        buf: &mut &'a [u8],
     ) -> Result<Canonicity, DecodeError> {
         self.replace_restricted_borrowed_from_length_delimited(buf, NotCanonical)
     }
@@ -1173,14 +1177,14 @@ where
     }
 
     fn decode_restricted_borrowed_length_delimited(
-        mut buf: &'a [u8],
+        buf: &mut &'a [u8],
         restrict_to: Canonicity,
     ) -> Result<(Self, Canonicity), DecodeError>
     where
         Self: Sized,
     {
         Self::decode_restricted_borrowed(
-            Capped::new(&mut buf).take_borrowed_length_delimited()?,
+            Capped::new(buf).take_borrowed_length_delimited()?,
             restrict_to,
         )
     }
@@ -1207,14 +1211,14 @@ where
 
     fn replace_restricted_borrowed_from_length_delimited(
         &mut self,
-        mut buf: &'a [u8],
+        buf: &mut &'a [u8],
         restrict_to: Canonicity,
     ) -> Result<Canonicity, DecodeError>
     where
         Self: Sized,
     {
         self.replace_restricted_borrowed_from(
-            Capped::new(&mut buf).take_borrowed_length_delimited()?,
+            Capped::new(buf).take_borrowed_length_delimited()?,
             restrict_to,
         )
     }
@@ -1226,7 +1230,7 @@ where
         })
     }
 
-    fn decode_canonical_borrowed_length_delimited(buf: &'a [u8]) -> Result<Self, DecodeError> {
+    fn decode_canonical_borrowed_length_delimited(buf: &mut &'a [u8]) -> Result<Self, DecodeError> {
         Self::decode_restricted_borrowed_length_delimited(buf, Canonical).map(|(val, canon)| {
             debug_assert_eq!(canon, Canonical);
             val
@@ -1240,7 +1244,7 @@ where
 
     fn replace_canonical_borrowed_from_length_delimited(
         &mut self,
-        buf: &'a [u8],
+        buf: &mut &'a [u8],
     ) -> Result<(), DecodeError> {
         self.replace_restricted_borrowed_from_length_delimited(buf, Canonical)
             .map(|canon| debug_assert_eq!(canon, Canonical))
