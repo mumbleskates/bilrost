@@ -112,7 +112,6 @@ struct PreprocessedMessage<'a> {
     where_clause: Option<&'a WhereClause>,
     unsorted_fields: Vec<(TokenStream, Field)>,
     distinguished: bool,
-    borrow_only: bool,
     has_ignored_fields: bool,
     tag_range: Option<RangeInclusive<u32>>,
 }
@@ -129,7 +128,6 @@ fn preprocess_message(input: &DeriveInput) -> Result<PreprocessedMessage, Error>
     let mut reserved_tags: Option<TagList> = None;
     let mut unknown_attrs = Vec::new();
     let mut distinguished = false;
-    let mut borrow_only = false;
     for attr in bilrost_attrs(input.attrs.clone())? {
         if let Some(tags) = tag_list_attr(&attr, "reserved_tags", None)? {
             set_option(
@@ -139,8 +137,6 @@ fn preprocess_message(input: &DeriveInput) -> Result<PreprocessedMessage, Error>
             )?;
         } else if word_attr(&attr, "distinguished") {
             set_bool(&mut distinguished, "duplicate distinguished attributes")?;
-        } else if word_attr(&attr, "borrowed") {
-            set_bool(&mut borrow_only, "duplicate borrowed attributes")?;
         } else {
             unknown_attrs.push(attr);
         }
@@ -241,7 +237,6 @@ fn preprocess_message(input: &DeriveInput) -> Result<PreprocessedMessage, Error>
         where_clause,
         unsorted_fields,
         distinguished,
-        borrow_only,
         has_ignored_fields,
         tag_range,
     })
@@ -421,7 +416,6 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         where_clause,
         unsorted_fields,
         distinguished,
-        borrow_only: _, // TODO(widders): impl borrow only
         has_ignored_fields,
         tag_range,
     } = preprocess_message(&input)?;
@@ -899,7 +893,6 @@ fn try_message_via_oneof(input: DeriveInput) -> Result<TokenStream, Error> {
         where_clause,
         fields,
         distinguished,
-        borrow_only: _, // TODO(widders): impl borrow only
         empty_variant,
     } = preprocess_oneof(&input)?;
 
@@ -1406,7 +1399,6 @@ struct PreprocessedOneof<'a> {
     where_clause: Option<&'a WhereClause>,
     fields: Vec<(Ident, Field)>,
     distinguished: bool,
-    borrow_only: bool,
     empty_variant: Option<Ident>,
 }
 
@@ -1421,12 +1413,9 @@ fn preprocess_oneof(input: &DeriveInput) -> Result<PreprocessedOneof, Error> {
 
     let mut unknown_attrs = Vec::new();
     let mut distinguished = false;
-    let mut borrow_only = false;
     for attr in bilrost_attrs(input.attrs.clone())? {
         if word_attr(&attr, "distinguished") {
             set_bool(&mut distinguished, "duplicate distinguished attributes")?;
-        } else if word_attr(&attr, "borrowed") {
-            set_bool(&mut borrow_only, "duplicate borrowed attributes")?;
         } else {
             unknown_attrs.push(attr);
         }
@@ -1508,7 +1497,6 @@ fn preprocess_oneof(input: &DeriveInput) -> Result<PreprocessedOneof, Error> {
         where_clause,
         fields,
         distinguished,
-        borrow_only,
         empty_variant,
     })
 }
@@ -1527,7 +1515,6 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         where_clause,
         fields,
         distinguished,
-        borrow_only: _, // TODO(widders): impl borrow only
         empty_variant,
     } = preprocess_oneof(&input)?;
 
@@ -2414,32 +2401,32 @@ mod test {
     }
 
     #[test]
-    fn test_accepts_distinguished_and_borrowed_messages() {
+    fn test_accepts_distinguished_messages() {
         _ = try_message(quote!(
-            #[bilrost(distinguished, borrowed)]
-            struct DistinguishedBorrowedMessage {
-                name: &str,
+            #[bilrost(distinguished)]
+            struct DistinguishedMessage {
+                name: String,
             }
         ))
         .unwrap();
         _ = try_message(quote!(
-            #[bilrost(distinguished, borrowed)]
-            enum DistinguishedBorrowedOneof {
+            #[bilrost(distinguished)]
+            enum DistinguishedOneof {
                 Empty,
                 #[bilrost(1)]
-                Name(&str),
+                Name(String),
             }
         ))
         .unwrap();
     }
 
     #[test]
-    fn test_accepts_distinguished_and_borrowed_oneofs() {
+    fn test_accepts_distinguished_oneofs() {
         _ = try_oneof(quote!(
-            #[bilrost(distinguished, borrowed)]
-            enum DistinguishedBorrowedOneof {
+            #[bilrost(distinguished)]
+            enum DistinguishedOneof {
                 #[bilrost(1)]
-                Name(&str),
+                Name(String),
             }
         ))
         .unwrap();
@@ -2449,8 +2436,8 @@ mod test {
     fn test_rejects_duplicated_message_attrs() {
         let output = try_message(quote!(
             #[bilrost(distinguished, distinguished)]
-            struct DistinguishedBorrowedMessage {
-                name: &str,
+            struct DistinguishedMessage {
+                name: String,
             }
         ));
         assert_eq!(
@@ -2458,26 +2445,14 @@ mod test {
                 .expect_err("message with duplicated distinguished attrs not detected")
                 .to_string(),
             "duplicate distinguished attributes"
-        );
-        let output = try_message(quote!(
-            #[bilrost(borrowed, distinguished, borrowed)]
-            struct DistinguishedBorrowedMessage {
-                name: &str,
-            }
-        ));
-        assert_eq!(
-            output
-                .expect_err("message with duplicated borrowed attrs not detected")
-                .to_string(),
-            "duplicate borrowed attributes"
         );
 
         let output = try_message(quote!(
             #[bilrost(distinguished, distinguished)]
-            enum DistinguishedBorrowedOneof {
+            enum DistinguishedOneof {
                 Empty,
                 #[bilrost(1)]
-                Name(&str),
+                Name(String),
             }
         ));
         assert_eq!(
@@ -2485,20 +2460,6 @@ mod test {
                 .expect_err("message with duplicated distinguished attrs not detected")
                 .to_string(),
             "duplicate distinguished attributes"
-        );
-        let output = try_message(quote!(
-            #[bilrost(borrowed, distinguished, borrowed)]
-            enum DistinguishedBorrowedOneof {
-                Empty,
-                #[bilrost(1)]
-                Name(&str),
-            }
-        ));
-        assert_eq!(
-            output
-                .expect_err("message with duplicated borrowed attrs not detected")
-                .to_string(),
-            "duplicate borrowed attributes"
         );
     }
 
@@ -2506,9 +2467,9 @@ mod test {
     fn test_rejects_duplicated_oneof_attrs() {
         let output = try_message(quote!(
             #[bilrost(distinguished, distinguished)]
-            enum DistinguishedBorrowedOneof {
+            enum DistinguishedOneof {
                 #[bilrost(1)]
-                Name(&str),
+                Name(String),
             }
         ));
         assert_eq!(
@@ -2516,19 +2477,6 @@ mod test {
                 .expect_err("message with duplicated distinguished attrs not detected")
                 .to_string(),
             "duplicate distinguished attributes"
-        );
-        let output = try_message(quote!(
-            #[bilrost(borrowed, distinguished, borrowed)]
-            enum DistinguishedBorrowedOneof {
-                #[bilrost(1)]
-                Name(&str),
-            }
-        ));
-        assert_eq!(
-            output
-                .expect_err("message with duplicated borrowed attrs not detected")
-                .to_string(),
-            "duplicate borrowed attributes"
         );
     }
 }

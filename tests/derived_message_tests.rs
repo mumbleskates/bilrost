@@ -4059,3 +4059,16 @@ fn unknown_fields_distinguished() {
         ],
     );
 }
+
+#[test]
+fn derive_borrowed_only() {
+    #[derive(Message)]
+    struct Borrowed<'a> {
+        key: u64,
+        val: &'a str,
+    }
+
+    static_assertions::assert_impl_all!(Borrowed: Message);
+    // Apparently due to the way we add a lifetime to the impls, this Just Works(tm)
+    static_assertions::assert_not_impl_any!(Borrowed: OwnedMessage);
+}
