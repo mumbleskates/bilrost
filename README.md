@@ -1043,6 +1043,45 @@ struct Borrowed<'a> {
 static_assertions::assert_not_impl_any!(Borrowed: OwnedMessage);
 ```
 
+#### Disabling owned decoding traits
+
+Normally deriving all the message traits always works even when owned traits are
+never available due to a trick of the light (the generic lifetime on the type).
+However, if that message has no generic lifetimes, it can be an error to derive
+owned message decoding!
+
+```rust,compile_fail
+# use bilrost::{BorrowedMessage, Message};
+# use std::collections::BTreeMap;
+const STATIC_LUTS: &[u8] = &[/* pretend this is include_bytes!'d */];
+
+#[derive(Message)]
+//       ^^^^^^^ error: the trait `ValueDecoder<General>` is not implemented
+//                      for `BTreeMap<&'static str, &'static str>`
+struct LookupTables {
+    alpha2: BTreeMap<&'static str, &'static str>,
+    alpha3: BTreeMap<&'static str, &'static str>,
+}
+
+let luts = LookupTables::decode_borrowed(STATIC_LUTS).unwrap();
+```
+
+If this is a problem, deriving owned decoders can be disabled in the derive
+macro via the `#[bilrost(borrowed_only)]` attribute:
+
+```rust,
+# use bilrost::{Message};
+# use std::collections::BTreeMap;
+#[derive(Message)]
+#[bilrost(borrowed_only)]
+struct LookupTables {
+    alpha2: BTreeMap<&'static str, &'static str>,
+    alpha3: BTreeMap<&'static str, &'static str>,
+}
+```
+
+#### `Cow<T>` and messages that can optionally borrow or own
+
 It's also possible to have fields that *optionally* borrow zero-copied data when
 decoding, by using [`Cow`][cow]. Borrowed decoding will (promises to) always
 produce `Cow::Borrowed` values, and "regular" decoding will always (can only!)
