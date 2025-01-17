@@ -13,7 +13,8 @@ use bilrost::DecodeErrorKind::{
     UnexpectedlyRepeated, WrongWireType,
 };
 use bilrost::{
-    DecodeErrorKind, DistinguishedOwnedMessage, Enumeration, Message, Oneof, OwnedMessage,
+    BorrowedMessage, DecodeErrorKind, DistinguishedBorrowedMessage, DistinguishedOwnedMessage,
+    Enumeration, Message, Oneof, OwnedMessage,
 };
 use core::mem::size_of;
 use itertools::{repeat_n, Itertools};
@@ -2175,7 +2176,7 @@ fn truncated_map() {
 // Vec tests
 
 #[test]
-fn decoding_vecs() {
+fn decoding_vecs_and_cows() {
     #[derive(Debug, PartialEq, Eq, Message)]
     #[bilrost(distinguished)]
     struct Foo<T> {
@@ -2254,6 +2255,51 @@ fn decoding_vecs() {
                 unpacked: Cow::Owned(expected.clone()),
             },
         );
+
+        // Detour! Test vec of cow also, and check that it decodes in the right borrowingness
+        let packed_buf = packed.encode_to_vec();
+        let encoded_packed = packed_buf.as_slice();
+        let expected_foo = Foo {
+            packed: expected.iter().cloned().map(Into::into).collect(),
+            unpacked: vec![],
+        };
+
+        {
+            let owned_cows = Foo::<Vec<Cow<str>>>::decode(encoded_packed)
+                .expect("did not decode into vec of cows");
+            assert_eq!(owned_cows, expected_foo);
+            for cow in owned_cows.packed {
+                assert!(matches!(cow, Cow::Owned(..)));
+            }
+        }
+
+        {
+            let owned_cows = Foo::<Vec<Cow<str>>>::decode_canonical(encoded_packed)
+                .expect("did not decode canonically into vec of cows");
+            assert_eq!(owned_cows, expected_foo);
+            for cow in owned_cows.packed {
+                assert!(matches!(cow, Cow::Owned(..)));
+            }
+        }
+
+        {
+            let borrowed_cows = Foo::<Vec<Cow<str>>>::decode_borrowed(encoded_packed)
+                .expect("did not decode borrowed into vec of cows");
+            assert_eq!(borrowed_cows, expected_foo);
+            for cow in borrowed_cows.packed {
+                assert!(matches!(cow, Cow::Borrowed(..)));
+            }
+        }
+
+        {
+            let borrowed_cows = Foo::<Vec<Cow<str>>>::decode_canonical_borrowed(encoded_packed)
+                .expect("did not decode canonically borrowed into vec of cows");
+            assert_eq!(borrowed_cows, expected_foo);
+            for cow in borrowed_cows.packed {
+                assert!(matches!(cow, Cow::Borrowed(..)));
+            }
+        }
+
         #[allow(unused_macros)]
         macro_rules! test_vec {
             ($vec_ty:ty) => {
