@@ -1,8 +1,8 @@
 use crate::buf::ReverseBuf;
 use crate::encoding::{
     const_varint, delegate_encoding, delegate_value_encoding, encode_varint, encoded_len_varint,
-    encoding_implemented_via_value_encoding, prepend_varint, Canonicity, Capped, DecodeContext,
-    DecodeError, DistinguishedValueBorrowDecoder, DistinguishedValueDecoder, ForOverwrite,
+    encoding_implemented_via_value_encoding, impl_cow_value_encoding, prepend_varint, Canonicity,
+    Capped, DecodeContext, DecodeError, DistinguishedValueBorrowDecoder, DistinguishedValueDecoder,
     RestrictedDecodeContext, ValueBorrowDecoder, ValueDecoder, ValueEncoder, WireType, Wiretyped,
 };
 use crate::DecodeErrorKind::InvalidValue;
@@ -143,83 +143,7 @@ mod vec_u8 {
     );
 }
 
-impl Wiretyped<PlainBytes> for Cow<'_, [u8]> {
-    const WIRE_TYPE: WireType = WireType::LengthDelimited;
-}
-
-impl ValueEncoder<PlainBytes> for Cow<'_, [u8]> {
-    #[inline]
-    fn encode_value<B: BufMut + ?Sized>(value: &Cow<[u8]>, buf: &mut B) {
-        ValueEncoder::<PlainBytes>::encode_value(&&**value, buf)
-    }
-
-    #[inline]
-    fn prepend_value<B: ReverseBuf + ?Sized>(value: &Cow<[u8]>, buf: &mut B) {
-        ValueEncoder::<PlainBytes>::prepend_value(&&**value, buf)
-    }
-
-    #[inline]
-    fn value_encoded_len(value: &Cow<[u8]>) -> usize {
-        ValueEncoder::<PlainBytes>::value_encoded_len(&&**value)
-    }
-}
-
-impl ValueDecoder<PlainBytes> for Cow<'_, [u8]> {
-    #[inline]
-    fn decode_value<B: Buf + ?Sized>(
-        value: &mut Cow<[u8]>,
-        buf: Capped<B>,
-        ctx: DecodeContext,
-    ) -> Result<(), DecodeError> {
-        ValueDecoder::<PlainBytes>::decode_value(value.to_mut(), buf, ctx)
-    }
-}
-
-impl DistinguishedValueDecoder<PlainBytes> for Cow<'_, [u8]> {
-    const CHECKS_EMPTY: bool = <Vec<u8> as DistinguishedValueDecoder<PlainBytes>>::CHECKS_EMPTY;
-
-    #[inline]
-    fn decode_value_distinguished<const ALLOW_EMPTY: bool>(
-        value: &mut Cow<[u8]>,
-        buf: Capped<impl Buf + ?Sized>,
-        ctx: RestrictedDecodeContext,
-    ) -> Result<Canonicity, DecodeError> {
-        DistinguishedValueDecoder::<PlainBytes>::decode_value_distinguished::<ALLOW_EMPTY>(
-            value.to_mut(),
-            buf,
-            ctx,
-        )
-    }
-}
-
-impl<'a> ValueBorrowDecoder<'a, PlainBytes> for Cow<'a, [u8]> {
-    #[inline]
-    fn borrow_decode_value(
-        value: &mut Cow<'a, [u8]>,
-        buf: Capped<&'a [u8]>,
-        ctx: DecodeContext,
-    ) -> Result<(), DecodeError> {
-        let mut s = <&[u8]>::for_overwrite();
-        ValueBorrowDecoder::<PlainBytes>::borrow_decode_value(&mut s, buf, ctx)?;
-        *value = Cow::Borrowed(s);
-        Ok(())
-    }
-}
-
-impl<'a> DistinguishedValueBorrowDecoder<'a, PlainBytes> for Cow<'a, [u8]> {
-    const CHECKS_EMPTY: bool =
-        <&[u8] as DistinguishedValueBorrowDecoder<'a, PlainBytes>>::CHECKS_EMPTY;
-
-    #[inline]
-    fn borrow_decode_value_distinguished<const ALLOW_EMPTY: bool>(
-        value: &mut Cow<'a, [u8]>,
-        buf: Capped<&'a [u8]>,
-        ctx: RestrictedDecodeContext,
-    ) -> Result<Canonicity, DecodeError> {
-        ValueBorrowDecoder::<PlainBytes>::borrow_decode_value(value, buf, ctx.into_inner())?;
-        Ok(Canonicity::Canonical)
-    }
-}
+impl_cow_value_encoding!(borrowed [u8], owned Vec<u8>, encoding PlainBytes);
 
 #[cfg(test)]
 mod cow_bytes {
@@ -408,6 +332,10 @@ mod u8_array {
         );
     }
 }
+
+impl_cow_value_encoding!(
+    borrowed [u8; N], owned [u8; N], encoding PlainBytes, with generic (const N: usize)
+);
 
 #[allow(unused_macros)]
 macro_rules! plain_bytes_vec_impl {

@@ -2572,6 +2572,134 @@ macro_rules! encoding_implemented_via_value_encoding {
 }
 pub(crate) use encoding_implemented_via_value_encoding;
 
+/// Cow<'a, T> implements owned decoding for owned traits and borrowed decoding for borrowed traits.
+/// This isn't writable as one or even several blanket impls for multiple reasons:
+///
+/// 1. blanket impls for Cow collide with things like the Collection for `Cow<[T]>` trait, which has
+///    value decoding via packed
+/// 2. if we try to define an impl that generalizes for just one encoder, we cannot spell the type
+///    of the value we are encoding because it's a reference and we need to be able to encode it by
+///    two different lifetimes
+/// 3. we cannot make encoding work through references, because implementing ValueEncoder<E> for &T
+///    where T: ValueEncoder collides with public and externally implementable traits
+/// 4. we cannot make encoding work on the referenced data instead of the owned data, because most
+///    types don't have a referent at all and are just a value
+///
+/// ...but we can deduplicate the impls via macro, which can know by caller fiat that the needed
+/// traits are going to be available for all the reference lifetimes we need.
+macro_rules! impl_cow_value_encoding {
+    (borrowed $T:ty, owned $Owned:ty, encoding $E:ty $(, with generic ($($generic:tt)*))?) => {
+        const _: () = {
+            use alloc::borrow::Cow;
+            use bytes::{Buf, BufMut};
+            use $crate::buf::ReverseBuf;
+            use $crate::encoding::{
+                Capped, DecodeContext, DistinguishedValueBorrowDecoder, DistinguishedValueDecoder,
+                ForOverwrite, RestrictedDecodeContext, ValueBorrowDecoder, ValueEncoder, WireType,
+                Wiretyped,
+            };
+            use $crate::{Canonicity, DecodeError};
+
+            impl$(<$($generic)*>)? Wiretyped<$E> for Cow<'_, $T> {
+                const WIRE_TYPE: WireType = {
+                    let b = <&$T as Wiretyped<$E>>::WIRE_TYPE;
+                    let o = <$Owned as Wiretyped<$E>>::WIRE_TYPE;
+                    match (b, o) {
+                        (WireType::Varint, WireType::Varint) => {}
+                        (WireType::LengthDelimited, WireType::LengthDelimited) => {}
+                        (WireType::ThirtyTwoBit, WireType::ThirtyTwoBit) => {}
+                        (WireType::SixtyFourBit, WireType::SixtyFourBit) => {}
+                        _ => {
+                            panic!("wiretypes mismatched for Cow impl");
+                        }
+                    }
+                    b
+                };
+            }
+
+            impl$(<$($generic)*>)? ValueEncoder<$E> for Cow<'_, $T> {
+                #[inline]
+                fn encode_value<B: BufMut + ?Sized>(value: &Cow<$T>, buf: &mut B) {
+                    ValueEncoder::<$E>::encode_value(&&**value, buf)
+                }
+
+                #[inline]
+                fn prepend_value<B: ReverseBuf + ?Sized>(value: &Cow<$T>, buf: &mut B) {
+                    ValueEncoder::<$E>::prepend_value(&&**value, buf)
+                }
+
+                #[inline]
+                fn value_encoded_len(value: &Cow<$T>) -> usize {
+                    ValueEncoder::<$E>::value_encoded_len(&&**value)
+                }
+            }
+
+            impl$(<$($generic)*>)? ValueDecoder<$E> for Cow<'_, $T> {
+                #[inline]
+                fn decode_value<B: Buf + ?Sized>(
+                    value: &mut Cow<$T>,
+                    buf: Capped<B>,
+                    ctx: DecodeContext,
+                ) -> Result<(), DecodeError> {
+                    ValueDecoder::<$E>::decode_value(value.to_mut(), buf, ctx)
+                }
+            }
+
+            impl$(<$($generic)*>)? DistinguishedValueDecoder<$E> for Cow<'_, $T> {
+                const CHECKS_EMPTY: bool = <$Owned as DistinguishedValueDecoder<$E>>::CHECKS_EMPTY;
+
+                #[inline]
+                fn decode_value_distinguished<const ALLOW_EMPTY: bool>(
+                    value: &mut Cow<$T>,
+                    buf: Capped<impl Buf + ?Sized>,
+                    ctx: RestrictedDecodeContext,
+                ) -> Result<Canonicity, DecodeError> {
+                    DistinguishedValueDecoder::<$E>::decode_value_distinguished::<ALLOW_EMPTY>(
+                        value.to_mut(),
+                        buf,
+                        ctx,
+                    )
+                }
+            }
+
+            impl<'a $(, $($generic)*)?> ValueBorrowDecoder<'a, $E> for Cow<'a, $T> {
+                #[inline]
+                fn borrow_decode_value(
+                    value: &mut Cow<'a, $T>,
+                    buf: Capped<&'a [u8]>,
+                    ctx: DecodeContext,
+                ) -> Result<(), DecodeError> {
+                    let mut s = <&$T>::for_overwrite();
+                    ValueBorrowDecoder::<$E>::borrow_decode_value(&mut s, buf, ctx)?;
+                    *value = Cow::Borrowed(s);
+                    Ok(())
+                }
+            }
+
+            impl<'a $(, $($generic)*)?> DistinguishedValueBorrowDecoder<'a, $E> for Cow<'a, $T> {
+                const CHECKS_EMPTY: bool =
+                    <&$T as DistinguishedValueBorrowDecoder<'a, $E>>::CHECKS_EMPTY;
+
+                #[inline]
+                fn borrow_decode_value_distinguished<const ALLOW_EMPTY: bool>(
+                    value: &mut Cow<'a, $T>,
+                    buf: Capped<&'a [u8]>,
+                    ctx: RestrictedDecodeContext,
+                ) -> Result<Canonicity, DecodeError> {
+                    let mut s = <&$T>::for_overwrite();
+                    let canon =
+                        DistinguishedValueBorrowDecoder::<$E>::borrow_decode_value_distinguished::<
+                            ALLOW_EMPTY,
+                        >(&mut s, buf, ctx)?;
+                    *value = Cow::Borrowed(s);
+                    Ok(canon)
+                }
+            }
+        };
+    };
+}
+pub(crate) use impl_cow_value_encoding;
+
 #[cfg(test)]
 mod test {
     use alloc::collections::{BTreeMap, BTreeSet};

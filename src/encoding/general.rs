@@ -5,9 +5,9 @@ use crate::encoding::message::{
 };
 use crate::encoding::{
     delegate_encoding, delegate_value_encoding, encode_varint, encoded_len_varint,
-    encoding_implemented_via_value_encoding, prepend_varint, Canonicity, Capped, DecodeContext,
-    DecodeError, DistinguishedProxiable, DistinguishedValueBorrowDecoder,
-    DistinguishedValueDecoder, Fixed, ForOverwrite, Map, Packed, PlainBytes, Proxiable, Proxied,
+    encoding_implemented_via_value_encoding, impl_cow_value_encoding, prepend_varint, Canonicity,
+    Capped, DecodeContext, DecodeError, DistinguishedProxiable, DistinguishedValueBorrowDecoder,
+    DistinguishedValueDecoder, Fixed, Map, Packed, PlainBytes, Proxiable, Proxied,
     RawDistinguishedMessageBorrowDecoder, RawMessageBorrowDecoder, RawMessageDecoder,
     RestrictedDecodeContext, Unpacked, ValueBorrowDecoder, ValueDecoder, ValueEncoder, Varint,
     WireType, Wiretyped,
@@ -207,82 +207,7 @@ mod string {
     check_type_test!(General, distinguished, String, WireType::LengthDelimited);
 }
 
-impl Wiretyped<General> for Cow<'_, str> {
-    const WIRE_TYPE: WireType = WireType::LengthDelimited;
-}
-
-impl ValueEncoder<General> for Cow<'_, str> {
-    #[inline]
-    fn encode_value<B: BufMut + ?Sized>(value: &Cow<str>, buf: &mut B) {
-        ValueEncoder::<PlainBytes>::encode_value(&value.as_bytes(), buf)
-    }
-
-    #[inline]
-    fn prepend_value<B: ReverseBuf + ?Sized>(value: &Cow<str>, buf: &mut B) {
-        ValueEncoder::<PlainBytes>::prepend_value(&value.as_bytes(), buf)
-    }
-
-    #[inline]
-    fn value_encoded_len(value: &Cow<str>) -> usize {
-        ValueEncoder::<PlainBytes>::value_encoded_len(&value.as_bytes())
-    }
-}
-
-impl ValueDecoder<General> for Cow<'_, str> {
-    #[inline]
-    fn decode_value<B: Buf + ?Sized>(
-        value: &mut Cow<str>,
-        buf: Capped<B>,
-        ctx: DecodeContext,
-    ) -> Result<(), DecodeError> {
-        ValueDecoder::<General>::decode_value(value.to_mut(), buf, ctx)
-    }
-}
-
-impl DistinguishedValueDecoder<General> for Cow<'_, str> {
-    const CHECKS_EMPTY: bool = <String as DistinguishedValueDecoder<General>>::CHECKS_EMPTY;
-
-    #[inline]
-    fn decode_value_distinguished<const ALLOW_EMPTY: bool>(
-        value: &mut Cow<str>,
-        buf: Capped<impl Buf + ?Sized>,
-        ctx: RestrictedDecodeContext,
-    ) -> Result<Canonicity, DecodeError> {
-        DistinguishedValueDecoder::<General>::decode_value_distinguished::<ALLOW_EMPTY>(
-            value.to_mut(),
-            buf,
-            ctx,
-        )
-    }
-}
-
-impl<'a> ValueBorrowDecoder<'a, General> for Cow<'a, str> {
-    #[inline]
-    fn borrow_decode_value(
-        value: &mut Cow<'a, str>,
-        buf: Capped<&'a [u8]>,
-        ctx: DecodeContext,
-    ) -> Result<(), DecodeError> {
-        let mut s = <&str>::for_overwrite();
-        ValueBorrowDecoder::<General>::borrow_decode_value(&mut s, buf, ctx)?;
-        *value = Cow::Borrowed(s);
-        Ok(())
-    }
-}
-
-impl<'a> DistinguishedValueBorrowDecoder<'a, General> for Cow<'a, str> {
-    const CHECKS_EMPTY: bool = <&str as DistinguishedValueBorrowDecoder<'a, General>>::CHECKS_EMPTY;
-
-    #[inline]
-    fn borrow_decode_value_distinguished<const ALLOW_EMPTY: bool>(
-        value: &mut Cow<'a, str>,
-        buf: Capped<&'a [u8]>,
-        ctx: RestrictedDecodeContext,
-    ) -> Result<Canonicity, DecodeError> {
-        ValueBorrowDecoder::<General>::borrow_decode_value(value, buf, ctx.into_inner())?;
-        Ok(Canonicity::Canonical)
-    }
-}
+impl_cow_value_encoding!(borrowed str, owned String, encoding General);
 
 #[cfg(test)]
 mod cow_string {
