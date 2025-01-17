@@ -1603,11 +1603,14 @@ fn parsing_strings() {
     #[derive(Debug, PartialEq, Eq, Message)]
     #[bilrost(distinguished)]
     struct Foo<T>(T);
+    #[derive(Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
+    struct Plain<'a>(#[bilrost(encoding(plainbytes))] &'a [u8]);
 
     macro_rules! parsing_string_type {
-        ($ty:ty) => {{
+        ($lifetime:ident $ty:ty) => {{
             assert::decodes!(
-                owned distinguished,
+                $lifetime distinguished,
                 [(0, OV::string("hello world"))],
                 Foo::<$ty>("hello world".into()),
             );
@@ -1641,19 +1644,25 @@ fn parsing_strings() {
 
             for invalid_string in invalid_strings {
                 assert::decodes!(
-                    owned never decodes Foo<$ty>,
+                    $lifetime never decodes Foo<$ty>,
                     [(0, OV::byte_slice(&invalid_string))],
                     InvalidValue,
                     "Foo.0",
+                );
+                assert::decodes!(
+                    borrowed distinguished,
+                    [(0, OV::byte_slice(&invalid_string))],
+                    Plain(invalid_string.as_slice()),
                 );
             }
         }};
     }
 
-    parsing_string_type!(String);
-    parsing_string_type!(Cow<str>);
+    parsing_string_type!(owned String);
+    parsing_string_type!(owned Cow<str>);
     #[cfg(feature = "bytestring")]
-    parsing_string_type!(bytestring::ByteString);
+    parsing_string_type!(owned bytestring::ByteString);
+    parsing_string_type!(borrowed & str);
 }
 
 #[test]
@@ -2085,7 +2094,8 @@ fn custom_hashers_hashbrown() {
 
 #[test]
 fn truncated_map() {
-    #[derive(Debug, PartialEq, Message)]
+    #[derive(Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
     struct Foo<T>(T, String);
 
     let OV::LengthDelimited(map_value) = OV::packed([
@@ -2117,7 +2127,7 @@ fn truncated_map() {
         };
         (($($ty:tt)*) $($mode_words:tt)*) => {
             assert::decodes!(
-                owned relaxed errs for Foo<$($ty)*<bool, String>>,
+                owned $($mode_words)* Foo<$($ty)*<bool, String>>,
                 [
                     (0, OV::byte_slice(truncated_bool_string_map)),
                     (1, OV::string("another field after that")),
@@ -2126,7 +2136,25 @@ fn truncated_map() {
                 "Foo.0",
             );
             assert::decodes!(
-                owned relaxed errs for Foo<$($ty)*<String, u64>>,
+                borrowed $($mode_words)* Foo<$($ty)*<bool, &str>>,
+                [
+                    (0, OV::byte_slice(truncated_bool_string_map)),
+                    (1, OV::string("another field after that")),
+                ],
+                Truncated,
+                "Foo.0",
+            );
+            assert::decodes!(
+                owned $($mode_words)* Foo<$($ty)*<String, u64>>,
+                [
+                    (0, OV::byte_slice(truncated_string_int_map)),
+                    (1, OV::string("another field after that")),
+                ],
+                Truncated,
+                "Foo.0",
+            );
+            assert::decodes!(
+                borrowed $($mode_words)* Foo<$($ty)*<&str, u64>>,
                 [
                     (0, OV::byte_slice(truncated_string_int_map)),
                     (1, OV::string("another field after that")),
@@ -2142,8 +2170,6 @@ fn truncated_map() {
     truncated_map_t!(relaxed std::collections::HashMap);
     #[cfg(feature = "hashbrown")]
     truncated_map_t!(relaxed hashbrown::HashMap);
-    // TODO(widders): here, and in truncated_collection_t, when borrowed switching is added we can
-    //  add borrowing string checks
 }
 
 // Vec tests
@@ -3023,6 +3049,9 @@ fn truncated_packed_collection() {
     #[derive(Debug, PartialEq, Eq, Message)]
     #[bilrost(distinguished)]
     struct Foo<T>(#[bilrost(encoding(packed))] T, String);
+    #[derive(Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
+    struct FooPlainbytes<T>(#[bilrost(encoding(packed<plainbytes>))] T, String);
 
     let OV::LengthDelimited(set_value) = OV::packed([OV::string("fooble"), OV::string("barbaz")])
     else {
@@ -3036,17 +3065,50 @@ fn truncated_packed_collection() {
     let truncated_packed_int_val = &set_value[..set_value.len() - 1];
 
     macro_rules! truncated_collection_t {
-        (relaxed $($ty:tt)*) => {
-            truncated_collection_t!(($($ty)*) relaxed errs for);
+        (
+            relaxed,
+            owned ($($owned_ty:tt)*),
+            borrowed ($($borrowed_ty:tt)*) $(,)?
+        ) => {
+            truncated_collection_t!(($($owned_ty)*), ($($borrowed_ty)*) relaxed errs for);
         };
-        (distinguished $($ty:tt)*) => {
-            truncated_collection_t!(($($ty)*) never decodes);
+        (
+            distinguished,
+            owned ($($owned_ty:tt)*),
+            borrowed ($($borrowed_ty:tt)*) $(,)?
+        ) => {
+            truncated_collection_t!(($($owned_ty)*), ($($borrowed_ty)*) never decodes);
         };
-        (($($ty:tt)*) $($mode_words:tt)*) => {
+        (($($owned_ty:tt)*), ($($borrowed_ty:tt)*) $($mode_words:tt)*) => {
             {
                 type T = String;
                 assert::decodes!(
-                    owned $($mode_words)* Foo<$($ty)*>,
+                    owned $($mode_words)* Foo<$($owned_ty)*>,
+                    [
+                        (0, OV::byte_slice(truncated_packed_string_val)),
+                        (1, OV::string("another field after that")),
+                    ],
+                    Truncated,
+                    "Foo.0",
+                );
+            }
+            {
+                type T = [u8];
+                assert::decodes!(
+                    borrowed $($mode_words)* FooPlainbytes<$($borrowed_ty)*>,
+                    [
+                        (0, OV::byte_slice(truncated_packed_string_val)),
+                        (1, OV::string("another field after that")),
+                    ],
+                    Truncated,
+                    "FooPlainbytes.0",
+                );
+            }
+            #[cfg(feature = "bstr")]
+            {
+                type T = bstr::BStr;
+                assert::decodes!(
+                    borrowed $($mode_words)* Foo<$($borrowed_ty)*>,
                     [
                         (0, OV::byte_slice(truncated_packed_string_val)),
                         (1, OV::string("another field after that")),
@@ -3058,7 +3120,7 @@ fn truncated_packed_collection() {
             {
                 type T = u64;
                 assert::decodes!(
-                    owned $($mode_words)* Foo<$($ty)*>,
+                    owned $($mode_words)* Foo<$($owned_ty)*>,
                     [
                         (0, OV::byte_slice(truncated_packed_int_val)),
                         (1, OV::string("another field after that")),
@@ -3070,23 +3132,55 @@ fn truncated_packed_collection() {
         };
     }
 
-    truncated_collection_t!(distinguished Vec<T>);
-    truncated_collection_t!(distinguished Cow<[T]>);
+    truncated_collection_t!(distinguished, owned(Vec<T>), borrowed(Vec<&T>),);
+    truncated_collection_t!(distinguished, owned(Cow<[T]>), borrowed(Cow<[&T]>),);
     #[cfg(feature = "arrayvec")]
-    truncated_collection_t!(distinguished arrayvec::ArrayVec<T, 2>);
+    truncated_collection_t!(
+        distinguished,
+        owned(arrayvec::ArrayVec<T, 2>),
+        borrowed(arrayvec::ArrayVec<&T, 2>),
+    );
     #[cfg(feature = "smallvec")]
-    truncated_collection_t!(distinguished smallvec::SmallVec<[T; 2]>);
+    truncated_collection_t!(
+        distinguished,
+        owned(smallvec::SmallVec<[T; 2]>),
+        borrowed(smallvec::SmallVec<[&T; 2]>),
+    );
     #[cfg(feature = "thin-vec")]
-    truncated_collection_t!(distinguished thin_vec::ThinVec<T>);
+    truncated_collection_t!(
+        distinguished,
+        owned(thin_vec::ThinVec<T>),
+        borrowed(thin_vec::ThinVec<&T>),
+    );
     #[cfg(feature = "tinyvec")]
-    truncated_collection_t!(distinguished tinyvec::ArrayVec<[T; 2]>);
+    truncated_collection_t!(
+        distinguished,
+        owned(tinyvec::ArrayVec<[T; 2]>),
+        borrowed(tinyvec::ArrayVec<[&T; 2]>),
+    );
     #[cfg(feature = "tinyvec")]
-    truncated_collection_t!(distinguished tinyvec::TinyVec<[T; 2]>);
-    truncated_collection_t!(distinguished std::collections::BTreeSet<T>);
+    truncated_collection_t!(
+        distinguished,
+        owned(tinyvec::TinyVec<[T; 2]>),
+        borrowed(tinyvec::TinyVec<[&T; 2]>),
+    );
+    truncated_collection_t!(
+        distinguished,
+        owned(std::collections::BTreeSet<T>),
+        borrowed(std::collections::BTreeSet<&T>),
+    );
     #[cfg(feature = "std")]
-    truncated_collection_t!(relaxed std::collections::HashSet<T>);
+    truncated_collection_t!(
+        relaxed,
+        owned(std::collections::HashSet<T>),
+        borrowed(std::collections::HashSet<&T>),
+    );
     #[cfg(feature = "hashbrown")]
-    truncated_collection_t!(relaxed hashbrown::HashSet<T>);
+    truncated_collection_t!(
+        relaxed,
+        owned(hashbrown::HashSet<T>),
+        borrowed(hashbrown::HashSet<&T>),
+    );
 }
 
 // Oneof tests
