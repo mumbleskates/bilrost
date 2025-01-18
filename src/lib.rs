@@ -6,7 +6,6 @@
 #![no_std]
 #![forbid(unsafe_op_in_unsafe_fn)]
 
-// TODO(widders): no-alloc support
 extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
