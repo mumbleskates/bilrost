@@ -20,6 +20,7 @@ pub use bilrost_derive::{Enumeration, Message, Oneof};
 
 pub mod buf;
 mod error;
+mod message;
 mod types;
 
 #[doc(hidden)]
@@ -27,7 +28,7 @@ pub mod encoding;
 #[doc(hidden)]
 mod iter;
 
-pub use crate::encoding::message::{
+pub use crate::message::{
     BorrowedMessage, DistinguishedBorrowedMessage, DistinguishedOwnedMessage, Message, OwnedMessage,
 };
 pub use crate::encoding::{Canonicity, Enumeration, WithCanonicity};
