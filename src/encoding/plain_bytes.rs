@@ -290,14 +290,14 @@ impl<'a, const N: usize> DistinguishedValueBorrowDecoder<'a, PlainBytes> for &'a
 #[cfg(test)]
 mod ref_u8_array {
     crate::encoding::test::check_borrowable!(
-        mod one_byte,
         borrowed: [u8; 1],
         encoding: crate::encoding::PlainBytes,
+        mod one_byte,
     );
     crate::encoding::test::check_borrowable!(
-        mod ten_bytes,
         borrowed: [u8; 10],
         encoding: crate::encoding::PlainBytes,
+        mod ten_bytes,
     );
 }
 

@@ -58,13 +58,14 @@ impl<'a> DistinguishedValueBorrowDecoder<'a, General> for &'a bstr::BStr {
     }
 }
 
-// #[cfg(test)]
-// mod ref_bstr {
-//     crate::encoding::test::check_borrowable!(
-//         borrowed: bstr::BStr,
-//         encoding: crate::encoding::General,
-//     );
-// }
+#[cfg(test)]
+mod ref_bstr {
+    crate::encoding::test::check_borrowable!(
+        borrowed: bstr::BStr,
+        encoding: crate::encoding::General,
+        converter(s: Vec<u8>) { bstr::BString::new(s) },
+    );
+}
 
 for_overwrite_via_default!(bstr::BString);
 

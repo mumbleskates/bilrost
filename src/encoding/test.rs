@@ -66,20 +66,53 @@ macro_rules! check_type_test {
 pub(crate) use check_type_test;
 
 macro_rules! check_borrowable {
-    (borrowed: $ty:ty, encoding: $encoding:ty $(,)?) => {
+    (
+        borrowed: $ty:ty,
+        encoding: $encoding:ty $(,)?
+    ) => {
         crate::encoding::test::check_borrowable!(
-            mod borrow_equivalence,
             borrowed: $ty,
             encoding: $encoding,
+            mod borrow_equivalence,
+            converter(val: <$ty as alloc::borrow::ToOwned>::Owned) val,
         );
     };
-    (mod $mod_name:ident, borrowed: $ty:ty, encoding: $encoding:ty $(,)?) => {
+    (
+        borrowed: $ty:ty,
+        encoding: $encoding:ty,
+        mod $mod_name:ident $(,)?
+    ) => {
+        crate::encoding::test::check_borrowable!(
+            borrowed: $ty,
+            encoding: $encoding,
+            mod $mod_name,
+            converter(val: <$ty as alloc::borrow::ToOwned>::Owned) val,
+        );
+    };
+    (
+        borrowed: $ty:ty,
+        encoding: $encoding:ty,
+        converter($from_value:ident: $from_ty:ty) $convert:expr $(,)?
+    ) => {
+        crate::encoding::test::check_borrowable!(
+            borrowed: $ty,
+            encoding: $encoding,
+            mod borrow_equivalence,
+            converter($from_value: $from_ty) $convert,
+        );
+    };
+    (
+        borrowed: $ty:ty,
+        encoding: $encoding:ty,
+        mod $mod_name:ident,
+        converter($from_value:ident: $from_ty:ty) $convert:expr $(,)?
+    ) => {
         mod $mod_name {
             #[allow(unused_imports)]
             use super::*;
             use crate::encoding::{
-                Capped, DistinguishedValueBorrowDecoder, EmptyState, RestrictedDecodeContext,
-                ValueEncoder,
+                Capped, ValueBorrowDecoder, DistinguishedValueBorrowDecoder, EmptyState, RestrictedDecodeContext,
+                ValueEncoder, DecodeContext
             };
             use crate::Canonicity::Canonical;
             use alloc::vec::Vec;
@@ -88,9 +121,25 @@ macro_rules! check_borrowable {
 
             proptest! {
                 #[test]
-                fn check(val: <$ty as alloc::borrow::ToOwned>::Owned) {
+                fn check($from_value: $from_ty) {
+                    let val = $convert;
                     let mut buf = Vec::new();
                     ValueEncoder::<$encoding>::encode_value(&val, &mut buf);
+
+                    // relaxed borrowed decoding
+                    let mut borrowed = <&$ty>::empty();
+                    ValueBorrowDecoder::<$encoding>::borrow_decode_value
+                    (
+                        &mut borrowed,
+                        Capped::new(&mut buf.as_slice()),
+                        DecodeContext::default(),
+                    )?;
+                    assert_eq!(
+                        borrowed,
+                        Borrow::<$ty>::borrow(&val),
+                    );
+
+                    // distinguished borrowed decoding
                     let mut borrowed = <&$ty>::empty();
                     assert_eq!(
                         DistinguishedValueBorrowDecoder::<$encoding>::
