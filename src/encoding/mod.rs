@@ -127,7 +127,11 @@ pub use encoding_traits::{
     DistinguishedValueBorrowDecoder, DistinguishedValueDecoder, ValueBorrowDecoder, ValueDecoder,
     ValueEncoder,
 };
-pub(crate) use macros::*;
+pub(crate) use macros::{
+    __impl_decoder_where_value_decoder, encoding_implemented_via_value_encoding,
+    impl_cow_value_encoding,
+};
+pub use macros::{delegate_encoding, delegate_value_encoding};
 pub use message::{
     RawDistinguishedMessageBorrowDecoder, RawDistinguishedMessageDecoder, RawMessage,
     RawMessageBorrowDecoder, RawMessageDecoder,
@@ -141,8 +145,8 @@ pub use oneof::{
     NonEmptyOneofBorrowDecoder, NonEmptyOneofDecoder,
 };
 pub use value_traits::{
-    Collection, DistinguishedCollection, DistinguishedMapping, EmptyState, Enumeration,
-    ForOverwrite, Mapping,
+    empty_state_via_for_overwrite, empty_state_via_default, for_overwrite_via_default, Collection, DistinguishedCollection,
+    DistinguishedMapping, EmptyState, Enumeration, ForOverwrite, Mapping,
 };
 
 /// Fixed-size encoder. Encodes integers in fixed-size format.

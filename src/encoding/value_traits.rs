@@ -32,6 +32,7 @@ pub trait ForOverwrite {
 }
 
 /// Implements `ForOverwrite` in terms of `Default`.
+#[macro_export]
 macro_rules! for_overwrite_via_default {
     (
         $ty:ty
@@ -50,21 +51,16 @@ macro_rules! for_overwrite_via_default {
         }
     };
 }
-pub(crate) use for_overwrite_via_default;
+pub use for_overwrite_via_default;
 
-/// Implements `EmptyState` in terms of `Default`.
-macro_rules! empty_state_via_default {
+/// Implements `EmptyState` in terms of `ForOverwrite`.
+#[macro_export]
+macro_rules! empty_state_via_for_overwrite {
     (
         $ty:ty
         $(, with generics ($($generics:tt)*))?
         $(, with where clause ($($where_clause:tt)*))?
     ) => {
-        $crate::encoding::value_traits::for_overwrite_via_default!(
-            $ty
-            $(, with generics ($($generics)*))?
-            $(, with where clause ($($where_clause)*))?
-        );
-
         impl<$($($generics)*)?> $crate::encoding::EmptyState for $ty
         where
             Self: ::core::default::Default + ::core::cmp::PartialEq,
@@ -82,7 +78,30 @@ macro_rules! empty_state_via_default {
         }
     };
 }
-pub(crate) use empty_state_via_default;
+pub use empty_state_via_for_overwrite;
+
+/// Implements both `EmptyState` and `ForOverwrite` in terms of `Default`.
+#[macro_export]
+macro_rules! empty_state_via_default {
+    (
+        $ty:ty
+        $(, with generics ($($generics:tt)*))?
+        $(, with where clause ($($where_clause:tt)*))?
+    ) => {
+        $crate::for_overwrite_via_default!(
+            $ty
+            $(, with generics ($($generics*)*))?
+            $(, with where clause ($($where_clause)*))?
+        );
+        $crate::empty_state_via_for_overwrite!(
+            $ty
+            $(, with generics ($($generics*)*))?
+            $(, with where clause ($($where_clause)*))?
+        );
+    };
+}
+pub use empty_state_via_default;
+
 
 /// Proxy trait for enumeration types conversions to and from `u32`
 pub trait Enumeration: Eq + Sized {

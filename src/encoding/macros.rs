@@ -1,4 +1,5 @@
 /// Macro rules for expressly delegating from one encoder to another.
+#[macro_export]
 macro_rules! delegate_encoding {
     (
         delegate from ($from_ty:ty) to ($to_ty:ty) for type ($value_ty:ty)
@@ -151,9 +152,10 @@ macro_rules! delegate_encoding {
         }
     };
 }
-pub(crate) use delegate_encoding;
+pub use delegate_encoding;
 
 /// This macro creates delegated `ValueEncoder` impls for a given type from one encoder to another.
+#[macro_export]
 macro_rules! delegate_value_encoding {
     (
         delegate from ($from_ty:ty) to ($to_ty:ty) for type ($value_ty:ty)
@@ -357,8 +359,7 @@ macro_rules! delegate_value_encoding {
         }
     };
 }
-// TODO(widders): this could be made public
-pub(crate) use delegate_value_encoding;
+pub use delegate_value_encoding;
 
 /// Most kinds of encodings want to act as field decoders for bare values in any situation where
 /// they also implement value decoding. Only a couple encodings want to do anything fancy, like

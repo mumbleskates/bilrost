@@ -1,8 +1,7 @@
 use crate::encoding::local_proxy::LocalProxy;
 use crate::encoding::proxy::SealedBilrostTag;
 use crate::encoding::type_support::common::time_proxies::TimeDeltaProxy;
-use crate::encoding::value_traits::empty_state_via_default;
-use crate::encoding::{
+use crate::encoding::{empty_state_via_default,
     delegate_value_encoding, Canonicity, DecodeErrorKind, DistinguishedProxiable, EmptyState,
     ForOverwrite, General, Packed, Proxiable, Proxied, Varint,
 };
