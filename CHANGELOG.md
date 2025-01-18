@@ -2,12 +2,42 @@
 
 ### Breaking changes
 
-* The (unstable) internal encoding traits continue to evolve, this time to split
-  relaxed decoding functionality out of encoding traits and into an
-  independent trait.
+* This release includes a major overhaul of encoding and decoding traits for
+  the library.
+
+| Capability                       | Old trait              | New trait                          |
+|----------------------------------|------------------------|------------------------------------|
+| encoding                         | `Message`              | `Message`                          |
+| relaxed decoding (owned)         | `Message`              | `OwnedMessage`                     |
+| distinguished decoding (owned)   | `DistinguishedMessage` | `DistinguishedOwnedMessage`        |
+| relaxed decoding (borrowed)      | (new!)                 | `BorrowedMessage<'a>`              |
+| distinguished decoding (borrowed | (new!)                 | `DistinguishedBorrowedMessage<'a>` |
+
+| Old derives                       | New derives                                                      |
+|-----------------------------------|------------------------------------------------------------------|
+| `Message`, `DistinguishedMessage` | `Message` with `#[bilrost(distinguished)]` on the struct         |
+| `Oneof`, `DistinguishedOneof`     | `Oneof` with `#[bilrost(distinguished)]` on the enum             |
+| all of the above                  | `Message` & `Oneof` with `#[bilrost(distinguished)]` on the enum |
+
+For very simple usage of the `bilrost` library, this will now probably mean
+importing both `Message` and `OwnedMessage` traits to have the desired
+functionality in scope.
+
+* The `DistinguishedMessage` and `DistinguishedOneof` traits & derives are gone
+  as well; rather than deriving multiple traits, simply add a
+  `#[bilrost(distinguished)]` attribute to the type being derived from.
 
 ### New features
 
+* It is now possible to do borrowed/zero-copy decoding, which is enabled by
+  default and available in the derive macros. This decodes from a `&[u8]` slice
+  with lifetime into messages that may reference its data.
+  * This adds support for `&str`, `&[u8]`, `&[u8; N]`, and `&bstr::BStr`; `Cow`
+    for these borrowed types also decodes as `Cow::Borrowed(&..)`.
+* Derive macros are now simpler to use, so now deriving all encoding and
+  decoding impls for messages and oneofs is done only with `Message` and
+  `Oneof`, and distinguished implementations are switched on and off by
+  attribute.
 * Added `From<Vec<u8>>` and `From<Box<[u8]>>` impls for `ReverseBuffer`.
 
 ### Fixes
@@ -15,6 +45,8 @@
 ### Cleanups
 
 * Changed internal and external phrasing from "expedient" encoding to "relaxed".
+* More reorganization and file cleanups, splitting up some large files into more
+  modules etc.
 
 ## V0.1011.1
 
