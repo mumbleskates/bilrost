@@ -3,6 +3,7 @@ use crate::encoding::message::{
     borrow_merge, borrow_merge_distinguished, merge, merge_distinguished,
     RawDistinguishedMessageDecoder, RawMessage,
 };
+use crate::encoding::proxy::SealedBilrostTag;
 use crate::encoding::{
     delegate_encoding, delegate_value_encoding, encode_varint, encoded_len_varint,
     encoding_implemented_via_value_encoding, impl_cow_value_encoding, prepend_varint, Canonicity,
@@ -340,7 +341,7 @@ mod blob {
     check_type_test!(General, distinguished, Blob, WireType::LengthDelimited);
 }
 
-impl Proxiable for core::time::Duration {
+impl Proxiable<SealedBilrostTag> for core::time::Duration {
     type Proxy = crate::encoding::local_proxy::LocalProxy<u64, 2>;
 
     fn new_proxy() -> Self::Proxy {
@@ -360,7 +361,7 @@ impl Proxiable for core::time::Duration {
     }
 }
 
-impl DistinguishedProxiable for core::time::Duration {
+impl DistinguishedProxiable<SealedBilrostTag> for core::time::Duration {
     fn decode_proxy_distinguished(
         &mut self,
         proxy: Self::Proxy,
@@ -373,7 +374,7 @@ impl DistinguishedProxiable for core::time::Duration {
     }
 }
 
-delegate_value_encoding!(delegate from (General) to (Proxied<Packed<Varint>>)
+delegate_value_encoding!(delegate from (General) to (Proxied<Packed<Varint>, SealedBilrostTag>)
     for type (core::time::Duration) including distinguished);
 
 #[cfg(test)]
@@ -381,14 +382,14 @@ mod core_time {
     use super::*;
     use crate::encoding::test::{check_type_empty, check_type_test};
 
-    check_type_empty!(core::time::Duration, via proxy);
+    check_type_empty!(core::time::Duration, via proxy with tag SealedBilrostTag);
     check_type_test!(
         General,
         relaxed,
         core::time::Duration,
         WireType::LengthDelimited
     );
-    check_type_empty!(core::time::Duration, via distinguished proxy);
+    check_type_empty!(core::time::Duration, via distinguished proxy with tag SealedBilrostTag);
     check_type_test!(
         General,
         distinguished,

@@ -166,7 +166,7 @@ pub use varint::Varint;
 /// their encoded representations by first translating to another type that is already supported.
 ///
 /// This encoding is not yet made available outside the crate.
-pub(crate) use proxy::{DistinguishedProxiable, Proxiable, Proxied};
+pub use proxy::{DistinguishedProxiable, Proxiable, Proxied};
 
 // This is an array of the smallest values whose varint representation is N+1 bytes, where N is the
 // index in the array.

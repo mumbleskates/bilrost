@@ -1,4 +1,5 @@
 use crate::encoding::local_proxy::LocalProxy;
+use crate::encoding::proxy::SealedBilrostTag;
 use crate::encoding::type_support::common::time_proxies::TimeDeltaProxy;
 use crate::encoding::value_traits::empty_state_via_default;
 use crate::encoding::{
@@ -61,7 +62,7 @@ fn parts_to_date(year: i32, ordinal0: i32) -> Option<Date> {
     Date::from_ordinal_date(year, ordinal).ok()
 }
 
-impl Proxiable for Date {
+impl Proxiable<SealedBilrostTag> for Date {
     type Proxy = LocalProxy<i32, 2>;
 
     fn new_proxy() -> Self::Proxy {
@@ -79,7 +80,7 @@ impl Proxiable for Date {
     }
 }
 
-impl DistinguishedProxiable for Date {
+impl DistinguishedProxiable<SealedBilrostTag> for Date {
     fn decode_proxy_distinguished(
         &mut self,
         proxy: Self::Proxy,
@@ -90,12 +91,13 @@ impl DistinguishedProxiable for Date {
     }
 }
 
-delegate_value_encoding!(delegate from (General) to (Proxied<Packed<Varint>>)
+delegate_value_encoding!(delegate from (General) to (Proxied<Packed<Varint>, SealedBilrostTag>)
     for type (Date) including distinguished);
 
 #[cfg(test)]
 mod date {
     use super::helpers::with_random_values;
+    use super::SealedBilrostTag;
     use crate::encoding::test::{check_type_empty, distinguished, relaxed};
     use crate::encoding::{EmptyState, WireType};
     use time::Date;
@@ -120,8 +122,8 @@ mod date {
         }
     }
 
-    check_type_empty!(Date, via proxy);
-    check_type_empty!(Date, via distinguished proxy);
+    check_type_empty!(Date, via proxy with tag SealedBilrostTag);
+    check_type_empty!(Date, via distinguished proxy with tag SealedBilrostTag);
 }
 
 impl ForOverwrite for Time {
@@ -154,7 +156,7 @@ where
     .ok()
 }
 
-impl Proxiable for Time {
+impl Proxiable<SealedBilrostTag> for Time {
     type Proxy = LocalProxy<u32, 4>;
 
     fn new_proxy() -> Self::Proxy {
@@ -177,7 +179,7 @@ impl Proxiable for Time {
     }
 }
 
-impl DistinguishedProxiable for Time {
+impl DistinguishedProxiable<SealedBilrostTag> for Time {
     fn decode_proxy_distinguished(
         &mut self,
         proxy: Self::Proxy,
@@ -188,12 +190,13 @@ impl DistinguishedProxiable for Time {
     }
 }
 
-delegate_value_encoding!(delegate from (General) to (Proxied<Packed<Varint>>)
+delegate_value_encoding!(delegate from (General) to (Proxied<Packed<Varint>, SealedBilrostTag>)
     for type (Time) including distinguished);
 
 #[cfg(test)]
 mod time_ty {
     use super::helpers::with_random_values;
+    use super::SealedBilrostTag;
     use crate::encoding::test::{check_type_empty, distinguished, relaxed};
     use crate::encoding::{EmptyState, WireType};
     use time::Time;
@@ -217,8 +220,8 @@ mod time_ty {
         }
     }
 
-    check_type_empty!(Time, via proxy);
-    check_type_empty!(Time, via distinguished proxy);
+    check_type_empty!(Time, via proxy with tag SealedBilrostTag);
+    check_type_empty!(Time, via distinguished proxy with tag SealedBilrostTag);
 }
 
 impl ForOverwrite for PrimitiveDateTime {
@@ -237,7 +240,7 @@ impl EmptyState for PrimitiveDateTime {
     }
 }
 
-impl Proxiable for PrimitiveDateTime {
+impl Proxiable<SealedBilrostTag> for PrimitiveDateTime {
     type Proxy = LocalProxy<i32, 6>;
 
     fn new_proxy() -> Self::Proxy {
@@ -265,7 +268,7 @@ impl Proxiable for PrimitiveDateTime {
     }
 }
 
-impl DistinguishedProxiable for PrimitiveDateTime {
+impl DistinguishedProxiable<SealedBilrostTag> for PrimitiveDateTime {
     fn decode_proxy_distinguished(
         &mut self,
         proxy: Self::Proxy,
@@ -279,7 +282,7 @@ impl DistinguishedProxiable for PrimitiveDateTime {
     }
 }
 
-delegate_value_encoding!(delegate from (General) to (Proxied<Packed<Varint>>)
+delegate_value_encoding!(delegate from (General) to (Proxied<Packed<Varint>, SealedBilrostTag>)
     for type (PrimitiveDateTime) including distinguished);
 
 #[cfg(test)]
@@ -287,6 +290,7 @@ mod primitivedatetime {
     use super::date::test_dates;
     use super::helpers::with_random_values;
     use super::time_ty::test_times;
+    use super::SealedBilrostTag;
     use crate::encoding::test::{check_type_empty, distinguished, relaxed};
     use crate::encoding::{EmptyState, WireType};
     use itertools::iproduct;
@@ -320,8 +324,8 @@ mod primitivedatetime {
         }
     }
 
-    check_type_empty!(PrimitiveDateTime, via proxy);
-    check_type_empty!(PrimitiveDateTime, via distinguished proxy);
+    check_type_empty!(PrimitiveDateTime, via proxy with tag SealedBilrostTag);
+    check_type_empty!(PrimitiveDateTime, via distinguished proxy with tag SealedBilrostTag);
 }
 
 impl ForOverwrite for UtcOffset {
@@ -340,7 +344,7 @@ impl EmptyState for UtcOffset {
     }
 }
 
-impl Proxiable for UtcOffset {
+impl Proxiable<SealedBilrostTag> for UtcOffset {
     type Proxy = (i8, i8, i8);
 
     fn new_proxy() -> Self::Proxy {
@@ -372,7 +376,7 @@ impl Proxiable for UtcOffset {
     }
 }
 
-impl DistinguishedProxiable for UtcOffset {
+impl DistinguishedProxiable<SealedBilrostTag> for UtcOffset {
     fn decode_proxy_distinguished(
         &mut self,
         proxy: Self::Proxy,
@@ -382,12 +386,13 @@ impl DistinguishedProxiable for UtcOffset {
     }
 }
 
-delegate_value_encoding!(delegate from (General) to (Proxied<(Varint, Varint, Varint)>)
+delegate_value_encoding!(delegate from (General) to (Proxied<(Varint, Varint, Varint), SealedBilrostTag>)
     for type (UtcOffset) including distinguished);
 
 #[cfg(test)]
 mod utcoffset {
     use super::helpers::with_random_values;
+    use super::SealedBilrostTag;
     use crate::encoding::test::{check_type_empty, distinguished, relaxed};
     use crate::encoding::{
         Capped, DecodeContext, DistinguishedValueDecoder, EmptyState, ForOverwrite, General,
@@ -417,8 +422,8 @@ mod utcoffset {
         }
     }
 
-    check_type_empty!(UtcOffset, via proxy);
-    check_type_empty!(UtcOffset, via distinguished proxy);
+    check_type_empty!(UtcOffset, via proxy with tag SealedBilrostTag);
+    check_type_empty!(UtcOffset, via distinguished proxy with tag SealedBilrostTag);
 
     #[test]
     fn utcoffset_rejects_mixed_signs() {
@@ -473,7 +478,7 @@ impl EmptyState for OffsetDateTime {
     }
 }
 
-impl Proxiable for OffsetDateTime {
+impl Proxiable<SealedBilrostTag> for OffsetDateTime {
     type Proxy = (PrimitiveDateTime, UtcOffset);
 
     fn new_proxy() -> Self::Proxy {
@@ -491,7 +496,7 @@ impl Proxiable for OffsetDateTime {
     }
 }
 
-impl DistinguishedProxiable for OffsetDateTime {
+impl DistinguishedProxiable<SealedBilrostTag> for OffsetDateTime {
     fn decode_proxy_distinguished(
         &mut self,
         proxy: Self::Proxy,
@@ -501,7 +506,7 @@ impl DistinguishedProxiable for OffsetDateTime {
     }
 }
 
-delegate_value_encoding!(delegate from (General) to (Proxied<General>)
+delegate_value_encoding!(delegate from (General) to (Proxied<General, SealedBilrostTag>)
     for type (OffsetDateTime) including distinguished);
 
 #[cfg(test)]
@@ -510,6 +515,7 @@ mod offsetdatetime {
     use super::odt_compose;
     use super::primitivedatetime::test_datetimes;
     use super::utcoffset::test_zones;
+    use super::SealedBilrostTag;
     use crate::encoding::test::{check_type_empty, distinguished, relaxed};
     use crate::encoding::WireType;
     use itertools::iproduct;
@@ -524,13 +530,13 @@ mod offsetdatetime {
         }
     }
 
-    check_type_empty!(OffsetDateTime, via proxy);
-    check_type_empty!(OffsetDateTime, via distinguished proxy);
+    check_type_empty!(OffsetDateTime, via proxy with tag SealedBilrostTag);
+    check_type_empty!(OffsetDateTime, via distinguished proxy with tag SealedBilrostTag);
 }
 
 empty_state_via_default!(Duration);
 
-impl Proxiable for Duration {
+impl Proxiable<SealedBilrostTag> for Duration {
     type Proxy = TimeDeltaProxy;
 
     fn new_proxy() -> Self::Proxy {
@@ -556,7 +562,7 @@ impl Proxiable for Duration {
     }
 }
 
-impl DistinguishedProxiable for Duration {
+impl DistinguishedProxiable<SealedBilrostTag> for Duration {
     fn decode_proxy_distinguished(
         &mut self,
         proxy: Self::Proxy,
@@ -566,12 +572,13 @@ impl DistinguishedProxiable for Duration {
     }
 }
 
-delegate_value_encoding!(delegate from (General) to (Proxied<General>)
+delegate_value_encoding!(delegate from (General) to (Proxied<General, SealedBilrostTag>)
     for type (Duration) including distinguished);
 
 #[cfg(test)]
 mod duration {
     use super::helpers::with_random_values;
+    use super::SealedBilrostTag;
     use crate::encoding::test::{check_type_empty, distinguished, relaxed};
     use crate::encoding::{EmptyState, WireType};
     use time::Duration;
@@ -596,6 +603,6 @@ mod duration {
         }
     }
 
-    check_type_empty!(Duration, via proxy);
-    check_type_empty!(Duration, via distinguished proxy);
+    check_type_empty!(Duration, via proxy with tag SealedBilrostTag);
+    check_type_empty!(Duration, via distinguished proxy with tag SealedBilrostTag);
 }

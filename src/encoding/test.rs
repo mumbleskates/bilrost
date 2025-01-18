@@ -395,19 +395,19 @@ macro_rules! check_type_empty {
         }
     };
 
-    ($ty:ty, via proxy) => {
+    ($ty:ty, via proxy with tag $tag:ty) => {
         #[test]
         fn check_type_empty_via_proxy() {
-            $crate::encoding::test::check_type_empty_proxied_impl::<$ty>();
-            $crate::encoding::test::check_proxy_round_trip::<$ty>();
+            $crate::encoding::test::check_type_empty_proxied_impl::<$ty, $tag>();
+            $crate::encoding::test::check_proxy_round_trip::<$ty, $tag>();
         }
     };
 
-    ($ty:ty, via distinguished proxy) => {
+    ($ty:ty, via distinguished proxy with tag $tag:ty) => {
         #[test]
         fn check_type_empty_via_distinguished_proxy() {
-            $crate::encoding::test::check_type_empty_proxied_impl::<$ty>();
-            $crate::encoding::test::check_proxy_round_trip_distinguished::<$ty>();
+            $crate::encoding::test::check_type_empty_proxied_impl::<$ty, $tag>();
+            $crate::encoding::test::check_proxy_round_trip_distinguished::<$ty, $tag>();
         }
     };
 }
@@ -424,18 +424,18 @@ where
     assert_eq!(empty, T::empty());
 }
 
-pub(crate) fn check_type_empty_proxied_impl<T>()
+pub(crate) fn check_type_empty_proxied_impl<T, Tag>()
 where
-    T: Debug + EmptyState + PartialEq + Proxiable,
+    T: Debug + EmptyState + PartialEq + Proxiable<Tag>,
     T::Proxy: Debug + EmptyState + PartialEq,
 {
     check_type_empty_impl::<T>();
     check_type_empty_impl::<T::Proxy>();
 }
 
-pub(crate) fn check_proxy_round_trip<T>()
+pub(crate) fn check_proxy_round_trip<T, Tag>()
 where
-    T: Debug + EmptyState + PartialEq + Proxiable,
+    T: Debug + EmptyState + PartialEq + Proxiable<Tag>,
     T::Proxy: Debug + EmptyState + PartialEq,
 {
     let start = T::empty();
@@ -447,9 +447,9 @@ where
     assert_eq!(start, end);
 }
 
-pub(crate) fn check_proxy_round_trip_distinguished<T>()
+pub(crate) fn check_proxy_round_trip_distinguished<T, Tag>()
 where
-    T: Debug + EmptyState + Eq + DistinguishedProxiable,
+    T: Debug + EmptyState + Eq + DistinguishedProxiable<Tag>,
     T::Proxy: Debug + EmptyState + Eq,
 {
     let start = T::empty();

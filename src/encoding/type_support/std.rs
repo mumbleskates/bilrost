@@ -1,3 +1,4 @@
+use crate::encoding::proxy::SealedBilrostTag;
 use crate::encoding::value_traits::for_overwrite_via_default;
 use crate::encoding::{
     delegate_encoding, delegate_value_encoding, Collection, EmptyState, ForOverwrite, General, Map,
@@ -150,7 +151,7 @@ impl EmptyState for SystemTime {
     }
 }
 
-impl Proxiable for SystemTime {
+impl Proxiable<SealedBilrostTag> for SystemTime {
     type Proxy = crate::encoding::local_proxy::LocalProxy<u64, 3>;
     fn new_proxy() -> Self::Proxy {
         Self::Proxy::new_empty()
@@ -201,7 +202,7 @@ impl Proxiable for SystemTime {
     }
 }
 
-delegate_value_encoding!(delegate from (General) to (Proxied<Packed<Varint>>)
+delegate_value_encoding!(delegate from (General) to (Proxied<Packed<Varint>, SealedBilrostTag>)
     for type (SystemTime));
 
 #[cfg(test)]
@@ -209,7 +210,7 @@ mod systemtime {
     use super::*;
     use crate::encoding::test::{check_type_empty, check_type_test};
 
-    check_type_empty!(SystemTime, via proxy);
+    check_type_empty!(SystemTime, via proxy with tag SealedBilrostTag);
     check_type_test!(General, relaxed, SystemTime, WireType::LengthDelimited);
 }
 

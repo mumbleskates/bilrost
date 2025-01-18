@@ -9,11 +9,13 @@ use core::ops::Deref;
 
 /// Proxied is a special encoder which translates the encoded type into its "proxy" type first,
 /// simplifying the encoding logic.
-// TODO(widders): if this is published, consider adding a tag type to the parameters so proxy impls
-//  can be sealed by their implementers
-pub struct Proxied<E>(E);
+pub struct Proxied<E, Tag = ()>(E, Tag);
 
-pub(crate) trait Proxiable {
+/// Tag struct used for sealing proxy implementations to our own crate specifically. Other crates
+/// may do the same in order to keep their proxy implementations from leaking.
+pub(crate) struct SealedBilrostTag;
+
+pub trait Proxiable<Tag = ()> {
     type Proxy;
 
     fn new_proxy() -> Self::Proxy;
@@ -23,24 +25,24 @@ pub(crate) trait Proxiable {
     fn decode_proxy(&mut self, proxy: Self::Proxy) -> Result<(), DecodeErrorKind>;
 }
 
-pub(crate) trait DistinguishedProxiable: Proxiable {
+pub trait DistinguishedProxiable<Tag = ()>: Proxiable<Tag> {
     fn decode_proxy_distinguished(
         &mut self,
         proxy: Self::Proxy,
     ) -> Result<Canonicity, DecodeErrorKind>;
 }
 
-impl<T, E> Wiretyped<Proxied<E>> for T
+impl<T, E, Tag> Wiretyped<Proxied<E, Tag>> for T
 where
-    T: Proxiable,
+    T: Proxiable<Tag>,
     T::Proxy: Wiretyped<E>,
 {
     const WIRE_TYPE: WireType = T::Proxy::WIRE_TYPE;
 }
 
-impl<T, E> ValueEncoder<Proxied<E>> for T
+impl<T, E, Tag> ValueEncoder<Proxied<E, Tag>> for T
 where
-    T: Proxiable,
+    T: Proxiable<Tag>,
     T::Proxy: ValueEncoder<E>,
 {
     #[inline]
@@ -83,9 +85,9 @@ where
     }
 }
 
-impl<T, E> ValueDecoder<Proxied<E>> for T
+impl<T, E, Tag> ValueDecoder<Proxied<E, Tag>> for T
 where
-    T: Proxiable,
+    T: Proxiable<Tag>,
     T::Proxy: ValueDecoder<E>,
 {
     #[inline]
@@ -100,9 +102,9 @@ where
     }
 }
 
-impl<T, E> DistinguishedValueDecoder<Proxied<E>> for T
+impl<T, E, Tag> DistinguishedValueDecoder<Proxied<E, Tag>> for T
 where
-    T: DistinguishedProxiable + Eq,
+    T: DistinguishedProxiable<Tag> + Eq,
     T::Proxy: DistinguishedValueDecoder<E>,
 {
     const CHECKS_EMPTY: bool = T::Proxy::CHECKS_EMPTY;
@@ -121,9 +123,9 @@ where
     }
 }
 
-impl<'a, T, E> ValueBorrowDecoder<'a, Proxied<E>> for T
+impl<'a, T, E, Tag> ValueBorrowDecoder<'a, Proxied<E, Tag>> for T
 where
-    T: Proxiable,
+    T: Proxiable<Tag>,
     T::Proxy: ValueBorrowDecoder<'a, E>,
 {
     #[inline]
@@ -138,9 +140,9 @@ where
     }
 }
 
-impl<'a, T, E> DistinguishedValueBorrowDecoder<'a, Proxied<E>> for T
+impl<'a, T, E, Tag> DistinguishedValueBorrowDecoder<'a, Proxied<E, Tag>> for T
 where
-    T: DistinguishedProxiable + Eq,
+    T: DistinguishedProxiable<Tag> + Eq,
     T::Proxy: DistinguishedValueBorrowDecoder<'a, E>,
 {
     const CHECKS_EMPTY: bool = T::Proxy::CHECKS_EMPTY;
