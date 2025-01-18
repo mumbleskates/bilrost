@@ -10,10 +10,10 @@ use bytes::{Buf, BufMut};
 /// Trait to be implemented by (or more commonly derived for) oneofs, which have knowledge of their
 /// variants' tags and encoding.
 ///
-/// `Oneof` (and `DistinguishedOneof`) can be represented in messages because they have an "empty"
-/// state (typically a dedicated empty enum variant or Option::None). When `Oneof` is derived for an
-/// enum that does not have a unit variant, the trait that is actually derived is `NonEmptyOneof`,
-/// which has no empty states and must be wrapped in `Option` at some point to be used.
+/// `Oneof` values can be represented in messages because they have an "empty"  state (typically a
+/// dedicated empty enum variant or Option::None). When `Oneof` is derived for an enum that does not
+/// have a unit variant, the trait that is actually derived is `NonEmptyOneof`, which has no empty
+/// states and must be wrapped in `Option` at some point to be used.
 ///
 /// In addition to decoding into the variants of the oneof, implementations of the maybe-empty
 /// `Oneof` traits need to be able to return and attach useful details to the appropriate errors for
@@ -29,8 +29,8 @@ use bytes::{Buf, BufMut};
 ///   decoding error occurs, while `NonEmptyOneof` does not need to do that.
 ///
 /// There are implementations provided, like `impl<T> Oneof for Option<T> where T: NonEmptyOneof`
-/// for both `Oneof` and `DistinguishedOneof`. These implementations take care of the above
-/// contract boundary as well.
+/// for all relevant oneof decoder traits (see the `generic_oneof_grant_empty_state_impls` mod).
+/// These implementations take care of the above contract boundary as well.
 ///
 /// Other than that: Both empty and non-empty oneofs can be `Box`ed, as there are also wrapper impls
 /// to cover that.
