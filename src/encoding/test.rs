@@ -65,6 +65,54 @@ macro_rules! check_type_test {
 }
 pub(crate) use check_type_test;
 
+macro_rules! check_borrowable {
+    (borrowed: $ty:ty, encoding: $encoding:ty $(,)?) => {
+        crate::encoding::test::check_borrowable!(
+            mod borrow_equivalence,
+            borrowed: $ty,
+            encoding: $encoding,
+        );
+    };
+    (mod $mod_name:ident, borrowed: $ty:ty, encoding: $encoding:ty $(,)?) => {
+        mod $mod_name {
+            #[allow(unused_imports)]
+            use super::*;
+            use crate::encoding::{
+                Capped, DistinguishedValueBorrowDecoder, EmptyState, RestrictedDecodeContext,
+                ValueEncoder,
+            };
+            use crate::Canonicity::Canonical;
+            use alloc::vec::Vec;
+            use core::borrow::Borrow;
+            use proptest::prelude::*;
+
+            proptest! {
+                #[test]
+                fn check(val: <$ty as alloc::borrow::ToOwned>::Owned) {
+                    let mut buf = Vec::new();
+                    ValueEncoder::<$encoding>::encode_value(&val, &mut buf);
+                    let mut borrowed = <&$ty>::empty();
+                    assert_eq!(
+                        DistinguishedValueBorrowDecoder::<$encoding>::
+                            borrow_decode_value_distinguished::<true>
+                        (
+                            &mut borrowed,
+                            Capped::new(&mut buf.as_slice()),
+                            RestrictedDecodeContext::new(Canonical),
+                        )?,
+                        Canonical,
+                    );
+                    assert_eq!(
+                        borrowed,
+                        Borrow::<$ty>::borrow(&val),
+                    );
+                }
+            }
+        }
+    };
+}
+pub(crate) use check_borrowable;
+
 fn check_legal_remaining(tag: u32, wire_type: WireType, remaining: usize) -> TestCaseResult {
     match wire_type {
         WireType::SixtyFourBit => 8..=8,

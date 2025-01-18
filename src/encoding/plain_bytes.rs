@@ -69,6 +69,11 @@ impl<'a> DistinguishedValueBorrowDecoder<'a, PlainBytes> for &'a [u8] {
     }
 }
 
+#[cfg(test)]
+mod ref_bytes {
+    crate::encoding::test::check_borrowable!(borrowed: [u8], encoding: crate::encoding::PlainBytes);
+}
+
 impl Wiretyped<PlainBytes> for Vec<u8> {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
 }
@@ -280,6 +285,20 @@ impl<'a, const N: usize> DistinguishedValueBorrowDecoder<'a, PlainBytes> for &'a
         ValueBorrowDecoder::<PlainBytes>::borrow_decode_value(value, buf, ctx.into_inner())?;
         Ok(Canonicity::Canonical)
     }
+}
+
+#[cfg(test)]
+mod ref_u8_array {
+    crate::encoding::test::check_borrowable!(
+        mod one_byte,
+        borrowed: [u8; 1],
+        encoding: crate::encoding::PlainBytes,
+    );
+    crate::encoding::test::check_borrowable!(
+        mod ten_bytes,
+        borrowed: [u8; 10],
+        encoding: crate::encoding::PlainBytes,
+    );
 }
 
 #[cfg(test)]

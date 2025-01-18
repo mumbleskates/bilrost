@@ -115,6 +115,11 @@ impl<'a> DistinguishedValueBorrowDecoder<'a, General> for &'a str {
     }
 }
 
+#[cfg(test)]
+mod ref_str {
+    crate::encoding::test::check_borrowable!(borrowed: str, encoding: crate::encoding::General);
+}
+
 impl Wiretyped<General> for String {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
 }

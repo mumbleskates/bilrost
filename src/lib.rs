@@ -27,11 +27,11 @@ pub mod encoding;
 #[doc(hidden)]
 mod iter;
 
+pub use crate::encoding::{Canonicity, Enumeration, WithCanonicity};
+pub use crate::error::{DecodeError, DecodeErrorKind, EncodeError};
 pub use crate::message::{
     BorrowedMessage, DistinguishedBorrowedMessage, DistinguishedOwnedMessage, Message, OwnedMessage,
 };
-pub use crate::encoding::{Canonicity, Enumeration, WithCanonicity};
-pub use crate::error::{DecodeError, DecodeErrorKind, EncodeError};
 
 pub use types::Blob;
 
