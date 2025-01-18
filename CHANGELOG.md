@@ -29,11 +29,19 @@ functionality in scope.
 
 ### New features
 
-* It is now possible to do borrowed/zero-copy decoding, which is enabled by
+* It is now possible to do borrowed zero-copy decoding, which is enabled by
   default and available in the derive macros. This decodes from a `&[u8]` slice
   with lifetime into messages that may reference its data.
   * This adds support for `&str`, `&[u8]`, `&[u8; N]`, and `&bstr::BStr`; `Cow`
     for these borrowed types also decodes as `Cow::Borrowed(&..)`.
+  * With this addition, there are now two different ways to have zero-copy
+    decoding that each work slightly differently:
+    1. Decode directly from `bytes::Bytes` and into fields of type
+       `bytes::Bytes` or `bytestring::Bytestring`. This yields owned, refcounted
+       handles to the original data.
+    2. Decode borrowed from `&[u8]` and into fields of type `&str`, `&[u8]`,
+       `&[u8; N]`, or `&bstr::BStr`. This yields data borrowed for a lifetime at
+       very low cost, protected by the borrow checker rather than a refcount.
 * Derive macros are now simpler to use, so now deriving all encoding and
   decoding impls for messages and oneofs is done only with `Message` and
   `Oneof`, and distinguished implementations are switched on and off by
