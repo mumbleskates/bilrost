@@ -115,6 +115,7 @@ macro_rules! check_borrowable {
                 ValueEncoder, DecodeContext
             };
             use crate::Canonicity::Canonical;
+            use alloc::format;
             use alloc::vec::Vec;
             use core::borrow::Borrow;
             use proptest::prelude::*;
@@ -133,25 +134,25 @@ macro_rules! check_borrowable {
                         &mut borrowed,
                         Capped::new(&mut buf.as_slice()),
                         DecodeContext::default(),
-                    )?;
-                    assert_eq!(
+                    ).expect("failed to borrow-decode");
+                    prop_assert_eq!(
                         borrowed,
                         Borrow::<$ty>::borrow(&val),
                     );
 
                     // distinguished borrowed decoding
                     let mut borrowed = <&$ty>::empty();
-                    assert_eq!(
+                    prop_assert_eq!(
                         DistinguishedValueBorrowDecoder::<$encoding>::
                             borrow_decode_value_distinguished::<true>
                         (
                             &mut borrowed,
                             Capped::new(&mut buf.as_slice()),
                             RestrictedDecodeContext::new(Canonical),
-                        )?,
+                        ).expect("failed to borrow-decode"),
                         Canonical,
                     );
-                    assert_eq!(
+                    prop_assert_eq!(
                         borrowed,
                         Borrow::<$ty>::borrow(&val),
                     );
