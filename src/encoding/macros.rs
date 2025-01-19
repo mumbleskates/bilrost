@@ -160,6 +160,11 @@ pub use delegate_encoding;
 /// fields themselves. Most built-in encodings in bilrost have the ability to encode any type they
 /// can encode as a value as a message field as well; a notable exception is the special `Proxied`
 /// encoding, which cannot.
+///
+/// Also includes support for providing borrowed value decoding implementations that delegate to the
+/// owned implementation, for types which have no borrowed representation. Most types supported by
+/// `bilrost` cannot be meaningfully borrowed and delegate their borrowed decoding impls back to the
+/// owned impls this way.
 #[macro_export]
 macro_rules! delegate_value_encoding {
     (
