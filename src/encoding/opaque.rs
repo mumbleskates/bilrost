@@ -262,10 +262,9 @@ impl<'a> OpaqueValue<'a> {
     }
 }
 
-/// Represents a bilrost field, with its tag and value. `OpaqueMessage` can encode and decode *any*
-/// potentially valid bilrost message as opaque values, and will re-encode the exact same bytes.
-/// Likewise, any state representable by `OpaqueMessage` encodes a potentially valid bilrost
-/// message.
+/// Represents a decoded Bilrost message. `OpaqueMessage` can encode and decode *any* potentially
+/// valid Bilrost message, and will re-encode the exact same bytes. The type is fully bijective to
+/// the set of potentially valid encoded Bilrost messages.
 ///
 /// At present this is still an unstable API, mostly used for internals and testing. Trait
 /// implementations and APIs of `OpaqueMessage` and `OpaqueValue` are subject to change.
@@ -301,13 +300,12 @@ impl<'a> OpaqueMessage<'a> {
     /// Converts this message to a fully owned deep copy.
     pub fn convert_to_owned(mut self) -> OpaqueMessage<'static> {
         for (_, value) in self.iter_mut() {
-            let LengthDelimited(Cow::Borrowed(borrowed)) = value else {
-                continue;
-            };
-            let owned_value = borrowed.to_owned();
-            *value = LengthDelimited(Cow::Owned(owned_value));
+            if let LengthDelimited(delimited) = value {
+                delimited.to_mut();
+            }
         }
-        // SAFETY: we've converted every `Cow` in the structure to `Owned` in-place
+        // SAFETY: we've converted every `Cow` in the structure to `Owned` in-place; no values that
+        // have the lifetime we are transmuting can still exist
         unsafe { mem::transmute(self) }
     }
 }
