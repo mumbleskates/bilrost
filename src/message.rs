@@ -434,6 +434,14 @@ pub trait BorrowedMessage<'a>: Message {
         Self: Sized;
 
     /// Decodes a length-delimited instance of the message from the buffer.
+    ///
+    /// * If the message decodes successfully, the provided slice will be shortened to no longer
+    ///   include the bytes that encoded it or its length delimiter.
+    /// * If the message is correctly delimited within the bounds of the slice but fails to decode,
+    ///   the provided slice will still be shortened even though an error is returned.
+    /// * If the slice is shorter than the length delimiter indicates, or if the length delimiter
+    ///   itself is truncated, an error with Truncated kind is returned and it is unspecified how
+    ///   the provided slice value is modified.
     fn decode_borrowed_length_delimited(buf: &mut &'a [u8]) -> Result<Self, DecodeError>
     where
         Self: Sized;
@@ -445,6 +453,14 @@ pub trait BorrowedMessage<'a>: Message {
 
     /// Decodes the non-ignored fields of this message, replacing their values from a
     /// length-delimited value encoded in the buffer.
+    ///
+    /// * If the message decodes successfully, the provided slice will be shortened to no longer
+    ///   include the bytes that encoded it or its length delimiter.
+    /// * If the message is correctly delimited within the bounds of the slice but fails to decode,
+    ///   the provided slice will still be shortened even though an error is returned.
+    /// * If the slice is shorter than the length delimiter indicates, or if the length delimiter
+    ///   itself is truncated, an error with Truncated kind is returned and it is unspecified how
+    ///   the provided slice value is modified.
     fn replace_borrowed_from_length_delimited(
         &mut self,
         buf: &mut &'a [u8],
@@ -488,6 +504,14 @@ pub trait DistinguishedBorrowedMessage<'a>: BorrowedMessage<'a> {
         Self: Sized;
 
     /// Decodes a length-delimited instance of the message from the buffer in distinguished mode.
+    ///
+    /// * If the message decodes successfully, the provided slice will be shortened to no longer
+    ///   include the bytes that encoded it or its length delimiter.
+    /// * If the message is correctly delimited within the bounds of the slice but fails to decode,
+    ///   the provided slice will still be shortened even though an error is returned.
+    /// * If the slice is shorter than the length delimiter indicates, or if the length delimiter
+    ///   itself is truncated, an error with Truncated kind is returned and it is unspecified how
+    ///   the provided slice value is modified.
     fn decode_distinguished_borrowed_length_delimited(
         buf: &mut &'a [u8],
     ) -> Result<(Self, Canonicity), DecodeError>
@@ -505,6 +529,14 @@ pub trait DistinguishedBorrowedMessage<'a>: BorrowedMessage<'a> {
 
     /// Decodes the non-ignored fields of this message in distinguished mode, replacing their values
     /// from a length-delimited value encoded in the buffer.
+    ///
+    /// * If the message decodes successfully, the provided slice will be shortened to no longer
+    ///   include the bytes that encoded it or its length delimiter.
+    /// * If the message is correctly delimited within the bounds of the slice but fails to decode,
+    ///   the provided slice will still be shortened even though an error is returned.
+    /// * If the slice is shorter than the length delimiter indicates, or if the length delimiter
+    ///   itself is truncated, an error with Truncated kind is returned and it is unspecified how
+    ///   the provided slice value is modified.
     fn replace_distinguished_borrowed_from_length_delimited(
         &mut self,
         buf: &mut &'a [u8],
@@ -523,6 +555,14 @@ pub trait DistinguishedBorrowedMessage<'a>: BorrowedMessage<'a> {
         Self: Sized;
 
     /// Decodes a length-delimited instance of the message from the buffer in restricted mode.
+    ///
+    /// * If the message decodes successfully, the provided slice will be shortened to no longer
+    ///   include the bytes that encoded it or its length delimiter.
+    /// * If the message is correctly delimited within the bounds of the slice but fails to decode,
+    ///   the provided slice will still be shortened even though an error is returned.
+    /// * If the slice is shorter than the length delimiter indicates, or if the length delimiter
+    ///   itself is truncated, an error with Truncated kind is returned and it is unspecified how
+    ///   the provided slice value is modified.
     fn decode_restricted_borrowed_length_delimited(
         buf: &mut &'a [u8],
         restrict_to: Canonicity,
@@ -542,6 +582,14 @@ pub trait DistinguishedBorrowedMessage<'a>: BorrowedMessage<'a> {
 
     /// Decodes the non-ignored fields of this message in restricted mode, replacing their values
     /// from a length-delimited value encoded in the buffer.
+    ///
+    /// * If the message decodes successfully, the provided slice will be shortened to no longer
+    ///   include the bytes that encoded it or its length delimiter.
+    /// * If the message is correctly delimited within the bounds of the slice but fails to decode,
+    ///   the provided slice will still be shortened even though an error is returned.
+    /// * If the slice is shorter than the length delimiter indicates, or if the length delimiter
+    ///   itself is truncated, an error with Truncated kind is returned and it is unspecified how
+    ///   the provided slice value is modified.
     fn replace_restricted_borrowed_from_length_delimited(
         &mut self,
         buf: &mut &'a [u8],
@@ -558,6 +606,14 @@ pub trait DistinguishedBorrowedMessage<'a>: BorrowedMessage<'a> {
         Self: Sized;
 
     /// Decodes a length-delimited instance of the message from the buffer in canonical mode.
+    ///
+    /// * If the message decodes successfully, the provided slice will be shortened to no longer
+    ///   include the bytes that encoded it or its length delimiter.
+    /// * If the message is correctly delimited within the bounds of the slice but fails to decode,
+    ///   the provided slice will still be shortened even though an error is returned.
+    /// * If the slice is shorter than the length delimiter indicates, or if the length delimiter
+    ///   itself is truncated, an error with Truncated kind is returned and it is unspecified how
+    ///   the provided slice value is modified.
     fn decode_canonical_borrowed_length_delimited(buf: &mut &'a [u8]) -> Result<Self, DecodeError>
     where
         Self: Sized;
@@ -570,6 +626,14 @@ pub trait DistinguishedBorrowedMessage<'a>: BorrowedMessage<'a> {
 
     /// Decodes the non-ignored fields of this message in canonical mode, replacing their values
     /// from a length-delimited value encoded in the buffer.
+    ///
+    /// * If the message decodes successfully, the provided slice will be shortened to no longer
+    ///   include the bytes that encoded it or its length delimiter.
+    /// * If the message is correctly delimited within the bounds of the slice but fails to decode,
+    ///   the provided slice will still be shortened even though an error is returned.
+    /// * If the slice is shorter than the length delimiter indicates, or if the length delimiter
+    ///   itself is truncated, an error with Truncated kind is returned and it is unspecified how
+    ///   the provided slice value is modified.
     fn replace_canonical_borrowed_from_length_delimited(
         &mut self,
         buf: &mut &'a [u8],
@@ -1026,7 +1090,6 @@ where
         Ok(message)
     }
 
-    // TODO(widders): test that this shortens the slice. canonical call versions too; 8 total
     fn decode_borrowed_length_delimited(buf: &mut &'a [u8]) -> Result<Self, DecodeError> {
         Self::decode_borrowed(Capped::new(buf).take_borrowed_length_delimited()?)
     }

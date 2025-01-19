@@ -7,7 +7,7 @@ use bilrost::encoding::{
     encode_varint, Collection, DistinguishedOneofDecoder, EmptyState, General, Oneof, OneofDecoder,
     Varint,
 };
-use bilrost::Canonicity::{HasExtensions, NotCanonical};
+use bilrost::Canonicity::{Canonical, HasExtensions, NotCanonical};
 use bilrost::DecodeErrorKind::{
     ConflictingFields, InvalidValue, InvalidVarint, OutOfDomainValue, TagOverflowed, Truncated,
     UnexpectedlyRepeated, WrongWireType,
@@ -4198,4 +4198,100 @@ fn unknown_fields_distinguished() {
             (NotCanonical, "Foo.oneof/InnerOneof.Three/Nested.0"),
         ],
     );
+}
+
+#[test]
+fn length_delimited_borrowed_decoding_shortens_input_slices() {
+    #[derive(Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
+    struct Foo<'a>(u64, &'a str);
+
+    let originals = [
+        Foo(1, "decode relaxed"),
+        Foo(2, "replace relaxed"),
+        Foo(3, "decode distinguished"),
+        Foo(4, "replace distinguished"),
+        Foo(5, "decode restricted"),
+        Foo(6, "replace restricted"),
+        Foo(7, "decode canonical"),
+        Foo(8, "replace canonical"),
+    ];
+
+    // build length-delimited set of messages in one buffer
+    let mut buf = vec![];
+    for m in &originals {
+        m.encode_length_delimited(&mut buf).unwrap();
+    }
+
+    let mut slice = buf.as_slice();
+
+    // We expect the messages come out in the same order, because each of these methods requires
+    // `&mut &[u8]` and will mutate the slice
+    let mut expectations = originals.into_iter();
+    let mut expected_next = || {
+        expectations
+            .next()
+            .ok_or(bilrost::DecodeError::new(DecodeErrorKind::Other))
+    };
+
+    let mut replaceable = Foo::empty();
+
+    assert_eq!(
+        Foo::decode_borrowed_length_delimited(&mut slice),
+        expected_next()
+    );
+
+    assert_eq!(
+        (
+            replaceable.replace_borrowed_from_length_delimited(&mut slice),
+            &replaceable
+        ),
+        (Ok(()), &expected_next().unwrap())
+    );
+
+    assert_eq!(
+        Foo::decode_distinguished_borrowed_length_delimited(&mut slice),
+        expected_next().map(|foo| (foo, Canonical))
+    );
+
+    assert_eq!(
+        (
+            replaceable.replace_distinguished_borrowed_from_length_delimited(&mut slice),
+            &replaceable
+        ),
+        (Ok(Canonical), &expected_next().unwrap())
+    );
+
+    assert_eq!(
+        Foo::decode_restricted_borrowed_length_delimited(&mut slice, Canonical),
+        expected_next().map(|foo| (foo, Canonical))
+    );
+
+    assert_eq!(
+        (
+            replaceable.replace_restricted_borrowed_from_length_delimited(&mut slice, Canonical),
+            &replaceable
+        ),
+        (Ok(Canonical), &expected_next().unwrap())
+    );
+
+    assert_eq!(
+        Foo::decode_canonical_borrowed_length_delimited(&mut slice),
+        expected_next()
+    );
+
+    assert_eq!(
+        (
+            replaceable.replace_canonical_borrowed_from_length_delimited(&mut slice),
+            &replaceable
+        ),
+        (Ok(()), &expected_next().unwrap())
+    );
+
+    assert!(slice.is_empty());
+}
+
+#[test]
+fn length_delimited_borrowed_decoding_fails_sensibly() {
+    
 }
