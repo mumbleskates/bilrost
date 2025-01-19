@@ -46,6 +46,8 @@ functionality in scope.
   decoding impls for messages and oneofs is done only with `Message` and
   `Oneof`, and distinguished implementations are switched on and off by
   attribute.
+* Opened the gates for crate documentation in the `encoding` module as the crate
+  is getting closer to what could become a stable release.
 * Added `From<Vec<u8>>` and `From<Box<[u8]>>` impls for `ReverseBuffer`.
 * **EXPERIMENTAL**: Made public a couple macros and the proxying traits &
   encoding type; see `encoding::{Proxied, Proxiable}` for details.
@@ -61,8 +63,7 @@ functionality in scope.
 * Changed internal and external phrasing from "expedient" encoding to "relaxed".
 * More reorganization and file cleanups, splitting up some large files into more
   modules etc.
-* Cleaned up some docs in the `encoding` module and opened it up for
-  documentation.
+* Cleaned up some docs in the `encoding` module.
 
 ## V0.1011.1
 
