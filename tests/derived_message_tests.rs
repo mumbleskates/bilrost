@@ -4290,8 +4290,3 @@ fn length_delimited_borrowed_decoding_shortens_input_slices() {
 
     assert!(slice.is_empty());
 }
-
-#[test]
-fn length_delimited_borrowed_decoding_fails_sensibly() {
-    
-}
