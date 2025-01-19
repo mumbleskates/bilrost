@@ -1,4 +1,6 @@
-/// Macro rules for expressly delegating from one encoder to another.
+//! Macro rules for expressly delegating from one encoder to another.
+
+/// Expressly delegates support for encoding message fields from one encoding to another.
 #[macro_export]
 macro_rules! delegate_encoding {
     (
@@ -154,7 +156,10 @@ macro_rules! delegate_encoding {
 }
 pub use delegate_encoding;
 
-/// This macro creates delegated `ValueEncoder` impls for a given type from one encoder to another.
+/// Expressly delegates support for encoding *values* from one encoding to another, but not message
+/// fields themselves. Most built-in encodings in bilrost have the ability to encode any type they
+/// can encode as a value as a message field as well; a notable exception is the special `Proxied`
+/// encoding, which cannot.
 #[macro_export]
 macro_rules! delegate_value_encoding {
     (
@@ -392,14 +397,14 @@ macro_rules! __impl_decoder_where_value_decoder {
         {
             #[inline(always)]
             fn $relaxed_method $($($buf_generic)*)? (
-                wire_type: WireType,
+                wire_type: $crate::encoding::WireType,
                 duplicated: bool,
                 value: &mut T,
-                buf: Capped<$buf_ty>,
-                ctx: DecodeContext,
-            ) -> Result<(), $crate::DecodeError> {
+                buf: $crate::encoding::Capped<$buf_ty>,
+                ctx: $crate::encoding::DecodeContext,
+            ) -> ::core::result::Result<(), $crate::DecodeError> {
                 if duplicated {
-                    return Err(
+                    return ::core::result::Result::Err(
                         $crate::DecodeError::new($crate::DecodeErrorKind::UnexpectedlyRepeated)
                     );
                 }
@@ -414,7 +419,7 @@ macro_rules! __impl_decoder_where_value_decoder {
         impl<$($lifetime,)? T $(, $($generics)*)?>
         $crate::encoding::$distinguished <$($lifetime,)? $encoding> for T
         where
-            T: Eq
+            T: ::core::cmp::Eq
                 + $crate::encoding::EmptyState
                 + $crate::encoding::$distinguished_value <$($lifetime,)? $encoding>,
             $($($where_clause)*)?
@@ -426,9 +431,9 @@ macro_rules! __impl_decoder_where_value_decoder {
                 value: &mut T,
                 buf: $crate::encoding::Capped<$buf_ty>,
                 ctx: $crate::encoding::RestrictedDecodeContext,
-            ) -> Result<$crate::Canonicity, $crate::DecodeError> {
+            ) -> ::core::result::Result<$crate::Canonicity, $crate::DecodeError> {
                 if duplicated {
-                    return Err(
+                    return ::core::result::Result::Err(
                         $crate::DecodeError::new(crate::DecodeErrorKind::UnexpectedlyRepeated)
                     );
                 }
@@ -463,7 +468,7 @@ macro_rules! encoding_implemented_via_value_encoding {
             $($($where_clause)*)?
         {
             #[inline(always)]
-            fn encode<B: BufMut + ?Sized>(
+            fn encode<B: $crate::bytes::BufMut + ?Sized>(
                 tag: u32,
                 value: &T,
                 buf: &mut B,
@@ -529,8 +534,9 @@ pub(crate) use encoding_implemented_via_value_encoding;
 /// 2. if we try to define an impl that generalizes for just one encoder, we cannot spell the type
 ///    of the value we are encoding because it's a reference and we need to be able to encode it by
 ///    two different lifetimes
-/// 3. we cannot make encoding work through references, because implementing ValueEncoder<E> for &T
-///    where T: ValueEncoder collides with public and externally implementable traits
+/// 3. we cannot make encoding work through references, because implementing
+///    `ValueEncoder<E> for &T where T: ValueEncoder` collides with public and externally
+///    implementable traits
 /// 4. we cannot make encoding work on the referenced data instead of the owned data, because most
 ///    types don't have a referent at all and are just a value
 ///
