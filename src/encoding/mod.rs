@@ -1,6 +1,18 @@
 //! This is the module that defines the core encoding implementation for bilrost, including the
 //! traits that dispatch it.
 //!
+//! ---
+//!
+//! ⚠️ All of the things beneath this module are "under the hood" and are intended for consumption
+//! of `bilrost` itself, in the output of the derive macros of the exactly matching version of the
+//! library. Historically these have undergone significant evolution, and stability of outside use
+//! of anything in or under this module is to be considered **EXPERIMENTAL** until further notice.
+//! That said, the changes that have been made over time are all aimed at eventual stability and a
+//! useful set of features for advanced external users to have a set of tools to work around
+//! annoyances and end up with a result that is as pleasing, ergonomic, and performant as possible.
+//!
+//! ---
+//!
 //! There are a whole product of traits for encoding and decoding in bilrost, based on the type of
 //! value and the capability.
 //!
@@ -66,16 +78,16 @@
 //! * `Fixed`, for fixed-width encodings of either 4 or 8 bytes
 //! * `General`, the default encoding
 //! * `Map<KE, VE>`, which encodes key/value mappings where the keys are encoded by the given
-//!   encodings KE and VE
+//!   encodings `KE` and `VE`
 //! * `Packed<E>`, which encodes homogenous containers as a value packed in a single field with the
-//!   given encoding E
+//!   given encoding `E`
 //! * `PlainBytes`, which implements encodings for `[u8]`-like types
-//! * `Proxied<E>`, which encodes values with the given encoding E after translating them to and
+//! * `Proxied<E>`, which encodes values with the given encoding `E` after translating them to and
 //!   from a proxy type using the Proxiable traits
 //! * `(T1, T2, ...)`, which implements encoding for tuples which have corresponding fields
 //! * `Unpacked<E>`, which encodes homogenous containers as zero or more values each encoded as
-//!   their own message field
-//! * `Varint`, which encodes all integers in the varint format (even u8 and i8)
+//!   their own message field with the given encoding `E`
+//! * `Varint`, which encodes all integers in the varint format (even `u8` and `i8`)
 //!
 //! Type support for third party types and for many common aspects of core type implementations can
 //! be found in the `type_support` sub-module tree.
@@ -145,8 +157,8 @@ pub use oneof::{
     NonEmptyOneofBorrowDecoder, NonEmptyOneofDecoder,
 };
 pub use value_traits::{
-    empty_state_via_for_overwrite, empty_state_via_default, for_overwrite_via_default, Collection, DistinguishedCollection,
-    DistinguishedMapping, EmptyState, Enumeration, ForOverwrite, Mapping,
+    empty_state_via_default, empty_state_via_for_overwrite, for_overwrite_via_default, Collection,
+    DistinguishedCollection, DistinguishedMapping, EmptyState, Enumeration, ForOverwrite, Mapping,
 };
 
 /// Fixed-size encoder. Encodes integers in fixed-size format.
@@ -166,10 +178,8 @@ pub use unpacked::Unpacked;
 /// Varint encoder. Encodes integer types as varints.
 pub use varint::Varint;
 
-/// Proxied is an encoding that provides value-encoding implementations for types that implement
-/// their encoded representations by first translating to another type that is already supported.
-///
-/// This encoding is not yet made available outside the crate.
+// Proxied is an encoding that provides value-encoding implementations for types that implement
+// their encoded representations by first translating to another type that is already supported.
 pub use proxy::{DistinguishedProxiable, Proxiable, Proxied};
 
 // This is an array of the smallest values whose varint representation is N+1 bytes, where N is the
@@ -657,6 +667,7 @@ pub const fn encoded_len_varint(value: u64) -> usize {
     }
 }
 
+/// Represents one of the four opaque field types of a Bilrost message field on the wire.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
 pub enum WireType {
@@ -762,6 +773,8 @@ impl TagRevWriter {
     }
 }
 
+/// Trait for simulating the writing of tags in order to measure the length that an encoding would
+/// be.
 pub trait TagMeasurer {
     fn key_len(&mut self, tag: u32) -> usize;
 }
@@ -791,6 +804,9 @@ impl TagMeasurer for RuntimeTagMeasurer {
     }
 }
 
+/// Simulator for writing tags which assumes that tags will never need to be encoded in more than
+/// a single byte. This holds true in a number of message types that can't output large tag numbers,
+/// such as tuples.
 #[derive(Default)]
 pub struct TrivialTagMeasurer {
     #[cfg(debug_assertions)]

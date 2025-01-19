@@ -97,8 +97,8 @@ pub(crate) fn borrow_merge_distinguished<'a, T: RawDistinguishedMessageBorrowDec
     Ok(canon)
 }
 
-/// Trait to be implemented by messages, which have knowledge of their fields' tags and encoding.
-/// The methods of this trait are meant to only be used by the `Message` implementation.
+/// Encoding trait to be implemented by messages. The methods of this trait are meant to only be
+/// used by the `Message` implementation.
 pub trait RawMessage: EmptyState {
     const __ASSERTIONS: ();
 
@@ -114,6 +114,8 @@ pub trait RawMessage: EmptyState {
     fn raw_encoded_len(&self) -> usize;
 }
 
+/// Decoding trait to be implemented by messages. The methods of this trait are meant to only be
+/// used by the `OwnedMessage` implementation.
 pub trait RawMessageDecoder: RawMessage {
     /// Decodes a field from a buffer into `self`.
     fn raw_decode_field<B: Buf + ?Sized>(
@@ -128,8 +130,8 @@ pub trait RawMessageDecoder: RawMessage {
         Self: Sized;
 }
 
-/// Complementary underlying trait for distinguished messages, all of whose fields have a
-/// distinguished encoding.
+/// Distinguished decoding trait to be implemented by messages. The methods of this trait are meant
+/// to only be used by the `DistinguishedOwnedMessage` implementation.
 pub trait RawDistinguishedMessageDecoder: RawMessage + Eq {
     fn raw_decode_field_distinguished<B: Buf + ?Sized>(
         &mut self,
@@ -143,6 +145,8 @@ pub trait RawDistinguishedMessageDecoder: RawMessage + Eq {
         Self: Sized;
 }
 
+/// Borrowed decoding trait to be implemented by messages. The methods of this trait are meant to
+/// only be used by the `BorrowedMessage` implementation.
 pub trait RawMessageBorrowDecoder<'a>: RawMessage {
     /// Decodes a field from a buffer into `self` from a borrowed slice.
     fn raw_borrow_decode_field(
@@ -157,6 +161,8 @@ pub trait RawMessageBorrowDecoder<'a>: RawMessage {
         Self: Sized;
 }
 
+/// Borrowed distinguished decoding trait to be implemented by messages. The methods of this trait
+/// are meant to only be used by the `DistinguishedBorrowedMessage` implementation.
 pub trait RawDistinguishedMessageBorrowDecoder<'a>: RawMessage + Eq {
     fn raw_borrow_decode_field_distinguished(
         &mut self,

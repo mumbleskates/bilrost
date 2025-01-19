@@ -102,7 +102,6 @@ macro_rules! empty_state_via_default {
 }
 pub use empty_state_via_default;
 
-
 /// Proxy trait for enumeration types conversions to and from `u32`
 pub trait Enumeration: Eq + Sized {
     /// Gets the numeric value of the enumeration.

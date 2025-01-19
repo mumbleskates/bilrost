@@ -153,10 +153,11 @@ pub trait OwnedMessage: Message {
 /// * "canonical" methods, which are shorthand for "restricted" methods with `Canonical` constraint
 ///   and do not return the `Canonicity`, because it will always be fully `Canonical`.
 ///
-/// Note that currently the only restriction level that is sensible to explicitly pass to
+/// Note that currently the only restriction level that is sensible to *explicitly* pass to
 /// "restricted" methods is `HasExtensions`: "distinguished" methods already dispatch to passing
 /// `NotCanonical`, and when `Canonical` is passed only `Canonical` can be returned from a
-/// successful result (hence the "canonical" methods).
+/// successful result (hence the "canonical" methods). It can of course make sense to call these
+/// methods with a varying restriction level.
 pub trait DistinguishedOwnedMessage: OwnedMessage {
     // ------------ Distinguished mode ------------
 
@@ -471,10 +472,11 @@ pub trait BorrowedMessage<'a>: Message {
 /// * "canonical" methods, which are shorthand for "restricted" methods with `Canonical` constraint
 ///   and do not return the `Canonicity`, because it will always be fully `Canonical`.
 ///
-/// Note that currently the only restriction level that is sensible to explicitly pass to
+/// Note that currently the only restriction level that is sensible to *explicitly* pass to
 /// "restricted" methods is `HasExtensions`: "distinguished" methods already dispatch to passing
 /// `NotCanonical`, and when `Canonical` is passed only `Canonical` can be returned from a
-/// successful result (hence the "canonical" methods).
+/// successful result (hence the "canonical" methods). It can of course make sense to call these
+/// methods with a varying restriction level.
 pub trait DistinguishedBorrowedMessage<'a>: BorrowedMessage<'a> {
     // ------------ Distinguished mode ------------
 

@@ -54,6 +54,7 @@ pub trait Oneof: EmptyState {
     fn oneof_variant_name(tag: u32) -> (&'static str, &'static str);
 }
 
+/// Relaxed owned decoding trait for oneofs.
 pub trait OneofDecoder: Oneof {
     /// Decodes from the given buffer.
     fn oneof_decode_field<B: Buf + ?Sized>(
@@ -65,8 +66,7 @@ pub trait OneofDecoder: Oneof {
     ) -> Result<(), DecodeError>;
 }
 
-/// Trait to be implemented by (or more commonly derived for) oneofs, which have knowledge of their
-/// variants' tags and encoding.
+/// Distinguished owned decoding trait for oneofs.
 pub trait DistinguishedOneofDecoder: Oneof {
     /// Decodes from the given buffer in distinguished mode.
     fn oneof_decode_field_distinguished<B: Buf + ?Sized>(
@@ -78,6 +78,7 @@ pub trait DistinguishedOneofDecoder: Oneof {
     ) -> Result<Canonicity, DecodeError>;
 }
 
+/// Relaxed borrowed decoding trait for oneofs.
 pub trait OneofBorrowDecoder<'a>: Oneof {
     fn oneof_borrow_decode_field(
         value: &mut Self,
@@ -88,6 +89,7 @@ pub trait OneofBorrowDecoder<'a>: Oneof {
     ) -> Result<(), DecodeError>;
 }
 
+/// Distinguished borrowed decoding trait for oneofs.
 pub trait DistinguishedOneofBorrowDecoder<'a>: Oneof {
     fn oneof_borrow_decode_field_distinguished(
         value: &mut Self,
@@ -99,7 +101,9 @@ pub trait DistinguishedOneofBorrowDecoder<'a>: Oneof {
 }
 
 /// Underlying trait for a oneof that has no inherent "empty" variant, opting instead to be wrapped
-/// in an `Option`.
+/// in an `Option`. This is the real trait that is derived for `enum` types that don't have a
+/// natural unit variant. Like the other `Oneof` traits, this is not intended for use by library
+/// users.
 pub trait NonEmptyOneof {
     const FIELD_TAGS: &'static [u32];
 
@@ -120,6 +124,7 @@ pub trait NonEmptyOneof {
     fn oneof_variant_name(tag: u32) -> (&'static str, &'static str);
 }
 
+/// Relaxed owned decoding trait for non-empty oneofs.
 pub trait NonEmptyOneofDecoder: NonEmptyOneof + Sized {
     /// Decodes from the given buffer.
     fn oneof_decode_field<B: Buf + ?Sized>(
@@ -130,8 +135,7 @@ pub trait NonEmptyOneofDecoder: NonEmptyOneof + Sized {
     ) -> Result<Self, DecodeError>;
 }
 
-/// Underlying trait for a oneof that has no inherent "empty" variant, opting instead to be wrapped
-/// in an `Option`.
+/// Distinguished owned decoding trait for non-empty oneofs.
 pub trait NonEmptyDistinguishedOneofDecoder: NonEmptyOneof + Sized {
     /// Decodes from the given buffer.
     fn oneof_decode_field_distinguished<B: Buf + ?Sized>(
@@ -142,6 +146,7 @@ pub trait NonEmptyDistinguishedOneofDecoder: NonEmptyOneof + Sized {
     ) -> Result<(Self, Canonicity), DecodeError>;
 }
 
+/// Relaxed borrowed decoding trait for non-empty oneofs.
 pub trait NonEmptyOneofBorrowDecoder<'a>: NonEmptyOneof + Sized {
     fn oneof_borrow_decode_field(
         tag: u32,
@@ -151,6 +156,7 @@ pub trait NonEmptyOneofBorrowDecoder<'a>: NonEmptyOneof + Sized {
     ) -> Result<Self, DecodeError>;
 }
 
+/// Distinguished borrowed decoding trait for non-empty oneofs.
 pub trait NonEmptyDistinguishedOneofBorrowDecoder<'a>: NonEmptyOneof + Sized {
     fn oneof_borrow_decode_field_distinguished(
         tag: u32,

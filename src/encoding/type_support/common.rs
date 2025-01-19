@@ -5,9 +5,9 @@ pub(crate) mod time_proxies {
         underived_decode, underived_decode_distinguished, underived_encode, underived_encoded_len,
         underived_prepend,
     };
-    use crate::encoding::{empty_state_via_default,
-        Capped, DecodeContext, DistinguishedValueDecoder, Fixed, General, RestrictedDecodeContext,
-        ValueDecoder, ValueEncoder, WireType, Wiretyped,
+    use crate::encoding::{
+        empty_state_via_default, Capped, DecodeContext, DistinguishedValueDecoder, Fixed, General,
+        RestrictedDecodeContext, ValueDecoder, ValueEncoder, WireType, Wiretyped,
     };
     use crate::DecodeErrorKind::InvalidValue;
     use crate::{Canonicity, DecodeError};

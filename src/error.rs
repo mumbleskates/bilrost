@@ -23,9 +23,9 @@ pub enum DecodeErrorKind {
     ConflictingFields,
     /// A field or part of a value occurred multiple times when it should not.
     UnexpectedlyRepeated,
-    /// A value was not encoded canonically. (Distinguished-mode error)
+    /// A value was not encoded canonically. (distinguished decoding error)
     NotCanonical,
-    /// Unknown fields were encountered. (Distinguished-mode error)
+    /// Unknown fields were encountered. (distinguished decoding error)
     UnknownField,
     /// Recursion limit was reached when parsing.
     RecursionLimitReached,

@@ -25,7 +25,7 @@ pub trait Encoder<E> {
     fn encoded_len(tag: u32, value: &Self, tm: &mut impl TagMeasurer) -> usize;
 }
 
-// The core trait for decoding bilrost data. Data must always be copied from the buffer.
+/// The core trait for decoding bilrost data. Data must always be copied from the buffer.
 pub trait Decoder<E>: Encoder<E> {
     /// Decodes a field's value with the given wire type; the field's key should have already been
     /// consumed from the buffer.
@@ -38,7 +38,7 @@ pub trait Decoder<E>: Encoder<E> {
     ) -> Result<(), DecodeError>;
 }
 
-/// Extension trait for canonical encoding and decoding. Distinguished decoding is available via
+/// Decoding trait for canonical decoding. Distinguished decoding is available via
 /// this trait, and any type that implements this trait is guaranteed to always emit canonical data
 /// via `Encoder`.
 pub trait DistinguishedDecoder<E>: Encoder<E> {
@@ -52,6 +52,7 @@ pub trait DistinguishedDecoder<E>: Encoder<E> {
     ) -> Result<Canonicity, DecodeError>;
 }
 
+/// Decoding trait that allows decoding borrowed data.
 pub trait BorrowDecoder<'a, E>: Encoder<E> {
     fn borrow_decode(
         wire_type: WireType,
@@ -62,6 +63,7 @@ pub trait BorrowDecoder<'a, E>: Encoder<E> {
     ) -> Result<(), DecodeError>;
 }
 
+/// Decoding trait that allows distinguished decoding of borrowed data.
 pub trait DistinguishedBorrowDecoder<'a, E>: Encoder<E> {
     /// Decodes a field for the value, returning a value indicating how canonical the encoding was.
     fn borrow_decode_distinguished(
@@ -141,6 +143,7 @@ pub trait DistinguishedValueDecoder<E>: ValueEncoder<E> + Eq {
     ) -> Result<Canonicity, DecodeError>;
 }
 
+/// Value-decoding trait for decoding borrowed values.
 pub trait ValueBorrowDecoder<'a, E>: ValueEncoder<E> {
     /// Decodes a field assuming the encoder's wire type directly from the buffer.
     fn borrow_decode_value(
@@ -150,10 +153,11 @@ pub trait ValueBorrowDecoder<'a, E>: ValueEncoder<E> {
     ) -> Result<(), DecodeError>;
 }
 
+/// Value-decoding trait for distinguished decoding of borrowed values.
 pub trait DistinguishedValueBorrowDecoder<'a, E>: ValueEncoder<E> + Eq {
-    /// Indicates whether the `ALLOW_EMPTY` argument in `decode_value_distinguished` has any effect.
-    /// Some decoder implementations can more cheaply determine whether they were empty during
-    /// decoding, and will return `NotCanonical` if `ALLOW_EMPTY` was false; for these
+    /// Indicates whether the `ALLOW_EMPTY` argument in `borrow_decode_value_distinguished` has any
+    /// effect. Some decoder implementations can more cheaply determine whether they were empty
+    /// during decoding, and will return `NotCanonical` if `ALLOW_EMPTY` was false; for these
     /// implementations, `CHECKS_EMPTY` should be set to `true`. When `CHECKS_EMPTY` is `false`, the
     /// caller must invoke `EmptyState::is_empty` after the call if empty states are non-canonical.
     const CHECKS_EMPTY: bool;
