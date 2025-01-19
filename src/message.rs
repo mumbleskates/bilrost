@@ -1231,13 +1231,25 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{DistinguishedOwnedMessage, Message, OwnedMessage, Vec};
-    use crate::WithCanonicity;
+    use super::{
+        BorrowedMessage, DistinguishedBorrowedMessage, DistinguishedOwnedMessage, Message,
+        OwnedMessage,
+    };
+    use alloc::vec::Vec;
 
-    const _MESSAGE_IS_DYN_COMPATIBLE: Option<&dyn OwnedMessage> = None;
-    const _DISTINGUISHED_MESSAGE_IS_DYN_COMPATIBLE: Option<&dyn DistinguishedOwnedMessage> = None;
+    const _MESSAGE_IS_DYN_COMPATIBLE: Option<&dyn Message> = None;
+    const _OWNED_MESSAGE_IS_DYN_COMPATIBLE: Option<&dyn OwnedMessage> = None;
+    const _DISTINGUISHED_OWNED_MESSAGE_IS_DYN_COMPATIBLE: Option<&dyn DistinguishedOwnedMessage> =
+        None;
+    const _BORROWED_MESSAGE_IS_DYN_COMPATIBLE: Option<&dyn BorrowedMessage<'static>> = None;
+    const _DISTINGUISHED_BORROWED_MESSAGE_IS_DYN_COMPATIBLE: Option<
+        &dyn DistinguishedBorrowedMessage<'static>,
+    > = None;
 
-    fn use_dyn_messages<M: OwnedMessage>(safe: &mut dyn OwnedMessage, mut msg: M) {
+    fn use_dyn_owned_messages<M: DistinguishedOwnedMessage>(
+        safe: &mut dyn DistinguishedOwnedMessage,
+        mut msg: M,
+    ) {
         let mut vec = Vec::<u8>::new();
 
         safe.encoded_len();
@@ -1247,7 +1259,12 @@ mod tests {
         safe.replace_from_length_delimited_dyn(&mut [0u8].as_slice())
             .unwrap();
         assert!(safe.is_empty());
+        safe.replace_canonical_from_length_delimited_dyn(&mut [0u8].as_slice())
+            .unwrap();
+        assert!(safe.is_empty());
         safe.replace_from_slice(&[]).unwrap();
+        assert!(safe.is_empty());
+        safe.replace_canonical_from_slice(&[]).unwrap();
         assert!(safe.is_empty());
 
         msg.encoded_len();
@@ -1256,8 +1273,8 @@ mod tests {
         msg.clear();
     }
 
-    fn use_dyn_distinguished_messages<M: DistinguishedOwnedMessage>(
-        safe: &mut dyn DistinguishedOwnedMessage,
+    fn use_dyn_borrowed_messages<'a, M: DistinguishedBorrowedMessage<'a>>(
+        safe: &mut dyn DistinguishedBorrowedMessage<'a>,
         mut msg: M,
     ) {
         let mut vec = Vec::<u8>::new();
@@ -1265,15 +1282,15 @@ mod tests {
         safe.encoded_len();
         safe.encode_dyn(&mut vec).unwrap();
         assert_eq!(vec, safe.encode_to_vec());
-        safe.replace_from_length_delimited_dyn(&mut [0u8].as_slice())
+        safe.replace_borrowed_from_length_delimited(&mut [0u8].as_slice())
             .unwrap();
-        safe.replace_distinguished_from_length_delimited_dyn(&mut [0u8].as_slice())
-            .canonical()
+        assert!(safe.is_empty());
+        safe.replace_canonical_borrowed_from_length_delimited(&mut [0u8].as_slice())
             .unwrap();
-        safe.clear();
+        assert!(safe.is_empty());
 
         msg.encoded_len();
-        msg = M::decode_length_delimited(&mut [0u8].as_slice()).unwrap();
+        msg = M::decode_borrowed_length_delimited(&mut [0u8].as_slice()).unwrap();
         msg.encode(&mut vec).unwrap();
         msg.clear();
     }
@@ -1281,8 +1298,8 @@ mod tests {
     #[test]
     fn using_dyn_messages() {
         let mut vec = Vec::<u8>::new();
-        use_dyn_messages(&mut (), ());
-        use_dyn_distinguished_messages(&mut (), ());
+        use_dyn_owned_messages(&mut (), ());
+        use_dyn_borrowed_messages(&mut (), ());
         assert_eq!(().encoded_len(), 0);
         ().encode(&mut vec).unwrap();
         ().encode_dyn(&mut vec).unwrap();
