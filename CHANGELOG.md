@@ -47,6 +47,12 @@ functionality in scope.
   `Oneof`, and distinguished implementations are switched on and off by
   attribute.
 * Added `From<Vec<u8>>` and `From<Box<[u8]>>` impls for `ReverseBuffer`.
+* **EXPERIMENTAL**: Made public a couple macros and the proxying traits &
+  encoding type; see `encoding::{Proxied, Proxiable}` for details.
+  * These can be used even to encode third-party types foreign to both your own
+    crate and to `bilrost` (via type-tagged impls) and completely break the
+    guarantees of the `bilrost` library. I do my best, but correctness is in
+    your hands!
 
 ### Fixes
 
@@ -55,6 +61,8 @@ functionality in scope.
 * Changed internal and external phrasing from "expedient" encoding to "relaxed".
 * More reorganization and file cleanups, splitting up some large files into more
   modules etc.
+* Cleaned up some docs in the `encoding` module and opened it up for
+  documentation.
 
 ## V0.1011.1
 
