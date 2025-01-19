@@ -98,7 +98,7 @@ decoding.
     - [Using the derive macros](#deriving-message)
     - [Encoding and decoding](#encoding-and-decoding-messages)
       - [Decoding distinguished canonical data](#decoding-in-distinguished-mode)
-      - [Canonicity information](#canonicity-information)
+      - [Borrowed decoding](#borrowed-messages)
       - [Using via trait-objects](#using-dyn-with-message-traits)
     - [`no_std` support](#no_std-support)
     - [Changelog](./CHANGELOG.md) ([on github][ghchangelog])
@@ -881,6 +881,11 @@ will be similarly lower-cased.
 
 There are a few other attributes available inside the "bilrost" attribute:
 
+##### Distinguished mode
+
+* **"distinguished"**: When placed on a message or oneof, this [enables
+  distinguished decoding](#deriving-distinguished-decoding).
+
 ##### Reserving tags
 
 * **"reserved_tags"**: When placed on the message itself, this declares that the
@@ -946,6 +951,11 @@ struct Tree {
     children: Vec<Tree>,
 }
 ```
+
+##### Borrowed-only decoding
+
+* **"borrowed_only"**: [disables](#disabling-owned-decoding-traits) derivation
+  of owned decoding implementations.
 
 ### Deriving distinguished decoding
 
@@ -1043,6 +1053,37 @@ struct Borrowed<'a> {
 static_assertions::assert_not_impl_any!(Borrowed: OwnedMessage);
 ```
 
+#### `Cow<T>` and messages that can optionally borrow or own
+
+It's also possible to have fields that *optionally* borrow zero-copied data when
+decoding, by using [`Cow`][cow]. Borrowed decoding will (promises to) always
+produce `Cow::Borrowed` values, and "regular" decoding will always (can only!)
+produce `Cow::Owned`:
+
+```rust,
+use bilrost::{BorrowedMessage, Message, OwnedMessage};
+use std::borrow::Cow;
+
+#[derive(Debug, PartialEq, Message)]
+struct Dm<'a> {
+    message: Cow<'a, str>,
+}
+
+let original = Dm {
+    message: "almost done with my chicken".into(),
+};
+let buf = original.encode_to_vec();
+let encoded = buf.as_slice();
+
+let owned = Dm::decode(encoded).unwrap();
+assert_eq!(owned, original);
+assert!(matches!(owned.message, Cow::Owned(..)));
+
+let borrowed = Dm::decode_borrowed(encoded).unwrap();
+assert_eq!(borrowed, original);
+assert!(matches!(borrowed.message, Cow::Borrowed(..)));
+```
+
 #### Disabling owned decoding traits
 
 Normally deriving all the message traits always works even when owned traits are
@@ -1078,37 +1119,6 @@ struct LookupTables {
     alpha2: BTreeMap<&'static str, &'static str>,
     alpha3: BTreeMap<&'static str, &'static str>,
 }
-```
-
-#### `Cow<T>` and messages that can optionally borrow or own
-
-It's also possible to have fields that *optionally* borrow zero-copied data when
-decoding, by using [`Cow`][cow]. Borrowed decoding will (promises to) always
-produce `Cow::Borrowed` values, and "regular" decoding will always (can only!)
-produce `Cow::Owned`:
-
-```rust,
-use bilrost::{BorrowedMessage, Message, OwnedMessage};
-use std::borrow::Cow;
-
-#[derive(Debug, PartialEq, Message)]
-struct Dm<'a> {
-    message: Cow<'a, str>,
-}
-
-let original = Dm {
-    message: "almost done with my chicken".into(),
-};
-let buf = original.encode_to_vec();
-let encoded = buf.as_slice();
-
-let owned = Dm::decode(encoded).unwrap();
-assert_eq!(owned, original);
-assert!(matches!(owned.message, Cow::Owned(..)));
-
-let borrowed = Dm::decode_borrowed(encoded).unwrap();
-assert_eq!(borrowed, original);
-assert!(matches!(borrowed.message, Cow::Borrowed(..)));
 ```
 
 ### Encoding and decoding messages
