@@ -22,7 +22,6 @@ mod error;
 mod message;
 mod types;
 
-#[doc(hidden)]
 pub mod encoding;
 #[doc(hidden)]
 mod iter;
