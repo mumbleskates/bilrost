@@ -17,7 +17,6 @@ use bytes::{Buf, BufMut};
 use core::fmt::Debug;
 use proptest::{prelude::*, test_runner::TestCaseResult};
 
-// TODO(widders): this needs to have borrowed decoding coverage
 /// Generalized proptest macro. Kind must be either `relaxed` or `distinguished`.
 macro_rules! check_type_test {
     ($encoder:ty, $kind:ident, $ty:ty, $wire_type:expr) => {
