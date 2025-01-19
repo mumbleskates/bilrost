@@ -26,6 +26,10 @@ pub struct Field {
     //  adapter applied to a reference; if the adapter is for example some newtype, this would allow
     //  encoding user A to implement e.g. `Collection` for third party B's container and then encode
     //  it without requiring anything to be implemented inside `bilrost`.
+    //  UPDATE: this can probably be done via adding a `= ()` defaulted tag type to the generics of
+    //  Packed, Unpacked, and Map decoders as well as the Mapping and Collection traits, allowing
+    //  third party implementers to actually implement for third-party types using their own tag.
+    //  This worked for proxies and it'll work again
     pub enumeration_ty: Option<Type>,
     /// If a field is part of a recursion of messages, currently the chain needs to be broken so
     /// that there is not a cyclic dependency of type constraints on the implementation of `Message`
