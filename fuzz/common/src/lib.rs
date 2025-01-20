@@ -341,7 +341,7 @@ where
 
 fn fuzz_borrowing<'a, M>(data: &'a [u8]) -> RoundtripResult
 where
-    M: OwnedMessage + BorrowedMessage<'a> + PartialEq,
+    M: OwnedMessage + BorrowedMessage<'a> + Debug + PartialEq,
 {
     let owned_relaxed = M::decode(data);
     let borrowed_relaxed = M::decode_borrowed(data);
@@ -353,15 +353,21 @@ where
         (Ok(..), Err(err)) => fuzz_bail!("only borrowed relaxed failed: {err}"),
         (Err(err), Ok(..)) => fuzz_bail!("only owned relaxed failed: {err}"),
     };
-    if owned_relaxed != borrowed_relaxed {
-        fuzz_bail!("owned and borrowed are unequal in relaxed mode");
+    // in relaxed mode we have to encode the values, because they may not have reflexive equality
+    // (they may contain NaN values), so instead we check to make sure that they encode exactly the
+    // same.
+    if owned_relaxed.encode_to_vec() != borrowed_relaxed.encode_to_vec() {
+        fuzz_bail!(
+            "owned and borrowed are equivalent in relaxed mode: \
+            owned={owned_relaxed:#?}, borrowed={borrowed_relaxed:#?}"
+        );
     }
     Ok(vec![])
 }
 
 fn fuzz_borrowing_distinguished<'a, M>(data: &'a [u8]) -> RoundtripResult
 where
-    M: DistinguishedOwnedMessage + DistinguishedBorrowedMessage<'a> + Eq,
+    M: DistinguishedOwnedMessage + DistinguishedBorrowedMessage<'a> + Debug + Eq,
 {
     let owned_distinguished = M::decode_distinguished(data);
     let borrowed_distinguished = M::decode_distinguished_borrowed(data);
@@ -377,7 +383,10 @@ where
             (Err(err), Ok(..)) => fuzz_bail!("only owned distinguished failed: {err}"),
         };
     if owned_distinguished != borrowed_distinguished {
-        fuzz_bail!("owned and borrowed results are unequal in distinguished mode");
+        fuzz_bail!(
+            "owned and borrowed results are unequal in distinguished mode: \
+            owned={owned_distinguished:#?}, borrowed={borrowed_distinguished:#?}"
+        );
     }
     Ok(vec![])
 }
