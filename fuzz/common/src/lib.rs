@@ -5,10 +5,10 @@ use bilrost::{
 };
 use bytes::BufMut;
 use eyre::{eyre as err, Report};
+use once_cell::sync::Lazy;
 use regex::Regex;
 use std::fmt::Debug;
 use std::str::{from_utf8, FromStr};
-use std::sync::LazyLock;
 
 pub mod test_messages;
 
@@ -47,7 +47,7 @@ pub fn test_borrowed_support(data: &[u8]) {
     >(data));
 }
 
-static DATE_RE: LazyLock<Regex> = LazyLock::new(|| {
+static DATE_RE: Lazy<Regex> = Lazy::new(|| {
     // exactly four digits, or +/- followed by any number
     let year = r"(\d{4}|[+-]\d+)";
     // 01-12
