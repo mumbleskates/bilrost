@@ -100,6 +100,8 @@ decoding.
       - [Decoding distinguished canonical data](#decoding-in-distinguished-mode)
       - [Borrowed decoding](#borrowed-messages)
       - [Using via trait-objects](#using-dyn-with-message-traits)
+      - [Self-referential borrowing with `yoke` for enormous speed + portable
+        structs](#recipe-for-making-borrowed-messages-portable)
     - [`no_std` support](#no_std-support)
     - [Changelog](./CHANGELOG.md) ([on github][ghchangelog])
 - [Differences from `prost`](#bilrost-vs-prost)
@@ -1083,6 +1085,55 @@ let borrowed = Dm::decode_borrowed(encoded).unwrap();
 assert_eq!(borrowed, original);
 assert!(matches!(borrowed.message, Cow::Borrowed(..)));
 ```
+
+#### Recipe for making borrowed messages portable
+
+Decoding message data into a struct that borrows from its input can be extremely
+fast, especially when the input would have otherwise been copied to lots of
+allocations -- often more than half of the cost of decoding is allocating
+strings. Unfortunately it also means that getting the borrow checker to let you
+keep the struct alive can be a struggle.
+
+For many use cases, the [`yoke`][yoke] crate can a huge help here. It allows you
+to pair the borrowed struct with anything that keeps the data it borrows alive,
+whether that's a `Vec<u8>` or (to enable cloning the resulting `Yoke`) an
+`Rc<[u8]>`, `Arc`, `Arc<Vec<u8>>`, or similar.
+
+[yoke]: https://docs.rs/yoke/latest/yoke/
+
+Here's a basic example:
+
+```rust,
+use bilrost::{BorrowedMessage, Message};
+use yoke::{Yoke, Yokeable};
+
+#[derive(Debug, PartialEq, Message, Yokeable)]
+struct OxenFree<'a> {
+    n: i32,
+    s: &'a str,
+}
+
+let buf = b"\x04\xf6\x00\x05\x10Hello from yoke!".to_vec();
+let yoke_result = Yoke::<OxenFree, _>::try_attach_to_cart(buf, |b| {
+    OxenFree::decode_borrowed(b)
+})
+.unwrap();
+
+assert_eq!(
+    yoke_result.get(),
+    &OxenFree {
+        n: 123,
+        s: "Hello from yoke!",
+    }
+);
+
+// `yoke_result` is now a value that is not bound by a lifetime!
+```
+
+It's not possible to do *anything* you could do with a yoked value that you
+could do with a regular struct value (destructuring it doesn't work since you
+can typically only get the struct by reference), but this solves many, many
+problems.
 
 #### Disabling owned decoding traits
 
