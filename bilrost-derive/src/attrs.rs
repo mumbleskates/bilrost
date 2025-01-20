@@ -9,8 +9,8 @@ use syn::parse::ParseStream;
 use syn::punctuated::Punctuated;
 use syn::token::Comma;
 use syn::{
-    parse, parse2, parse_str, BinOp, Expr, ExprBinary, ExprLit, Lit, LitInt, Meta, MetaList,
-    MetaNameValue,
+    parse, parse2, parse_str, BinOp, Expr, ExprBinary, ExprLit, ExprRange, Lit, LitInt, Meta,
+    MetaList, MetaNameValue, RangeLimits,
 };
 
 pub fn tag_attr(attr: &Meta) -> Result<Option<u32>, Error> {
@@ -60,7 +60,7 @@ impl TagList {
         self.0.sort_by_key(|r| (*r.start(), *r.end()));
         for (lower, higher) in self.0.iter().tuple_windows() {
             if lower.end() >= higher.start() {
-                bail!("tag {} is duplicated in tag list", lower.end());
+                bail!("tag {} is duplicated in tag list", higher.start());
             }
         }
         Ok(())
@@ -104,9 +104,24 @@ impl parse::Parse for TagList {
                             let (left, right) = (lit_u32(&left)?, lit_u32(&right)?);
                             left..=right
                         }
+                        // One tag number prefixed by a `..=`
+                        Expr::Range(ExprRange {
+                            start: None,
+                            limits: RangeLimits::Closed(..),
+                            end: Some(right),
+                            ..
+                        }) => 0..=lit_u32(&right)?,
+                        // One tag number suffixed by a `..`
+                        Expr::Range(ExprRange {
+                            start: Some(left),
+                            limits: RangeLimits::HalfOpen(..),
+                            end: None,
+                            ..
+                        }) => lit_u32(&left)?..=u32::MAX,
                         _ => return Err(syn::Error::new(
                             input.span(),
-                            "expected either a single tag number or a range separated by a dash",
+                            "expected either a single tag number (N), a range separated by \
+                            a dash (N-M), a range-from (N..), or a range-to (..=N)",
                         )),
                     })
                 })
