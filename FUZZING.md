@@ -41,5 +41,4 @@ Then build a fuzz target and run afl on it:
 
 To reproduce a crash, use the `reproduce` binary in the "fuzz/common" directory:
 
-    cd fuzz
     cargo run --package common --bin reproduce -- <crashfile>
