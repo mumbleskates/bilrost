@@ -1,8 +1,7 @@
 use bilrost::Canonicity::{Canonical, HasExtensions, NotCanonical};
-use bilrost::{
-    BorrowedMessage, DecodeError, DecodeErrorKind, DistinguishedBorrowedMessage,
-    DistinguishedOwnedMessage, OwnedMessage,
-};
+#[cfg(feature = "compare-borrowed")]
+use bilrost::{BorrowedMessage, DistinguishedBorrowedMessage};
+use bilrost::{DecodeError, DecodeErrorKind, DistinguishedOwnedMessage, OwnedMessage};
 use bytes::BufMut;
 use eyre::{eyre as err, Report};
 use once_cell::sync::Lazy;
@@ -13,38 +12,47 @@ use std::str::{from_utf8, FromStr};
 pub mod test_messages;
 
 pub fn test_message(data: &[u8]) {
-    _ = expect_no_fuzz_error(roundtrip::<test_messages::TestAllTypes>(data));
-    _ = expect_no_fuzz_error(roundtrip_distinguished::<test_messages::TestDistinguished>(
+    check_fuzz_result(roundtrip::<test_messages::TestAllTypes>(data));
+    check_fuzz_result(roundtrip_distinguished::<test_messages::TestDistinguished>(
         data,
     ));
-    _ = expect_no_fuzz_error(fuzz_borrowing::<test_messages::TestAllTypes>(data));
-    _ = expect_no_fuzz_error(fuzz_borrowing_distinguished::<
-        test_messages::TestDistinguished,
-    >(data));
+    #[cfg(feature = "compare-borrowed")]
+    {
+        check_fuzz_result(fuzz_borrowing::<test_messages::TestAllTypes>(data));
+        check_fuzz_result(fuzz_borrowing_distinguished::<
+            test_messages::TestDistinguished,
+        >(data));
+    }
 }
 
 pub fn test_type_support(data: &[u8]) {
-    _ = expect_no_fuzz_error(roundtrip::<test_messages::TestTypeSupport>(data));
-    _ = expect_no_fuzz_error(roundtrip_distinguished::<
+    check_fuzz_result(roundtrip::<test_messages::TestTypeSupport>(data));
+    check_fuzz_result(roundtrip_distinguished::<
         test_messages::TestTypeSupportDistinguished,
     >(data));
-    _ = expect_no_fuzz_error(fuzz_borrowing::<test_messages::TestTypeSupport>(data));
-    _ = expect_no_fuzz_error(fuzz_borrowing_distinguished::<
-        test_messages::TestTypeSupportDistinguished,
-    >(data));
+    #[cfg(feature = "compare-borrowed")]
+    {
+        check_fuzz_result(fuzz_borrowing::<test_messages::TestTypeSupport>(data));
+        check_fuzz_result(fuzz_borrowing_distinguished::<
+            test_messages::TestTypeSupportDistinguished,
+        >(data));
+    }
 }
 
 pub fn test_borrowed_support(data: &[u8]) {
-    _ = expect_no_fuzz_error(roundtrip::<test_messages::TestTypeSupportBorrowable>(data));
-    _ = expect_no_fuzz_error(roundtrip_distinguished::<
+    check_fuzz_result(roundtrip::<test_messages::TestTypeSupportBorrowable>(data));
+    check_fuzz_result(roundtrip_distinguished::<
         test_messages::TestTypeSupportBorrowable,
     >(data));
-    _ = expect_no_fuzz_error(fuzz_borrowing::<test_messages::TestTypeSupportBorrowable>(
-        data,
-    ));
-    _ = expect_no_fuzz_error(fuzz_borrowing_distinguished::<
-        test_messages::TestTypeSupportBorrowable,
-    >(data));
+    #[cfg(feature = "compare-borrowed")]
+    {
+        check_fuzz_result(fuzz_borrowing::<test_messages::TestTypeSupportBorrowable>(
+            data,
+        ));
+        check_fuzz_result(fuzz_borrowing_distinguished::<
+            test_messages::TestTypeSupportBorrowable,
+        >(data));
+    }
 }
 
 static DATE_RE: Lazy<Regex> = Lazy::new(|| {
@@ -144,14 +152,16 @@ pub fn test_parse_duration(data: &[u8]) {
 
 type RoundtripResult = Result<Vec<u8>, RoundtripError>;
 
-fn expect_no_fuzz_error(result: RoundtripResult) -> Result<Vec<u8>, DecodeError> {
+fn fuzz_result(result: RoundtripResult) -> Result<Result<Vec<u8>, DecodeError>, Report> {
     match result {
-        Err(RoundtripError::Error(err)) => {
-            panic!("{err:?}");
-        }
-        Ok(val) => Ok(val),
-        Err(RoundtripError::DecodeError(err)) => Err(err),
+        Err(RoundtripError::Error(err)) => Err(err),
+        Ok(val) => Ok(Ok(val)),
+        Err(RoundtripError::DecodeError(err)) => Ok(Err(err)),
     }
+}
+
+fn check_fuzz_result(result: RoundtripResult) {
+    _ = fuzz_result(result).unwrap();
 }
 
 #[derive(Debug)]
@@ -336,6 +346,7 @@ where
     Ok(buf1)
 }
 
+#[cfg(feature = "compare-borrowed")]
 fn fuzz_borrowing<'a, M>(data: &'a [u8]) -> RoundtripResult
 where
     M: OwnedMessage + BorrowedMessage<'a> + Debug + PartialEq,
@@ -362,6 +373,7 @@ where
     Ok(vec![])
 }
 
+#[cfg(feature = "compare-borrowed")]
 fn fuzz_borrowing_distinguished<'a, M>(data: &'a [u8]) -> RoundtripResult
 where
     M: DistinguishedOwnedMessage + DistinguishedBorrowedMessage<'a> + Debug + Eq,

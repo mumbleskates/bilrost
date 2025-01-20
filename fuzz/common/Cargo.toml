@@ -40,6 +40,12 @@ features = [
     "tinyvec",
 ]
 
+[features]
+compare-borrowed = []
+# this is the feature name we enable everywhere for the workspace test suite, ensuring that we will
+# assert all our types' borrowing impls via the test messages.
+full-test-suite = ["compare-borrowed"]
+
 [[bin]]
 name = "reproduce"
 
