@@ -11,7 +11,7 @@ use tinyvec::ArrayVec;
 /// could trigger bugs that occur in any message type in this file.  We verify
 /// this stays true in a unit test.
 #[derive(Clone, Debug, PartialEq, Message)]
-// next tag: 116
+#[bilrost(reserved_tags(117-299, 320-1000, 1010-1999, 2010..))]
 pub struct TestAllTypes {
     /// Singular
     #[bilrost(1)]
@@ -46,6 +46,8 @@ pub struct TestAllTypes {
     pub bytes: Vec<u8>,
     #[bilrost(15)]
     pub blob: Blob,
+    #[bilrost(116)]
+    pub bytes_bytes: bytes::Bytes,
     #[bilrost(16)]
     pub core_duration: core::time::Duration,
     #[bilrost(17)]
@@ -364,7 +366,7 @@ pub mod test_message {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Message)]
-#[bilrost(distinguished)]
+#[bilrost(distinguished, reserved_tags(67-100, 107-199, 207..))]
 pub struct TestDistinguished {
     /// Singular
     #[bilrost(tag(1), encoding(varint))]
@@ -385,6 +387,12 @@ pub struct TestDistinguished {
     pub string: String,
     #[bilrost(tag(9), encoding(plainbytes))]
     pub bytes: Vec<u8>,
+    #[bilrost(64)]
+    pub blob: Blob,
+    #[bilrost(65)]
+    pub bytes_bytes: bytes::Bytes,
+    #[bilrost(66)]
+    pub bytestring: bytestring::ByteString,
     #[bilrost(tag(10), encoding((general, general, fixed)))]
     pub tuple: (u64, String, u32),
     #[bilrost(11)]
