@@ -13,7 +13,7 @@ Then the fuzzers can be run:
 The following fuzzers are available:
 
 * `bilrost_fuzz`: core bilrost functionality and parsing
-* `bilrost_borrowing_fuzz`: some very basic tests of bilrost borrowed decoding
+* `bilrost_borrowed_fuzz`: some very basic tests of bilrost borrowed decoding
   functionality on `Cow<T>` types
 * `bilrost_type_support_fuzz`: extended bilrost type support for third party
   types
