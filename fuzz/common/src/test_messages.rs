@@ -509,5 +509,6 @@ pub struct TestTypeSupportBorrowable<'a> {
     bstr: Cow<'a, bstr::BStr>,
     #[bilrost(encoding(plainbytes))]
     small_array: Cow<'a, [u8; 1]>,
+    #[bilrost(encoding(plainbytes))]
     bigger_array: Cow<'a, [u8; 16]>,
 }
