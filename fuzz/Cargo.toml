@@ -30,6 +30,7 @@ path = "fuzzers/bilrost_fuzz.rs"
 [[bin]]
 name = "bilrost_borrowed_fuzz"
 path = "fuzzers/bilrost_borrowed_fuzz.rs"
+required-features = ["common/compare-borrowed"]
 
 [[bin]]
 name = "bilrost_type_support_fuzz"
