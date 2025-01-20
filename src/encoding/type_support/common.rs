@@ -6,8 +6,9 @@ pub(crate) mod time_proxies {
         underived_prepend,
     };
     use crate::encoding::{
-        empty_state_via_default, Capped, DecodeContext, DistinguishedValueDecoder, Fixed, General,
-        RestrictedDecodeContext, ValueDecoder, ValueEncoder, WireType, Wiretyped,
+        delegate_value_encoding, empty_state_via_default, Capped, DecodeContext,
+        DistinguishedValueDecoder, Fixed, General, RestrictedDecodeContext, ValueDecoder,
+        ValueEncoder, WireType, Wiretyped,
     };
     use crate::DecodeErrorKind::InvalidValue;
     use crate::{Canonicity, DecodeError};
@@ -80,6 +81,10 @@ pub(crate) mod time_proxies {
             }, buf, ctx)
         }
     }
+
+    delegate_value_encoding!(
+        encoding (General) borrows type (TimeDeltaProxy) as owned including distinguished
+    );
 }
 
 /// This is where we show that we have equivalent encodings for the time and chrono crate types.
