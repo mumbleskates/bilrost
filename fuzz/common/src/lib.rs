@@ -120,9 +120,6 @@ pub fn test_parse_date(data: &[u8]) {
 }
 
 pub fn test_parse_duration(data: &[u8]) {
-    use std::str::from_utf8;
-    use std::str::FromStr;
-
     // input must be text
     let Ok(original_text) = from_utf8(data) else {
         return;
