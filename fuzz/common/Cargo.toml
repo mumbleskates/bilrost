@@ -15,6 +15,7 @@ cargo-fuzz = true
 
 [dependencies]
 bilrost-types = { path = "../../bilrost-types" }
+bstr = "1.11"
 bytes = "1"
 chrono = "0.4"
 eyre = "0.6"

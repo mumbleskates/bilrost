@@ -1,4 +1,5 @@
 use bilrost::{Blob, Enumeration, Message, Oneof};
+use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
 use tinyvec::ArrayVec;
 
@@ -497,4 +498,16 @@ pub struct TestTypeSupportDistinguished {
     time_utcoffset: time::UtcOffset,
     time_offsetdatetime: time::OffsetDateTime,
     time_duration: time::Duration,
+}
+
+#[derive(Debug, PartialEq, Eq, Message)]
+#[bilrost(distinguished)]
+pub struct TestTypeSupportBorrowable<'a> {
+    str: Cow<'a, str>,
+    #[bilrost(encoding(plainbytes))]
+    bytes: Cow<'a, [u8]>,
+    bstr: Cow<'a, bstr::BStr>,
+    #[bilrost(encoding(plainbytes))]
+    small_array: Cow<'a, [u8; 1]>,
+    bigger_array: Cow<'a, [u8; 16]>,
 }
