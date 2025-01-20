@@ -290,9 +290,9 @@ where
         return RoundtripResult::Error(err!("encoded and prepended messages were different",));
     }
 
-    let roundtrip = match M::decode_distinguished(buf1.as_slice()).canonical() {
+    let roundtrip = match M::decode_canonical(buf1.as_slice()) {
         Ok(roundtrip) => roundtrip,
-        Err(error) => return RoundtripResult::Error(err!(DecodeError::new(error))),
+        Err(error) => return RoundtripResult::Error(err!(error)),
     };
 
     if roundtrip != message {
