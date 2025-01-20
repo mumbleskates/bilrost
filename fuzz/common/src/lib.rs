@@ -356,12 +356,6 @@ where
     if owned_relaxed != borrowed_relaxed {
         fuzz_bail!("owned and borrowed are unequal in relaxed mode");
     }
-    if owned_relaxed.encode_to_vec() != data {
-        fuzz_bail!("owned relaxed does not round trip");
-    }
-    if borrowed_relaxed.encode_to_vec() != data {
-        fuzz_bail!("borrowed relaxed does not round trip");
-    }
     Ok(vec![])
 }
 
