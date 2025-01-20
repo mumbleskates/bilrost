@@ -27,6 +27,7 @@ tinyvec = "1"
 path = "../.."
 default-features = false
 features = [
+    "bstr",
     "derive",
     "auto-optimize",
     "no-recursion-limit",
