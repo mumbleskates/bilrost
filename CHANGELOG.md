@@ -49,6 +49,7 @@ functionality in scope.
 * Opened the gates for crate documentation in the `encoding` module as the crate
   is getting closer to what could become a stable release.
 * Added `From<Vec<u8>>` and `From<Box<[u8]>>` impls for `ReverseBuffer`.
+* Added new forms of ranges in the `reserved_tags` attribute: `5..` and `..=5`.
 * **EXPERIMENTAL**: Made public a couple macros and the proxying traits &
   encoding type; see `encoding::{Proxied, Proxiable}` for details.
   * These can be used even to encode third-party types foreign to both your own

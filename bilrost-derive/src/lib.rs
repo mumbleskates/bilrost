@@ -2128,6 +2128,48 @@ mod test {
             output.expect_err("reserved tags not detected").to_string(),
             "message Invalid field b has reserved tag 4"
         );
+
+        let output = try_message(quote! {
+            #[bilrost(reserved_tags(5-10, 55))]
+            struct Invalid {
+                #[bilrost(tag = "1")]
+                a: bool,
+                #[bilrost(oneof(3-5))]
+                b: Option<super::Whatever>,
+            }
+        });
+        assert_eq!(
+            output.expect_err("reserved tags not detected").to_string(),
+            "message Invalid field b has reserved tag 5"
+        );
+
+        let output = try_message(quote! {
+            #[bilrost(reserved_tags(..=3, 55))]
+            struct Invalid {
+                #[bilrost(tag = "999")]
+                a: bool,
+                #[bilrost(oneof(3-5))]
+                b: Option<super::Whatever>,
+            }
+        });
+        assert_eq!(
+            output.expect_err("reserved tags not detected").to_string(),
+            "message Invalid field b has reserved tag 3"
+        );
+
+        let output = try_message(quote! {
+            #[bilrost(reserved_tags(0, 5..))]
+            struct Invalid {
+                #[bilrost(tag = "1")]
+                a: bool,
+                #[bilrost(oneof(3-5))]
+                b: Option<super::Whatever>,
+            }
+        });
+        assert_eq!(
+            output.expect_err("reserved tags not detected").to_string(),
+            "message Invalid field b has reserved tag 5"
+        );
     }
 
     #[test]
@@ -2144,6 +2186,96 @@ mod test {
                 output.expect_err("oversized tag range not detected")
             ),
             "invalid message field Invalid.a: too-large tag range 1-100; use smaller ranges"
+        );
+    }
+
+    #[test]
+    fn test_accepts_tag_ranges() {
+        try_message(quote! {
+            #[bilrost(reserved_tags(1, 2, 3))]
+            struct Valid {
+                #[bilrost(4)]
+                x: String,
+            }
+        }).unwrap();
+
+        try_message(quote! {
+            #[bilrost(reserved_tags(1-3, 8-100))]
+            struct Valid {
+                #[bilrost(4)]
+                x: String,
+            }
+        }).unwrap();
+
+        try_message(quote! {
+            #[bilrost(reserved_tags(..=3, 8..))]
+            struct Valid {
+                #[bilrost(4)]
+                x: String,
+            }
+        }).unwrap();
+    }
+
+    #[test]
+    fn test_rejects_colliding_tag_ranges() {
+        let output = try_message(quote! {
+            #[bilrost(reserved_tags(10, 15, 10))]
+            struct Invalid;
+        });
+        assert_eq!(
+            format!(
+                "{:#}",
+                output.expect_err("colliding reserved tag ranges not detected")
+            ),
+            "tag 10 is duplicated in tag list"
+        );
+
+        let output = try_message(quote! {
+            #[bilrost(reserved_tags(1-100, 55))]
+            struct Invalid;
+        });
+        assert_eq!(
+            format!(
+                "{:#}",
+                output.expect_err("colliding reserved tag ranges not detected")
+            ),
+            "tag 55 is duplicated in tag list"
+        );
+
+        let output = try_message(quote! {
+            #[bilrost(reserved_tags(1-100, 50-200))]
+            struct Invalid;
+        });
+        assert_eq!(
+            format!(
+                "{:#}",
+                output.expect_err("colliding reserved tag ranges not detected")
+            ),
+            "tag 50 is duplicated in tag list"
+        );
+
+        let output = try_message(quote! {
+            #[bilrost(reserved_tags(..=100, 6-10, 2))]
+            struct Invalid;
+        });
+        assert_eq!(
+            format!(
+                "{:#}",
+                output.expect_err("colliding reserved tag ranges not detected")
+            ),
+            "tag 2 is duplicated in tag list"
+        );
+
+        let output = try_message(quote! {
+            #[bilrost(reserved_tags(100.., 60, 9999))]
+            struct Invalid;
+        });
+        assert_eq!(
+            format!(
+                "{:#}",
+                output.expect_err("colliding reserved tag ranges not detected")
+            ),
+            "tag 9999 is duplicated in tag list"
         );
     }
 
@@ -2261,7 +2393,7 @@ mod test {
         })
         .unwrap();
     }
-
+ 
     #[test]
     fn test_overlapping_message() {
         _ = try_message(quote! {

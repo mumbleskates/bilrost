@@ -667,7 +667,8 @@ attribute and the `reserved_tags` attribute is the same: the whole list is comma
 separated, and each item may be either a single tag number or an inclusive range
 from minimum to maximum separated with a dash (like `1-5`). For both
 `reserved_tags` and `oneof`, the following are all exactly equivalent:
-`1, 2, 3, 4, 5`; `1-5`; `4, 5, 1-3`
+`1, 2, 3, 4, 5`; `1-5`; `4, 5, 1-3`. It's also possible to specify open-ended
+ranges, spelled like `10..` and `..=10`.
 
 The field tags in the oneof must be unique, both within the oneof itself and
 within any message containing it. Oneof variants can only contain types that
