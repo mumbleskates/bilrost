@@ -17,11 +17,19 @@ pub fn test_message(data: &[u8]) {
     expect_no_fuzz_error(roundtrip_distinguished::<test_messages::TestDistinguished>(
         data,
     ));
+    expect_no_fuzz_error(fuzz_borrowing::<test_messages::TestAllTypes>(data));
+    expect_no_fuzz_error(fuzz_borrowing_distinguished::<
+        test_messages::TestDistinguished,
+    >(data));
 }
 
 pub fn test_type_support(data: &[u8]) {
     expect_no_fuzz_error(roundtrip::<test_messages::TestTypeSupport>(data));
     expect_no_fuzz_error(roundtrip_distinguished::<
+        test_messages::TestTypeSupportDistinguished,
+    >(data));
+    expect_no_fuzz_error(fuzz_borrowing::<test_messages::TestTypeSupport>(data));
+    expect_no_fuzz_error(fuzz_borrowing_distinguished::<
         test_messages::TestTypeSupportDistinguished,
     >(data));
 }
@@ -31,7 +39,12 @@ pub fn test_borrowed_support(data: &[u8]) {
     expect_no_fuzz_error(roundtrip_distinguished::<
         test_messages::TestTypeSupportBorrowable,
     >(data));
-    expect_no_fuzz_error(fuzz_borrowing::<test_messages::TestTypeSupportBorrowable>(data));
+    expect_no_fuzz_error(fuzz_borrowing::<test_messages::TestTypeSupportBorrowable>(
+        data,
+    ));
+    expect_no_fuzz_error(fuzz_borrowing_distinguished::<
+        test_messages::TestTypeSupportBorrowable,
+    >(data));
 }
 
 static DATE_RE: LazyLock<Regex> = LazyLock::new(|| {
@@ -324,7 +337,7 @@ where
 
 fn fuzz_borrowing<'a, M>(data: &'a [u8]) -> RoundtripResult
 where
-    M: DistinguishedOwnedMessage + DistinguishedBorrowedMessage<'a> + Debug + Eq,
+    M: OwnedMessage + BorrowedMessage<'a> + PartialEq,
 {
     let owned_relaxed = M::decode(data);
     let borrowed_relaxed = M::decode_borrowed(data);
@@ -345,7 +358,13 @@ where
     if borrowed_relaxed.encode_to_vec() != data {
         fuzz_bail!("borrowed relaxed does not round trip");
     }
+    Ok(vec![])
+}
 
+fn fuzz_borrowing_distinguished<'a, M>(data: &'a [u8]) -> RoundtripResult
+where
+    M: DistinguishedOwnedMessage + DistinguishedBorrowedMessage<'a> + Eq,
+{
     let owned_distinguished = M::decode_distinguished(data);
     let borrowed_distinguished = M::decode_distinguished_borrowed(data);
     let (owned_distinguished, borrowed_distinguished) =
@@ -362,6 +381,5 @@ where
     if owned_distinguished != borrowed_distinguished {
         fuzz_bail!("owned and borrowed results are unequal in distinguished mode");
     }
-
     Ok(vec![])
 }
