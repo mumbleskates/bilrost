@@ -6,6 +6,7 @@ use bilrost::{
 use bytes::BufMut;
 use eyre::{eyre as err, Report};
 use regex::Regex;
+use std::fmt::Debug;
 use std::str::{from_utf8, FromStr};
 use std::sync::LazyLock;
 
@@ -23,6 +24,14 @@ pub fn test_type_support(data: &[u8]) {
     expect_no_fuzz_error(roundtrip_distinguished::<
         test_messages::TestTypeSupportDistinguished,
     >(data));
+}
+
+pub fn test_borrowed_support(data: &[u8]) {
+    expect_no_fuzz_error(roundtrip::<test_messages::TestTypeSupportBorrowable>(data));
+    expect_no_fuzz_error(roundtrip_distinguished::<
+        test_messages::TestTypeSupportBorrowable,
+    >(data));
+    expect_no_fuzz_error(fuzz_borrowing::<test_messages::TestTypeSupportBorrowable>(data));
 }
 
 static DATE_RE: LazyLock<Regex> = LazyLock::new(|| {
@@ -315,10 +324,44 @@ where
 
 fn fuzz_borrowing<'a, M>(data: &'a [u8]) -> RoundtripResult
 where
-    M: DistinguishedOwnedMessage + DistinguishedBorrowedMessage<'a> + Eq,
+    M: DistinguishedOwnedMessage + DistinguishedBorrowedMessage<'a> + Debug + Eq,
 {
-    let owned_relaxed = M::decode(data)?;
-    let borrowed_relaxed = M::decode_borrowed(data)?;
-    todo!();
+    let owned_relaxed = M::decode(data);
+    let borrowed_relaxed = M::decode_borrowed(data);
+    let (owned_relaxed, borrowed_relaxed) = match (owned_relaxed, borrowed_relaxed) {
+        (Ok(owned_relaxed), Ok(borrowed_relaxed)) => (owned_relaxed, borrowed_relaxed),
+        (Err(err), Err(..)) => {
+            return Err(RoundtripError::DecodeError(err));
+        }
+        (Ok(..), Err(err)) => fuzz_bail!("only borrowed relaxed failed: {err}"),
+        (Err(err), Ok(..)) => fuzz_bail!("only owned relaxed failed: {err}"),
+    };
+    if owned_relaxed != borrowed_relaxed {
+        fuzz_bail!("owned and borrowed are unequal in relaxed mode");
+    }
+    if owned_relaxed.encode_to_vec() != data {
+        fuzz_bail!("owned relaxed does not round trip");
+    }
+    if borrowed_relaxed.encode_to_vec() != data {
+        fuzz_bail!("borrowed relaxed does not round trip");
+    }
+
+    let owned_distinguished = M::decode_distinguished(data);
+    let borrowed_distinguished = M::decode_distinguished_borrowed(data);
+    let (owned_distinguished, borrowed_distinguished) =
+        match (owned_distinguished, borrowed_distinguished) {
+            (Ok(owned_distinguished), Ok(borrowed_distinguished)) => {
+                (owned_distinguished, borrowed_distinguished)
+            }
+            (Err(err), Err(..)) => {
+                return Err(RoundtripError::DecodeError(err));
+            }
+            (Ok(..), Err(err)) => fuzz_bail!("only borrowed distinguished failed: {err}"),
+            (Err(err), Ok(..)) => fuzz_bail!("only owned distinguished failed: {err}"),
+        };
+    if owned_distinguished != borrowed_distinguished {
+        fuzz_bail!("owned and borrowed results are unequal in distinguished mode");
+    }
+
     Ok(vec![])
 }
