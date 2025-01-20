@@ -141,9 +141,9 @@ where
     ) -> Result<Canonicity, DecodeError> {
         let mut proxy = T::new_proxy();
         let mut canon = DistinguishedValueDecoder::<E>::decode_value_distinguished::<ALLOW_EMPTY>(
-            &mut proxy, buf, ctx,
+            &mut proxy, buf, ctx.clone(),
         )?;
-        canon.update(value.decode_proxy_distinguished(proxy)?);
+        ctx.update(&mut canon, value.decode_proxy_distinguished(proxy)?)?;
         Ok(canon)
     }
 }
@@ -180,8 +180,8 @@ where
         let mut proxy = T::new_proxy();
         let mut canon = DistinguishedValueBorrowDecoder::<E>::borrow_decode_value_distinguished::<
             ALLOW_EMPTY,
-        >(&mut proxy, buf, ctx)?;
-        canon.update(value.decode_proxy_distinguished(proxy)?);
+        >(&mut proxy, buf, ctx.clone())?;
+        ctx.update(&mut canon, value.decode_proxy_distinguished(proxy)?)?;
         Ok(canon)
     }
 }
