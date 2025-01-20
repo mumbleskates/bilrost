@@ -1,25 +1,28 @@
+use bilrost::Canonicity::{Canonical, HasExtensions, NotCanonical};
+use bilrost::{
+    BorrowedMessage, DecodeError, DecodeErrorKind, DistinguishedBorrowedMessage,
+    DistinguishedOwnedMessage, OwnedMessage,
+};
 use bytes::BufMut;
-use eyre::eyre as err;
+use eyre::{eyre as err, Report};
 use regex::Regex;
 use std::str::{from_utf8, FromStr};
 use std::sync::LazyLock;
 
-use bilrost::Canonicity::{Canonical, HasExtensions, NotCanonical};
-use bilrost::{
-    DecodeError, DecodeErrorKind, DistinguishedOwnedMessage, OwnedMessage, WithCanonicity,
-};
-
 pub mod test_messages;
 
 pub fn test_message(data: &[u8]) {
-    let _ = roundtrip::<test_messages::TestAllTypes>(data).unwrap_error();
-    let _ = roundtrip_distinguished::<test_messages::TestDistinguished>(data).unwrap_error();
+    expect_no_fuzz_error(roundtrip::<test_messages::TestAllTypes>(data));
+    expect_no_fuzz_error(roundtrip_distinguished::<test_messages::TestDistinguished>(
+        data,
+    ));
 }
 
 pub fn test_type_support(data: &[u8]) {
-    let _ = roundtrip::<test_messages::TestTypeSupport>(data).unwrap_error();
-    let _ =
-        roundtrip_distinguished::<test_messages::TestTypeSupportDistinguished>(data).unwrap_error();
+    expect_no_fuzz_error(roundtrip::<test_messages::TestTypeSupport>(data));
+    expect_no_fuzz_error(roundtrip_distinguished::<
+        test_messages::TestTypeSupportDistinguished,
+    >(data));
 }
 
 static DATE_RE: LazyLock<Regex> = LazyLock::new(|| {
@@ -120,37 +123,39 @@ pub fn test_parse_duration(data: &[u8]) {
     assert_eq!(Ok(&duration), roundtrip_text.parse().as_ref());
 }
 
-enum RoundtripResult {
-    /// The roundtrip succeeded.
-    Ok(Vec<u8>),
+type RoundtripResult = Result<Vec<u8>, RoundtripError>;
+
+fn expect_no_fuzz_error(result: RoundtripResult) {
+    if let res @ Err(RoundtripError::Error(..)) = result {
+        _ = res.unwrap();
+    }
+}
+
+#[derive(Debug)]
+enum RoundtripError {
     /// The data could not be decoded. This could indicate a bug in bilrost,
     /// or it could indicate that the input was bogus.
     DecodeError(DecodeError),
     /// Re-encoding or validating the data failed.  This indicates a bug in `bilrost`.
-    Error(eyre::Error),
+    Error(Report),
 }
 
-impl RoundtripResult {
-    /// Unwrap the roundtrip result.
-    #[allow(dead_code)]
-    pub fn unwrap(self) -> Vec<u8> {
-        match self {
-            RoundtripResult::Ok(buf) => buf,
-            RoundtripResult::DecodeError(error) => {
-                panic!("failed to decode the roundtrip data: {}", error)
-            }
-            RoundtripResult::Error(error) => panic!("failed roundtrip: {}", error),
-        }
+impl From<Report> for RoundtripError {
+    fn from(err: Report) -> Self {
+        RoundtripError::Error(err)
     }
+}
 
-    /// Unwrap the roundtrip result. Panics if the result was a validation or re-encoding error.
-    pub fn unwrap_error(self) -> Result<Vec<u8>, DecodeError> {
-        match self {
-            RoundtripResult::Ok(buf) => Ok(buf),
-            RoundtripResult::DecodeError(error) => Err(error),
-            RoundtripResult::Error(error) => panic!("failed roundtrip: {}", error),
-        }
+impl From<DecodeError> for RoundtripError {
+    fn from(err: DecodeError) -> Self {
+        RoundtripError::DecodeError(err)
     }
+}
+
+macro_rules! fuzz_bail {
+    ($($anything:tt)*) => {
+        return Err(RoundtripError::Error(err!($($anything)*)))
+    };
 }
 
 fn roundtrip<M>(data: &[u8]) -> RoundtripResult
@@ -158,41 +163,38 @@ where
     M: OwnedMessage,
 {
     // Try to decode a message from the data. If decoding fails, continue.
-    let message = match M::decode(data) {
-        Ok(decoded) => decoded,
-        Err(error) => return RoundtripResult::DecodeError(error),
-    };
+    let message = M::decode(data)?;
 
     let encoded_len = message.encoded_len();
 
     let buf1 = message.encode_to_vec();
     if encoded_len != buf1.len() {
-        return RoundtripResult::Error(err!(
+        fuzz_bail!(
             "expected encoded len ({}) did not match actual encoded len ({})",
             encoded_len,
             buf1.len()
-        ));
+        );
     }
 
     let prepend_buf = message.encode_fast();
 
     if encoded_len != prepend_buf.len() {
-        return RoundtripResult::Error(err!(
+        fuzz_bail!(
             "expected encoded len ({}) did not match actual prepended len ({})",
             encoded_len,
             prepend_buf.len()
-        ));
+        );
     }
 
     let mut prepended = Vec::new();
     prepended.put(prepend_buf);
     if prepended != buf1 {
-        return RoundtripResult::Error(err!("encoded and prepended messages were different"));
+        fuzz_bail!("encoded and prepended messages were different");
     }
 
     let roundtrip = match M::decode(buf1.as_slice()) {
         Ok(roundtrip) => roundtrip,
-        Err(error) => return RoundtripResult::Error(err!(error)),
+        Err(error) => fuzz_bail!("message did not round trip: {error}"),
     };
 
     let buf2 = roundtrip.encode_to_vec();
@@ -208,16 +210,14 @@ where
     */
 
     if buf1 != buf2 {
-        return RoundtripResult::Error(err!("roundtripped encoded buffers do not match"));
+        fuzz_bail!("roundtripped encoded buffers do not match");
     }
 
     if buf1 != buf3 {
-        return RoundtripResult::Error(err!(
-            "roundtripped encoded buffers do not match with prepend-encoding"
-        ));
+        fuzz_bail!("roundtripped encoded buffers do not match with prepend-encoding");
     }
 
-    RoundtripResult::Ok(buf1)
+    Ok(buf1)
 }
 
 fn roundtrip_distinguished<M>(data: &[u8]) -> RoundtripResult
@@ -225,51 +225,42 @@ where
     M: DistinguishedOwnedMessage + Eq,
 {
     // Try to decode a message from the data. If decoding fails, continue.
-    let (message, canon) = match M::decode_distinguished(data) {
-        Ok(decoded) => decoded,
-        Err(error) => return RoundtripResult::DecodeError(error),
-    };
+    let (message, canon) = M::decode_distinguished(data)?;
 
     let encoded_len = message.encoded_len();
 
     let buf1 = message.encode_to_vec();
     if encoded_len != buf1.len() {
-        return RoundtripResult::Error(err!(
+        fuzz_bail!(
             "expected encoded len ({}) did not match actual encoded len ({})",
             encoded_len,
             buf1.len()
-        ));
+        );
     }
 
     match canon {
         Canonical => {
             if buf1.as_slice() != data {
-                return RoundtripResult::Error(err!("decoded canonically but did not round trip"));
+                fuzz_bail!("decoded canonically but did not round trip");
             }
         }
         _ => {
             if M::decode_restricted(data, Canonical).is_ok() {
-                return RoundtripResult::Error(err!(
-                    "decoded non-canonically but restricted mode did not err"
-                ));
+                fuzz_bail!("decoded non-canonically but restricted mode did not err");
             };
             if canon == NotCanonical {
                 let Err(err) = M::decode_restricted(data, HasExtensions) else {
-                    return RoundtripResult::Error(err!(
-                        "decoded non-canonically but partially restricted mode did not err"
-                    ));
+                    fuzz_bail!("decoded non-canonically but partially restricted mode did not err");
                 };
                 if err.kind() != DecodeErrorKind::NotCanonical {
-                    return RoundtripResult::Error(err!(
+                    fuzz_bail!(
                         "decoded non-canonically but partially restricted mode produced the wrong \
                         error: {err}"
-                    ));
+                    );
                 }
             }
             if buf1.as_slice() == data {
-                return RoundtripResult::Error(err!(
-                    "decoded non-canonically but round tripped unchanged"
-                ));
+                fuzz_bail!("decoded non-canonically but round tripped unchanged");
             }
         }
     }
@@ -277,26 +268,26 @@ where
     let prepend_buf = message.encode_fast();
 
     if encoded_len != prepend_buf.len() {
-        return RoundtripResult::Error(err!(
+        fuzz_bail!(
             "expected encoded len ({}) did not match actual prepended len ({})",
             encoded_len,
             prepend_buf.len()
-        ));
+        );
     }
 
     let mut prepended = Vec::new();
     prepended.put(prepend_buf);
     if prepended != buf1 {
-        return RoundtripResult::Error(err!("encoded and prepended messages were different",));
+        fuzz_bail!("encoded and prepended messages were different");
     }
 
     let roundtrip = match M::decode_canonical(buf1.as_slice()) {
         Ok(roundtrip) => roundtrip,
-        Err(error) => return RoundtripResult::Error(err!(error)),
+        Err(error) => fuzz_bail!("messages did not roundtrip canonically: {error}"),
     };
 
     if roundtrip != message {
-        return RoundtripResult::Error(err!("roundtripped message structs are not equal"));
+        fuzz_bail!("roundtripped message structs are not equal");
     }
 
     let buf2 = roundtrip.encode_to_vec();
@@ -312,14 +303,22 @@ where
     */
 
     if buf1 != buf2 {
-        return RoundtripResult::Error(err!("roundtripped encoded buffers do not match"));
+        fuzz_bail!("roundtripped encoded buffers do not match");
     }
 
     if buf1 != buf3 {
-        return RoundtripResult::Error(err!(
-            "roundtripped encoded buffers do not match with prepend-encoding"
-        ));
+        fuzz_bail!("roundtripped encoded buffers do not match with prepend-encoding");
     }
 
-    RoundtripResult::Ok(buf1)
+    Ok(buf1)
+}
+
+fn fuzz_borrowing<'a, M>(data: &'a [u8]) -> RoundtripResult
+where
+    M: DistinguishedOwnedMessage + DistinguishedBorrowedMessage<'a> + Eq,
+{
+    let owned_relaxed = M::decode(data)?;
+    let borrowed_relaxed = M::decode_borrowed(data)?;
+    todo!();
+    Ok(vec![])
 }
