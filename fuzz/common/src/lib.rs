@@ -381,3 +381,11 @@ where
     }
     Ok(vec![])
 }
+
+#[test]
+fn run_test_funcs_empty() {
+    test_message(&[]);
+    test_type_support(&[]);
+    test_borrowed_support(&[]);
+    test_parse_duration(&[]);
+}

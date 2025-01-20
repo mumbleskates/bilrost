@@ -11,214 +11,285 @@ use tinyvec::ArrayVec;
 /// could trigger bugs that occur in any message type in this file.  We verify
 /// this stays true in a unit test.
 #[derive(Clone, Debug, PartialEq, Message)]
+// next tag: 116
 pub struct TestAllTypes {
     /// Singular
+    #[bilrost(1)]
     pub sint32: i32,
+    #[bilrost(2)]
     pub sint64: i64,
+    #[bilrost(3)]
     pub uint32: u32,
+    #[bilrost(4)]
     pub uint64: u64,
-    #[bilrost(encoding(fixed))]
+    #[bilrost(tag(5), encoding(fixed))]
     pub ufixed32: u32,
-    #[bilrost(encoding(fixed))]
+    #[bilrost(tag(6), encoding(fixed))]
     pub ufixed64: u64,
-    #[bilrost(encoding(fixed))]
+    #[bilrost(tag(7), encoding(fixed))]
     pub sfixed32: i32,
-    #[bilrost(encoding(fixed))]
+    #[bilrost(tag(8), encoding(fixed))]
     pub sfixed64: i64,
+    #[bilrost(9)]
     pub float32: f32,
+    #[bilrost(10)]
     pub float64: f64,
+    #[bilrost(11)]
     pub bool: bool,
+    #[bilrost(12)]
     pub string: String,
-    #[bilrost(encoding((general, general, fixed)))]
+    #[bilrost(115)]
+    pub bytestring: bytestring::ByteString,
+    #[bilrost(tag(13), encoding((general, general, fixed)))]
     pub tuple: (u64, String, u32),
-    #[bilrost(encoding(plainbytes))]
+    #[bilrost(tag(14), encoding(plainbytes))]
     pub bytes: Vec<u8>,
+    #[bilrost(15)]
     pub blob: Blob,
+    #[bilrost(16)]
     pub core_duration: core::time::Duration,
+    #[bilrost(17)]
     pub core_systemtime: std::time::SystemTime,
+    #[bilrost(18)]
     pub direct_message: test_message::NestedMessage,
+    #[bilrost(19)]
     pub boxed_message: Box<test_message::NestedMessage>,
-    #[bilrost(enumeration(test_message::NestedEnum))]
+    #[bilrost(tag(20), enumeration(test_message::NestedEnum))]
     pub helped_enum: u32,
+    #[bilrost(21)]
     pub direct_enum: test_message::NestedEnum,
+    #[bilrost(22)]
     pub map_varint_varint: BTreeMap<i32, i32>,
-    #[bilrost(encoding(map<fixed, fixed>))]
+    #[bilrost(tag(23), encoding(map<fixed, fixed>))]
     pub map_ufixed32_ufixed32: BTreeMap<u32, u32>,
-    #[bilrost(encoding(map<fixed, fixed>))]
+    #[bilrost(tag(24), encoding(map<fixed, fixed>))]
     pub map_ufixed64_ufixed64: BTreeMap<u64, u64>,
-    #[bilrost(encoding(map<fixed, fixed>))]
+    #[bilrost(tag(25), encoding(map<fixed, fixed>))]
     pub map_fixed32_fixed64: BTreeMap<i32, f64>,
+    #[bilrost(26)]
     pub map_bool_bool: BTreeMap<bool, bool>,
+    #[bilrost(27)]
     pub map_string_string: BTreeMap<String, String>,
+    #[bilrost(28)]
     pub map_string_bytes: BTreeMap<String, Blob>,
+    #[bilrost(29)]
     pub map_string_nested_message: BTreeMap<String, test_message::NestedMessage>,
+    #[bilrost(30)]
     pub map_string_nested_enum: BTreeMap<String, test_message::NestedEnum>,
     /// Optional
+    #[bilrost(31)]
     pub optional_sint32: Option<i32>,
+    #[bilrost(32)]
     pub optional_sint64: Option<i64>,
+    #[bilrost(33)]
     pub optional_uint32: Option<u32>,
+    #[bilrost(34)]
     pub optional_uint64: Option<u64>,
-    #[bilrost(encoding(fixed))]
+    #[bilrost(tag(35), encoding(fixed))]
     pub optional_ufixed32: Option<u32>,
-    #[bilrost(encoding(fixed))]
+    #[bilrost(tag(36), encoding(fixed))]
     pub optional_ufixed64: Option<u64>,
-    #[bilrost(encoding(fixed))]
+    #[bilrost(tag(37), encoding(fixed))]
     pub optional_sfixed32: Option<i32>,
-    #[bilrost(encoding(fixed))]
+    #[bilrost(tag(38), encoding(fixed))]
     pub optional_sfixed64: Option<i64>,
+    #[bilrost(39)]
     pub optional_float32: Option<f32>,
+    #[bilrost(40)]
     pub optional_float64: Option<f64>,
+    #[bilrost(41)]
     pub optional_bool: Option<bool>,
+    #[bilrost(42)]
     pub optional_string: Option<String>,
-    #[bilrost(encoding((general, general, fixed)))]
+    #[bilrost(tag(43), encoding((general, general, fixed)))]
     pub optional_tuple: Option<(u64, String, u32)>,
-    #[bilrost(encoding(plainbytes))]
+    #[bilrost(tag(44), encoding(plainbytes))]
     pub optional_bytes: Option<Vec<u8>>,
+    #[bilrost(45)]
     pub optional_blob: Option<Blob>,
+    #[bilrost(46)]
     pub optional_message: Option<test_message::NestedMessage>,
+    #[bilrost(47)]
     pub optional_boxed_message: Option<Box<test_message::NestedMessage>>,
-    #[bilrost(enumeration(test_message::NestedEnum))]
+    #[bilrost(tag(48), enumeration(test_message::NestedEnum))]
     pub optional_helped_enum: Option<u32>,
+    #[bilrost(49)]
     pub optional_enum: Option<test_message::NestedEnum>,
+    #[bilrost(50)]
     pub optional_map_fixed32_fixed64: Option<BTreeMap<i32, f64>>,
+    #[bilrost(51)]
     pub optional_map_bool_bool: Option<BTreeMap<bool, bool>>,
+    #[bilrost(52)]
     pub optional_map_string_string: Option<BTreeMap<String, String>>,
+    #[bilrost(53)]
     pub optional_map_string_bytes: Option<BTreeMap<String, Blob>>,
+    #[bilrost(54)]
     pub optional_map_string_nested_message: Option<BTreeMap<String, test_message::NestedMessage>>,
+    #[bilrost(55)]
     pub optional_map_string_nested_enum: Option<BTreeMap<String, test_message::NestedEnum>>,
     /// Unpacked
+    #[bilrost(56)]
     pub unpacked_sint32: Vec<i32>,
+    #[bilrost(57)]
     pub unpacked_sint64: Vec<i64>,
+    #[bilrost(58)]
     pub unpacked_uint32: Vec<u32>,
+    #[bilrost(59)]
     pub unpacked_uint64: Vec<u64>,
-    #[bilrost(encoding(fixed))]
+    #[bilrost(tag(60), encoding(fixed))]
     pub unpacked_ufixed32: Vec<u32>,
-    #[bilrost(encoding(fixed))]
+    #[bilrost(tag(61), encoding(fixed))]
     pub unpacked_ufixed64: Vec<u64>,
-    #[bilrost(encoding(fixed))]
+    #[bilrost(tag(62), encoding(fixed))]
     pub unpacked_sfixed32: Vec<i32>,
-    #[bilrost(encoding(fixed))]
+    #[bilrost(tag(63), encoding(fixed))]
     pub unpacked_sfixed64: Vec<i64>,
+    #[bilrost(64)]
     pub unpacked_float32: Vec<f32>,
+    #[bilrost(65)]
     pub unpacked_float64: Vec<f64>,
+    #[bilrost(66)]
     pub unpacked_bool: Vec<bool>,
+    #[bilrost(67)]
     pub unpacked_string: Vec<String>,
-    #[bilrost(encoding(unpacked<(general, general, fixed)>))]
+    #[bilrost(tag(68), encoding(unpacked<(general, general, fixed)>))]
     pub unpacked_tuple: Vec<(u64, String, u32)>,
-    #[bilrost(encoding(unpacked<plainbytes>))]
+    #[bilrost(tag(69), encoding(unpacked<plainbytes>))]
     pub unpacked_bytes: Vec<Vec<u8>>,
+    #[bilrost(70)]
     pub unpacked_blob: Vec<Blob>,
+    #[bilrost(71)]
     pub unpacked_nested_message: Vec<test_message::NestedMessage>,
-    #[bilrost(encoding(unpacked))]
+    #[bilrost(tag(72), encoding(unpacked))]
     pub unpacked_varint_arr: [u64; 3],
-    #[bilrost(encoding(unpacked<fixed>))]
+    #[bilrost(tag(73), encoding(unpacked<fixed>))]
     pub unpacked_fixed_arr: [u32; 3],
-    #[bilrost(encoding(unpacked))]
+    #[bilrost(tag(74), encoding(unpacked))]
     pub unpacked_varint_arrayvec: ArrayVec<[u64; 3]>,
-    #[bilrost(encoding(unpacked<fixed>))]
+    #[bilrost(tag(75), encoding(unpacked<fixed>))]
     pub unpacked_fixed_arrayvec: ArrayVec<[u32; 3]>,
     /// Packed
-    #[bilrost(encoding(packed))]
+    #[bilrost(tag(76), encoding(packed))]
     pub packed_uint32: Vec<u32>,
-    #[bilrost(encoding(packed))]
+    #[bilrost(tag(77), encoding(packed))]
     pub packed_uint64: Vec<u64>,
-    #[bilrost(encoding(packed<fixed>))]
+    #[bilrost(tag(78), encoding(packed<fixed>))]
     pub packed_ufixed32: Vec<u32>,
-    #[bilrost(encoding(packed<fixed>))]
+    #[bilrost(tag(79), encoding(packed<fixed>))]
     pub packed_ufixed64: Vec<u64>,
-    #[bilrost(encoding(packed))]
+    #[bilrost(tag(80), encoding(packed))]
     pub packed_bool: Vec<bool>,
-    #[bilrost(encoding(packed))]
+    #[bilrost(tag(81), encoding(packed))]
     pub packed_string: Vec<String>,
-    #[bilrost(encoding(packed<(general, general, fixed)>))]
+    #[bilrost(tag(82), encoding(packed<(general, general, fixed)>))]
     pub packed_tuple: Vec<(u64, String, u32)>,
-    #[bilrost(encoding(packed))]
+    #[bilrost(tag(83), encoding(packed))]
     pub packed_nested_enum: Vec<test_message::NestedEnum>,
-    #[bilrost(encoding(packed))]
+    #[bilrost(tag(84), encoding(packed))]
     pub packed_varint_arr: [u64; 3],
-    #[bilrost(encoding(packed<fixed>))]
+    #[bilrost(tag(85), encoding(packed<fixed>))]
     pub packed_fixed_arr: [u32; 3],
-    #[bilrost(encoding(packed))]
+    #[bilrost(tag(86), encoding(packed))]
     pub packed_varint_arrayvec: ArrayVec<[u64; 3]>,
-    #[bilrost(encoding(packed<fixed>))]
+    #[bilrost(tag(87), encoding(packed<fixed>))]
     pub packed_fixed_arrayvec: ArrayVec<[u32; 3]>,
     /// Set, unpacked
+    #[bilrost(88)]
     pub unpacked_set_uint32: BTreeSet<u32>,
+    #[bilrost(89)]
     pub unpacked_set_uint64: BTreeSet<u64>,
-    #[bilrost(encoding(unpacked<fixed>))]
+    #[bilrost(tag(90), encoding(unpacked<fixed>))]
     pub unpacked_set_ufixed32: BTreeSet<u32>,
-    #[bilrost(encoding(unpacked<fixed>))]
+    #[bilrost(tag(91), encoding(unpacked<fixed>))]
     pub unpacked_set_ufixed64: BTreeSet<u64>,
+    #[bilrost(92)]
     pub unpacked_set_bool: BTreeSet<bool>,
+    #[bilrost(93)]
     pub unpacked_set_string: BTreeSet<String>,
+    #[bilrost(94)]
     pub unpacked_set_blob: BTreeSet<Blob>,
+    #[bilrost(95)]
     pub unpacked_set_enum: BTreeSet<test_message::NestedEnum>,
+    #[bilrost(96)]
     pub unpacked_set_map: BTreeSet<BTreeMap<bool, bool>>,
     /// Set, packed
-    #[bilrost(encoding(packed))]
+    #[bilrost(tag(97), encoding(packed))]
     pub packed_set_uint32: BTreeSet<u32>,
-    #[bilrost(encoding(packed))]
+    #[bilrost(tag(98), encoding(packed))]
     pub packed_set_uint64: BTreeSet<u64>,
-    #[bilrost(encoding(packed<fixed>))]
+    #[bilrost(tag(99), encoding(packed<fixed>))]
     pub packed_set_ufixed32: BTreeSet<u32>,
-    #[bilrost(encoding(packed<fixed>))]
+    #[bilrost(tag(100), encoding(packed<fixed>))]
     pub packed_set_ufixed64: BTreeSet<u64>,
-    #[bilrost(encoding(packed))]
+    #[bilrost(tag(101), encoding(packed))]
     pub packed_set_bool: BTreeSet<bool>,
-    #[bilrost(encoding(packed))]
+    #[bilrost(tag(102), encoding(packed))]
     pub packed_set_string: BTreeSet<String>,
-    #[bilrost(encoding(packed))]
+    #[bilrost(tag(103), encoding(packed))]
     pub packed_set_blob: BTreeSet<Blob>,
-    #[bilrost(encoding(packed))]
+    #[bilrost(tag(104), encoding(packed))]
     pub packed_set_enum: BTreeSet<test_message::NestedEnum>,
-    #[bilrost(encoding(packed))]
+    #[bilrost(tag(105), encoding(packed))]
     pub packed_set_map: BTreeSet<BTreeMap<bool, bool>>,
     /// Set, packed & optional
-    #[bilrost(encoding(packed))]
+    #[bilrost(tag(106), encoding(packed))]
     pub optional_packed_set_uint32: Option<BTreeSet<u32>>,
-    #[bilrost(encoding(packed))]
+    #[bilrost(tag(107), encoding(packed))]
     pub optional_packed_set_uint64: Option<BTreeSet<u64>>,
-    #[bilrost(encoding(packed<fixed>))]
+    #[bilrost(tag(108), encoding(packed<fixed>))]
     pub optional_packed_set_ufixed32: Option<BTreeSet<u32>>,
-    #[bilrost(encoding(packed<fixed>))]
+    #[bilrost(tag(109), encoding(packed<fixed>))]
     pub optional_packed_set_ufixed64: Option<BTreeSet<u64>>,
-    #[bilrost(encoding(packed))]
+    #[bilrost(tag(110), encoding(packed))]
     pub optional_packed_set_bool: Option<BTreeSet<bool>>,
-    #[bilrost(encoding(packed))]
+    #[bilrost(tag(111), encoding(packed))]
     pub optional_packed_set_string: Option<BTreeSet<String>>,
-    #[bilrost(encoding(packed<plainbytes>))]
+    #[bilrost(tag(112), encoding(packed<plainbytes>))]
     pub optional_packed_set_bytes: Option<BTreeSet<Vec<u8>>>,
-    #[bilrost(encoding(map<packed, general>))]
+    #[bilrost(tag(113), encoding(map<packed, general>))]
     pub optional_map_set_enum_f32: Option<BTreeMap<BTreeSet<test_message::NestedEnum>, f32>>,
     /// Recursive message
-    #[bilrost(recurses)]
+    #[bilrost(tag(114), recurses)]
     pub recursive_message: Option<Box<TestAllTypes>>,
     /// Well-known types
-    #[bilrost(tag = 301)]
+    #[bilrost(301)]
     pub direct_duration: bilrost_types::Duration,
+    #[bilrost(302)]
     pub direct_timestamp: bilrost_types::Timestamp,
+    #[bilrost(303)]
     pub direct_struct: bilrost_types::StructValue,
+    #[bilrost(304)]
     pub direct_value: bilrost_types::Value,
+    #[bilrost(305)]
     pub optional_duration: Option<bilrost_types::Duration>,
+    #[bilrost(306)]
     pub optional_timestamp: Option<bilrost_types::Timestamp>,
+    #[bilrost(307)]
     pub optional_struct: Option<bilrost_types::StructValue>,
+    #[bilrost(308)]
     pub optional_value: Option<bilrost_types::Value>,
+    #[bilrost(309)]
     pub unpacked_duration: Vec<bilrost_types::Duration>,
+    #[bilrost(310)]
     pub unpacked_timestamp: Vec<bilrost_types::Timestamp>,
+    #[bilrost(311)]
     pub unpacked_struct: Vec<bilrost_types::StructValue>,
+    #[bilrost(312)]
     pub unpacked_value: Vec<bilrost_types::Value>,
+    #[bilrost(313)]
     pub unpacked_list_value: Vec<bilrost_types::ListValue>,
-    #[bilrost(encoding(packed))]
+    #[bilrost(tag(314), encoding(packed))]
     pub packed_duration: Vec<bilrost_types::Duration>,
-    #[bilrost(encoding(packed))]
+    #[bilrost(tag(315), encoding(packed))]
     pub packed_timestamp: Vec<bilrost_types::Timestamp>,
-    #[bilrost(encoding(packed))]
+    #[bilrost(tag(316), encoding(packed))]
     pub packed_struct: Vec<bilrost_types::StructValue>,
-    #[bilrost(encoding(packed))]
+    #[bilrost(tag(317), encoding(packed))]
     pub packed_value: Vec<bilrost_types::Value>,
-    #[bilrost(encoding(packed))]
+    #[bilrost(tag(318), encoding(packed))]
     pub packed_list_value: Vec<bilrost_types::ListValue>,
     /// Oneofs
+    #[bilrost(319)]
     pub oneof_as_submessage: test_message::OneofField,
     #[bilrost(oneof(1001-1009))]
     pub nonempty_oneof_field: Option<test_message::NonEmptyOneofField>,
@@ -232,8 +303,9 @@ pub mod test_message {
 
     #[derive(Clone, Debug, PartialEq, Message)]
     pub struct NestedMessage {
+        #[bilrost(1)]
         pub a: i32,
-        #[bilrost(recurses)]
+        #[bilrost(tag(2), recurses)]
         pub corecursive: Option<Box<TestAllTypes>>,
     }
     #[derive(Clone, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord, Enumeration)]
@@ -295,114 +367,138 @@ pub mod test_message {
 #[bilrost(distinguished)]
 pub struct TestDistinguished {
     /// Singular
-    #[bilrost(encoding(varint))]
+    #[bilrost(tag(1), encoding(varint))]
     pub uint8: u8,
+    #[bilrost(2)]
     pub uint16: u16,
+    #[bilrost(3)]
     pub uint32: u32,
+    #[bilrost(4)]
     pub uint64: u64,
-    #[bilrost(encoding(fixed))]
+    #[bilrost(tag(5), encoding(fixed))]
     pub ufixed32: u32,
-    #[bilrost(encoding(fixed))]
+    #[bilrost(tag(6), encoding(fixed))]
     pub ufixed64: u64,
+    #[bilrost(7)]
     pub bool: bool,
+    #[bilrost(8)]
     pub string: String,
-    #[bilrost(encoding(plainbytes))]
+    #[bilrost(tag(9), encoding(plainbytes))]
     pub bytes: Vec<u8>,
-    #[bilrost(encoding((general, general, fixed)))]
+    #[bilrost(tag(10), encoding((general, general, fixed)))]
     pub tuple: (u64, String, u32),
+    #[bilrost(11)]
     pub core_duration: core::time::Duration,
+    #[bilrost(12)]
     pub direct_message: test_distinguished::NestedMessage,
+    #[bilrost(13)]
     pub direct_enum: test_distinguished::NestedEnum,
+    #[bilrost(14)]
     pub map_varint_varint: BTreeMap<i32, i32>,
-    #[bilrost(encoding(map<fixed, fixed>))]
+    #[bilrost(tag(15), encoding(map<fixed, fixed>))]
     pub map_ufixed32_ufixed32: BTreeMap<i32, i32>,
+    #[bilrost(16)]
     pub map_bool_bool: BTreeMap<bool, bool>,
+    #[bilrost(17)]
     pub map_u32_nested_message: BTreeMap<u32, test_distinguished::NestedMessage>,
+    #[bilrost(18)]
     pub map_u32_nested_enum: BTreeMap<u32, test_distinguished::NestedEnum>,
     /// Optional
+    #[bilrost(19)]
     pub optional_uint64: Option<u64>,
-    #[bilrost(encoding(fixed))]
+    #[bilrost(tag(20), encoding(fixed))]
     pub optional_ufixed32: Option<u32>,
+    #[bilrost(21)]
     pub optional_bool: Option<bool>,
-    #[bilrost(encoding(plainbytes))]
+    #[bilrost(tag(22), encoding(plainbytes))]
     pub optional_bytes: Option<Vec<u8>>,
-    #[bilrost(encoding((general, general, fixed)))]
+    #[bilrost(tag(23), encoding((general, general, fixed)))]
     pub optional_tuple: Option<(u64, String, u32)>,
+    #[bilrost(24)]
     pub optional_message: Option<test_distinguished::NestedMessage>,
+    #[bilrost(25)]
     pub optional_boxed_message: Option<Box<test_distinguished::NestedMessage>>,
+    #[bilrost(26)]
     pub optional_enum: Option<test_distinguished::NestedEnum>,
+    #[bilrost(27)]
     pub optional_map_bool_bool: Option<BTreeMap<bool, bool>>,
     /// Unpacked
+    #[bilrost(28)]
     pub unpacked_varint: Vec<u16>,
-    #[bilrost(encoding(fixed))]
+    #[bilrost(tag(29), encoding(fixed))]
     pub unpacked_fixed: Vec<u32>,
+    #[bilrost(30)]
     pub unpacked_bool: Vec<bool>,
-    #[bilrost(encoding(plainbytes))]
+    #[bilrost(tag(31), encoding(plainbytes))]
     pub unpacked_string: Vec<Vec<u8>>,
+    #[bilrost(32)]
     pub unpacked_nested_message: Vec<test_distinguished::NestedMessage>,
-    #[bilrost(encoding(unpacked))]
+    #[bilrost(tag(33), encoding(unpacked))]
     pub unpacked_varint_arr: [u64; 3],
-    #[bilrost(encoding(unpacked<fixed>))]
+    #[bilrost(tag(34), encoding(unpacked<fixed>))]
     pub unpacked_fixed_arr: [u32; 3],
-    #[bilrost(encoding(unpacked<plainbytes>))]
+    #[bilrost(tag(35), encoding(unpacked<plainbytes>))]
     pub unpacked_bytes_arr: [Vec<u8>; 3],
-    #[bilrost(encoding(unpacked))]
+    #[bilrost(tag(36), encoding(unpacked))]
     pub unpacked_varint_arrayvec: ArrayVec<[u64; 3]>,
-    #[bilrost(encoding(unpacked<fixed>))]
+    #[bilrost(tag(37), encoding(unpacked<fixed>))]
     pub unpacked_fixed_arrayvec: ArrayVec<[u32; 3]>,
-    #[bilrost(encoding(unpacked<plainbytes>))]
+    #[bilrost(tag(38), encoding(unpacked<plainbytes>))]
     pub unpacked_bytes_arrayvec: ArrayVec<[Vec<u8>; 3]>,
     /// Packed
-    #[bilrost(encoding(packed))]
+    #[bilrost(tag(39), encoding(packed))]
     pub packed_uint32: Vec<u32>,
-    #[bilrost(encoding(packed<fixed>))]
+    #[bilrost(tag(40), encoding(packed<fixed>))]
     pub packed_ufixed32: Vec<u32>,
-    #[bilrost(encoding(packed))]
+    #[bilrost(tag(41), encoding(packed))]
     pub packed_bool: Vec<bool>,
-    #[bilrost(encoding(packed<plainbytes>))]
+    #[bilrost(tag(42), encoding(packed<plainbytes>))]
     pub packed_bytes: Vec<Vec<u8>>,
-    #[bilrost(encoding(packed<(general, general, fixed)>))]
+    #[bilrost(tag(43), encoding(packed<(general, general, fixed)>))]
     pub packed_tuple: Vec<(u64, String, u32)>,
-    #[bilrost(encoding(packed))]
+    #[bilrost(tag(44), encoding(packed))]
     pub packed_nested_enum: Vec<test_distinguished::NestedEnum>,
-    #[bilrost(encoding(packed))]
+    #[bilrost(tag(45), encoding(packed))]
     pub packed_varint_arr: [u64; 3],
-    #[bilrost(encoding(packed<fixed>))]
+    #[bilrost(tag(46), encoding(packed<fixed>))]
     pub packed_fixed_arr: [u32; 3],
-    #[bilrost(encoding(packed))]
+    #[bilrost(tag(47), encoding(packed))]
     pub packed_varint_arrayvec: ArrayVec<[u64; 3]>,
-    #[bilrost(encoding(packed<fixed>))]
+    #[bilrost(tag(48), encoding(packed<fixed>))]
     pub packed_fixed_arrayvec: ArrayVec<[u32; 3]>,
-    #[bilrost(encoding(packed<plainbytes>))]
+    #[bilrost(tag(49), encoding(packed<plainbytes>))]
     pub packed_bytes_arrayvec: ArrayVec<[Vec<u8>; 3]>,
     /// Set, unpacked
+    #[bilrost(50)]
     pub unpacked_set_uint32: BTreeSet<u32>,
-    #[bilrost(encoding(unpacked<fixed>))]
+    #[bilrost(tag(51), encoding(unpacked<fixed>))]
     pub unpacked_set_ufixed32: BTreeSet<u32>,
+    #[bilrost(52)]
     pub unpacked_set_bool: BTreeSet<bool>,
-    #[bilrost(encoding(unpacked<plainbytes>))]
+    #[bilrost(tag(53), encoding(unpacked<plainbytes>))]
     pub unpacked_set_bytes: BTreeSet<Vec<u8>>,
-    pub unpacked_set_enum: BTreeSet<test_distinguished::NestedEnum>,
+    #[bilrost(54)]
     pub unpacked_set_map: BTreeSet<BTreeMap<bool, bool>>,
     /// Set, packed
-    #[bilrost(encoding(packed))]
+    #[bilrost(tag(55), encoding(packed))]
     pub packed_set_uint32: BTreeSet<u32>,
-    #[bilrost(encoding(packed<fixed>))]
+    #[bilrost(tag(56), encoding(packed<fixed>))]
     pub packed_set_ufixed32: BTreeSet<u32>,
-    #[bilrost(encoding(packed))]
+    #[bilrost(tag(57), encoding(packed))]
     pub packed_set_bool: BTreeSet<bool>,
-    #[bilrost(encoding(packed<plainbytes>))]
+    #[bilrost(tag(58), encoding(packed<plainbytes>))]
     pub packed_set_blob: BTreeSet<Vec<u8>>,
-    #[bilrost(encoding(packed))]
+    #[bilrost(tag(59), encoding(packed))]
     pub packed_set_enum: BTreeSet<test_distinguished::NestedEnum>,
-    #[bilrost(encoding(packed))]
+    #[bilrost(tag(60), encoding(packed))]
     pub packed_set_map: BTreeSet<BTreeMap<bool, bool>>,
     /// Set, packed & optional
-    #[bilrost(encoding(packed))]
+    #[bilrost(tag(61), encoding(packed))]
     pub optional_packed_set_uint32: Option<BTreeSet<u32>>,
-    #[bilrost(encoding(packed))]
+    #[bilrost(tag(62), encoding(packed))]
     pub optional_packed_set_map: Option<BTreeSet<BTreeMap<bool, bool>>>,
     /// Oneofs
+    #[bilrost(63)]
     pub oneof_as_submessage: test_distinguished::OneofField,
     #[bilrost(oneof(101-106))]
     pub nonempty_oneof_field: Option<test_distinguished::NonEmptyOneofField>,
@@ -416,8 +512,9 @@ pub mod test_distinguished {
     #[derive(Clone, Debug, PartialEq, Eq, Message)]
     #[bilrost(distinguished)]
     pub struct NestedMessage {
+        #[bilrost(1)]
         pub a: u64,
-        #[bilrost(recurses)]
+        #[bilrost(tag(2), recurses)]
         pub corecursive: Option<Box<TestDistinguished>>,
         #[bilrost(oneof(201-206))]
         pub oneof_field: OneofField,
@@ -463,52 +560,83 @@ pub mod test_distinguished {
 
 #[derive(Debug, PartialEq, Message)]
 pub struct TestTypeSupport {
+    #[bilrost(1)]
     core_duration: core::time::Duration,
+    #[bilrost(2)]
     chrono_naive_date: chrono::NaiveDate,
+    #[bilrost(3)]
     chrono_naive_time: chrono::NaiveTime,
+    #[bilrost(4)]
     chrono_naive_date_time: chrono::NaiveDateTime,
+    #[bilrost(5)]
     chrono_fixed_offset: chrono::FixedOffset,
+    #[bilrost(6)]
     chrono_date_time_utc: chrono::DateTime<chrono::Utc>,
+    #[bilrost(7)]
     chrono_date_time_fixed: chrono::DateTime<chrono::FixedOffset>,
+    #[bilrost(8)]
     chrono_time_delta: chrono::TimeDelta,
+    #[bilrost(9)]
     time_date: time::Date,
+    #[bilrost(10)]
     time_time: time::Time,
+    #[bilrost(11)]
     time_primitivedatetime: time::PrimitiveDateTime,
+    #[bilrost(12)]
     time_utcoffset: time::UtcOffset,
+    #[bilrost(13)]
     time_offsetdatetime: time::OffsetDateTime,
+    #[bilrost(14)]
     time_duration: time::Duration,
 
+    #[bilrost(15)]
     std_systemtime: std::time::SystemTime,
 }
 
 #[derive(Debug, PartialEq, Eq, Message)]
 #[bilrost(distinguished)]
 pub struct TestTypeSupportDistinguished {
+    #[bilrost(1)]
     core_duration: core::time::Duration,
+    #[bilrost(2)]
     chrono_naive_date: chrono::NaiveDate,
+    #[bilrost(3)]
     chrono_naive_time: chrono::NaiveTime,
+    #[bilrost(4)]
     chrono_naive_date_time: chrono::NaiveDateTime,
+    #[bilrost(5)]
     chrono_fixed_offset: chrono::FixedOffset,
+    #[bilrost(6)]
     chrono_date_time_utc: chrono::DateTime<chrono::Utc>,
+    #[bilrost(7)]
     chrono_date_time_fixed: chrono::DateTime<chrono::FixedOffset>,
+    #[bilrost(8)]
     chrono_time_delta: chrono::TimeDelta,
+    #[bilrost(9)]
     time_date: time::Date,
+    #[bilrost(10)]
     time_time: time::Time,
+    #[bilrost(11)]
     time_primitivedatetime: time::PrimitiveDateTime,
+    #[bilrost(12)]
     time_utcoffset: time::UtcOffset,
+    #[bilrost(13)]
     time_offsetdatetime: time::OffsetDateTime,
+    #[bilrost(14)]
     time_duration: time::Duration,
 }
 
 #[derive(Debug, PartialEq, Eq, Message)]
 #[bilrost(distinguished)]
 pub struct TestTypeSupportBorrowable<'a> {
+    #[bilrost(1)]
     str: Cow<'a, str>,
-    #[bilrost(encoding(plainbytes))]
+    #[bilrost(tag(2), encoding(plainbytes))]
     bytes: Cow<'a, [u8]>,
+    #[bilrost(3)]
     bstr: Cow<'a, bstr::BStr>,
-    #[bilrost(encoding(plainbytes))]
+    #[bilrost(tag(4), encoding(plainbytes))]
     small_array: Cow<'a, [u8; 1]>,
-    #[bilrost(encoding(plainbytes))]
+    #[bilrost(tag(5), encoding(plainbytes))]
     bigger_array: Cow<'a, [u8; 16]>,
 }
