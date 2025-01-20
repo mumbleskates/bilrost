@@ -13,36 +13,36 @@ use std::sync::LazyLock;
 pub mod test_messages;
 
 pub fn test_message(data: &[u8]) {
-    expect_no_fuzz_error(roundtrip::<test_messages::TestAllTypes>(data));
-    expect_no_fuzz_error(roundtrip_distinguished::<test_messages::TestDistinguished>(
+    _ = expect_no_fuzz_error(roundtrip::<test_messages::TestAllTypes>(data));
+    _ = expect_no_fuzz_error(roundtrip_distinguished::<test_messages::TestDistinguished>(
         data,
     ));
-    expect_no_fuzz_error(fuzz_borrowing::<test_messages::TestAllTypes>(data));
-    expect_no_fuzz_error(fuzz_borrowing_distinguished::<
+    _ = expect_no_fuzz_error(fuzz_borrowing::<test_messages::TestAllTypes>(data));
+    _ = expect_no_fuzz_error(fuzz_borrowing_distinguished::<
         test_messages::TestDistinguished,
     >(data));
 }
 
 pub fn test_type_support(data: &[u8]) {
-    expect_no_fuzz_error(roundtrip::<test_messages::TestTypeSupport>(data));
-    expect_no_fuzz_error(roundtrip_distinguished::<
+    _ = expect_no_fuzz_error(roundtrip::<test_messages::TestTypeSupport>(data));
+    _ = expect_no_fuzz_error(roundtrip_distinguished::<
         test_messages::TestTypeSupportDistinguished,
     >(data));
-    expect_no_fuzz_error(fuzz_borrowing::<test_messages::TestTypeSupport>(data));
-    expect_no_fuzz_error(fuzz_borrowing_distinguished::<
+    _ = expect_no_fuzz_error(fuzz_borrowing::<test_messages::TestTypeSupport>(data));
+    _ = expect_no_fuzz_error(fuzz_borrowing_distinguished::<
         test_messages::TestTypeSupportDistinguished,
     >(data));
 }
 
 pub fn test_borrowed_support(data: &[u8]) {
-    expect_no_fuzz_error(roundtrip::<test_messages::TestTypeSupportBorrowable>(data));
-    expect_no_fuzz_error(roundtrip_distinguished::<
+    _ = expect_no_fuzz_error(roundtrip::<test_messages::TestTypeSupportBorrowable>(data));
+    _ = expect_no_fuzz_error(roundtrip_distinguished::<
         test_messages::TestTypeSupportBorrowable,
     >(data));
-    expect_no_fuzz_error(fuzz_borrowing::<test_messages::TestTypeSupportBorrowable>(
+    _ = expect_no_fuzz_error(fuzz_borrowing::<test_messages::TestTypeSupportBorrowable>(
         data,
     ));
-    expect_no_fuzz_error(fuzz_borrowing_distinguished::<
+    _ = expect_no_fuzz_error(fuzz_borrowing_distinguished::<
         test_messages::TestTypeSupportBorrowable,
     >(data));
 }
@@ -147,9 +147,13 @@ pub fn test_parse_duration(data: &[u8]) {
 
 type RoundtripResult = Result<Vec<u8>, RoundtripError>;
 
-fn expect_no_fuzz_error(result: RoundtripResult) {
-    if let res @ Err(RoundtripError::Error(..)) = result {
-        _ = res.unwrap();
+fn expect_no_fuzz_error(result: RoundtripResult) -> Result<Vec<u8>, DecodeError> {
+    match result {
+        Err(RoundtripError::Error(err)) => {
+            panic!("{err:?}");
+        }
+        Ok(val) => Ok(val),
+        Err(RoundtripError::DecodeError(err)) => Err(err),
     }
 }
 
