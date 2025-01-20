@@ -141,7 +141,9 @@ where
     ) -> Result<Canonicity, DecodeError> {
         let mut proxy = T::new_proxy();
         let mut canon = DistinguishedValueDecoder::<E>::decode_value_distinguished::<ALLOW_EMPTY>(
-            &mut proxy, buf, ctx.clone(),
+            &mut proxy,
+            buf,
+            ctx.clone(),
         )?;
         ctx.update(&mut canon, value.decode_proxy_distinguished(proxy)?)?;
         Ok(canon)
