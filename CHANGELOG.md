@@ -65,6 +65,9 @@ functionality in scope.
 * More reorganization and file cleanups, splitting up some large files into more
   modules etc.
 * Cleaned up some docs in the `encoding` module.
+* Improved type coverage in the fuzz testing modules and gave the message
+  definitions fixed field tags so existing fuzzing corpora will be maximally
+  useful.
 * Internals: Ironed out a lingering annoyance with the field decoding APIs; the
   `Decoder` traits no longer accept a `duplicated` boolean argument that
   mandates returning an error when it is true. Instead, message implementations
