@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/bilrost-derive/0.1012.0")]
+#![doc(html_root_url = "https://docs.rs/bilrost-derive/0.1013.0-dev")]
 // The `quote!` macro requires deep recursion.
 #![recursion_limit = "4096"]
 #![no_std]
