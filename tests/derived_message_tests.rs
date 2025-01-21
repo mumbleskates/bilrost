@@ -4014,6 +4014,48 @@ fn tuples() {
         NotCanonical,
         "FooTuple.0",
     );
+
+    // Errors within tuples
+    #[derive(Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
+    struct Wrapper<T>(T);
+
+    assert::decodes!(
+        owned never decodes Wrapper<(i64,)>,
+        [
+            (0, OV::message(&[
+                (0, OV::fixed_i64(123)),
+            ].into_opaque_message())),
+        ],
+        WrongWireType,
+        "Wrapper.0/(1-tuple).0",
+    );
+    assert::decodes!(
+        owned non-canonically,
+        [
+            (0, OV::message(&[
+                (0, OV::i64(456)),
+                (1, OV::message(&[
+                    (0, OV::str("hello")),
+                    (123, OV::str("extra")),
+                ].into_opaque_message())),
+            ].into_opaque_message())),
+        ],
+        Wrapper::<(i64, (String,))>((456_i64, ("hello".to_owned(),))),
+        HasExtensions,
+        "Wrapper.0/(2-tuple).1",
+    );
+    assert::decodes!(
+        owned never decodes Wrapper<(i64,)>,
+        [
+            (0, OV::message(&[
+                (0, OV::i64(123)),
+                (0, OV::i64(123)),
+            ].into_opaque_message())),
+        ],
+        UnexpectedlyRepeated,
+        "Wrapper.0/(1-tuple).0",
+    );
 }
 
 #[test]
@@ -4354,5 +4396,17 @@ fn proxied_underived_error_propagation() {
         ],
         WrongWireType,
         "Foo.proxied/TimeDelta.nanos",
+    );
+
+    assert::decodes!(
+        owned never decodes Foo,
+        [
+            (1, OV::message(&[
+                (1, OV::i64(123)),
+                (1, OV::i64(123)),
+            ].into_opaque_message())),
+        ],
+        UnexpectedlyRepeated,
+        "Foo.proxied/TimeDelta.secs",
     );
 }
