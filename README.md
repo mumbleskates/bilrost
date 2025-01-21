@@ -516,8 +516,9 @@ We can now import and use its traits and derive macros. The main three are:
   except when they are included in a `Message` struct (or [have `Message`
   derived themselves](#deriving-message-for-enums)).
 
-And then there are the four traits for the different message decoding
-capabilities:
+And then there are the five traits for the different [message encoding and 
+decoding](#encoding-and-decoding-messages) capabilities:
+* `Message`
 * `OwnedMessage`
 * `BorrowedMessage`
 * `DistinguishedOwnedMessage`
@@ -1042,7 +1043,7 @@ that part. These values can be represented in a message struct as references
 that will refer to the original, uncopied data in the slice that was decoded.
 
 When a message or oneof has one of these reference fields, it can no longer
-decode owned data from any buffer, and won't implement the "owned" message
+decode owned data from any buffer and won't implement the "owned" message
 decoding traits.
 
 ```rust,
@@ -1133,7 +1134,7 @@ assert_eq!(
 
 It's not possible to do *anything* you could do with a yoked value that you
 could do with a regular struct value (destructuring it doesn't work since you
-can typically only get the struct by reference), but this solves many, many
+can typically only get the struct by reference) but this still solves many, many
 problems.
 
 #### Disabling owned decoding traits
@@ -1207,7 +1208,8 @@ Trait `Message`: encoding (implemented by every message)
 * `prepend`: encodes the message into a `&mut bilrost::buf::ReverseBuf`,
   *before* any data that is already there.
 
-Trait `OwnedMessage`: decoding a fully owned message value from any `bytes::Buf`
+Trait `OwnedMessage`: decoding a fully owned message value from any
+[`bytes::Buf`][buf]
 * `decode`, `decode_length_delimited`: decodes the message type from a
   `bytes::Buf`. The length-delimited version of the call will consume only as
   many bytes as the length delimiter (read from the front of the `Buf`)
