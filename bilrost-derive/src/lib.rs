@@ -640,13 +640,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
 
             quote! {
                 #(#tags)* => {
-                    if let ::core::result::Result::Err(mut error) = if duplicated {
-                        ::core::result::Result::Err(::bilrost::DecodeError::new(
-                            ::bilrost::DecodeErrorKind::UnexpectedlyRepeated
-                        ))
-                    } else {
-                        #decode
-                    } {
+                    if let ::core::result::Result::Err(mut error) = #decode {
                         error.push(stringify!(#ident), stringify!(#field_ident));
                         return ::core::result::Result::Err(error);
                     }
@@ -819,13 +813,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
 
                 quote! {
                     #(#tags)* => {
-                        match if duplicated {
-                            ::core::result::Result::Err(::bilrost::DecodeError::new(
-                                ::bilrost::DecodeErrorKind::UnexpectedlyRepeated
-                            ))
-                        } else {
-                            #decode
-                        } {
+                        match #decode {
                             ::core::result::Result::Ok(new_canon) => {
                                 canon.update(new_canon);
                             }

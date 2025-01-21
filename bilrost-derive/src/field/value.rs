@@ -228,14 +228,29 @@ impl Field {
                 ),
             }
         };
-        quote!(
+        let decode = quote!(
             <#ty as ::bilrost::encoding::#decoder_trait<#encoding>>::#call(
                 wire_type,
                 #ident,
                 buf,
                 ctx,
             )
-        )
+        );
+        if self.in_oneof {
+            decode
+        } else {
+            // When not in a oneof, we need to check the duplicated status of the field ourselves to
+            // attach the right field name to the error while decoding.
+            quote! {
+                if duplicated {
+                    ::core::result::Result::Err(::bilrost::DecodeError::new(
+                        ::bilrost::DecodeErrorKind::UnexpectedlyRepeated
+                    ))
+                } else {
+                    #decode
+                }
+            }
+        }
     }
 
     /// Returns an expression which evaluates to the encoded length of the field. The given ident
