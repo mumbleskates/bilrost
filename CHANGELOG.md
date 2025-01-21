@@ -59,6 +59,19 @@ functionality in scope.
 
 ### Fixes
 
+* Internal: It should no longer be possible for restricted and canonical message
+  decoding modes to return data or canonicity that is less than the restriction
+  level that was specified, if a decoding implementation returns a lower
+  canonicity but forgets to check against the restriction in the context. The
+  worst that should happen is that the error is raised late, at the end of
+  decoding, when it is too late to add information about the location of the
+  error. There are also debug-only assertions that test that this should never
+  happen, and explanatory documentation about exactly when a `Canonicity` should
+  be checked against the restricted context on `RestrictedDecodeContext::check`.
+  * It's unlikely this should change any behavior as formerly the canonicity was
+    checked very aggressively in all existing implementations, far more often
+    than it had to be.
+
 ### Cleanups
 
 * Changed internal and external phrasing from "expedient" encoding to "relaxed".
