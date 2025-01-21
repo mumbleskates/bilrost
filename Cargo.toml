@@ -1,6 +1,6 @@
 [package]
 name = "bilrost"
-version = "0.1012.0-dev"
+version = "0.1012.0"
 authors = [
     "Kent Ross <k@mad.cash>",
     "Dan Burkert <dan@danburkert.com>",
@@ -39,7 +39,7 @@ harness = false
 
 [dependencies]
 arrayvec = { version = ">=0.6", default-features = false, optional = true }
-bilrost-derive = { version = "=0.1012.0-dev", path = "bilrost-derive", optional = true }
+bilrost-derive = { version = "=0.1012.0", path = "bilrost-derive", optional = true }
 bstr = { version = ">=1", default-features = false, features = ["alloc"], optional = true }
 bytes = { version = "1", default-features = false }
 bytestring = { version = ">=1", default-features = false, optional = true }
