@@ -5,13 +5,13 @@
 * This release includes a major overhaul of encoding and decoding traits for
   the library.
 
-| Capability                       | Old trait              | New trait                          |
-|----------------------------------|------------------------|------------------------------------|
-| encoding                         | `Message`              | `Message`                          |
-| relaxed decoding (owned)         | `Message`              | `OwnedMessage`                     |
-| distinguished decoding (owned)   | `DistinguishedMessage` | `DistinguishedOwnedMessage`        |
-| relaxed decoding (borrowed)      | (new!)                 | `BorrowedMessage<'a>`              |
-| distinguished decoding (borrowed | (new!)                 | `DistinguishedBorrowedMessage<'a>` |
+| Capability                        | Old trait              | New trait                          |
+|-----------------------------------|------------------------|------------------------------------|
+| encoding                          | `Message`              | `Message`                          |
+| relaxed decoding (owned)          | `Message`              | `OwnedMessage`                     |
+| distinguished decoding (owned)    | `DistinguishedMessage` | `DistinguishedOwnedMessage`        |
+| relaxed decoding (borrowed)       | (new!)                 | `BorrowedMessage<'a>`              |
+| distinguished decoding (borrowed) | (new!)                 | `DistinguishedBorrowedMessage<'a>` |
 
 | Old derives                       | New derives                                                      |
 |-----------------------------------|------------------------------------------------------------------|
@@ -65,6 +65,11 @@ functionality in scope.
 * More reorganization and file cleanups, splitting up some large files into more
   modules etc.
 * Cleaned up some docs in the `encoding` module.
+* Internals: Ironed out a lingering annoyance with the field decoding APIs; the
+  `Decoder` traits no longer accept a `duplicated` boolean argument that
+  mandates returning an error when it is true. Instead, message implementations
+  that have defined fields directly create the `UnexpectedlyRepeated` decoding
+  error themselves and record any relevant field information.
 
 ## V0.1011.1
 
