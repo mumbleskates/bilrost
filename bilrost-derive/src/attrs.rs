@@ -118,11 +118,13 @@ impl parse::Parse for TagList {
                             end: None,
                             ..
                         }) => lit_u32(&left)?..=u32::MAX,
-                        _ => return Err(syn::Error::new(
-                            input.span(),
-                            "expected either a single tag number (N), a range separated by \
+                        _ => {
+                            return Err(syn::Error::new(
+                                input.span(),
+                                "expected either a single tag number (N), a range separated by \
                             a dash (N-M), a range-from (N..), or a range-to (..=N)",
-                        )),
+                            ))
+                        }
                     })
                 })
                 .collect::<Result<Vec<_>, _>>()?,
