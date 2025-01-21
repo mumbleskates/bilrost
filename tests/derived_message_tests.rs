@@ -4317,3 +4317,42 @@ fn regression_test_proxied_canonical_type_checks_restriction() {
         "Foo.proxied",
     );
 }
+
+#[cfg(feature = "chrono")]
+#[test]
+fn proxied_underived_error_propagation() {
+    #[derive(Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
+    struct Foo {
+        proxied: chrono::TimeDelta,
+    }
+
+    assert::decodes!(
+        owned non-canonically,
+        [
+            (1, OV::message(&[
+                (1, OV::i64(123)),
+                (2, OV::fixed_i32(456)),
+                (3, OV::str("what")),
+            ].into_opaque_message())),
+        ],
+        Foo {
+            proxied: chrono::TimeDelta::new(123, 456).unwrap(),
+        },
+        HasExtensions,
+        "Foo.proxied",
+    );
+
+    // This test actually shows the message name from underived's error info
+    assert::decodes!(
+        owned never decodes Foo,
+        [
+            (1, OV::message(&[
+                (1, OV::i64(123)),
+                (2, OV::str("string instead of nanos")),
+            ].into_opaque_message())),
+        ],
+        WrongWireType,
+        "Foo.proxied/TimeDelta.nanos",
+    );
+}
