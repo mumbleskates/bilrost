@@ -103,7 +103,8 @@ macro_rules! underived_decode {
                                 buf.lend(),
                                 ctx.clone(),
                             )
-                        }.map_err(|mut error| {
+                        }
+                        .map_err(|mut error| {
                             error.push(stringify!($name), stringify!($field_name));
                             error
                         })?
