@@ -149,8 +149,6 @@ macro_rules! underived_decode_distinguished {
                     last_tag = Some(tag);
                     match tag {
                         $($tag => {
-                            if duplicated {
-                            } else {}
                             canon.update(
                                 if duplicated {
                                     Err(DecodeError::new(UnexpectedlyRepeated))
