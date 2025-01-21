@@ -49,6 +49,11 @@ pub(crate) fn merge_distinguished<T: RawDistinguishedMessageDecoder, B: Buf + ?S
             ctx.clone(),
         )?);
     }
+    debug_assert!(
+        canon >= ctx.min_canonicity,
+        "a poorly behaved distinguished decoder did not check canonicity against the context and \
+        convert it into an error"
+    );
     Ok(canon)
 }
 
@@ -94,6 +99,11 @@ pub(crate) fn borrow_merge_distinguished<'a, T: RawDistinguishedMessageBorrowDec
             ctx.clone(),
         )?);
     }
+    debug_assert!(
+        canon >= ctx.min_canonicity,
+        "a poorly behaved distinguished decoder did not check canonicity against the context and \
+        convert it into an error"
+    );
     Ok(canon)
 }
 

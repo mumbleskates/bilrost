@@ -915,23 +915,11 @@ where
     {
         let mut message = Self::empty();
         let ctx = RestrictedDecodeContext::new(restrict_to);
-        let canon = merge_distinguished(&mut message, buf, ctx.clone()).and_then(|canon| {
-            // well-behaved decoding should never return canonicity that's worse than
-            // restrict_to, but if an implementation forgets to check lowering canonicity
-            // against the context when they happen it's possible for the overall decoding
-            // process to violate that constraint. We guard this with a debug assert and then
-            // convert it into an error (which won't have any kind of detailed information on
-            // it, but we will at least err like we should).
-            //
+        let canon = merge_distinguished(&mut message, buf, ctx.clone())
+            // Safety backstop to ensure we do not return a canonicity worse than restrict_to.
             // See the docs on `RestrictedDecodeContext::check` for details on canonicity
             // checking.
-            debug_assert!(
-                canon >= restrict_to,
-                "a poorly behaved distinguished decoder did not check canonicity against the \
-                context and convert it into an error"
-            );
-            ctx.check(canon)
-        })?;
+            .and_then(|canon| ctx.check(canon))?;
         Ok((message, canon))
     }
 
@@ -972,18 +960,10 @@ where
                 self.clear();
                 err
             })
-            .and_then(|canon| {
-                // double check well-behaved canonicity.
-                //
-                // See the docs on `RestrictedDecodeContext::check` for details on canonicity
-                // checking.
-                debug_assert!(
-                    canon >= restrict_to,
-                    "a poorly behaved distinguished decoder did not check canonicity against the \
-                    context and convert it into an error"
-                );
-                ctx.check(canon)
-            })
+            // Safety backstop to ensure we do not return a canonicity worse than restrict_to.
+            // See the docs on `RestrictedDecodeContext::check` for details on canonicity
+            // checking.
+            .and_then(|canon| ctx.check(canon))
     }
 
     fn replace_restricted_from_slice(
@@ -1166,18 +1146,10 @@ where
         let mut message = Self::empty();
         let ctx = RestrictedDecodeContext::new(restrict_to);
         let canon = borrow_merge_distinguished(&mut message, Capped::new(&mut buf), ctx.clone())
-            .and_then(|canon| {
-                // double check well-behaved canonicity.
-                //
-                // See the docs on `RestrictedDecodeContext::check` for details on canonicity
-                // checking.
-                debug_assert!(
-                    canon >= restrict_to,
-                    "a poorly behaved distinguished decoder did not check canonicity against the \
-                    context and convert it into an error"
-                );
-                ctx.check(canon)
-            })?;
+            // Safety backstop to ensure we do not return a canonicity worse than restrict_to.
+            // See the docs on `RestrictedDecodeContext::check` for details on canonicity
+            // checking.
+            .and_then(|canon| ctx.check(canon))?;
         Ok((message, canon))
     }
 
@@ -1209,18 +1181,10 @@ where
                 self.clear();
                 err
             })
-            .and_then(|canon| {
-                // double check well-behaved canonicity.
-                //
-                // See the docs on `RestrictedDecodeContext::check` for details on canonicity
-                // checking.
-                debug_assert!(
-                    canon >= restrict_to,
-                    "a poorly behaved distinguished decoder did not check canonicity against the \
-                    context and convert it into an error"
-                );
-                ctx.check(canon)
-            })
+            // Safety backstop to ensure we do not return a canonicity worse than restrict_to.
+            // See the docs on `RestrictedDecodeContext::check` for details on canonicity
+            // checking.
+            .and_then(|canon| ctx.check(canon))
     }
 
     fn replace_restricted_borrowed_from_length_delimited(
