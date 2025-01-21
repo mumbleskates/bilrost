@@ -167,7 +167,6 @@ where
     }
 }
 
-// TODO(widders): regression test for unchecked canon reduction here
 impl<'a, T, E, Tag> DistinguishedValueBorrowDecoder<'a, Proxied<E, Tag>> for T
 where
     T: DistinguishedProxiable<Tag> + Eq,

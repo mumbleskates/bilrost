@@ -8,7 +8,7 @@ use crate::encoding::{
     RawMessageBorrowDecoder, RawMessageDecoder, RestrictedDecodeContext,
 };
 use crate::Canonicity::{Canonical, NotCanonical};
-use crate::{length_delimiter_len, Canonicity, DecodeError, EncodeError, WithCanonicity};
+use crate::{length_delimiter_len, Canonicity, DecodeError, EncodeError};
 use alloc::vec::Vec;
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 

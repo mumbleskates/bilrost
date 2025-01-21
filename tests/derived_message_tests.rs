@@ -4290,3 +4290,30 @@ fn length_delimited_borrowed_decoding_shortens_input_slices() {
 
     assert!(slice.is_empty());
 }
+
+#[test]
+fn regression_test_proxied_canonical_type_checks_restriction() {
+    #[derive(Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
+    struct Foo {
+        proxied: core::time::Duration,
+    }
+
+    #[derive(Message)]
+    struct FooEquivalent {
+        #[bilrost(encoding(packed))]
+        proxy_repr: Vec<u64>,
+    }
+
+    let thousand_seconds = FooEquivalent {
+        proxy_repr: vec![1000, 0],
+    };
+
+    assert::decodes!(
+        owned non-canonically,
+        thousand_seconds.encode_to_vec(),
+        Foo { proxied: core::time::Duration::from_secs(1000)},
+        NotCanonical,
+        "Foo.proxied",
+    );
+}
