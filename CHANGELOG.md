@@ -1,12 +1,9 @@
-## v0.1013.0-dev
-
-### Breaking changes
-
-### New features
+## v0.1012.1
 
 ### Fixes
 
-### Cleanups
+* Internals macros: Fixed the `empty_state_via_for_overwrite` macro, which was
+  incompletely implemented and still referenced the `Default` trait.
 
 ## v0.1012.0
 

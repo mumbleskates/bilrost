@@ -63,12 +63,12 @@ macro_rules! empty_state_via_for_overwrite {
     ) => {
         impl<$($($generics)*)?> $crate::encoding::EmptyState for $ty
         where
-            Self: ::core::default::Default + ::core::cmp::PartialEq,
+            Self: $crate::encoding::ForOverwrite + ::core::cmp::PartialEq,
             $($($where_clause)*)?
         {
             #[inline]
             fn is_empty(&self) -> bool {
-                *self == Self::default()
+                *self == Self::empty()
             }
 
             #[inline]
