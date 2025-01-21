@@ -5,10 +5,10 @@ use crate::encoding::message::{
 use crate::encoding::{
     encode_varint, encoded_len_varint, prepend_varint, Capped, DecodeContext, EmptyState,
     RawDistinguishedMessageBorrowDecoder, RawDistinguishedMessageDecoder, RawMessage,
-    RawMessageBorrowDecoder, RawMessageDecoder, RestrictedDecodeContext,
+    RawMessageBorrowDecoder, RawMessageDecoder, RestrictedDecodeContext
 };
 use crate::Canonicity::{Canonical, NotCanonical};
-use crate::{length_delimiter_len, Canonicity, DecodeError, EncodeError};
+use crate::{length_delimiter_len, Canonicity, DecodeError, EncodeError, WithCanonicity};
 use alloc::vec::Vec;
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 
@@ -997,30 +997,36 @@ where
     }
 
     fn decode_canonical<B: Buf>(buf: B) -> Result<Self, DecodeError> {
-        Self::decode_restricted(buf, Canonical).map(|(val, canon)| {
+        Self::decode_restricted(buf, Canonical).and_then(|(val, canon)| {
             debug_assert_eq!(canon, Canonical);
-            val
+            canon.canonical()?;
+            Ok(val)
         })
     }
 
     fn decode_canonical_length_delimited<B: Buf>(buf: B) -> Result<Self, DecodeError> {
-        Self::decode_restricted_length_delimited(buf, Canonical).map(|(val, canon)| {
-            debug_assert_eq!(canon, Canonical);
-            val
+        Self::decode_restricted_length_delimited(buf, Canonical).and_then(|(val, canon)| {
+            assert_eq!(canon, Canonical);
+            canon.canonical()?;
+            Ok(val)
         })
     }
 
     #[doc(hidden)]
     fn decode_canonical_capped<B: Buf + ?Sized>(buf: Capped<B>) -> Result<Self, DecodeError> {
-        Self::decode_restricted_capped(buf, Canonical).map(|(val, canon)| {
-            debug_assert_eq!(canon, Canonical);
-            val
+        Self::decode_restricted_capped(buf, Canonical).and_then(|(val, canon)| {
+            assert_eq!(canon, Canonical);
+            canon.canonical()?;
+            Ok(val)
         })
     }
 
     fn replace_canonical_from<B: Buf>(&mut self, buf: B) -> Result<(), DecodeError> {
         self.replace_restricted_from(buf, Canonical)
-            .map(|canon| debug_assert_eq!(canon, Canonical))
+            .and_then(|canon| {
+                assert_eq!(canon, Canonical);
+                Ok(canon.canonical()?)
+            })
     }
 
     fn replace_canonical_from_length_delimited<B: Buf>(
@@ -1028,7 +1034,10 @@ where
         buf: B,
     ) -> Result<(), DecodeError> {
         self.replace_restricted_from_length_delimited(buf, Canonical)
-            .map(|canon| debug_assert_eq!(canon, Canonical))
+            .and_then(|canon| {
+                assert_eq!(canon, Canonical);
+                Ok(canon.canonical()?)
+            })
     }
 
     #[doc(hidden)]
@@ -1037,17 +1046,26 @@ where
         buf: Capped<B>,
     ) -> Result<(), DecodeError> {
         self.replace_restricted_from_capped(buf, Canonical)
-            .map(|canon| debug_assert_eq!(canon, Canonical))
+            .and_then(|canon| {
+                assert_eq!(canon, Canonical);
+                Ok(canon.canonical()?)
+            })
     }
 
     fn replace_canonical_from_slice(&mut self, buf: &[u8]) -> Result<(), DecodeError> {
         self.replace_restricted_from(buf, Canonical)
-            .map(|canon| debug_assert_eq!(canon, Canonical))
+            .and_then(|canon| {
+                assert_eq!(canon, Canonical);
+                Ok(canon.canonical()?)
+            })
     }
 
     fn replace_canonical_from_dyn(&mut self, buf: &mut dyn Buf) -> Result<(), DecodeError> {
         self.replace_restricted_from(buf, Canonical)
-            .map(|canon| debug_assert_eq!(canon, Canonical))
+            .and_then(|canon| {
+                assert_eq!(canon, Canonical);
+                Ok(canon.canonical()?)
+            })
     }
 
     fn replace_canonical_from_length_delimited_slice(
@@ -1055,7 +1073,10 @@ where
         buf: &[u8],
     ) -> Result<(), DecodeError> {
         self.replace_restricted_from_length_delimited(buf, Canonical)
-            .map(|canon| debug_assert_eq!(canon, Canonical))
+            .and_then(|canon| {
+                assert_eq!(canon, Canonical);
+                Ok(canon.canonical()?)
+            })
     }
 
     fn replace_canonical_from_length_delimited_dyn(
@@ -1063,7 +1084,10 @@ where
         buf: &mut dyn Buf,
     ) -> Result<(), DecodeError> {
         self.replace_restricted_from_length_delimited(buf, Canonical)
-            .map(|canon| debug_assert_eq!(canon, Canonical))
+            .and_then(|canon| {
+                assert_eq!(canon, Canonical);
+                Ok(canon.canonical()?)
+            })
     }
 
     #[doc(hidden)]
@@ -1072,7 +1096,10 @@ where
         buf: Capped<dyn Buf>,
     ) -> Result<(), DecodeError> {
         self.replace_restricted_from_capped(buf, Canonical)
-            .map(|canon| debug_assert_eq!(canon, Canonical))
+            .and_then(|canon| {
+                assert_eq!(canon, Canonical);
+                Ok(canon.canonical()?)
+            })
     }
 }
 
@@ -1202,22 +1229,27 @@ where
     }
 
     fn decode_canonical_borrowed(buf: &'a [u8]) -> Result<Self, DecodeError> {
-        Self::decode_restricted_borrowed(buf, Canonical).map(|(val, canon)| {
-            debug_assert_eq!(canon, Canonical);
-            val
+        Self::decode_restricted_borrowed(buf, Canonical).and_then(|(val, canon)| {
+            assert_eq!(canon, Canonical);
+            canon.canonical()?;
+            Ok(val)
         })
     }
 
     fn decode_canonical_borrowed_length_delimited(buf: &mut &'a [u8]) -> Result<Self, DecodeError> {
-        Self::decode_restricted_borrowed_length_delimited(buf, Canonical).map(|(val, canon)| {
-            debug_assert_eq!(canon, Canonical);
-            val
+        Self::decode_restricted_borrowed_length_delimited(buf, Canonical).and_then(|(val, canon)| {
+            assert_eq!(canon, Canonical);
+            canon.canonical()?;
+            Ok(val)
         })
     }
 
     fn replace_canonical_borrowed_from(&mut self, buf: &'a [u8]) -> Result<(), DecodeError> {
         self.replace_restricted_borrowed_from(buf, Canonical)
-            .map(|canon| debug_assert_eq!(canon, Canonical))
+            .and_then(|canon| {
+                assert_eq!(canon, Canonical);
+                Ok(canon.canonical()?)
+            })
     }
 
     fn replace_canonical_borrowed_from_length_delimited(
@@ -1225,7 +1257,10 @@ where
         buf: &mut &'a [u8],
     ) -> Result<(), DecodeError> {
         self.replace_restricted_borrowed_from_length_delimited(buf, Canonical)
-            .map(|canon| debug_assert_eq!(canon, Canonical))
+            .and_then(|canon| {
+                assert_eq!(canon, Canonical);
+                Ok(canon.canonical()?)
+            })
     }
 }
 
