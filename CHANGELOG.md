@@ -5,35 +5,39 @@
 * This release includes a major overhaul of encoding and decoding traits for
   the library.
 
-| Capability                        | Old trait              | New trait                          |
-|-----------------------------------|------------------------|------------------------------------|
-| encoding                          | `Message`              | `Message`                          |
-| relaxed decoding (owned)          | `Message`              | `OwnedMessage`                     |
-| distinguished decoding (owned)    | `DistinguishedMessage` | `DistinguishedOwnedMessage`        |
-| relaxed decoding (borrowed)       | (new!)                 | `BorrowedMessage<'a>`              |
-| distinguished decoding (borrowed) | (new!)                 | `DistinguishedBorrowedMessage<'a>` |
+  | Capability                        | Old trait              | New trait                          |
+  |-----------------------------------|------------------------|------------------------------------|
+  | encoding                          | `Message`              | `Message`                          |
+  | relaxed decoding (owned)          | `Message`              | `OwnedMessage`                     |
+  | distinguished decoding (owned)    | `DistinguishedMessage` | `DistinguishedOwnedMessage`        |
+  | relaxed decoding (borrowed)       | (new!)                 | `BorrowedMessage<'a>`              |
+  | distinguished decoding (borrowed) | (new!)                 | `DistinguishedBorrowedMessage<'a>` |
 
-| Old derives                       | New derives                                                      |
-|-----------------------------------|------------------------------------------------------------------|
-| `Message`, `DistinguishedMessage` | `Message` with `#[bilrost(distinguished)]` on the struct         |
-| `Oneof`, `DistinguishedOneof`     | `Oneof` with `#[bilrost(distinguished)]` on the enum             |
-| all of the above                  | `Message` & `Oneof` with `#[bilrost(distinguished)]` on the enum |
-
-For very simple usage of the `bilrost` library, this will now probably mean
-importing both `Message` and `OwnedMessage` traits to have the desired
-functionality in scope.
+  For very simple usage of the `bilrost` library, this will now probably mean
+  importing both `Message` and `OwnedMessage` traits to have the desired
+  functionality in scope.
 
 * The `DistinguishedMessage` and `DistinguishedOneof` traits & derives are gone
   as well; rather than deriving multiple traits, simply add a
-  `#[bilrost(distinguished)]` attribute to the type being derived from.
+  `#[bilrost(distinguished)]` attribute to the type being derived from:
+
+  | Old derives                                    | New derives                                                      |
+  |------------------------------------------------|------------------------------------------------------------------|
+  | `Message`, `DistinguishedMessage`              | `Message` with `#[bilrost(distinguished)]` on the struct         |
+  | `Oneof`, `DistinguishedOneof`                  | `Oneof` with `#[bilrost(distinguished)]` on the enum             |
+  | all of the above                               | `Message` & `Oneof` with `#[bilrost(distinguished)]` on the enum |
+  | just using `Message`, `Oneof`, & `Enumeration` | (no change)                                                      |
 
 ### New features
 
 * It is now possible to do borrowed zero-copy decoding, which is enabled by
   default and available in the derive macros. This decodes from a `&[u8]` slice
   with lifetime into messages that may reference its data.
-  * This adds support for `&str`, `&[u8]`, `&[u8; N]`, and `&bstr::BStr`; `Cow`
-    for these borrowed types also decodes as `Cow::Borrowed(&..)`.
+  * This adds support for the types `&str`, `&[u8]`, `&[u8; N]`, and
+    `&bstr::BStr`; these types can appear in message fields, oneof fields, and
+    nested in other containers just like any other type. This also adds
+    guaranteed behavior for `Cow` for these borrowed types also decodes as
+    `Cow::Borrowed(&..)` when decoding from borrowed data.
   * With this addition, there are now two different ways to have zero-copy
     decoding that each work slightly differently:
     1. Decode directly from `bytes::Bytes` and into fields of type
@@ -59,11 +63,11 @@ functionality in scope.
 
 ### Fixes
 
-* Internal: It should no longer be possible for restricted and canonical message
-  decoding modes to return data or canonicity that is less than the restriction
-  level that was specified, if a decoding implementation returns a lower
-  canonicity but forgets to check against the restriction in the context. The
-  worst that should happen is that the error is raised late, at the end of
+* Internals: It should no longer be possible for restricted and canonical
+  message decoding modes to return data or canonicity that is less than the
+  restriction level that was specified, if a decoding implementation returns a
+  lower canonicity but forgets to check against the restriction in the context.
+  The worst that should happen is that the error is raised late, at the end of
   decoding, when it is too late to add information about the location of the
   error. There are also debug-only assertions that test that this should never
   happen, and explanatory documentation about exactly when a `Canonicity` should
@@ -84,8 +88,8 @@ functionality in scope.
 * Internals: Ironed out a lingering annoyance with the field decoding APIs; the
   `Decoder` traits no longer accept a `duplicated` boolean argument that
   mandates returning an error when it is true. Instead, message implementations
-  that have defined fields directly create the `UnexpectedlyRepeated` decoding
-  error themselves and record any relevant field information.
+  that have defined fields are responsible for creating the
+  `UnexpectedlyRepeated` decoding error themselves.
 
 ## V0.1011.1
 
