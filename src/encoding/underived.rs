@@ -79,6 +79,8 @@ macro_rules! underived_decode {
         $ctx:ident
     ) => {
         {
+            use crate::DecodeError;
+            use crate::DecodeErrorKind::UnexpectedlyRepeated;
             use crate::encoding::{skip_field, Decoder, TagReader};
             let mut buf = $buf.take_length_delimited()?;
             let ctx = $ctx;
@@ -92,13 +94,16 @@ macro_rules! underived_decode {
                 last_tag = Some(tag);
                 match tag {
                     $($tag => {
-                        Decoder::<$encoder>::decode(
-                            wire_type,
-                            duplicated,
-                            $target,
-                            buf.lend(),
-                            ctx.clone(),
-                        ).map_err(|mut error| {
+                        if duplicated {
+                            Err(DecodeError::new(UnexpectedlyRepeated))
+                        } else {
+                            Decoder::<$encoder>::decode(
+                                wire_type,
+                                $target,
+                                buf.lend(),
+                                ctx.clone(),
+                            )
+                        }.map_err(|mut error| {
                             error.push(stringify!($name), stringify!($field_name));
                             error
                         })?
@@ -124,6 +129,8 @@ macro_rules! underived_decode_distinguished {
         $ctx:ident
     ) => {
         {
+            use crate::DecodeError;
+            use crate::DecodeErrorKind::UnexpectedlyRepeated;
             use crate::encoding::{skip_field, Canonicity, DistinguishedDecoder, TagReader};
             let mut buf = $buf.take_length_delimited()?;
             let ctx = $ctx;
@@ -141,14 +148,20 @@ macro_rules! underived_decode_distinguished {
                     last_tag = Some(tag);
                     match tag {
                         $($tag => {
+                            if duplicated {
+                            } else {}
                             canon.update(
-                                DistinguishedDecoder::<$encoder>::decode_distinguished(
-                                    wire_type,
-                                    duplicated,
-                                    $target,
-                                    buf.lend(),
-                                    ctx.clone(),
-                                ).map_err(|mut error| {
+                                if duplicated {
+                                    Err(DecodeError::new(UnexpectedlyRepeated))
+                                } else {
+                                    DistinguishedDecoder::<$encoder>::decode_distinguished(
+                                        wire_type,
+                                        $target,
+                                        buf.lend(),
+                                        ctx.clone(),
+                                    )
+                                }
+                                .map_err(|mut error| {
                                     error.push(stringify!($name), stringify!($field_name));
                                     error
                                 })?,

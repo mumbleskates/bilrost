@@ -3,7 +3,6 @@ use crate::encoding::{
     check_wire_type, Capped, DecodeContext, ForOverwrite, RestrictedDecodeContext, TagMeasurer,
     TagRevWriter, TagWriter, WireType,
 };
-use crate::DecodeErrorKind::UnexpectedlyRepeated;
 use crate::{Canonicity, DecodeError};
 use bytes::{Buf, BufMut};
 use core::ops::Deref;
@@ -31,7 +30,6 @@ pub trait Decoder<E>: Encoder<E> {
     /// consumed from the buffer.
     fn decode<B: Buf + ?Sized>(
         wire_type: WireType,
-        duplicated: bool,
         value: &mut Self,
         buf: Capped<B>,
         ctx: DecodeContext,
@@ -45,7 +43,6 @@ pub trait DistinguishedDecoder<E>: Encoder<E> {
     /// Decodes a field for the value, returning a value indicating how canonical the encoding was.
     fn decode_distinguished<B: Buf + ?Sized>(
         wire_type: WireType,
-        duplicated: bool,
         value: &mut Self,
         buf: Capped<B>,
         ctx: RestrictedDecodeContext,
@@ -56,7 +53,6 @@ pub trait DistinguishedDecoder<E>: Encoder<E> {
 pub trait BorrowDecoder<'a, E>: Encoder<E> {
     fn borrow_decode(
         wire_type: WireType,
-        duplicated: bool,
         value: &mut Self,
         buf: Capped<&'a [u8]>,
         ctx: DecodeContext,
@@ -68,7 +64,6 @@ pub trait DistinguishedBorrowDecoder<'a, E>: Encoder<E> {
     /// Decodes a field for the value, returning a value indicating how canonical the encoding was.
     fn borrow_decode_distinguished(
         wire_type: WireType,
-        duplicated: bool,
         value: &mut Self,
         buf: Capped<&'a [u8]>,
         ctx: RestrictedDecodeContext,
@@ -380,14 +375,10 @@ mod generic_optional {
         #[inline]
         fn decode<B: Buf + ?Sized>(
             wire_type: WireType,
-            duplicated: bool,
             value: &mut Self,
             buf: Capped<B>,
             ctx: DecodeContext,
         ) -> Result<(), DecodeError> {
-            if duplicated {
-                return Err(DecodeError::new(UnexpectedlyRepeated));
-            }
             <T as FieldDecoder<E>>::decode_field(
                 wire_type,
                 value.get_or_insert_with(T::for_overwrite),
@@ -405,14 +396,10 @@ mod generic_optional {
         #[inline]
         fn decode_distinguished<B: Buf + ?Sized>(
             wire_type: WireType,
-            duplicated: bool,
             value: &mut Option<T>,
             buf: Capped<B>,
             ctx: RestrictedDecodeContext,
         ) -> Result<Canonicity, DecodeError> {
-            if duplicated {
-                return Err(DecodeError::new(UnexpectedlyRepeated));
-            }
             check_wire_type(T::WIRE_TYPE, wire_type)?;
             T::decode_value_distinguished::<true>(
                 value.get_or_insert_with(T::for_overwrite),
@@ -429,14 +416,10 @@ mod generic_optional {
         #[inline]
         fn borrow_decode(
             wire_type: WireType,
-            duplicated: bool,
             value: &mut Self,
             buf: Capped<&'a [u8]>,
             ctx: DecodeContext,
         ) -> Result<(), DecodeError> {
-            if duplicated {
-                return Err(DecodeError::new(UnexpectedlyRepeated));
-            }
             <T as FieldBorrowDecoder<E>>::borrow_decode_field(
                 wire_type,
                 value.get_or_insert_with(T::for_overwrite),
@@ -454,14 +437,10 @@ mod generic_optional {
         #[inline]
         fn borrow_decode_distinguished(
             wire_type: WireType,
-            duplicated: bool,
             value: &mut Option<T>,
             buf: Capped<&'a [u8]>,
             ctx: RestrictedDecodeContext,
         ) -> Result<Canonicity, DecodeError> {
-            if duplicated {
-                return Err(DecodeError::new(UnexpectedlyRepeated));
-            }
             check_wire_type(T::WIRE_TYPE, wire_type)?;
             T::borrow_decode_value_distinguished::<true>(
                 value.get_or_insert_with(T::for_overwrite),

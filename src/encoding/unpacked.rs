@@ -9,7 +9,7 @@ use crate::encoding::{
     TagMeasurer, TagRevWriter, TagWriter, ValueBorrowDecoder, ValueDecoder, ValueEncoder, WireType,
     Wiretyped,
 };
-use crate::DecodeErrorKind::{InvalidValue, UnexpectedlyRepeated};
+use crate::DecodeErrorKind::InvalidValue;
 use crate::{Canonicity, DecodeError};
 use bytes::BufMut;
 
@@ -381,14 +381,10 @@ macro_rules! impl_decoders {
             #[inline]
             fn $relaxed_method $($($buf_generic)*)? (
                 wire_type: WireType,
-                duplicated: bool,
                 value: &mut C,
                 buf: Capped<$buf_ty>,
                 ctx: DecodeContext,
             ) -> Result<(), DecodeError> {
-                if duplicated {
-                    return Err(DecodeError::new(UnexpectedlyRepeated));
-                }
                 if wire_type == WireType::LengthDelimited
                     && <C::Item as Wiretyped<E>>::WIRE_TYPE != WireType::LengthDelimited
                 {
@@ -413,14 +409,10 @@ macro_rules! impl_decoders {
             #[inline]
             fn $distinguished_method $($($buf_generic)*)? (
                 wire_type: WireType,
-                duplicated: bool,
                 value: &mut C,
                 buf: Capped<$buf_ty>,
                 ctx: RestrictedDecodeContext,
             ) -> Result<Canonicity, DecodeError> {
-                if duplicated {
-                    return Err(DecodeError::new(UnexpectedlyRepeated));
-                }
                 if wire_type == WireType::LengthDelimited
                     && <T as Wiretyped<E>>::WIRE_TYPE != WireType::LengthDelimited
                 {
@@ -448,14 +440,10 @@ macro_rules! impl_decoders {
             #[inline]
             fn $relaxed_method $($($buf_generic)*)? (
                 wire_type: WireType,
-                duplicated: bool,
                 value: &mut [T; N],
                 buf: Capped<$buf_ty>,
                 ctx: DecodeContext,
             ) -> Result<(), DecodeError> {
-                if duplicated {
-                    return Err(DecodeError::new(UnexpectedlyRepeated));
-                }
                 $mode::decode_array_either_repr(wire_type, value, buf, ctx)
             }
         }
@@ -472,14 +460,10 @@ macro_rules! impl_decoders {
             #[inline]
             fn $distinguished_method $($($buf_generic)*)? (
                 wire_type: WireType,
-                duplicated: bool,
                 value: &mut [T; N],
                 buf: Capped<$buf_ty>,
                 ctx: RestrictedDecodeContext,
             ) -> Result<Canonicity, DecodeError> {
-                if duplicated {
-                    return Err(DecodeError::new(UnexpectedlyRepeated));
-                }
                 let canon = $mode::decode_distinguished_array_either_repr(
                     wire_type,
                     value,
@@ -502,14 +486,10 @@ macro_rules! impl_decoders {
             #[inline]
             fn $relaxed_method $($($buf_generic)*)? (
                 wire_type: WireType,
-                duplicated: bool,
                 value: &mut Option<[T; N]>,
                 buf: Capped<$buf_ty>,
                 ctx: DecodeContext,
             ) -> Result<(), DecodeError> {
-                if duplicated {
-                    return Err(DecodeError::new(UnexpectedlyRepeated));
-                }
                 $mode::decode_array_either_repr(
                     wire_type,
                     value.get_or_insert_with(ForOverwrite::for_overwrite),
@@ -532,14 +512,10 @@ macro_rules! impl_decoders {
             #[inline]
             fn $distinguished_method $($($buf_generic)*)? (
                 wire_type: WireType,
-                duplicated: bool,
                 value: &mut Option<[T; N]>,
                 buf: Capped<$buf_ty>,
                 ctx: RestrictedDecodeContext,
             ) -> Result<Canonicity, DecodeError> {
-                if duplicated {
-                    return Err(DecodeError::new(UnexpectedlyRepeated));
-                }
                 $mode::decode_distinguished_array_either_repr(
                     wire_type,
                     value.get_or_insert_with(ForOverwrite::for_overwrite),

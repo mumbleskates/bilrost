@@ -51,14 +51,12 @@ macro_rules! delegate_encoding {
             #[inline(always)]
             fn decode<B: $crate::bytes::Buf + ?Sized>(
                 wire_type: $crate::encoding::WireType,
-                duplicated: bool,
                 value: &mut $value_ty,
                 buf: $crate::encoding::Capped<B>,
                 ctx: $crate::encoding::DecodeContext,
             ) -> Result<(), $crate::DecodeError> {
                 $crate::encoding::Decoder::<$to_ty>::decode(
                     wire_type,
-                    duplicated,
                     value,
                     buf,
                     ctx,
@@ -75,14 +73,12 @@ macro_rules! delegate_encoding {
             #[inline(always)]
             fn borrow_decode(
                 wire_type: $crate::encoding::WireType,
-                duplicated: bool,
                 value: &mut $value_ty,
                 buf: $crate::encoding::Capped<&'__a [u8]>,
                 ctx: $crate::encoding::DecodeContext,
             ) -> Result<(), $crate::DecodeError> {
                 $crate::encoding::BorrowDecoder::<$to_ty>::borrow_decode(
                     wire_type,
-                    duplicated,
                     value,
                     buf,
                     ctx,
@@ -112,14 +108,12 @@ macro_rules! delegate_encoding {
             #[inline(always)]
             fn decode_distinguished<B: $crate::bytes::Buf + ?Sized>(
                 wire_type: $crate::encoding::WireType,
-                duplicated: bool,
                 value: &mut $value_ty,
                 buf: $crate::encoding::Capped<B>,
                 ctx: $crate::encoding::RestrictedDecodeContext,
             ) -> Result<$crate::Canonicity, $crate::DecodeError> {
                 $crate::encoding::DistinguishedDecoder::<$to_ty>::decode_distinguished(
                     wire_type,
-                    duplicated,
                     value,
                     buf,
                     ctx,
@@ -138,14 +132,12 @@ macro_rules! delegate_encoding {
             #[inline(always)]
             fn borrow_decode_distinguished(
                 wire_type: $crate::encoding::WireType,
-                duplicated: bool,
                 value: &mut $value_ty,
                 buf: $crate::encoding::Capped<&'__a [u8]>,
                 ctx: $crate::encoding::RestrictedDecodeContext,
             ) -> Result<$crate::Canonicity, $crate::DecodeError> {
                 $crate::encoding::DistinguishedBorrowDecoder::<$to_ty>::borrow_decode_distinguished(
                     wire_type,
-                    duplicated,
                     value,
                     buf,
                     ctx,
@@ -403,16 +395,10 @@ macro_rules! __impl_decoder_where_value_decoder {
             #[inline(always)]
             fn $relaxed_method $($($buf_generic)*)? (
                 wire_type: $crate::encoding::WireType,
-                duplicated: bool,
                 value: &mut T,
                 buf: $crate::encoding::Capped<$buf_ty>,
                 ctx: $crate::encoding::DecodeContext,
             ) -> ::core::result::Result<(), $crate::DecodeError> {
-                if duplicated {
-                    return ::core::result::Result::Err(
-                        $crate::DecodeError::new($crate::DecodeErrorKind::UnexpectedlyRepeated)
-                    );
-                }
                 $crate::encoding::$relaxed_field::<$encoding>::$relaxed_field_method(
                     wire_type, value, buf, ctx)
             }
@@ -432,16 +418,10 @@ macro_rules! __impl_decoder_where_value_decoder {
             #[inline(always)]
             fn $distinguished_method $($($buf_generic)*)? (
                 wire_type: $crate::encoding::WireType,
-                duplicated: bool,
                 value: &mut T,
                 buf: $crate::encoding::Capped<$buf_ty>,
                 ctx: $crate::encoding::RestrictedDecodeContext,
             ) -> ::core::result::Result<$crate::Canonicity, $crate::DecodeError> {
-                if duplicated {
-                    return ::core::result::Result::Err(
-                        $crate::DecodeError::new(crate::DecodeErrorKind::UnexpectedlyRepeated)
-                    );
-                }
                 // decoding a value as a whole message field, empty values are unacceptable
                 let mut canon = $crate::encoding::$distinguished_field::<$encoding>
                     ::$distinguished_field_method::<false>(

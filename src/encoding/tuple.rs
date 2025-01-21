@@ -27,6 +27,7 @@ use crate::encoding::{
     ValueBorrowDecoder, ValueDecoder, ValueEncoder, WireType, Wiretyped,
 };
 use crate::DecodeError;
+use crate::DecodeErrorKind::UnexpectedlyRepeated;
 
 macro_rules! impl_tuple {
     (
@@ -110,13 +111,17 @@ macro_rules! impl_tuple {
                     // Decode the field. Each tuple field has a tag corresponding to its index.
                     match tag {
                         $($numbers => {
-                            $letters::decode(
-                                wire_type,
-                                duplicated,
-                                &mut value.$numbers,
-                                buf.lend(),
-                                ctx.clone(),
-                            ).map_err(|mut error| {
+                            if duplicated {
+                                Err(DecodeError::new(UnexpectedlyRepeated))
+                            } else {
+                                $letters::decode(
+                                    wire_type,
+                                    &mut value.$numbers,
+                                    buf.lend(),
+                                    ctx.clone(),
+                                )
+                            }
+                            .map_err(|mut error| {
                                 error.push($name, stringify!($numbers));
                                 error
                             })?
@@ -165,17 +170,20 @@ macro_rules! impl_tuple {
                     match tag {
                         $($numbers => {
                             canon.update(
-                                $letters::decode_distinguished(
-                                    wire_type,
-                                    duplicated,
-                                    &mut value.$numbers,
-                                    buf.lend(),
-                                    ctx.clone(),
-                                )
-                                    .map_err(|mut error| {
-                                        error.push($name, stringify!($numbers));
-                                        error
-                                    })?
+                                if duplicated {
+                                    Err(DecodeError::new(UnexpectedlyRepeated))
+                                } else {
+                                    $letters::decode_distinguished(
+                                        wire_type,
+                                        &mut value.$numbers,
+                                        buf.lend(),
+                                        ctx.clone(),
+                                    )
+                                }
+                                .map_err(|mut error| {
+                                    error.push($name, stringify!($numbers));
+                                    error
+                                })?
                             );
                         })*
                         _ => {
@@ -215,13 +223,17 @@ macro_rules! impl_tuple {
                     // Decode the field. Each tuple field has a tag corresponding to its index.
                     match tag {
                         $($numbers => {
-                            $letters::borrow_decode(
-                                wire_type,
-                                duplicated,
-                                &mut value.$numbers,
-                                buf.lend(),
-                                ctx.clone(),
-                            ).map_err(|mut error| {
+                            if duplicated {
+                                Err(DecodeError::new(UnexpectedlyRepeated))
+                            } else {
+                                $letters::borrow_decode(
+                                    wire_type,
+                                    &mut value.$numbers,
+                                    buf.lend(),
+                                    ctx.clone(),
+                                )
+                            }
+                            .map_err(|mut error| {
                                 error.push($name, stringify!($numbers));
                                 error
                             })?
@@ -270,17 +282,20 @@ macro_rules! impl_tuple {
                     match tag {
                         $($numbers => {
                             canon.update(
-                                $letters::borrow_decode_distinguished(
-                                    wire_type,
-                                    duplicated,
-                                    &mut value.$numbers,
-                                    buf.lend(),
-                                    ctx.clone(),
-                                )
-                                    .map_err(|mut error| {
-                                        error.push($name, stringify!($numbers));
-                                        error
-                                    })?
+                                if duplicated {
+                                    Err(DecodeError::new(UnexpectedlyRepeated))
+                                } else {
+                                    $letters::borrow_decode_distinguished(
+                                        wire_type,
+                                        &mut value.$numbers,
+                                        buf.lend(),
+                                        ctx.clone(),
+                                    )
+                                }
+                                .map_err(|mut error| {
+                                    error.push($name, stringify!($numbers));
+                                    error
+                                })?
                             );
                         })*
                         _ => {

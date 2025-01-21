@@ -9,7 +9,7 @@ use crate::encoding::{
     FieldEncoder, General, RestrictedDecodeContext, TagMeasurer, TagRevWriter, TagWriter,
     ValueBorrowDecoder, ValueDecoder, ValueEncoder, WireType, Wiretyped,
 };
-use crate::DecodeErrorKind::{InvalidValue, Truncated, UnexpectedlyRepeated};
+use crate::DecodeErrorKind::{InvalidValue, Truncated};
 use bytes::{Buf, BufMut};
 
 pub struct Packed<E = General>(E);
@@ -247,14 +247,10 @@ macro_rules! impl_decoders {
             #[inline]
             fn $relaxed_method $($($buf_generic)*)? (
                 wire_type: WireType,
-                duplicated: bool,
                 value: &mut C,
                 buf: Capped<$buf_ty>,
                 ctx: DecodeContext,
             ) -> Result<(), DecodeError> {
-                if duplicated {
-                    return Err(DecodeError::new(UnexpectedlyRepeated));
-                }
                 if wire_type == WireType::LengthDelimited {
                     // We've encountered the expected length-delimited type: decode it in packed
                     // format.
@@ -275,14 +271,10 @@ macro_rules! impl_decoders {
             #[inline]
             fn $distinguished_method $($($buf_generic)*)? (
                 wire_type: WireType,
-                duplicated: bool,
                 value: &mut C,
                 buf: Capped<$buf_ty>,
                 ctx: RestrictedDecodeContext,
             ) -> Result<Canonicity, DecodeError> {
-                if duplicated {
-                    return Err(DecodeError::new(UnexpectedlyRepeated));
-                }
                 if wire_type == WireType::LengthDelimited {
                     // We've encountered the expected length-delimited type: decode it in packed
                     // format. Set ALLOW_EMPTY to false: empty collections are not canonical
@@ -418,14 +410,10 @@ macro_rules! impl_decoders {
             #[inline]
             fn $relaxed_method $($($buf_generic)*)? (
                 wire_type: WireType,
-                duplicated: bool,
                 value: &mut [T; N],
                 buf: Capped<$buf_ty>,
                 ctx: DecodeContext,
             ) -> Result<(), DecodeError> {
-                if duplicated {
-                    return Err(DecodeError::new(UnexpectedlyRepeated));
-                }
                 if wire_type == WireType::LengthDelimited {
                     // We've encountered the expected length-delimited type: decode it in packed
                     // format.
@@ -453,14 +441,10 @@ macro_rules! impl_decoders {
             #[inline]
             fn $distinguished_method $($($buf_generic)*)? (
                 wire_type: WireType,
-                duplicated: bool,
                 value: &mut [T; N],
                 buf: Capped<$buf_ty>,
                 ctx: RestrictedDecodeContext,
             ) -> Result<Canonicity, DecodeError> {
-                if duplicated {
-                    return Err(DecodeError::new(UnexpectedlyRepeated));
-                }
                 if wire_type == WireType::LengthDelimited {
                     // We've encountered the expected length-delimited type: decode it in packed
                     // format.

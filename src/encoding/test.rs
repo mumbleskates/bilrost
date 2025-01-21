@@ -250,7 +250,6 @@ macro_rules! check_type {
                     let mut roundtrip_value = T::for_overwrite();
                     _ = <T as $decoder_trait<E>>::$decode(
                         wire_type,
-                        false,
                         &mut roundtrip_value,
                         buf.lend(),
                         $context,
@@ -339,7 +338,6 @@ macro_rules! check_type {
 
                     _ = <T as $decoder_trait<E>>::$decode(
                         wire_type,
-                        false,
                         &mut roundtrip_value,
                         buf.lend(),
                         $context,
@@ -475,7 +473,6 @@ where
     assert_eq!(
         DistinguishedDecoder::<E>::decode_distinguished(
             wire_type,
-            false,
             &mut decoded,
             capped,
             RestrictedDecodeContext::new(Canonicity::NotCanonical),
@@ -942,7 +939,6 @@ fn check_rejects_wrong_wire_type<T: ForOverwrite + Decoder<E>, E>(wire_type: Wir
     assert_eq!(
         <T as Decoder<E>>::decode(
             wire_type,
-            false,
             &mut out,
             Capped::new(&mut [0u8; 0].as_slice()),
             DecodeContext::default(),
@@ -959,7 +955,6 @@ where
     assert_eq!(
         <T as DistinguishedDecoder<E>>::decode_distinguished(
             wire_type,
-            false,
             &mut out,
             Capped::new(&mut [0u8; 0].as_slice()),
             RestrictedDecodeContext::new(Canonicity::NotCanonical),
