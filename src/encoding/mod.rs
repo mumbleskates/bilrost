@@ -618,6 +618,23 @@ impl RestrictedDecodeContext {
     }
 
     /// Checks the given canonicity against the minimum constraint that this context has.
+    ///
+    /// This must be called and checked at a few specific times, whenever the canonicity is
+    /// (possibly) being reduced and it hasn't already been checked by some source that returned
+    /// that canonicity value:
+    ///
+    /// 1. When decoding, and a non-canonical state is observed (such as a value that is represented
+    ///    in a non-canonical form, or an unknown field in the encoding), this can be called with a
+    ///    literal `Canonicity` value.
+    /// 2. After calling one of the distinguished helper trait methods that does not have a
+    ///    restricted context in its parameters to check against, and therefore could not possibly
+    ///    have converted a non-canonical state into an error yet:
+    ///     2a. `DistinguishedProxiable::decode_proxy_distinguished`
+    ///     2b. `DistinguishedCollection::insert_distinguished`
+    ///
+    /// After these canonicity values have been checked, and at all other times, it should be safe
+    /// to directly update the canonicity that an implementation will itself return since each value
+    /// it receives should already be tolerated by the context.
     #[inline]
     pub fn check(&self, canon: Canonicity) -> Result<Canonicity, DecodeError> {
         match (canon < self.min_canonicity, canon) {
@@ -1065,11 +1082,12 @@ pub fn skip_field<B: Buf + ?Sized>(
 }
 
 /// Indicator of the "canonicity" of a decoded value or a decoding process that was performed.
+///
+/// See documentation on `RestrictedDecodeContext::check` for details on when this should be checked
+/// for returning canonicity errors.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 #[repr(u8)]
 #[must_use]
-// TODO(widders): document apis that return canonicity without a restricted context where it
-//  MUST be checked in distinguished mode
 pub enum Canonicity {
     /// The decoded data was not represented in its canonical form.
     NotCanonical,

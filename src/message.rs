@@ -963,6 +963,9 @@ where
                 // process to violate that constraint. We guard this with a debug assert and then
                 // convert it into an error (which won't have any kind of detailed information on
                 // it, but we will at least err like we should).
+                //
+                // See the docs on `RestrictedDecodeContext::check` for details on canonicity
+                // checking.
                 debug_assert!(canon >= restrict_to);
                 ctx.check(canon)
             })
