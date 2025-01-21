@@ -179,7 +179,7 @@ macro_rules! impl_tuple {
                             );
                         })*
                         _ => {
-                            ctx.update(&mut canon, Canonicity::HasExtensions)?;
+                            canon.update(ctx.check(Canonicity::HasExtensions)?);
                             skip_field(wire_type, buf.lend())?;
                         },
                     }
@@ -284,7 +284,7 @@ macro_rules! impl_tuple {
                             );
                         })*
                         _ => {
-                            ctx.update(&mut canon, Canonicity::HasExtensions)?;
+                            canon.update(ctx.check(Canonicity::HasExtensions)?);
                             skip_field(wire_type, buf.lend())?;
                         },
                     }

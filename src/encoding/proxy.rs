@@ -145,7 +145,7 @@ where
             buf,
             ctx.clone(),
         )?;
-        ctx.update(&mut canon, value.decode_proxy_distinguished(proxy)?)?;
+        canon.update(ctx.check(value.decode_proxy_distinguished(proxy)?)?);
         Ok(canon)
     }
 }
@@ -167,6 +167,7 @@ where
     }
 }
 
+// TODO(widders): regression test for unchecked canon reduction here
 impl<'a, T, E, Tag> DistinguishedValueBorrowDecoder<'a, Proxied<E, Tag>> for T
 where
     T: DistinguishedProxiable<Tag> + Eq,
@@ -183,7 +184,7 @@ where
         let mut canon = DistinguishedValueBorrowDecoder::<E>::borrow_decode_value_distinguished::<
             ALLOW_EMPTY,
         >(&mut proxy, buf, ctx.clone())?;
-        ctx.update(&mut canon, value.decode_proxy_distinguished(proxy)?)?;
+        canon.update(ctx.check(value.decode_proxy_distinguished(proxy)?)?);
         Ok(canon)
     }
 }

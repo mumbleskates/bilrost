@@ -451,7 +451,7 @@ macro_rules! __impl_decoder_where_value_decoder {
                         ctx.clone(),
                     )?;
                 if !T::CHECKS_EMPTY && value.is_empty() {
-                    ctx.update(&mut canon, crate::Canonicity::NotCanonical)?;
+                    canon.update(ctx.check(crate::Canonicity::NotCanonical)?);
                 }
                 Ok(canon)
             }

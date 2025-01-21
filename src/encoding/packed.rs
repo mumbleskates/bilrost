@@ -233,7 +233,7 @@ macro_rules! impl_decoders {
                             ctx.clone(),
                         )?,
                     );
-                    ctx.update(&mut canon, value.insert_distinguished(new_val)?)?;
+                    canon.update(ctx.check(value.insert_distinguished(new_val)?)?);
                 }
                 Ok(canon)
             }

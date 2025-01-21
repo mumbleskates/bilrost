@@ -844,15 +844,15 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
                     where
                         __B: ::bilrost::bytes::Buf + ?Sized,
                     {
-                        let canon = &mut ::bilrost::Canonicity::Canonical;
+                        let mut canon = ::bilrost::Canonicity::Canonical;
                         match tag {
                             #(#decode_owned)*
                             _ => {
-                                ctx.update(canon, ::bilrost::Canonicity::HasExtensions)?;
+                                canon.update(ctx.check(::bilrost::Canonicity::HasExtensions)?);
                                 ::bilrost::encoding::skip_field(wire_type, buf)?;
                             }
                         }
-                        ::core::result::Result::Ok(*canon)
+                        ::core::result::Result::Ok(canon)
                     }
                 }
             }
@@ -877,7 +877,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
                     match tag {
                         #(#decode_borrowed)*
                         _ => {
-                            ctx.update(canon, ::bilrost::Canonicity::HasExtensions)?;
+                            canon.update(ctx.check(::bilrost::Canonicity::HasExtensions)?);
                             ::bilrost::encoding::skip_field(wire_type, buf)?;
                         }
                     }
@@ -2197,7 +2197,8 @@ mod test {
                 #[bilrost(4)]
                 x: String,
             }
-        }).unwrap();
+        })
+        .unwrap();
 
         try_message(quote! {
             #[bilrost(reserved_tags(1-3, 8-100))]
@@ -2205,7 +2206,8 @@ mod test {
                 #[bilrost(4)]
                 x: String,
             }
-        }).unwrap();
+        })
+        .unwrap();
 
         try_message(quote! {
             #[bilrost(reserved_tags(..=3, 8..))]
@@ -2213,7 +2215,8 @@ mod test {
                 #[bilrost(4)]
                 x: String,
             }
-        }).unwrap();
+        })
+        .unwrap();
     }
 
     #[test]
@@ -2393,7 +2396,7 @@ mod test {
         })
         .unwrap();
     }
- 
+
     #[test]
     fn test_overlapping_message() {
         _ = try_message(quote! {

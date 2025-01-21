@@ -155,7 +155,7 @@ macro_rules! underived_decode_distinguished {
                             );
                         })*
                         _ => {
-                            ctx.update(&mut canon, Canonicity::HasExtensions)?;
+                            canon.update(ctx.check(Canonicity::HasExtensions)?);
                             skip_field(wire_type, buf.lend())?;
                         },
                     }

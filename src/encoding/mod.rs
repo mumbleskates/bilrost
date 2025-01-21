@@ -626,14 +626,6 @@ impl RestrictedDecodeContext {
             _ => Ok(canon),
         }
     }
-
-    /// Shorthand call to simultaneously update the given canonicity with the new value and fail if
-    /// it is below the minimum for this context.
-    #[inline]
-    pub fn update(&self, canon: &mut Canonicity, new: Canonicity) -> Result<(), DecodeError> {
-        canon.update(self.check(new)?);
-        Ok(())
-    }
 }
 
 /// Returns the encoded length of the value in LEB128-bijective variable length format.
@@ -1076,6 +1068,8 @@ pub fn skip_field<B: Buf + ?Sized>(
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 #[repr(u8)]
 #[must_use]
+// TODO(widders): document apis that return canonicity without a restricted context where it
+//  MUST be checked in distinguished mode
 pub enum Canonicity {
     /// The decoded data was not represented in its canonical form.
     NotCanonical,

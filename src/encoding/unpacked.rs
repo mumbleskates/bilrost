@@ -143,7 +143,7 @@ macro_rules! define_decoders {
                         ctx.clone(),
                     )?,
                 );
-                ctx.update(&mut canon, collection.insert_distinguished(new_item)?)?;
+                canon.update(ctx.check(collection.insert_distinguished(new_item)?)?);
 
                 if let Some(next_wire_type) = peek_repeated_field(&mut buf) {
                     check_wire_type(<T::Item as Wiretyped<E>>::WIRE_TYPE, next_wire_type)?;
