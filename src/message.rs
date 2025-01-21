@@ -925,11 +925,11 @@ where
             //
             // See the docs on `RestrictedDecodeContext::check` for details on canonicity
             // checking.
-                debug_assert!(
-                    canon >= restrict_to,
-                    "a poorly behaved distinguished decoder did not check canonicity against the \
-                    context and convert it into an error"
-                );
+            debug_assert!(
+                canon >= restrict_to,
+                "a poorly behaved distinguished decoder did not check canonicity against the \
+                context and convert it into an error"
+            );
             ctx.check(canon)
         })?;
         Ok((message, canon))
