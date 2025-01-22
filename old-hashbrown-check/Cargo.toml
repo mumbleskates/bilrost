@@ -1,0 +1,12 @@
+[package]
+name = "old-hashbrown-check"
+version = "0.0.0"
+authors = [
+    "Kent Ross <k@mad.cash>",
+]
+edition = "2021"
+resolver = "2"
+
+[dependencies]
+bilrost = { path = "..", default-features = false, features = ["derive", "hashbrown"] }
+hashbrown = "=0.1.0"
