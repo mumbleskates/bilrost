@@ -41,18 +41,18 @@ name = "varint"
 harness = false
 
 [dependencies]
-arrayvec = { version = ">=0.6", default-features = false, optional = true }
+arrayvec = { version = ">=0.6.0,<0.8", default-features = false, optional = true }
 bilrost-derive = { version = "=0.1013.0-dev", path = "bilrost-derive", optional = true }
-bstr = { version = ">=1", default-features = false, features = ["alloc"], optional = true }
-bytes = { version = "1", default-features = false }
-bytestring = { version = ">=1", default-features = false, optional = true }
-chrono = { version = ">=0.4.34", default-features = false, optional = true }
-const_panic = { version = "0.2", default-features = false, features = ["non_basic"], optional = true }
-hashbrown = { version = ">=0.1.0", default-features = false, optional = true }
-smallvec = { version = ">=1.6.1", default-features = false, features = ["const_generics"], optional = true }
-thin-vec = { version = ">=0.2", default-features = false, optional = true }
-time = { version = ">=0.3.0", default-features = false, optional = true }
-tinyvec = { version = ">=1", default-features = false, features = ["alloc", "rustc_1_57"], optional = true }
+bstr = { version = "^1", default-features = false, features = ["alloc"], optional = true }
+bytes = { version = "^1", default-features = false }
+bytestring = { version = "^1", default-features = false, optional = true }
+chrono = { version = "^0.4.34", default-features = false, optional = true }
+const_panic = { version = "0.2.12", default-features = false, features = ["non_basic"], optional = true }
+hashbrown = { version = ">=0.1.0,<0.16", default-features = false, optional = true }
+smallvec = { version = ">=1.6.1,<2", default-features = false, features = ["const_generics"], optional = true }
+thin-vec = { version = "^0.2", default-features = false, optional = true }
+time = { version = "^0.3.0", default-features = false, optional = true }
+tinyvec = { version = "^1", default-features = false, features = ["alloc", "rustc_1_57"], optional = true }
 
 # pprof prevents building on windows, so must be an optional feature.
 # pprof's MSRV was bumped to 1.66 in the v0.14 release, so we should continue to support 0.13.
