@@ -9,11 +9,8 @@ struct VeryOldHashbrown {
 
 #[cfg(test)]
 #[test]
-fn it_works() {
+fn old_hashbrown_encoding_functions() {
     use bilrost::OwnedMessage;
-
-    let def = VeryOldHashbrown::default();
-    let def_hasher = hashbrown::hash_map::DefaultHashBuilder::default();
 
     let original = VeryOldHashbrown {
         map: HashMap::from_iter([(1, "hello".to_owned()), (2, "world".to_owned())]),
