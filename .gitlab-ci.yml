@@ -36,6 +36,7 @@ test:
     - cargo test --workspace --all-targets --no-default-features
     - cargo test --workspace --doc         --no-default-features
     - cargo test --workspace --all-targets --features test-suite-extra --no-default-features
+    - ./test-ancient-hashbrown.sh
 
 test-msrv:
   image: rust:1.65
@@ -50,3 +51,4 @@ test-msrv:
     - cargo test --workspace --all-targets --no-default-features
     - cargo test --workspace --doc         --no-default-features
     - cargo test --workspace --all-targets --features test-suite-extra --no-default-features
+    - ./test-ancient-hashbrown.sh

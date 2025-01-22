@@ -49,6 +49,8 @@ jobs:
         run: cargo test --workspace --doc --no-default-features
       - name: test suite extra external crate options
         run: cargo test --workspace --features test-suite-extra --no-default-features
+      - name: ancient hashbrown check
+        run: ./test-ancient-hashbrown.sh
 
   kani:
     runs-on: ubuntu-latest
