@@ -885,7 +885,7 @@ mod tests {
 
             assert_eq!(
                 ts,
-                ts.to_string().parse::<Timestamp>().unwrap(),
+                ts.to_string().parse::<Timestamp>()?,
             )
         }
 
@@ -901,7 +901,7 @@ mod tests {
 
             prop_assert_eq!(
                 &duration,
-                &duration.to_string().parse::<Duration>().unwrap(),
+                &duration.to_string().parse::<Duration>()?,
                 "{}", duration.to_string()
             );
         }
@@ -913,7 +913,8 @@ mod tests {
         ) {
             let timestamp = Timestamp { seconds, nanos };
             let date_time = DateTime::from(timestamp.clone());
-            let roundtrip = Timestamp::try_from(date_time).unwrap();
+            let roundtrip = Timestamp::try_from(date_time)
+                .map_err(|()| TestCaseError::fail("timestamp didn't round trip from DateTime"))?;
 
             let mut normalized_timestamp = timestamp;
             normalized_timestamp.normalize();
@@ -942,7 +943,10 @@ mod tests {
             };
 
             if date_time.is_valid() {
-                let timestamp = Timestamp::try_from(date_time).unwrap();
+                let timestamp = Timestamp::try_from(date_time)
+                    .map_err(|()| {
+                        TestCaseError::fail("timestamp didn't round trip from DateTime")
+                    })?;
                 let roundtrip = DateTime::from(timestamp);
 
                 prop_assert_eq!(date_time, roundtrip);

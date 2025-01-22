@@ -607,7 +607,7 @@ mod tests {
         fn check_system_time_roundtrip(
             system_time: SystemTime,
         ) {
-            prop_assert_eq!(SystemTime::try_from(Timestamp::from(system_time)).unwrap(), system_time);
+            prop_assert_eq!(SystemTime::try_from(Timestamp::from(system_time))?, system_time);
         }
 
         #[test]
@@ -618,7 +618,7 @@ mod tests {
             let mut timestamp = Timestamp { seconds, nanos };
             let is_canonical = timestamp.is_canonical();
             timestamp.normalize();
-            prop_assert_eq!(is_canonical, timestamp == Timestamp{ seconds, nanos });
+            prop_assert_eq!(is_canonical, timestamp == Timestamp { seconds, nanos });
             if let Ok(system_time) = SystemTime::try_from(timestamp.clone()) {
                 prop_assert_eq!(Timestamp::from(system_time), timestamp);
             }
@@ -629,7 +629,7 @@ mod tests {
             let mut timestamp = Timestamp { seconds, nanos };
             let is_canonical = timestamp.is_canonical();
             timestamp.normalize();
-            prop_assert_eq!(is_canonical, timestamp == Timestamp{ seconds, nanos });
+            prop_assert_eq!(is_canonical, timestamp == Timestamp { seconds, nanos });
             let timestamp = timestamp;
             let datetime: DateTime = timestamp.clone().into();
             prop_assert_eq!(Timestamp::try_from(datetime), Ok(timestamp));
@@ -645,7 +645,7 @@ mod tests {
                 Ok(duration) => duration,
                 Err(_) => return Err(TestCaseError::reject("duration out of range")),
             };
-            prop_assert_eq!(time::Duration::try_from(bilrost_duration.clone()).unwrap(), std_duration);
+            prop_assert_eq!(time::Duration::try_from(bilrost_duration.clone())?, std_duration);
 
             if std_duration != time::Duration::default() {
                 let neg_prost_duration = Duration {
@@ -672,7 +672,7 @@ mod tests {
                 Ok(duration) => duration,
                 Err(_) => return Err(TestCaseError::reject("duration out of range")),
             };
-            prop_assert_eq!(time::Duration::try_from(bilrost_duration.clone()).unwrap(), std_duration);
+            prop_assert_eq!(time::Duration::try_from(bilrost_duration.clone())?, std_duration);
 
             if std_duration != time::Duration::default() {
                 let neg_prost_duration = Duration {
@@ -787,7 +787,7 @@ mod tests {
     fn check_duration_try_from_negative_nanos() {
         let seconds: u64 = 0;
         let nanos: u32 = 1;
-        let std_duration = std::time::Duration::new(seconds, nanos);
+        let std_duration = time::Duration::new(seconds, nanos);
 
         let neg_prost_duration = Duration {
             seconds: 0,

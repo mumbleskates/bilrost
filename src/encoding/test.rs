@@ -133,7 +133,7 @@ macro_rules! check_borrowable {
                         &mut borrowed,
                         Capped::new(&mut buf.as_slice()),
                         DecodeContext::default(),
-                    ).expect("failed to borrow-decode");
+                    )?;
                     prop_assert_eq!(
                         borrowed,
                         Borrow::<$ty>::borrow(&val),
@@ -148,7 +148,7 @@ macro_rules! check_borrowable {
                             &mut borrowed,
                             Capped::new(&mut buf.as_slice()),
                             RestrictedDecodeContext::new(Canonical),
-                        ).expect("failed to borrow-decode"),
+                        )?,
                         Canonical,
                     );
                     prop_assert_eq!(
@@ -1018,11 +1018,11 @@ proptest! {
         let mut buf = Vec::<u8>::new();
         ValueEncoder::<General>::encode_value(&value, &mut buf);
         let mut out = 0u64;
-        prop_assert!(ValueDecoder::<General>::decode_value(
+        ValueDecoder::<General>::decode_value(
             &mut out,
             Capped::new(&mut &*buf),
             DecodeContext::default(),
-        ).is_ok());
+        )?;
         prop_assert_eq!(out, value as u64);
     }
 
@@ -1031,11 +1031,11 @@ proptest! {
         let mut buf = Vec::<u8>::new();
         ValueEncoder::<General>::encode_value(&value, &mut buf);
         let mut out = 0i64;
-        prop_assert!(ValueDecoder::<General>::decode_value(
+        ValueDecoder::<General>::decode_value(
             &mut out,
             Capped::new(&mut &*buf),
             DecodeContext::default(),
-        ).is_ok());
+        )?;
         prop_assert_eq!(out, value as i64);
     }
 
@@ -1045,11 +1045,11 @@ proptest! {
         let mut buf = Vec::<u8>::new();
         ValueEncoder::<General>::encode_value(&value, &mut buf);
         let mut out = 0u32;
-        prop_assert!(ValueDecoder::<General>::decode_value(
+        ValueDecoder::<General>::decode_value(
             &mut out,
             Capped::new(&mut &*buf),
             DecodeContext::default(),
-        ).is_ok());
+        )?;
         prop_assert_eq!(out as u64, value);
     }
 
@@ -1059,11 +1059,11 @@ proptest! {
         let mut buf = Vec::<u8>::new();
         ValueEncoder::<General>::encode_value(&value, &mut buf);
         let mut out = 0i32;
-        prop_assert!(ValueDecoder::<General>::decode_value(
+        ValueDecoder::<General>::decode_value(
             &mut out,
             Capped::new(&mut &*buf),
             DecodeContext::default(),
-        ).is_ok());
+        )?;
         prop_assert_eq!(out as i64, value);
     }
 
