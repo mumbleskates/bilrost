@@ -5,13 +5,15 @@ use crate::encoding::{
 };
 use crate::DecodeErrorKind;
 use crate::DecodeErrorKind::UnexpectedlyRepeated;
+use core::hash::Hash;
 
 for_overwrite_via_default!(hashbrown::HashSet<T, S>,
         with generics (T, S),
-        with where clause (S: Default + core::hash::BuildHasher));
+        with where clause (T: Eq + Hash, S: Default + core::hash::BuildHasher));
 
 impl<T, S> EmptyState for hashbrown::HashSet<T, S>
 where
+    T: Eq + Hash,
     S: Default + core::hash::BuildHasher,
 {
     #[inline]
@@ -27,7 +29,7 @@ where
 
 impl<T, S> Collection for hashbrown::HashSet<T, S>
 where
-    T: Eq + core::hash::Hash,
+    T: Eq + Hash,
     S: Default + core::hash::BuildHasher,
 {
     type Item = T;
@@ -68,10 +70,11 @@ where
 
 for_overwrite_via_default!(hashbrown::HashMap<K, V, S>,
         with generics (K, V, S),
-        with where clause (S: Default + core::hash::BuildHasher));
+        with where clause (K: Eq + Hash, S: Default + core::hash::BuildHasher));
 
 impl<K, V, S> EmptyState for hashbrown::HashMap<K, V, S>
 where
+    K: Eq + Hash,
     S: Default + core::hash::BuildHasher,
 {
     #[inline]
@@ -87,7 +90,7 @@ where
 
 impl<K, V, S> Mapping for hashbrown::HashMap<K, V, S>
 where
-    K: Eq + core::hash::Hash,
+    K: Eq + Hash,
     S: Default + core::hash::BuildHasher,
 {
     type Key = K;
@@ -133,11 +136,11 @@ where
 
 delegate_encoding!(delegate from (General) to (Unpacked<General>)
     for type (hashbrown::HashSet<T, S>)
-    with where clause (S: Default + core::hash::BuildHasher)
+    with where clause (T: Eq + Hash, S: Default + core::hash::BuildHasher)
     with generics (T, S));
 delegate_value_encoding!(delegate from (General) to (Map<General, General>)
     for type (hashbrown::HashMap<K, V, S>)
-    with where clause (K: Eq + core::hash::Hash, S: Default + core::hash::BuildHasher)
+    with where clause (K: Eq + Hash, S: Default + core::hash::BuildHasher)
     with generics (K, V, S));
 
 #[cfg(test)]
