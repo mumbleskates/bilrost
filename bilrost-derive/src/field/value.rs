@@ -301,6 +301,9 @@ impl Field {
                         )
                     }
                 },
+                // Encoding or decoding a oneof field always has trivially externally determined
+                // presence, and we never need to know whether or not the value is empty; it never
+                // needs to implement the empty state.
                 quote!(#ty: ::bilrost::encoding::ForOverwrite),
             ]
         } else {
@@ -322,8 +325,9 @@ impl Field {
                         )
                     }
                 },
-                // Distinguished decoding always requires EmptyState instead of just ForOverwrite
-                // because we must check whether values are still empty after we've decoded them.
+                // Message field encoding always requires EmptyState instead of just ForOverwrite
+                // because we need to know whether a field is empty to know whether we should write
+                // anything; and all the decoding traits imply the encoding trait.
                 quote!(#ty: ::bilrost::encoding::EmptyState),
             ]
         }
