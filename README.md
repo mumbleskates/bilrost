@@ -2368,9 +2368,8 @@ of key changes.
   take multiple bytes to encode; in Bilrost, the only time a field key takes
   more than a single byte is when more than 31 tags have been skipped in a row.
 * Fields' tags are less constrained. In Protobuf field tags are restricted to
-  the range [1, 2^29-1]; in Bilrost we have made the decision to continue
-  numbering them naturally from 1, but to otherwise allow any unsigned 32 bit
-  integer as a tag number.
+  the range [1, 2^29-1]; in Bilrost we have made the decision to allow any
+  unsigned 32 bit integer as a tag number.
 * Protobuf uses three bits in field keys for the wire type, and has six of these
   wire types allocated; two are used as data-less delimiting markers for
   "groups", which are a legacy and long-deprecated method of nesting data within
