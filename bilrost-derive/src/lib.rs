@@ -434,7 +434,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     let self_where = if has_ignored_fields {
         // When there are ignored fields, the whole message impl should be bounded by
         // Self: Default
-        Some(quote!(Self: core::default::Default))
+        Some(quote!(Self: ::core::default::Default))
     } else {
         None
     };
