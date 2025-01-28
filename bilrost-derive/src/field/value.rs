@@ -1,13 +1,3 @@
-use alloc::format;
-use alloc::string::ToString;
-use alloc::vec;
-use alloc::vec::Vec;
-
-use eyre::{bail, Error};
-use proc_macro2::{Ident, Span, TokenStream};
-use quote::quote;
-use syn::{parse_str, Index, Meta, Type};
-
 use crate::attrs::{named_attr, tag_attr, word_attr};
 use crate::field::{
     set_bool, set_option,
@@ -15,6 +5,15 @@ use crate::field::{
     DecodeMode::{self, Distinguished, Relaxed},
     WhereFor::{self, Decode, Encode},
 };
+use crate::CRATE;
+use alloc::format;
+use alloc::string::ToString;
+use alloc::vec;
+use alloc::vec::Vec;
+use eyre::{bail, Error};
+use proc_macro2::{Ident, Span, TokenStream};
+use quote::quote;
+use syn::{parse_str, Index, Meta, Type};
 
 /// A field in a bilrost message or oneof
 #[derive(Clone)]
@@ -147,12 +146,13 @@ impl Field {
 
     /// Returns a statement which encodes the field using buffer `buf` and tag writer `tw`.
     pub fn encode(&self, ident: TokenStream) -> TokenStream {
+        let crate_ = CRATE;
         let tag = self.tag;
         let encoder = &self.encoding;
         let ty = &self.ty;
         if self.in_oneof {
             quote! {
-                <#ty as ::bilrost::encoding::FieldEncoder<#encoder>>::encode_field(
+                <#ty as #crate_::encoding::FieldEncoder<#encoder>>::encode_field(
                     #tag,
                     &#ident,
                     buf,
@@ -161,19 +161,20 @@ impl Field {
             }
         } else {
             quote! {
-                <#ty as ::bilrost::encoding::Encoder<#encoder>>::encode(#tag, &#ident, buf, tw);
+                <#ty as #crate_::encoding::Encoder<#encoder>>::encode(#tag, &#ident, buf, tw);
             }
         }
     }
 
     /// Returns a statement which encodes the field using buffer `buf` and tag writer `tw`.
     pub fn prepend(&self, ident: TokenStream) -> TokenStream {
+        let crate_ = CRATE;
         let tag = self.tag;
         let encoder = &self.encoding;
         let ty = &self.ty;
         if self.in_oneof {
             quote! {
-                <#ty as ::bilrost::encoding::FieldEncoder<#encoder>>::prepend_field(
+                <#ty as #crate_::encoding::FieldEncoder<#encoder>>::prepend_field(
                     #tag,
                     &#ident,
                     buf,
@@ -182,7 +183,7 @@ impl Field {
             }
         } else {
             quote! {
-                <#ty as ::bilrost::encoding::Encoder<#encoder>>::prepend_encode(
+                <#ty as #crate_::encoding::Encoder<#encoder>>::prepend_encode(
                     #tag,
                     &#ident,
                     buf,
@@ -200,6 +201,7 @@ impl Field {
         lifetime: DecodeLifetime,
         mode: DecodeMode,
     ) -> TokenStream {
+        let crate_ = CRATE;
         let encoding = &self.encoding;
         let ty = &self.ty;
         let (decoder_trait, call) = if self.in_oneof {
@@ -229,7 +231,7 @@ impl Field {
             }
         };
         let decode = quote!(
-            <#ty as ::bilrost::encoding::#decoder_trait<#encoding>>::#call(
+            <#ty as #crate_::encoding::#decoder_trait<#encoding>>::#call(
                 wire_type,
                 #ident,
                 buf,
@@ -243,8 +245,8 @@ impl Field {
             // attach the right field name to the error while decoding.
             quote! {
                 if duplicated {
-                    ::core::result::Result::Err(::bilrost::DecodeError::new(
-                        ::bilrost::DecodeErrorKind::UnexpectedlyRepeated
+                    ::core::result::Result::Err(#crate_::DecodeError::new(
+                        #crate_::DecodeErrorKind::UnexpectedlyRepeated
                     ))
                 } else {
                     #decode
@@ -256,12 +258,13 @@ impl Field {
     /// Returns an expression which evaluates to the encoded length of the field. The given ident
     /// must be the location name of the field value, not a reference.
     pub fn encoded_len(&self, ident: TokenStream) -> TokenStream {
+        let crate_ = CRATE;
         let tag = self.tag;
         let encoder = &self.encoding;
         let ty = &self.ty;
         if self.in_oneof {
             quote! {
-                <#ty as ::bilrost::encoding::FieldEncoder<#encoder>>::field_encoded_len(
+                <#ty as #crate_::encoding::FieldEncoder<#encoder>>::field_encoded_len(
                     #tag,
                     &#ident,
                     tm,
@@ -269,13 +272,14 @@ impl Field {
             }
         } else {
             quote! {
-                <#ty as ::bilrost::encoding::Encoder<#encoder>>::encoded_len(#tag, &#ident, tm)
+                <#ty as #crate_::encoding::Encoder<#encoder>>::encoded_len(#tag, &#ident, tm)
             }
         }
     }
 
     /// Returns the where clause constraint terms for the field's encoder.
     pub fn where_terms(&self, purpose: WhereFor) -> Vec<TokenStream> {
+        let crate_ = CRATE;
         if self.recurses {
             return vec![];
         }
@@ -284,19 +288,19 @@ impl Field {
         if self.in_oneof {
             vec![
                 match purpose {
-                    Encode => quote!(#ty: ::bilrost::encoding::ValueEncoder<#encoding>),
+                    Encode => quote!(#ty: #crate_::encoding::ValueEncoder<#encoding>),
                     Decode(Owned, Relaxed) => {
-                        quote!(#ty: ::bilrost::encoding::ValueDecoder<#encoding>)
+                        quote!(#ty: #crate_::encoding::ValueDecoder<#encoding>)
                     }
                     Decode(Borrowed, Relaxed) => {
-                        quote!(#ty: ::bilrost::encoding::ValueBorrowDecoder<'__a, #encoding>)
+                        quote!(#ty: #crate_::encoding::ValueBorrowDecoder<'__a, #encoding>)
                     }
                     Decode(Owned, Distinguished) => {
-                        quote!(#ty: ::bilrost::encoding::DistinguishedValueDecoder<#encoding>)
+                        quote!(#ty: #crate_::encoding::DistinguishedValueDecoder<#encoding>)
                     }
                     Decode(Borrowed, Distinguished) => {
                         quote!(
-                            #ty: ::bilrost::encoding::
+                            #ty: #crate_::encoding::
                                 DistinguishedValueBorrowDecoder<'__a, #encoding>
                         )
                     }
@@ -304,31 +308,31 @@ impl Field {
                 // Encoding or decoding a oneof field always has trivially externally determined
                 // presence, and we never need to know whether or not the value is empty; it never
                 // needs to implement the empty state.
-                quote!(#ty: ::bilrost::encoding::ForOverwrite),
+                quote!(#ty: #crate_::encoding::ForOverwrite),
             ]
         } else {
             vec![
                 match purpose {
-                    Encode => quote!(#ty: ::bilrost::encoding::Encoder<#encoding>),
+                    Encode => quote!(#ty: #crate_::encoding::Encoder<#encoding>),
                     Decode(Owned, Relaxed) => {
-                        quote!(#ty: ::bilrost::encoding::Decoder<#encoding>)
+                        quote!(#ty: #crate_::encoding::Decoder<#encoding>)
                     }
                     Decode(Borrowed, Relaxed) => {
-                        quote!(#ty: ::bilrost::encoding::BorrowDecoder<'__a, #encoding>)
+                        quote!(#ty: #crate_::encoding::BorrowDecoder<'__a, #encoding>)
                     }
                     Decode(Owned, Distinguished) => {
-                        quote!(#ty: ::bilrost::encoding::DistinguishedDecoder<#encoding>)
+                        quote!(#ty: #crate_::encoding::DistinguishedDecoder<#encoding>)
                     }
                     Decode(Borrowed, Distinguished) => {
                         quote!(
-                            #ty: ::bilrost::encoding::DistinguishedBorrowDecoder<'__a, #encoding>
+                            #ty: #crate_::encoding::DistinguishedBorrowDecoder<'__a, #encoding>
                         )
                     }
                 },
                 // Message field encoding always requires EmptyState instead of just ForOverwrite
                 // because we need to know whether a field is empty to know whether we should write
                 // anything; and all the decoding traits imply the encoding trait.
-                quote!(#ty: ::bilrost::encoding::EmptyState),
+                quote!(#ty: #crate_::encoding::EmptyState),
             ]
         }
     }
@@ -336,6 +340,7 @@ impl Field {
     /// Returns methods to embed in the message. `ident` must be the name of the field within the
     /// message struct.
     pub fn methods(&self, ident: &TokenStream) -> Option<TokenStream> {
+        let crate_ = CRATE;
         let enumeration_ty = self.enumeration_ty.as_ref()?;
 
         let ident_str = ident.to_string();
@@ -357,18 +362,18 @@ impl Field {
         Some(quote! {
             fn #get(
                 &self
-            ) -> <#enumeration_ty as ::bilrost::encoding::EnumerationHelper<#field_ty>>::Output {
+            ) -> <#enumeration_ty as #crate_::encoding::EnumerationHelper<#field_ty>>::Output {
                 <
-                    #enumeration_ty as ::bilrost::encoding::EnumerationHelper<#field_ty>
+                    #enumeration_ty as #crate_::encoding::EnumerationHelper<#field_ty>
                 >::help_get(self.#ident)
             }
 
             fn #set(
                 &mut self,
-                val: <#enumeration_ty as ::bilrost::encoding::EnumerationHelper<#field_ty>>::Input,
+                val: <#enumeration_ty as #crate_::encoding::EnumerationHelper<#field_ty>>::Input,
             ) {
                 self.#ident = <
-                    #enumeration_ty as ::bilrost::encoding::EnumerationHelper<#field_ty>
+                    #enumeration_ty as #crate_::encoding::EnumerationHelper<#field_ty>
                 >::help_set(val);
             }
         })

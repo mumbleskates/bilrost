@@ -1,9 +1,9 @@
+use crate::CRATE;
 use alloc::fmt::Debug;
 use alloc::format;
 use alloc::string::{String, ToString};
 use alloc::vec;
 use alloc::vec::Vec;
-
 use eyre::{bail, Error};
 use proc_macro2::{Ident, TokenStream};
 use quote::{quote, ToTokens};
@@ -96,6 +96,7 @@ impl Field {
     }
 
     pub fn tag_list_guard(&self, field_name: String) -> Option<TokenStream> {
+        let crate_ = CRATE;
         match self {
             Field::Oneof(field) => {
                 let mut tags = self.tags();
@@ -108,9 +109,9 @@ impl Field {
                 let description = description.as_str();
                 // Static assertion pattern borrowed from static_assertions crate.
                 Some(quote!(
-                    ::bilrost::assert_tags_are_equal(
+                    #crate_::assert_tags_are_equal(
                         #description,
-                        <#oneof_ty as ::bilrost::encoding::Oneof>::FIELD_TAGS,
+                        <#oneof_ty as #crate_::encoding::Oneof>::FIELD_TAGS,
                         &[#(#tags),*],
                     );
                 ))

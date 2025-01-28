@@ -29,6 +29,7 @@ use core::mem::take;
 use core::ops::{Deref, RangeInclusive};
 use eyre::{bail, eyre as err, Error};
 use itertools::Itertools;
+use once_cell::sync::Lazy;
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, ToTokens, TokenStreamExt};
 use syn::{
@@ -39,6 +40,20 @@ use syn::{
 
 mod attrs;
 mod field;
+
+struct Tokenable<T>(T);
+
+impl<T> ToTokens for Tokenable<T>
+where
+    T: Deref,
+    T::Target: ToTokens,
+{
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        self.0.to_tokens(tokens);
+    }
+}
+
+const CRATE: Tokenable<Lazy<TokenStream>> = Tokenable(Lazy::new(|| quote!(::bilrost)));
 
 /// Helper type to ensure a value is used at runtime.
 struct MustMove<T>(Option<T>);
@@ -75,8 +90,9 @@ impl<T> Deref for MustMove<T> {
 /// simultaneously easier to spell when writing the field attributes and making them less likely to
 /// shadow custom encoder types.
 fn encoder_alias_header() -> TokenStream {
+    let crate_ = CRATE;
     quote! {
-        use ::bilrost::encoding::{
+        use #crate_::encoding::{
             Fixed as fixed,
             General as general,
             Map as map,
@@ -408,6 +424,7 @@ fn append_generic(generics: &Generics, ident: TokenStream) -> TokenStream {
 }
 
 fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
+    let crate_ = CRATE;
     let input: DeriveInput = parse2(input)?;
 
     if let Data::Enum(..) = input.data {
@@ -457,9 +474,9 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     let can_use_trivial_tag_measurer = matches!(tag_range, Some(range) if *range.end() < 32);
 
     let tag_measurer_ty = if can_use_trivial_tag_measurer {
-        quote!(::bilrost::encoding::TrivialTagMeasurer)
+        quote!(#crate_::encoding::TrivialTagMeasurer)
     } else {
-        quote!(::bilrost::encoding::RuntimeTagMeasurer)
+        quote!(#crate_::encoding::RuntimeTagMeasurer)
     };
 
     let encoded_len = fields.iter().map(|chunk| match chunk {
@@ -560,7 +577,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
                 {
                     let mut parts = [
                         (0u32, ::core::option::Option::None::<
-                                   fn(&Self, &mut __B, &mut ::bilrost::encoding::TagWriter)
+                                   fn(&Self, &mut __B, &mut #crate_::encoding::TagWriter)
                                >);
                         #max_parts
                     ];
@@ -616,7 +633,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
                 {
                     let mut parts = [
                         (0u32, ::core::option::Option::None::<
-                                   fn(&Self, &mut __B, &mut ::bilrost::encoding::TagRevWriter)
+                                   fn(&Self, &mut __B, &mut #crate_::encoding::TagRevWriter)
                                >);
                         #max_parts
                     ];
@@ -681,25 +698,25 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
 
     let impl_owned_decoder = (!borrow_only).then(|| {
         quote! {
-            impl #impl_generics ::bilrost::encoding::RawMessageDecoder
+            impl #impl_generics #crate_::encoding::RawMessageDecoder
             for #ident #ty_generics #owned_decoder_where_clause {
                 #[allow(unused_variables)]
                 #[inline]
                 fn raw_decode_field<__B>(
                     &mut self,
                     tag: u32,
-                    wire_type: ::bilrost::encoding::WireType,
+                    wire_type: #crate_::encoding::WireType,
                     duplicated: bool,
-                    buf: ::bilrost::encoding::Capped<__B>,
-                    ctx: ::bilrost::encoding::DecodeContext,
-                ) -> ::core::result::Result<(), ::bilrost::DecodeError>
+                    buf: #crate_::encoding::Capped<__B>,
+                    ctx: #crate_::encoding::DecodeContext,
+                ) -> ::core::result::Result<(), #crate_::DecodeError>
                 where
-                    __B: ::bilrost::bytes::Buf + ?Sized,
+                    __B: #crate_::bytes::Buf + ?Sized,
                 {
-                    let _ = <Self as ::bilrost::encoding::RawMessage>::__ASSERTIONS;
+                    let _ = <Self as #crate_::encoding::RawMessage>::__ASSERTIONS;
                     match tag {
                         #(#decode_owned)*
-                        _ => ::bilrost::encoding::skip_field(wire_type, buf)?,
+                        _ => #crate_::encoding::skip_field(wire_type, buf)?,
                     }
                     ::core::result::Result::Ok(())
                 }
@@ -715,34 +732,34 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     // Even in rust 1.79 nightly, if the constant is never named anywhere the assertions won't
     // actually run.
     let impls = quote! {
-        impl #impl_generics ::bilrost::encoding::RawMessage
+        impl #impl_generics #crate_::encoding::RawMessage
         for #ident #ty_generics #encoder_where_clause {
             const __ASSERTIONS: () = { #(#static_guards)* };
 
             #[allow(unused_variables)]
             fn raw_encode<__B>(&self, buf: &mut __B)
             where
-                __B: ::bilrost::bytes::BufMut + ?Sized,
+                __B: #crate_::bytes::BufMut + ?Sized,
             {
-                let _ = <Self as ::bilrost::encoding::RawMessage>::__ASSERTIONS;
-                let tw = &mut ::bilrost::encoding::TagWriter::new();
+                let _ = <Self as #crate_::encoding::RawMessage>::__ASSERTIONS;
+                let tw = &mut #crate_::encoding::TagWriter::new();
                 #(#encode)*
             }
 
             #[allow(unused_variables)]
             fn raw_prepend<__B>(&self, buf: &mut __B)
             where
-                __B: ::bilrost::buf::ReverseBuf + ?Sized,
+                __B: #crate_::buf::ReverseBuf + ?Sized,
             {
-                let _ = <Self as ::bilrost::encoding::RawMessage>::__ASSERTIONS;
-                let tw = &mut ::bilrost::encoding::TagRevWriter::new();
+                let _ = <Self as #crate_::encoding::RawMessage>::__ASSERTIONS;
+                let tw = &mut #crate_::encoding::TagRevWriter::new();
                 #(#prepend)*
                 tw.finalize(buf);
             }
 
             #[inline]
             fn raw_encoded_len(&self) -> usize {
-                let _ = <Self as ::bilrost::encoding::RawMessage>::__ASSERTIONS;
+                let _ = <Self as #crate_::encoding::RawMessage>::__ASSERTIONS;
                 let tm = &mut #tag_measurer_ty::new();
                 0 #(+ #encoded_len)*
             }
@@ -750,45 +767,45 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
 
         #impl_owned_decoder
 
-        impl #borrow_generics ::bilrost::encoding::RawMessageBorrowDecoder<'__a>
+        impl #borrow_generics #crate_::encoding::RawMessageBorrowDecoder<'__a>
         for #ident #ty_generics #borrowed_decoder_where_clause {
             #[allow(unused_variables)]
             #[inline]
             fn raw_borrow_decode_field(
                 &mut self,
                 tag: u32,
-                wire_type: ::bilrost::encoding::WireType,
+                wire_type: #crate_::encoding::WireType,
                 duplicated: bool,
-                buf: ::bilrost::encoding::Capped<&'__a [u8]>,
-                ctx: ::bilrost::encoding::DecodeContext,
-            ) -> ::core::result::Result<(), ::bilrost::DecodeError> {
-                let _ = <Self as ::bilrost::encoding::RawMessage>::__ASSERTIONS;
+                buf: #crate_::encoding::Capped<&'__a [u8]>,
+                ctx: #crate_::encoding::DecodeContext,
+            ) -> ::core::result::Result<(), #crate_::DecodeError> {
+                let _ = <Self as #crate_::encoding::RawMessage>::__ASSERTIONS;
                 match tag {
                     #(#decode_borrowed)*
-                    _ => ::bilrost::encoding::skip_field(wire_type, buf)?,
+                    _ => #crate_::encoding::skip_field(wire_type, buf)?,
                 }
                 ::core::result::Result::Ok(())
             }
         }
 
-        impl #impl_generics ::bilrost::encoding::ForOverwrite
+        impl #impl_generics #crate_::encoding::ForOverwrite
         for #ident #ty_generics #encoder_where_clause {
             fn for_overwrite() -> Self {
                 Self {
-                    #(#field_idents: ::bilrost::encoding::ForOverwrite::for_overwrite(),)*
+                    #(#field_idents: #crate_::encoding::ForOverwrite::for_overwrite(),)*
                     #initialize_ignored
                 }
             }
         }
 
-        impl #impl_generics ::bilrost::encoding::EmptyState
+        impl #impl_generics #crate_::encoding::EmptyState
         for #ident #ty_generics #encoder_where_clause {
             fn is_empty(&self) -> bool {
-                true #(&& ::bilrost::encoding::EmptyState::is_empty(&self.#field_idents))*
+                true #(&& #crate_::encoding::EmptyState::is_empty(&self.#field_idents))*
             }
 
             fn clear(&mut self) {
-                #(::bilrost::encoding::EmptyState::clear(&mut self.#field_idents);)*
+                #(#crate_::encoding::EmptyState::clear(&mut self.#field_idents);)*
             }
         }
     };
@@ -829,27 +846,27 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
 
         let impl_owned_decoder = (!borrow_only).then(|| {
             quote! {
-                impl #impl_generics ::bilrost::encoding::RawDistinguishedMessageDecoder
+                impl #impl_generics #crate_::encoding::RawDistinguishedMessageDecoder
                 for #ident #ty_generics #owned_decoder_where_clause {
                     #[allow(unused_variables)]
                     #[inline]
                     fn raw_decode_field_distinguished<__B>(
                         &mut self,
                         tag: u32,
-                        wire_type: ::bilrost::encoding::WireType,
+                        wire_type: #crate_::encoding::WireType,
                         duplicated: bool,
-                        buf: ::bilrost::encoding::Capped<__B>,
-                        ctx: ::bilrost::encoding::RestrictedDecodeContext,
-                    ) -> ::core::result::Result<::bilrost::Canonicity, ::bilrost::DecodeError>
+                        buf: #crate_::encoding::Capped<__B>,
+                        ctx: #crate_::encoding::RestrictedDecodeContext,
+                    ) -> ::core::result::Result<#crate_::Canonicity, #crate_::DecodeError>
                     where
-                        __B: ::bilrost::bytes::Buf + ?Sized,
+                        __B: #crate_::bytes::Buf + ?Sized,
                     {
-                        let mut canon = ::bilrost::Canonicity::Canonical;
+                        let mut canon = #crate_::Canonicity::Canonical;
                         match tag {
                             #(#decode_owned)*
                             _ => {
-                                canon.update(ctx.check(::bilrost::Canonicity::HasExtensions)?);
-                                ::bilrost::encoding::skip_field(wire_type, buf)?;
+                                canon.update(ctx.check(#crate_::Canonicity::HasExtensions)?);
+                                #crate_::encoding::skip_field(wire_type, buf)?;
                             }
                         }
                         ::core::result::Result::Ok(canon)
@@ -861,24 +878,24 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         quote! {
             #impl_owned_decoder
 
-            impl #borrow_generics ::bilrost::encoding::RawDistinguishedMessageBorrowDecoder<'__a>
+            impl #borrow_generics #crate_::encoding::RawDistinguishedMessageBorrowDecoder<'__a>
             for #ident #ty_generics #borrowed_decoder_where_clause {
                 #[allow(unused_variables)]
                 #[inline]
                 fn raw_borrow_decode_field_distinguished(
                     &mut self,
                     tag: u32,
-                    wire_type: ::bilrost::encoding::WireType,
+                    wire_type: #crate_::encoding::WireType,
                     duplicated: bool,
-                    buf: ::bilrost::encoding::Capped<&'__a [u8]>,
-                    ctx: ::bilrost::encoding::RestrictedDecodeContext,
-                ) -> ::core::result::Result<::bilrost::Canonicity, ::bilrost::DecodeError> {
-                    let canon = &mut ::bilrost::Canonicity::Canonical;
+                    buf: #crate_::encoding::Capped<&'__a [u8]>,
+                    ctx: #crate_::encoding::RestrictedDecodeContext,
+                ) -> ::core::result::Result<#crate_::Canonicity, #crate_::DecodeError> {
+                    let canon = &mut #crate_::Canonicity::Canonical;
                     match tag {
                         #(#decode_borrowed)*
                         _ => {
-                            canon.update(ctx.check(::bilrost::Canonicity::HasExtensions)?);
-                            ::bilrost::encoding::skip_field(wire_type, buf)?;
+                            canon.update(ctx.check(#crate_::Canonicity::HasExtensions)?);
+                            #crate_::encoding::skip_field(wire_type, buf)?;
                         }
                     }
                     ::core::result::Result::Ok(*canon)
@@ -904,6 +921,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
 }
 
 fn try_message_via_oneof(input: DeriveInput) -> Result<TokenStream, Error> {
+    let crate_ = CRATE;
     let PreprocessedOneof {
         ident,
         impl_generics,
@@ -919,9 +937,9 @@ fn try_message_via_oneof(input: DeriveInput) -> Result<TokenStream, Error> {
         fields.iter().map(|(_, field)| field.last_tag()).max(),
         Some(last_tag) if last_tag >= 32
     ) {
-        quote!(::bilrost::encoding::RuntimeTagMeasurer)
+        quote!(#crate_::encoding::RuntimeTagMeasurer)
     } else {
-        quote!(::bilrost::encoding::TrivialTagMeasurer)
+        quote!(#crate_::encoding::TrivialTagMeasurer)
     };
 
     if empty_variant.is_none() {
@@ -931,34 +949,34 @@ fn try_message_via_oneof(input: DeriveInput) -> Result<TokenStream, Error> {
     let borrow_generics = append_generic(impl_generics, quote!('__a));
 
     let encoder_where_clause =
-        append_self_where(where_clause, Some(quote!(Self: ::bilrost::encoding::Oneof)));
+        append_self_where(where_clause, Some(quote!(Self: #crate_::encoding::Oneof)));
     let owned_decoder_where_clause = append_self_where(
         where_clause,
-        Some(quote!(Self: ::bilrost::encoding::OneofDecoder)),
+        Some(quote!(Self: #crate_::encoding::OneofDecoder)),
     );
     let borrowed_decoder_where_clause = append_self_where(
         where_clause,
-        Some(quote!(Self: ::bilrost::encoding::OneofBorrowDecoder<'__a>)),
+        Some(quote!(Self: #crate_::encoding::OneofBorrowDecoder<'__a>)),
     );
 
     let impl_owned_decoder = (!borrow_only).then(|| {
         quote! {
-            impl #impl_generics ::bilrost::encoding::RawMessageDecoder
+            impl #impl_generics #crate_::encoding::RawMessageDecoder
             for #ident #ty_generics #owned_decoder_where_clause {
                 #[inline(always)]
                 fn raw_decode_field<__B>(
                     &mut self,
                     tag: u32,
-                    wire_type: ::bilrost::encoding::WireType,
+                    wire_type: #crate_::encoding::WireType,
                     _duplicated: bool,
-                    buf: ::bilrost::encoding::Capped<__B>,
-                    ctx: ::bilrost::encoding::DecodeContext,
-                ) -> ::core::result::Result<(), ::bilrost::DecodeError>
+                    buf: #crate_::encoding::Capped<__B>,
+                    ctx: #crate_::encoding::DecodeContext,
+                ) -> ::core::result::Result<(), #crate_::DecodeError>
                 where
-                    __B: ::bilrost::bytes::Buf + ?Sized,
+                    __B: #crate_::bytes::Buf + ?Sized,
                 {
-                    if <Self as ::bilrost::encoding::Oneof>::FIELD_TAGS.contains(&tag) {
-                        <Self as ::bilrost::encoding::OneofDecoder>::oneof_decode_field(
+                    if <Self as #crate_::encoding::Oneof>::FIELD_TAGS.contains(&tag) {
+                        <Self as #crate_::encoding::OneofDecoder>::oneof_decode_field(
                             self,
                             tag,
                             wire_type,
@@ -974,35 +992,35 @@ fn try_message_via_oneof(input: DeriveInput) -> Result<TokenStream, Error> {
     });
 
     let impls = quote! {
-        impl #impl_generics ::bilrost::encoding::RawMessage
+        impl #impl_generics #crate_::encoding::RawMessage
         for #ident #ty_generics #encoder_where_clause {
             const __ASSERTIONS: () = ();
 
             #[inline(always)]
             fn raw_encode<__B>(&self, buf: &mut __B)
             where
-                __B: ::bilrost::bytes::BufMut + ?Sized,
+                __B: #crate_::bytes::BufMut + ?Sized,
             {
-                <Self as ::bilrost::encoding::Oneof>::oneof_encode(
+                <Self as #crate_::encoding::Oneof>::oneof_encode(
                     self,
                     buf,
-                    &mut ::bilrost::encoding::TagWriter::new(),
+                    &mut #crate_::encoding::TagWriter::new(),
                 );
             }
 
             #[inline(always)]
             fn raw_prepend<__B>(&self, buf: &mut __B)
             where
-                __B: ::bilrost::buf::ReverseBuf + ?Sized,
+                __B: #crate_::buf::ReverseBuf + ?Sized,
             {
-                let tw = &mut ::bilrost::encoding::TagRevWriter::new();
-                <Self as ::bilrost::encoding::Oneof>::oneof_prepend(self, buf, tw);
+                let tw = &mut #crate_::encoding::TagRevWriter::new();
+                <Self as #crate_::encoding::Oneof>::oneof_prepend(self, buf, tw);
                 tw.finalize(buf);
             }
 
             #[inline(always)]
             fn raw_encoded_len(&self) -> usize {
-                <Self as ::bilrost::encoding::Oneof>::oneof_encoded_len(
+                <Self as #crate_::encoding::Oneof>::oneof_encoded_len(
                     self,
                     &mut #tag_measurer::new(),
                 )
@@ -1011,19 +1029,19 @@ fn try_message_via_oneof(input: DeriveInput) -> Result<TokenStream, Error> {
 
         #impl_owned_decoder
 
-        impl #borrow_generics ::bilrost::encoding::RawMessageBorrowDecoder<'__a>
+        impl #borrow_generics #crate_::encoding::RawMessageBorrowDecoder<'__a>
         for #ident #ty_generics #borrowed_decoder_where_clause {
             #[inline(always)]
             fn raw_borrow_decode_field(
                 &mut self,
                 tag: u32,
-                wire_type: ::bilrost::encoding::WireType,
+                wire_type: #crate_::encoding::WireType,
                 _duplicated: bool,
-                buf: ::bilrost::encoding::Capped<&'__a [u8]>,
-                ctx: ::bilrost::encoding::DecodeContext,
-            ) -> ::core::result::Result<(), ::bilrost::DecodeError> {
-                if <Self as ::bilrost::encoding::Oneof>::FIELD_TAGS.contains(&tag) {
-                    <Self as ::bilrost::encoding::OneofBorrowDecoder>::oneof_borrow_decode_field(
+                buf: #crate_::encoding::Capped<&'__a [u8]>,
+                ctx: #crate_::encoding::DecodeContext,
+            ) -> ::core::result::Result<(), #crate_::DecodeError> {
+                if <Self as #crate_::encoding::Oneof>::FIELD_TAGS.contains(&tag) {
+                    <Self as #crate_::encoding::OneofBorrowDecoder>::oneof_borrow_decode_field(
                         self,
                         tag,
                         wire_type,
@@ -1041,34 +1059,34 @@ fn try_message_via_oneof(input: DeriveInput) -> Result<TokenStream, Error> {
         let owned_decoder_where_clause = append_self_where(
             where_clause,
             Some(quote!(
-                Self: ::bilrost::encoding::DistinguishedOneofDecoder + ::core::cmp::Eq
+                Self: #crate_::encoding::DistinguishedOneofDecoder + ::core::cmp::Eq
             )),
         );
         let borrowed_decoder_where_clause = append_self_where(
             where_clause,
             Some(quote!(
-                Self: ::bilrost::encoding::DistinguishedOneofBorrowDecoder<'__a> + ::core::cmp::Eq
+                Self: #crate_::encoding::DistinguishedOneofBorrowDecoder<'__a> + ::core::cmp::Eq
             )),
         );
 
         let impl_owned_decoder = (!borrow_only).then(|| {
             quote! {
-                impl #impl_generics ::bilrost::encoding::RawDistinguishedMessageDecoder
+                impl #impl_generics #crate_::encoding::RawDistinguishedMessageDecoder
                 for #ident #ty_generics #owned_decoder_where_clause {
                     #[inline(always)]
                     fn raw_decode_field_distinguished<__B>(
                         &mut self,
                         tag: u32,
-                        wire_type: ::bilrost::encoding::WireType,
+                        wire_type: #crate_::encoding::WireType,
                         _duplicated: bool,
-                        buf: ::bilrost::encoding::Capped<__B>,
-                        ctx: ::bilrost::encoding::RestrictedDecodeContext,
-                    ) -> ::core::result::Result<::bilrost::Canonicity, ::bilrost::DecodeError>
+                        buf: #crate_::encoding::Capped<__B>,
+                        ctx: #crate_::encoding::RestrictedDecodeContext,
+                    ) -> ::core::result::Result<#crate_::Canonicity, #crate_::DecodeError>
                     where
-                        __B: ::bilrost::bytes::Buf + ?Sized,
+                        __B: #crate_::bytes::Buf + ?Sized,
                     {
-                        if <Self as ::bilrost::encoding::Oneof>::FIELD_TAGS.contains(&tag) {
-                            <Self as ::bilrost::encoding::DistinguishedOneofDecoder>::
+                        if <Self as #crate_::encoding::Oneof>::FIELD_TAGS.contains(&tag) {
+                            <Self as #crate_::encoding::DistinguishedOneofDecoder>::
                                 oneof_decode_field_distinguished
                             (
                                 self,
@@ -1078,7 +1096,7 @@ fn try_message_via_oneof(input: DeriveInput) -> Result<TokenStream, Error> {
                                 ctx,
                             )
                         } else {
-                            ctx.check(::bilrost::Canonicity::HasExtensions)
+                            ctx.check(#crate_::Canonicity::HasExtensions)
                         }
                     }
                 }
@@ -1088,19 +1106,19 @@ fn try_message_via_oneof(input: DeriveInput) -> Result<TokenStream, Error> {
         quote! {
             #impl_owned_decoder
 
-            impl #borrow_generics ::bilrost::encoding::RawDistinguishedMessageBorrowDecoder<'__a>
+            impl #borrow_generics #crate_::encoding::RawDistinguishedMessageBorrowDecoder<'__a>
             for #ident #ty_generics #borrowed_decoder_where_clause {
                 #[inline(always)]
                 fn raw_borrow_decode_field_distinguished(
                     &mut self,
                     tag: u32,
-                    wire_type: ::bilrost::encoding::WireType,
+                    wire_type: #crate_::encoding::WireType,
                     _duplicated: bool,
-                    buf: ::bilrost::encoding::Capped<&'__a [u8]>,
-                    ctx: ::bilrost::encoding::RestrictedDecodeContext,
-                ) -> ::core::result::Result<::bilrost::Canonicity, ::bilrost::DecodeError> {
-                    if <Self as ::bilrost::encoding::Oneof>::FIELD_TAGS.contains(&tag) {
-                        <Self as ::bilrost::encoding::DistinguishedOneofBorrowDecoder>::
+                    buf: #crate_::encoding::Capped<&'__a [u8]>,
+                    ctx: #crate_::encoding::RestrictedDecodeContext,
+                ) -> ::core::result::Result<#crate_::Canonicity, #crate_::DecodeError> {
+                    if <Self as #crate_::encoding::Oneof>::FIELD_TAGS.contains(&tag) {
+                        <Self as #crate_::encoding::DistinguishedOneofBorrowDecoder>::
                             oneof_borrow_decode_field_distinguished
                         (
                             self,
@@ -1110,7 +1128,7 @@ fn try_message_via_oneof(input: DeriveInput) -> Result<TokenStream, Error> {
                             ctx,
                         )
                     } else {
-                        ctx.check(::bilrost::Canonicity::HasExtensions)
+                        ctx.check(#crate_::Canonicity::HasExtensions)
                     }
                 }
             }
@@ -1130,6 +1148,7 @@ pub fn message(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 }
 
 fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
+    let crate_ = CRATE;
     let input: DeriveInput = parse2(input)?;
     let ident = input.ident;
 
@@ -1194,7 +1213,7 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
     // directly with an arbitrary variant.
     let creation_impl = if let Some(zero) = &zero_variant_ident {
         quote! {
-            impl #impl_generics ::bilrost::encoding::ForOverwrite
+            impl #impl_generics #crate_::encoding::ForOverwrite
             for #ident #ty_generics #where_clause {
                 #[inline]
                 fn for_overwrite() -> Self {
@@ -1202,7 +1221,7 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
                 }
             }
 
-            impl #impl_generics ::bilrost::encoding::EmptyState
+            impl #impl_generics #crate_::encoding::EmptyState
             for #ident #ty_generics #where_clause {
                 #[inline]
                 fn is_empty(&self) -> bool {
@@ -1218,7 +1237,7 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
     } else {
         let (first_variant, _) = variants.first().unwrap();
         quote! {
-            impl #impl_generics ::bilrost::encoding::ForOverwrite
+            impl #impl_generics #crate_::encoding::ForOverwrite
             for #ident #ty_generics #where_clause {
                 fn for_overwrite() -> Self {
                     Self::#first_variant
@@ -1228,7 +1247,7 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
     };
 
     let expanded = quote! {
-        impl #impl_generics ::bilrost::Enumeration for #ident #ty_generics #where_clause {
+        impl #impl_generics #crate_::Enumeration for #ident #ty_generics #where_clause {
             #[inline]
             fn to_number(&self) -> u32 {
                 match self {
@@ -1257,59 +1276,59 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
 
         #creation_impl
 
-        impl #impl_generics ::bilrost::encoding::Wiretyped<::bilrost::encoding::General>
+        impl #impl_generics #crate_::encoding::Wiretyped<#crate_::encoding::General>
         for #ident #ty_generics #where_clause {
-            const WIRE_TYPE: ::bilrost::encoding::WireType = ::bilrost::encoding::WireType::Varint;
+            const WIRE_TYPE: #crate_::encoding::WireType = #crate_::encoding::WireType::Varint;
         }
 
-        impl #impl_generics ::bilrost::encoding::ValueEncoder<::bilrost::encoding::General>
+        impl #impl_generics #crate_::encoding::ValueEncoder<#crate_::encoding::General>
         for #ident #ty_generics #where_clause {
             #[inline]
-            fn encode_value<__B: ::bilrost::bytes::BufMut + ?Sized>(value: &Self, buf: &mut __B) {
-                ::bilrost::encoding::encode_varint(
-                    ::bilrost::Enumeration::to_number(value) as u64,
+            fn encode_value<__B: #crate_::bytes::BufMut + ?Sized>(value: &Self, buf: &mut __B) {
+                #crate_::encoding::encode_varint(
+                    #crate_::Enumeration::to_number(value) as u64,
                     buf,
                 );
             }
 
             #[inline]
-            fn prepend_value<__B: ::bilrost::buf::ReverseBuf + ?Sized>(
+            fn prepend_value<__B: #crate_::buf::ReverseBuf + ?Sized>(
                 value: &Self,
                 buf: &mut __B,
             ) {
-                ::bilrost::encoding::prepend_varint(
-                    ::bilrost::Enumeration::to_number(value) as u64,
+                #crate_::encoding::prepend_varint(
+                    #crate_::Enumeration::to_number(value) as u64,
                     buf,
                 );
             }
 
             #[inline]
             fn value_encoded_len(value: &Self) -> usize {
-                ::bilrost::encoding::encoded_len_varint(
-                    ::bilrost::encoding::Enumeration::to_number(value) as u64
+                #crate_::encoding::encoded_len_varint(
+                    #crate_::encoding::Enumeration::to_number(value) as u64
                 )
             }
         }
 
-        impl #impl_generics ::bilrost::encoding::ValueDecoder<::bilrost::encoding::General>
+        impl #impl_generics #crate_::encoding::ValueDecoder<#crate_::encoding::General>
         for #ident #ty_generics #where_clause {
             #[inline]
-            fn decode_value<__B: ::bilrost::bytes::Buf + ?Sized>(
+            fn decode_value<__B: #crate_::bytes::Buf + ?Sized>(
                 value: &mut Self,
-                mut buf: ::bilrost::encoding::Capped<__B>,
-                _ctx: ::bilrost::encoding::DecodeContext,
-            ) -> Result<(), ::bilrost::DecodeError> {
+                mut buf: #crate_::encoding::Capped<__B>,
+                _ctx: #crate_::encoding::DecodeContext,
+            ) -> Result<(), #crate_::DecodeError> {
                 let decoded = buf.decode_varint()?;
                 let ::core::result::Result::Ok(in_range) = u32::try_from(decoded) else {
                     return ::core::result::Result::Err(
-                        ::bilrost::DecodeErrorKind::OutOfDomainValue.into()
+                        #crate_::DecodeErrorKind::OutOfDomainValue.into()
                     );
                 };
-                let ::core::result::Result::Ok(typed) = <Self as ::bilrost::Enumeration>::
+                let ::core::result::Result::Ok(typed) = <Self as #crate_::Enumeration>::
                     try_from_number
                 (in_range) else {
                     return ::core::result::Result::Err(
-                        ::bilrost::DecodeErrorKind::OutOfDomainValue.into()
+                        #crate_::DecodeErrorKind::OutOfDomainValue.into()
                     );
                 };
                 *value = typed;
@@ -1318,35 +1337,35 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
         }
 
         impl #impl_generics
-        ::bilrost::encoding::DistinguishedValueDecoder<::bilrost::encoding::General>
+        #crate_::encoding::DistinguishedValueDecoder<#crate_::encoding::General>
         for #ident #ty_generics #where_clause {
             const CHECKS_EMPTY: bool = false;
 
             #[inline]
             fn decode_value_distinguished<const ALLOW_EMPTY: bool>(
                 value: &mut Self,
-                buf: ::bilrost::encoding::Capped<impl ::bilrost::bytes::Buf + ?Sized>,
-                ctx: ::bilrost::encoding::RestrictedDecodeContext,
-            ) -> Result<::bilrost::Canonicity, ::bilrost::DecodeError> {
-                ::bilrost::encoding::ValueDecoder::<::bilrost::encoding::General>::decode_value(
+                buf: #crate_::encoding::Capped<impl #crate_::bytes::Buf + ?Sized>,
+                ctx: #crate_::encoding::RestrictedDecodeContext,
+            ) -> Result<#crate_::Canonicity, #crate_::DecodeError> {
+                #crate_::encoding::ValueDecoder::<#crate_::encoding::General>::decode_value(
                     value,
                     buf,
                     ctx.into_inner(),
                 )?;
-                ::core::result::Result::Ok(::bilrost::Canonicity::Canonical)
+                ::core::result::Result::Ok(#crate_::Canonicity::Canonical)
             }
         }
 
         impl #borrow_generics
-        ::bilrost::encoding::ValueBorrowDecoder<'__a, ::bilrost::encoding::General>
+        #crate_::encoding::ValueBorrowDecoder<'__a, #crate_::encoding::General>
         for #ident #ty_generics #where_clause {
             #[inline(always)]
             fn borrow_decode_value(
                 value: &mut Self,
-                mut buf: ::bilrost::encoding::Capped<&'__a [u8]>,
-                ctx: ::bilrost::encoding::DecodeContext,
-            ) -> Result<(), ::bilrost::DecodeError> {
-                ::bilrost::encoding::ValueDecoder::<::bilrost::encoding::General>::decode_value(
+                mut buf: #crate_::encoding::Capped<&'__a [u8]>,
+                ctx: #crate_::encoding::DecodeContext,
+            ) -> Result<(), #crate_::DecodeError> {
+                #crate_::encoding::ValueDecoder::<#crate_::encoding::General>::decode_value(
                     value,
                     buf,
                     ctx,
@@ -1355,22 +1374,22 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
         }
 
         impl #borrow_generics
-        ::bilrost::encoding::DistinguishedValueBorrowDecoder<'__a, ::bilrost::encoding::General>
+        #crate_::encoding::DistinguishedValueBorrowDecoder<'__a, #crate_::encoding::General>
         for #ident #ty_generics #where_clause {
             const CHECKS_EMPTY: bool = false;
 
             #[inline(always)]
             fn borrow_decode_value_distinguished<const ALLOW_EMPTY: bool>(
                 value: &mut Self,
-                buf: ::bilrost::encoding::Capped<&'__a [u8]>,
-                ctx: ::bilrost::encoding::RestrictedDecodeContext,
-            ) -> Result<::bilrost::Canonicity, ::bilrost::DecodeError> {
-                ::bilrost::encoding::ValueDecoder::<::bilrost::encoding::General>::decode_value(
+                buf: #crate_::encoding::Capped<&'__a [u8]>,
+                ctx: #crate_::encoding::RestrictedDecodeContext,
+            ) -> Result<#crate_::Canonicity, #crate_::DecodeError> {
+                #crate_::encoding::ValueDecoder::<#crate_::encoding::General>::decode_value(
                     value,
                     buf,
                     ctx.into_inner(),
                 )?;
-                ::core::result::Result::Ok(::bilrost::Canonicity::Canonical)
+                ::core::result::Result::Ok(#crate_::Canonicity::Canonical)
             }
         }
     };
@@ -1538,6 +1557,7 @@ fn preprocess_oneof(input: &DeriveInput) -> Result<PreprocessedOneof, Error> {
 }
 
 fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
+    let crate_ = CRATE;
     let input: DeriveInput = parse2(input)?;
 
     // TODO(widders): support a "message" word attr that converts an enum variant, with possibly
@@ -1636,7 +1656,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         encoded_len.push(quote!(#ident::#empty_ident => 0));
 
         empty_state_impl = Some(quote! {
-            impl #impl_generics ::bilrost::encoding::ForOverwrite
+            impl #impl_generics #crate_::encoding::ForOverwrite
             for #ident #ty_generics #encoder_where_clause {
                 #[inline]
                 fn for_overwrite() -> Self {
@@ -1644,7 +1664,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
                 }
             }
 
-            impl #impl_generics ::bilrost::encoding::EmptyState
+            impl #impl_generics #crate_::encoding::EmptyState
             for #ident #ty_generics #encoder_where_clause {
                 #[inline]
                 fn is_empty(&self) -> bool {
@@ -1738,17 +1758,17 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
                     ::core::result::Result::Err(error) => ::core::result::Result::Err(error),
                 }
             } else {
-                ::core::result::Result::Err(::bilrost::DecodeError::new(
-                    if ::bilrost::encoding::#encoder_trait::oneof_current_tag(value) == #some(tag) {
-                        ::bilrost::DecodeErrorKind::UnexpectedlyRepeated
+                ::core::result::Result::Err(#crate_::DecodeError::new(
+                    if #crate_::encoding::#encoder_trait::oneof_current_tag(value) == #some(tag) {
+                        #crate_::DecodeErrorKind::UnexpectedlyRepeated
                     } else {
-                        ::bilrost::DecodeErrorKind::ConflictingFields
+                        #crate_::DecodeErrorKind::ConflictingFields
                     }
                 ))
             } {
                 ::core::result::Result::Err(mut error) => {
                     let (msg, field) =
-                        <Self as ::bilrost::encoding::#encoder_trait>::oneof_variant_name(tag);
+                        <Self as #crate_::encoding::#encoder_trait>::oneof_variant_name(tag);
                     error.push(msg, field);
                     ::core::result::Result::Err(error)
                 }
@@ -1759,16 +1779,16 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
 
     let impl_owned_decoder = (!borrow_only).then(|| {
         quote! {
-            impl #impl_generics ::bilrost::encoding::#owned_decoder_trait
+            impl #impl_generics #crate_::encoding::#owned_decoder_trait
             for #ident #ty_generics #owned_decoder_where_clause
             {
-                fn oneof_decode_field<__B: ::bilrost::bytes::Buf + ?Sized>(
+                fn oneof_decode_field<__B: #crate_::bytes::Buf + ?Sized>(
                     #decode_field_self_arg
                     tag: u32,
-                    wire_type: ::bilrost::encoding::WireType,
-                    buf: ::bilrost::encoding::Capped<__B>,
-                    ctx: ::bilrost::encoding::DecodeContext,
-                ) -> ::core::result::Result<#decode_field_return_ty, ::bilrost::DecodeError> {
+                    wire_type: #crate_::encoding::WireType,
+                    buf: #crate_::encoding::Capped<__B>,
+                    ctx: #crate_::encoding::DecodeContext,
+                ) -> ::core::result::Result<#decode_field_return_ty, #crate_::DecodeError> {
                     #decode_owned
                 }
             }
@@ -1776,25 +1796,25 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
     });
 
     let impls = quote! {
-        impl #impl_generics ::bilrost::encoding::#encoder_trait
+        impl #impl_generics #crate_::encoding::#encoder_trait
         for #ident #ty_generics #encoder_where_clause
         {
             const FIELD_TAGS: &'static [u32] = &[#(#sorted_tags),*];
 
-            fn oneof_encode<__B: ::bilrost::bytes::BufMut + ?Sized>(
+            fn oneof_encode<__B: #crate_::bytes::BufMut + ?Sized>(
                 &self,
                 buf: &mut __B,
-                tw: &mut ::bilrost::encoding::TagWriter,
+                tw: &mut #crate_::encoding::TagWriter,
             ) {
                 match self {
                     #(#encode,)*
                 }
             }
 
-            fn oneof_prepend<__B: ::bilrost::buf::ReverseBuf + ?Sized>(
+            fn oneof_prepend<__B: #crate_::buf::ReverseBuf + ?Sized>(
                 &self,
                 buf: &mut __B,
-                tw: &mut ::bilrost::encoding::TagRevWriter,
+                tw: &mut #crate_::encoding::TagRevWriter,
             ) {
                 match self {
                     #(#prepend,)*
@@ -1803,7 +1823,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
 
             fn oneof_encoded_len(
                 &self,
-                tm: &mut impl ::bilrost::encoding::TagMeasurer,
+                tm: &mut impl #crate_::encoding::TagMeasurer,
             ) -> usize {
                 match self {
                     #(#encoded_len,)*
@@ -1826,16 +1846,16 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
 
         #impl_owned_decoder
 
-        impl #borrow_generics ::bilrost::encoding::#borrowed_decoder_trait
+        impl #borrow_generics #crate_::encoding::#borrowed_decoder_trait
         for #ident #ty_generics #borrowed_decoder_where_clause
         {
             fn oneof_borrow_decode_field(
                 #decode_field_self_arg
                 tag: u32,
-                wire_type: ::bilrost::encoding::WireType,
-                buf: ::bilrost::encoding::Capped<&'__a [u8]>,
-                ctx: ::bilrost::encoding::DecodeContext,
-            ) -> ::core::result::Result<#decode_field_return_ty, ::bilrost::DecodeError> {
+                wire_type: #crate_::encoding::WireType,
+                buf: #crate_::encoding::Capped<&'__a [u8]>,
+                ctx: #crate_::encoding::DecodeContext,
+            ) -> ::core::result::Result<#decode_field_return_ty, #crate_::DecodeError> {
                 #decode_borrowed
             }
         }
@@ -1843,46 +1863,45 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         #empty_state_impl
     };
 
-    let distinguished_impls =
-        distinguished.then(|| {
-            let owned_decoder_trait;
-            let borrowed_decoder_trait;
-            let relaxed_oneof_trait; // we must reference the parent trait for `oneof_current_tag`
-            let decode_field_self_arg;
-            let decode_field_return_ty;
-            let some; // oneofs that have empty states return Option<u32> from `oneof_current_tag`
-            let owned_decoder_where_clause;
-            let borrowed_decoder_where_clause;
-            if empty_variant.is_some() {
-                owned_decoder_trait = quote!(DistinguishedOneofDecoder);
-                borrowed_decoder_trait = quote!(DistinguishedOneofBorrowDecoder<'__a>);
-                relaxed_oneof_trait = quote!(Oneof);
-                decode_field_self_arg = Some(quote!(value: &mut Self,));
-                decode_field_return_ty = quote!(::bilrost::Canonicity);
-                some = Some(quote!(::core::option::Option::Some));
-                [owned_decoder_where_clause, borrowed_decoder_where_clause] = [Owned, Borrowed]
-                    .map(|lifetime| {
-                        append_wheres(
-                            where_clause,
-                            Some(quote!(Self: ::bilrost::encoding::Oneof)),
-                            &fields,
-                            Decode(lifetime, Distinguished),
-                        )
-                    });
-            } else {
-                owned_decoder_trait = quote!(NonEmptyDistinguishedOneofDecoder);
-                borrowed_decoder_trait = quote!(NonEmptyDistinguishedOneofBorrowDecoder<'__a>);
-                relaxed_oneof_trait = quote!(NonEmptyOneof);
-                decode_field_self_arg = None;
-                decode_field_return_ty = quote!((Self, ::bilrost::Canonicity));
-                some = None;
-                [owned_decoder_where_clause, borrowed_decoder_where_clause] = [Owned, Borrowed]
-                    .map(|lifetime| {
-                        append_wheres(where_clause, None, &fields, Decode(lifetime, Distinguished))
-                    });
-            };
+    let distinguished_impls = distinguished.then(|| {
+        let owned_decoder_trait;
+        let borrowed_decoder_trait;
+        let relaxed_oneof_trait; // we must reference the parent trait for `oneof_current_tag`
+        let decode_field_self_arg;
+        let decode_field_return_ty;
+        let some; // oneofs that have empty states return Option<u32> from `oneof_current_tag`
+        let owned_decoder_where_clause;
+        let borrowed_decoder_where_clause;
+        if empty_variant.is_some() {
+            owned_decoder_trait = quote!(DistinguishedOneofDecoder);
+            borrowed_decoder_trait = quote!(DistinguishedOneofBorrowDecoder<'__a>);
+            relaxed_oneof_trait = quote!(Oneof);
+            decode_field_self_arg = Some(quote!(value: &mut Self,));
+            decode_field_return_ty = quote!(#crate_::Canonicity);
+            some = Some(quote!(::core::option::Option::Some));
+            [owned_decoder_where_clause, borrowed_decoder_where_clause] =
+                [Owned, Borrowed].map(|lifetime| {
+                    append_wheres(
+                        where_clause,
+                        Some(quote!(Self: #crate_::encoding::Oneof)),
+                        &fields,
+                        Decode(lifetime, Distinguished),
+                    )
+                });
+        } else {
+            owned_decoder_trait = quote!(NonEmptyDistinguishedOneofDecoder);
+            borrowed_decoder_trait = quote!(NonEmptyDistinguishedOneofBorrowDecoder<'__a>);
+            relaxed_oneof_trait = quote!(NonEmptyOneof);
+            decode_field_self_arg = None;
+            decode_field_return_ty = quote!((Self, #crate_::Canonicity));
+            some = None;
+            [owned_decoder_where_clause, borrowed_decoder_where_clause] =
+                [Owned, Borrowed].map(|lifetime| {
+                    append_wheres(where_clause, None, &fields, Decode(lifetime, Distinguished))
+                });
+        };
 
-            let [decode_owned, decode_borrowed] = match empty_variant {
+        let [decode_owned, decode_borrowed] = match empty_variant {
             None => [
                 decode_arms(Owned, Distinguished),
                 decode_arms(Borrowed, Distinguished),
@@ -1905,19 +1924,19 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
                             },
                         }
                     } else {
-                        ::core::result::Result::Err(::bilrost::DecodeError::new(
-                            if ::bilrost::encoding::#relaxed_oneof_trait::oneof_current_tag(value)
+                        ::core::result::Result::Err(#crate_::DecodeError::new(
+                            if #crate_::encoding::#relaxed_oneof_trait::oneof_current_tag(value)
                                 == #some(tag)
                             {
-                                ::bilrost::DecodeErrorKind::UnexpectedlyRepeated
+                                #crate_::DecodeErrorKind::UnexpectedlyRepeated
                             } else {
-                                ::bilrost::DecodeErrorKind::ConflictingFields
+                                #crate_::DecodeErrorKind::ConflictingFields
                             }
                         ))
                     } {
                         ::core::result::Result::Err(mut error) => {
                             let (msg, field) =
-                                <Self as ::bilrost::encoding::#relaxed_oneof_trait>::
+                                <Self as #crate_::encoding::#relaxed_oneof_trait>::
                                     oneof_variant_name(tag);
                             error.push(msg, field);
                             ::core::result::Result::Err(error)
@@ -1928,40 +1947,42 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
             }),
         };
 
-            let impl_owned_decoder = (!borrow_only).then(|| quote! {
-            impl #impl_generics ::bilrost::encoding::#owned_decoder_trait
-            for #ident #ty_generics #owned_decoder_where_clause
-            {
-                fn oneof_decode_field_distinguished<__B: ::bilrost::bytes::Buf + ?Sized>(
-                    #decode_field_self_arg
-                    tag: u32,
-                    wire_type: ::bilrost::encoding::WireType,
-                    buf: ::bilrost::encoding::Capped<__B>,
-                    ctx: ::bilrost::encoding::RestrictedDecodeContext,
-                ) -> ::core::result::Result<#decode_field_return_ty, ::bilrost::DecodeError> {
-                    #decode_owned
-                }
-            }
-        });
-
+        let impl_owned_decoder = (!borrow_only).then(|| {
             quote! {
-                #impl_owned_decoder
-
-                impl #borrow_generics ::bilrost::encoding::#borrowed_decoder_trait
-                for #ident #ty_generics #borrowed_decoder_where_clause
+                impl #impl_generics #crate_::encoding::#owned_decoder_trait
+                for #ident #ty_generics #owned_decoder_where_clause
                 {
-                    fn oneof_borrow_decode_field_distinguished(
+                    fn oneof_decode_field_distinguished<__B: #crate_::bytes::Buf + ?Sized>(
                         #decode_field_self_arg
                         tag: u32,
-                        wire_type: ::bilrost::encoding::WireType,
-                        buf: ::bilrost::encoding::Capped<&'__a [u8]>,
-                        ctx: ::bilrost::encoding::RestrictedDecodeContext,
-                    ) -> ::core::result::Result<#decode_field_return_ty, ::bilrost::DecodeError> {
-                        #decode_borrowed
+                        wire_type: #crate_::encoding::WireType,
+                        buf: #crate_::encoding::Capped<__B>,
+                        ctx: #crate_::encoding::RestrictedDecodeContext,
+                    ) -> ::core::result::Result<#decode_field_return_ty, #crate_::DecodeError> {
+                        #decode_owned
                     }
                 }
             }
         });
+
+        quote! {
+            #impl_owned_decoder
+
+            impl #borrow_generics #crate_::encoding::#borrowed_decoder_trait
+            for #ident #ty_generics #borrowed_decoder_where_clause
+            {
+                fn oneof_borrow_decode_field_distinguished(
+                    #decode_field_self_arg
+                    tag: u32,
+                    wire_type: #crate_::encoding::WireType,
+                    buf: #crate_::encoding::Capped<&'__a [u8]>,
+                    ctx: #crate_::encoding::RestrictedDecodeContext,
+                ) -> ::core::result::Result<#decode_field_return_ty, #crate_::DecodeError> {
+                    #decode_borrowed
+                }
+            }
+        }
+    });
 
     let aliases = encoder_alias_header();
     Ok(quote! {
@@ -1993,6 +2014,7 @@ struct DecoderForOneof<'a> {
 
 impl ToTokens for DecoderForOneof<'_> {
     fn to_tokens(&self, tokens: &mut TokenStream) {
+        let crate_ = CRATE;
         let ident = self.ident;
         let variant_ident = self.variant_ident;
         let field = self.field;
@@ -2009,7 +2031,7 @@ impl ToTokens for DecoderForOneof<'_> {
         tokens.append_all(match self.mode {
             Relaxed => quote! {
                 #tag => {
-                    let mut new_value = ::bilrost::encoding::ForOverwrite::for_overwrite();
+                    let mut new_value = #crate_::encoding::ForOverwrite::for_overwrite();
                     match #decode {
                         ::core::result::Result::Ok(()) => {
                             ::core::result::Result::Ok(#ident::#variant_ident #with_new_value)
@@ -2020,7 +2042,7 @@ impl ToTokens for DecoderForOneof<'_> {
             },
             Distinguished => quote! {
                 #tag => {
-                    let mut new_value = ::bilrost::encoding::ForOverwrite::for_overwrite();
+                    let mut new_value = #crate_::encoding::ForOverwrite::for_overwrite();
                     match #decode {
                         ::core::result::Result::Ok(canon) => ::core::result::Result::Ok((
                             #ident::#variant_ident #with_new_value,

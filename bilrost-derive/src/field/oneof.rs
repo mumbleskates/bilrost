@@ -1,11 +1,3 @@
-use alloc::vec;
-use alloc::vec::Vec;
-
-use eyre::{bail, Error};
-use proc_macro2::TokenStream;
-use quote::quote;
-use syn::{Meta, Type};
-
 use crate::attrs::tag_list_attr;
 use crate::field::{
     set_option,
@@ -13,6 +5,13 @@ use crate::field::{
     DecodeMode::{self, Distinguished, Relaxed},
     WhereFor::{self, Decode, Encode},
 };
+use crate::CRATE;
+use alloc::vec;
+use alloc::vec::Vec;
+use eyre::{bail, Error};
+use proc_macro2::TokenStream;
+use quote::quote;
+use syn::{Meta, Type};
 
 #[derive(Clone)]
 pub struct Field {
@@ -52,15 +51,17 @@ impl Field {
 
     /// Returns a statement which encodes the oneof field.
     pub fn encode(&self, ident: TokenStream) -> TokenStream {
+        let crate_ = CRATE;
         quote! {
-            ::bilrost::encoding::Oneof::oneof_encode(&#ident, buf, tw);
+            #crate_::encoding::Oneof::oneof_encode(&#ident, buf, tw);
         }
     }
 
     /// Returns a statement which prepends the oneof field.
     pub fn prepend(&self, ident: TokenStream) -> TokenStream {
+        let crate_ = CRATE;
         quote! {
-            ::bilrost::encoding::Oneof::oneof_prepend(&#ident, buf, tw);
+            #crate_::encoding::Oneof::oneof_prepend(&#ident, buf, tw);
         }
     }
 
@@ -71,6 +72,7 @@ impl Field {
         lifetime: DecodeLifetime,
         mode: DecodeMode,
     ) -> TokenStream {
+        let crate_ = CRATE;
         let (trait_name, call) = match (lifetime, mode) {
             (Owned, Relaxed) => (quote!(OneofDecoder), quote!(oneof_decode_field)),
             (Borrowed, Relaxed) => (
@@ -86,36 +88,39 @@ impl Field {
                 quote!(oneof_borrow_decode_field_distinguished),
             ),
         };
-        quote!(::bilrost::encoding::#trait_name::#call(#ident, tag, wire_type, buf, ctx))
+        quote!(#crate_::encoding::#trait_name::#call(#ident, tag, wire_type, buf, ctx))
     }
 
     /// Returns an expression which evaluates to the encoded length of the oneof field.
     pub fn encoded_len(&self, ident: TokenStream) -> TokenStream {
-        quote!(::bilrost::encoding::Oneof::oneof_encoded_len(&#ident, tm))
+        let crate_ = CRATE;
+        quote!(#crate_::encoding::Oneof::oneof_encoded_len(&#ident, tm))
     }
 
     /// Returns an expression which evaluates to an Option<u32> of the tag of the (maybe) present
     /// field in the oneof.
     pub fn current_tag(&self, ident: TokenStream) -> TokenStream {
-        quote!(::bilrost::encoding::Oneof::oneof_current_tag(&#ident))
+        let crate_ = CRATE;
+        quote!(#crate_::encoding::Oneof::oneof_current_tag(&#ident))
     }
 
     /// Returns the where clause constraint term for the field really implementing the oneof trait.
     pub fn where_terms(&self, purpose: WhereFor) -> Vec<TokenStream> {
+        let crate_ = CRATE;
         let ty = &self.ty;
         vec![match purpose {
-            Encode => quote!(#ty: ::bilrost::encoding::Oneof),
+            Encode => quote!(#ty: #crate_::encoding::Oneof),
             Decode(Owned, Relaxed) => {
-                quote!(#ty: ::bilrost::encoding::OneofDecoder)
+                quote!(#ty: #crate_::encoding::OneofDecoder)
             }
             Decode(Borrowed, Relaxed) => {
-                quote!(#ty: ::bilrost::encoding::OneofBorrowDecoder<'__a>)
+                quote!(#ty: #crate_::encoding::OneofBorrowDecoder<'__a>)
             }
             Decode(Owned, Distinguished) => {
-                quote!(#ty: ::bilrost::encoding::DistinguishedOneofDecoder)
+                quote!(#ty: #crate_::encoding::DistinguishedOneofDecoder)
             }
             Decode(Borrowed, Distinguished) => {
-                quote!(#ty: ::bilrost::encoding::DistinguishedOneofBorrowDecoder<'__a>)
+                quote!(#ty: #crate_::encoding::DistinguishedOneofBorrowDecoder<'__a>)
             }
         }]
     }
