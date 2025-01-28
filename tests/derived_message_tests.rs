@@ -1332,7 +1332,7 @@ fn truncated_nested_varint() {
         // \xff...: data that will be greedily decoded as an valid varint that still runs over.
         &b"\x05\x04\x04\xff\xff\xff\xff\xff\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09"[..];
     let invalid_not_truncated =
-        // \x05: field 1, length-delimited; \x0a: 0 bytes; \x04: field 1, varint;
+        // \x05: field 1, length-delimited; \x0a: 10 bytes; \x04: field 1, varint;
         // \xff...: an invalid varint
         &b"\x05\x0a\x04\xff\xff\xff\xff\xff\xff\xff\xff\xff"[..];
 
