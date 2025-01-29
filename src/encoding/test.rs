@@ -11,7 +11,7 @@ use crate::DecodeErrorKind::{
 use crate::{Blob, Canonicity, DecodeError};
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::format;
-use alloc::string::{String, ToString};
+use alloc::string::String;
 use alloc::vec::Vec;
 use bytes::{Buf, BufMut};
 use core::fmt::Debug;
@@ -226,9 +226,7 @@ macro_rules! check_type {
                     let mut buf = Capped::new(&mut slice);
                     let mut tr = TagReader::new();
 
-                    let (decoded_tag, decoded_wire_type) = tr
-                        .decode_key(buf.lend())
-                        .map_err(|error| TestCaseError::fail(error.to_string()))?;
+                    let (decoded_tag, decoded_wire_type) = tr.decode_key(buf.lend())?;
                     prop_assert_eq!(
                         tag,
                         decoded_tag,
@@ -253,8 +251,7 @@ macro_rules! check_type {
                         &mut roundtrip_value,
                         buf.lend(),
                         $context,
-                    )
-                    .map_err(|error| TestCaseError::fail(error.to_string()))?;
+                    )?;
 
                     prop_assert!(
                         !buf.remaining() > 0,
@@ -316,9 +313,7 @@ macro_rules! check_type {
                     let mut tr = TagReader::new();
 
                     let mut roundtrip_value = T::for_overwrite();
-                    let (decoded_tag, decoded_wire_type) = tr
-                        .decode_key(buf.lend())
-                        .map_err(|error| TestCaseError::fail(error.to_string()))?;
+                    let (decoded_tag, decoded_wire_type) = tr.decode_key(buf.lend())?;
 
                     prop_assert_eq!(
                         tag,
@@ -341,8 +336,7 @@ macro_rules! check_type {
                         &mut roundtrip_value,
                         buf.lend(),
                         $context,
-                    )
-                    .map_err(|error| TestCaseError::fail(error.to_string()))?;
+                    )?;
 
                     prop_assert!(
                         !buf.remaining() > 0,
