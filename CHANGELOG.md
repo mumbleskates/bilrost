@@ -2,6 +2,10 @@
 
 ### Breaking changes
 
+* Renamed `OpaqueMessage::{borrowed, convert_to_owned}` to `to_borrowed` and
+  `into_owned` to better match [common naming conventions](
+  https://rust-lang.github.io/api-guidelines/naming.html#ad-hoc-conversions-follow-as_-to_-into_-conventions-c-conv)
+
 ### New features
 
 ### Fixes

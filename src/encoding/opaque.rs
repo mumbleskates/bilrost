@@ -292,13 +292,13 @@ impl<'a> OpaqueMessage<'a> {
         FlatAdapter(self.0.iter_mut()).flatten()
     }
 
-    /// Produces a full copy of the message with all data (re-)borrowed.
-    pub fn borrowed(&self) -> OpaqueMessage {
+    /// Produces a full copy of the message with all borrowable data (re-)borrowed.
+    pub fn to_borrowed(&self) -> OpaqueMessage {
         self.iter().map(|(k, v)| (*k, v.borrow())).collect()
     }
 
     /// Converts this message to a fully owned deep copy.
-    pub fn convert_to_owned(mut self) -> OpaqueMessage<'static> {
+    pub fn into_owned(mut self) -> OpaqueMessage<'static> {
         for (_, value) in self.iter_mut() {
             if let LengthDelimited(delimited) = value {
                 delimited.to_mut();
