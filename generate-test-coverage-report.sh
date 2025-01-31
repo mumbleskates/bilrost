@@ -2,7 +2,7 @@
 
 set -euxo pipefail
 
-cd $(dirname $0)
+cd "$(dirname "$0")"
 cargo install rustfilt
 
 cargo clean
@@ -19,8 +19,8 @@ llvm-profdata merge -sparse \
 
 llvm-cov show --format=html -Xdemangler=rustfilt \
  --instr-profile=coverage/tests/profdata/merged.profdata \
- -object $(ls target/debug/deps/* | \
-    grep -P '^target/debug/deps/(bilrost|derived_message_tests)-[0-9a-f]+$') \
+ -object "$(ls target/debug/deps/* | \
+    grep -P '^target/debug/deps/(bilrost|derived_message_tests)-[0-9a-f]+$')" \
  -sources src \
  --show-line-counts-or-regions \
  --output-dir=coverage/tests

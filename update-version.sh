@@ -15,7 +15,7 @@ VERSION="$1"
 
 # Remove the patch number from the cargo lines in the readme only if it's a plain semver
 if [[ "${VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-  MINOR="$( echo ${VERSION} | cut -d\. -f1-2 )"
+  MINOR="$( echo "${VERSION}" | cut -d\. -f1-2 )"
 else
   MINOR="${VERSION}"
 fi

@@ -4,8 +4,8 @@
 
 set -euxo pipefail
 
-cat msrv-pins.txt | while IFS= read -r LINE; do
+while IFS= read -r LINE; do
   CRATE="$(echo "${LINE}" | cut --delimiter=' ' --fields=1)"
   VERSION="$(echo "${LINE}" | cut --delimiter=' ' --fields=2)"
   cargo update --package "${CRATE}" --precise "${VERSION}"
-done
+done < msrv-pins.txt

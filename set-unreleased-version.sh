@@ -6,7 +6,7 @@
 
 set -euxo pipefail
 
-cd $(dirname $0)
+cd "$(dirname "$0")"
 
 if [ "$#" -ne 1 ]
 then
@@ -30,5 +30,5 @@ cat <(
 ) CHANGELOG.md > NEW_CHANGELOG.md
 mv NEW_CHANGELOG.md CHANGELOG.md
 
-$(dirname $0)/update-version.sh ${VERSION}
+"$(dirname "$0")/update-version.sh" "${VERSION}"
 git commit -a -m "update version to ${VERSION}"

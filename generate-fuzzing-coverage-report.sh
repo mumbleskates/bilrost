@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
-cd $(dirname $0)
+
+set -euxo --pipefail
+
+cd "$(dirname "$0")"
 cargo install rustfilt
 
 cargo fuzz coverage bilrost_fuzz

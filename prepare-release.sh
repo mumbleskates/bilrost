@@ -13,6 +13,6 @@ then
 fi
 VERSION="$1"
 
-$(dirname $0)/update-version.sh ${VERSION}
+"$(dirname "$0")/update-version.sh" "${VERSION}"
 if [[ "$(git status --porcelain)" != "" ]]; then git commit -a -m "release ${VERSION}" ; fi
 git tag -a "v${VERSION}" -m "release ${VERSION}"
