@@ -251,7 +251,7 @@ impl<'a> OpaqueValue<'a> {
     }
 
     /// Converts this value to a fully owned deep copy.
-    pub fn convert_to_owned(self) -> OpaqueValue<'static> {
+    pub fn into_owned(self) -> OpaqueValue<'static> {
         match self {
             Varint(value) => Varint(value),
             LengthDelimited(Cow::Owned(value)) => LengthDelimited(Cow::Owned(value)),
