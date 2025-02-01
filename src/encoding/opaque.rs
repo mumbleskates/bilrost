@@ -29,88 +29,88 @@ pub enum OpaqueValue<'a> {
 
 use OpaqueValue::*;
 
-impl<'a> OpaqueValue<'a> {
-    pub fn u64(value: u64) -> Self {
+impl OpaqueValue<'_> {
+    pub fn u64(value: u64) -> OpaqueValue<'static> {
         Varint(value)
     }
 
-    pub fn i64(value: i64) -> Self {
+    pub fn i64(value: i64) -> OpaqueValue<'static> {
         Varint(super::varint::i64_to_unsigned(value))
     }
 
-    pub fn u32(value: u32) -> Self {
+    pub fn u32(value: u32) -> OpaqueValue<'static> {
         Varint(value.into())
     }
 
-    pub fn i32(value: i32) -> Self {
+    pub fn i32(value: i32) -> OpaqueValue<'static> {
         Varint(super::varint::i64_to_unsigned(value as i64))
     }
 
-    pub fn u16(value: u16) -> Self {
+    pub fn u16(value: u16) -> OpaqueValue<'static> {
         Varint(value.into())
     }
 
-    pub fn i16(value: i16) -> Self {
+    pub fn i16(value: i16) -> OpaqueValue<'static> {
         Varint(super::varint::i64_to_unsigned(value as i64))
     }
 
-    pub fn u8(value: u8) -> Self {
+    pub fn u8(value: u8) -> OpaqueValue<'static> {
         Varint(value.into())
     }
 
-    pub fn i8(value: i8) -> Self {
+    pub fn i8(value: i8) -> OpaqueValue<'static> {
         Varint(super::varint::i64_to_unsigned(value as i64))
     }
 
-    pub fn bool(value: bool) -> Self {
+    pub fn bool(value: bool) -> OpaqueValue<'static> {
         Varint(if value { 1 } else { 0 })
     }
 
-    pub fn fixed_u64(value: u64) -> Self {
+    pub fn fixed_u64(value: u64) -> OpaqueValue<'static> {
         SixtyFourBit(value.to_le_bytes())
     }
 
-    pub fn fixed_i64(value: i64) -> Self {
+    pub fn fixed_i64(value: i64) -> OpaqueValue<'static> {
         SixtyFourBit(value.to_le_bytes())
     }
 
-    pub fn fixed_u32(value: u32) -> Self {
+    pub fn fixed_u32(value: u32) -> OpaqueValue<'static> {
         ThirtyTwoBit(value.to_le_bytes())
     }
 
-    pub fn fixed_i32(value: i32) -> Self {
+    pub fn fixed_i32(value: i32) -> OpaqueValue<'static> {
         ThirtyTwoBit(value.to_le_bytes())
     }
 
-    pub fn f64(value: f64) -> Self {
+    pub fn f64(value: f64) -> OpaqueValue<'static> {
         SixtyFourBit(value.to_le_bytes())
     }
 
-    pub fn f32(value: f32) -> Self {
+    pub fn f32(value: f32) -> OpaqueValue<'static> {
         ThirtyTwoBit(value.to_le_bytes())
     }
 
-    pub fn str(value: &'a str) -> Self {
+    pub fn str(value: &str) -> OpaqueValue<'_> {
         LengthDelimited(Cow::Borrowed(value.as_bytes()))
     }
 
-    pub fn string<S: Into<String>>(value: S) -> Self {
+    pub fn string<S: Into<String>>(value: S) -> OpaqueValue<'static> {
         LengthDelimited(Cow::Owned(value.into().into_bytes()))
     }
 
-    pub fn byte_slice(value: &'a [u8]) -> Self {
+    pub fn byte_slice(value: &[u8]) -> OpaqueValue<'_> {
         LengthDelimited(Cow::Borrowed(value))
     }
 
-    pub fn bytes<B: Into<Vec<u8>>>(value: B) -> Self {
+    pub fn bytes<B: Into<Vec<u8>>>(value: B) -> OpaqueValue<'static> {
         LengthDelimited(Cow::Owned(value.into()))
     }
 
-    pub fn message<M: Message>(value: &M) -> Self {
+    pub fn message<M: Message>(value: &M) -> OpaqueValue<'static> {
         LengthDelimited(Cow::Owned(value.encode_to_vec()))
     }
 
-    pub fn packed<'b, T: IntoIterator<Item = OpaqueValue<'b>>>(items: T) -> Self {
+    pub fn packed<'b, T: IntoIterator<Item = OpaqueValue<'b>>>(items: T) -> OpaqueValue<'static> {
         let mut value = Vec::new();
         for item in items {
             item.encode_value(&mut value);
@@ -185,7 +185,7 @@ impl<'a> OpaqueValue<'a> {
     fn decode_value<B: Buf + ?Sized>(
         wire_type: WireType,
         mut buf: Capped<B>,
-    ) -> Result<Self, DecodeError> {
+    ) -> Result<OpaqueValue<'static>, DecodeError> {
         Ok(match wire_type {
             WireType::Varint => Varint(buf.decode_varint()?),
             WireType::LengthDelimited => {
@@ -212,10 +212,10 @@ impl<'a> OpaqueValue<'a> {
         })
     }
 
-    fn borrow_decode_value(
+    fn borrow_decode_value<'a>(
         wire_type: WireType,
         mut buf: Capped<&'a [u8]>,
-    ) -> Result<Self, DecodeError> {
+    ) -> Result<OpaqueValue<'a>, DecodeError> {
         Ok(match wire_type {
             WireType::Varint => Varint(buf.decode_varint()?),
             WireType::LengthDelimited => {
@@ -241,7 +241,7 @@ impl<'a> OpaqueValue<'a> {
     }
 
     /// Get a copy of this value with borrowed or re-borrowed data.
-    pub fn borrow(&self) -> OpaqueValue {
+    pub fn borrow(&self) -> OpaqueValue<'_> {
         match self {
             Varint(value) => Varint(*value),
             LengthDelimited(value) => LengthDelimited(Cow::Borrowed(value.as_ref())),
