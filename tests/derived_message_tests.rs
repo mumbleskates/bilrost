@@ -1249,7 +1249,7 @@ fn parsing_varints() {
         (5, 1 << 32),
         (6, 1 << 32),
         #[cfg(not(target_pointer_width = "64"))]
-        (7, (usize::MAX as u64) + 1),
+        (9, (usize::MAX as u64) + 1),
         #[cfg(not(target_pointer_width = "64"))]
         (10, (usize::MAX as u64) + 1),
     ] {
