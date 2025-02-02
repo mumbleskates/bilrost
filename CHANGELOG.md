@@ -1,3 +1,10 @@
+## v0.1010.2
+
+### Fixes
+
+* BUGFIX: Message implementations derived for oneof types no longer fail to skip
+  the data in unknown fields that the mssage also contains.
+
 ## v0.1010.1
 
 ### Cleanups
