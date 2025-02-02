@@ -3502,6 +3502,10 @@ fn oneof_as_message() {
         UnexpectedlyRepeated,
         "AB.A",
     );
+    // This test is very important: the second field is an extension that must be skipped correctly.
+    // If it is not consumed when it should be skipped and is instead read as if it were a bunch of
+    // field keys, it acts as a poison pill that is consumed all at once as an invalid varint,
+    // throwing an error instead.
     assert::decodes!(
         owned non-canonically,
         [(1, OV::bool(true)), (99, OV::bytes([0xff; 16]))],
