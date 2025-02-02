@@ -1,11 +1,11 @@
 use crate::attrs::{named_attr, tag_attr, word_attr};
+use crate::crate_name;
 use crate::field::{
     set_bool, set_option,
     DecodeLifetime::{self, Borrowed, Owned},
     DecodeMode::{self, Distinguished, Relaxed},
     WhereFor::{self, Decode, Encode},
 };
-use crate::CRATE;
 use alloc::format;
 use alloc::string::ToString;
 use alloc::vec;
@@ -146,7 +146,7 @@ impl Field {
 
     /// Returns a statement which encodes the field using buffer `buf` and tag writer `tw`.
     pub fn encode(&self, ident: TokenStream) -> TokenStream {
-        let crate_ = CRATE;
+        let crate_ = crate_name();
         let tag = self.tag;
         let encoder = &self.encoding;
         let ty = &self.ty;
@@ -168,7 +168,7 @@ impl Field {
 
     /// Returns a statement which encodes the field using buffer `buf` and tag writer `tw`.
     pub fn prepend(&self, ident: TokenStream) -> TokenStream {
-        let crate_ = CRATE;
+        let crate_ = crate_name();
         let tag = self.tag;
         let encoder = &self.encoding;
         let ty = &self.ty;
@@ -201,7 +201,7 @@ impl Field {
         lifetime: DecodeLifetime,
         mode: DecodeMode,
     ) -> TokenStream {
-        let crate_ = CRATE;
+        let crate_ = crate_name();
         let encoding = &self.encoding;
         let ty = &self.ty;
         let (decoder_trait, call) = if self.in_oneof {
@@ -258,7 +258,7 @@ impl Field {
     /// Returns an expression which evaluates to the encoded length of the field. The given ident
     /// must be the location name of the field value, not a reference.
     pub fn encoded_len(&self, ident: TokenStream) -> TokenStream {
-        let crate_ = CRATE;
+        let crate_ = crate_name();
         let tag = self.tag;
         let encoder = &self.encoding;
         let ty = &self.ty;
@@ -279,7 +279,7 @@ impl Field {
 
     /// Returns the where clause constraint terms for the field's encoder.
     pub fn where_terms(&self, purpose: WhereFor) -> Vec<TokenStream> {
-        let crate_ = CRATE;
+        let crate_ = crate_name();
         if self.recurses {
             return vec![];
         }
@@ -340,7 +340,7 @@ impl Field {
     /// Returns methods to embed in the message. `ident` must be the name of the field within the
     /// message struct.
     pub fn methods(&self, ident: &TokenStream) -> Option<TokenStream> {
-        let crate_ = CRATE;
+        let crate_ = crate_name();
         let enumeration_ty = self.enumeration_ty.as_ref()?;
 
         let ident_str = ident.to_string();

@@ -29,7 +29,6 @@ use core::mem::take;
 use core::ops::{Deref, RangeInclusive};
 use eyre::{bail, eyre as err, Error};
 use itertools::Itertools;
-use once_cell::sync::Lazy;
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, ToTokens, TokenStreamExt};
 use syn::{
@@ -41,19 +40,9 @@ use syn::{
 mod attrs;
 mod field;
 
-struct Tokenable<T>(T);
-
-impl<T> ToTokens for Tokenable<T>
-where
-    T: Deref,
-    T::Target: ToTokens,
-{
-    fn to_tokens(&self, tokens: &mut TokenStream) {
-        self.0.to_tokens(tokens);
-    }
+fn crate_name() -> TokenStream {
+    quote!(::bilrost)
 }
-
-const CRATE: Tokenable<Lazy<TokenStream>> = Tokenable(Lazy::new(|| quote!(::bilrost)));
 
 /// Helper type to ensure a value is used at runtime.
 struct MustMove<T>(Option<T>);
@@ -90,7 +79,7 @@ impl<T> Deref for MustMove<T> {
 /// simultaneously easier to spell when writing the field attributes and making them less likely to
 /// shadow custom encoder types.
 fn encoder_alias_header() -> TokenStream {
-    let crate_ = CRATE;
+    let crate_ = crate_name();
     quote! {
         use #crate_::encoding::{
             Fixed as fixed,
@@ -424,7 +413,7 @@ fn append_generic(generics: &Generics, ident: TokenStream) -> TokenStream {
 }
 
 fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
-    let crate_ = CRATE;
+    let crate_ = crate_name();
     let input: DeriveInput = parse2(input)?;
 
     if let Data::Enum(..) = input.data {
@@ -921,7 +910,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
 }
 
 fn try_message_via_oneof(input: DeriveInput) -> Result<TokenStream, Error> {
-    let crate_ = CRATE;
+    let crate_ = crate_name();
     let PreprocessedOneof {
         ident,
         impl_generics,
@@ -1152,7 +1141,7 @@ pub fn message(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 }
 
 fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
-    let crate_ = CRATE;
+    let crate_ = crate_name();
     let input: DeriveInput = parse2(input)?;
     let ident = input.ident;
 
@@ -1561,7 +1550,7 @@ fn preprocess_oneof(input: &DeriveInput) -> Result<PreprocessedOneof, Error> {
 }
 
 fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
-    let crate_ = CRATE;
+    let crate_ = crate_name();
     let input: DeriveInput = parse2(input)?;
 
     // TODO(widders): support a "message" word attr that converts an enum variant, with possibly
@@ -2018,7 +2007,7 @@ struct DecoderForOneof<'a> {
 
 impl ToTokens for DecoderForOneof<'_> {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        let crate_ = CRATE;
+        let crate_ = crate_name();
         let ident = self.ident;
         let variant_ident = self.variant_ident;
         let field = self.field;

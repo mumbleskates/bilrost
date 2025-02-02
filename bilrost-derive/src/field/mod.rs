@@ -1,4 +1,4 @@
-use crate::CRATE;
+use crate::crate_name;
 use alloc::fmt::Debug;
 use alloc::format;
 use alloc::string::{String, ToString};
@@ -96,7 +96,7 @@ impl Field {
     }
 
     pub fn tag_list_guard(&self, field_name: String) -> Option<TokenStream> {
-        let crate_ = CRATE;
+        let crate_ = crate_name();
         match self {
             Field::Oneof(field) => {
                 let mut tags = self.tags();
