@@ -968,9 +968,9 @@ fn parsing_varints() {
         (4, 65536),
         (5, 1 << 32),
         (6, 1 << 32),
-        #[cfg(nottarget_pointer_width = "64")]
-        (7, (usize::MAX as u64) + 1),
-        #[cfg(nottarget_pointer_width = "64")]
+        #[cfg(not(target_pointer_width = "64"))]
+        (9, (usize::MAX as u64) + 1),
+        #[cfg(not(target_pointer_width = "64"))]
         (10, (usize::MAX as u64) + 1),
     ] {
         assert::never_decodes::<Foo>(

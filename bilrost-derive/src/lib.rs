@@ -2031,7 +2031,7 @@ mod test {
                 B,
                 #[bilrost(2 + 1)]
                 C,
-                #[bilrost(SomeType<T>::SOME_CONSTANT)]
+                #[bilrost(SomeType::<T>::SOME_CONSTANT)]
                 D,
             }
         ))
@@ -2047,7 +2047,7 @@ mod test {
                 B,
                 #[bilrost(2 + 1)]
                 C,
-                #[bilrost(SomeType<T>::SOME_CONSTANT)]
+                #[bilrost(SomeType::<T>::SOME_CONSTANT)]
                 D,
                 HasNoValue,
             }
