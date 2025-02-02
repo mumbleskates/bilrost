@@ -984,7 +984,7 @@ fn try_message_via_oneof(input: DeriveInput) -> Result<TokenStream, Error> {
                             ctx,
                         )
                     } else {
-                        ::core::result::Result::Ok(())
+                        #crate_::encoding::skip_field(wire_type, buf)
                     }
                 }
             }
@@ -1049,7 +1049,7 @@ fn try_message_via_oneof(input: DeriveInput) -> Result<TokenStream, Error> {
                         ctx,
                     )
                 } else {
-                    ::core::result::Result::Ok(())
+                    #crate_::encoding::skip_field(wire_type, buf)
                 }
             }
         }
@@ -1096,7 +1096,9 @@ fn try_message_via_oneof(input: DeriveInput) -> Result<TokenStream, Error> {
                                 ctx,
                             )
                         } else {
-                            ctx.check(#crate_::Canonicity::HasExtensions)
+                            _ = ctx.check(#crate_::Canonicity::HasExtensions)?;
+                            #crate_::encoding::skip_field(wire_type, buf)?;
+                            ::core::result::Result::Ok(#crate_::Canonicity::HasExtensions)
                         }
                     }
                 }
@@ -1128,7 +1130,9 @@ fn try_message_via_oneof(input: DeriveInput) -> Result<TokenStream, Error> {
                             ctx,
                         )
                     } else {
-                        ctx.check(#crate_::Canonicity::HasExtensions)
+                        _ = ctx.check(#crate_::Canonicity::HasExtensions)?;
+                        #crate_::encoding::skip_field(wire_type, buf)?;
+                        ::core::result::Result::Ok(#crate_::Canonicity::HasExtensions)
                     }
                 }
             }
