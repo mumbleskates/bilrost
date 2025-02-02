@@ -2830,6 +2830,11 @@ fn oneof_as_message() {
         UnexpectedlyRepeated,
         "AB.A",
     );
+    assert::decodes_non_canonically(
+        [(1, OV::bool(true)), (99, OV::bytes([0xff; 16]))],
+        AB::A(true),
+        HasExtensions,
+    );
 
     // These tags are very different lengths and may use the RuntimeTagMeasurer instead of the
     // TrivialTagMeasurer, so we should test that path.
