@@ -456,14 +456,16 @@ impl<T> EmptyState for Vec<T> {
 
 impl<T> Collection for Vec<T> {
     type Item = T;
-    type RefIter<'a> = core::slice::Iter<'a, T>
-        where
-            T: 'a,
-            Self: 'a;
-    type ReverseIter<'a> = core::iter::Rev<core::slice::Iter<'a, T>>
-        where
-            Self::Item: 'a,
-            Self: 'a;
+    type RefIter<'a>
+        = core::slice::Iter<'a, T>
+    where
+        T: 'a,
+        Self: 'a;
+    type ReverseIter<'a>
+        = core::iter::Rev<core::slice::Iter<'a, T>>
+    where
+        Self::Item: 'a,
+        Self: 'a;
 
     #[inline]
     fn len(&self) -> usize {
@@ -518,14 +520,16 @@ where
     T: Clone,
 {
     type Item = T;
-    type RefIter<'a> = core::slice::Iter<'a, T>
-        where
-            T: 'a,
-            Self: 'a;
-    type ReverseIter<'a> = core::iter::Rev<core::slice::Iter<'a, T>>
-        where
-            Self::Item: 'a,
-            Self: 'a;
+    type RefIter<'a>
+        = core::slice::Iter<'a, T>
+    where
+        T: 'a,
+        Self: 'a;
+    type ReverseIter<'a>
+        = core::iter::Rev<core::slice::Iter<'a, T>>
+    where
+        Self::Item: 'a,
+        Self: 'a;
 
     #[inline]
     fn len(&self) -> usize {
@@ -570,14 +574,16 @@ impl<T, const N: usize> EmptyState for arrayvec::ArrayVec<T, N> {
 #[cfg(feature = "arrayvec")]
 impl<T, const N: usize> Collection for arrayvec::ArrayVec<T, N> {
     type Item = T;
-    type RefIter<'a> = core::slice::Iter<'a, T>
-        where
-            T: 'a,
-            Self: 'a;
-    type ReverseIter<'a> = core::iter::Rev<core::slice::Iter<'a, T>>
-        where
-            Self::Item: 'a,
-            Self: 'a;
+    type RefIter<'a>
+        = core::slice::Iter<'a, T>
+    where
+        T: 'a,
+        Self: 'a;
+    type ReverseIter<'a>
+        = core::iter::Rev<core::slice::Iter<'a, T>>
+    where
+        Self::Item: 'a,
+        Self: 'a;
 
     #[inline]
     fn len(&self) -> usize {
@@ -625,14 +631,16 @@ impl<A: smallvec::Array> EmptyState for smallvec::SmallVec<A> {
 #[cfg(feature = "smallvec")]
 impl<T, A: smallvec::Array<Item = T>> Collection for smallvec::SmallVec<A> {
     type Item = T;
-    type RefIter<'a> = core::slice::Iter<'a, T>
-        where
-            T: 'a,
-            Self: 'a;
-    type ReverseIter<'a> = core::iter::Rev<core::slice::Iter<'a, T>>
-        where
-            Self::Item: 'a,
-            Self: 'a;
+    type RefIter<'a>
+        = core::slice::Iter<'a, T>
+    where
+        T: 'a,
+        Self: 'a;
+    type ReverseIter<'a>
+        = core::iter::Rev<core::slice::Iter<'a, T>>
+    where
+        Self::Item: 'a,
+        Self: 'a;
 
     #[inline]
     fn len(&self) -> usize {
@@ -678,14 +686,16 @@ impl<T> EmptyState for thin_vec::ThinVec<T> {
 #[cfg(feature = "thin-vec")]
 impl<T> Collection for thin_vec::ThinVec<T> {
     type Item = T;
-    type RefIter<'a> = core::slice::Iter<'a, T>
-        where
-            T: 'a,
-            Self: 'a;
-    type ReverseIter<'a> = core::iter::Rev<core::slice::Iter<'a, T>>
-        where
-            Self::Item: 'a,
-            Self: 'a;
+    type RefIter<'a>
+        = core::slice::Iter<'a, T>
+    where
+        T: 'a,
+        Self: 'a;
+    type ReverseIter<'a>
+        = core::iter::Rev<core::slice::Iter<'a, T>>
+    where
+        Self::Item: 'a,
+        Self: 'a;
 
     #[inline]
     fn len(&self) -> usize {
@@ -733,14 +743,16 @@ impl<A: tinyvec::Array> EmptyState for tinyvec::ArrayVec<A> {
 #[cfg(feature = "tinyvec")]
 impl<T, A: tinyvec::Array<Item = T>> Collection for tinyvec::ArrayVec<A> {
     type Item = T;
-    type RefIter<'a> = core::slice::Iter<'a, T>
-        where
-            T: 'a,
-            Self: 'a;
-    type ReverseIter<'a> = core::iter::Rev<core::slice::Iter<'a, T>>
-        where
-            Self::Item: 'a,
-            Self: 'a;
+    type RefIter<'a>
+        = core::slice::Iter<'a, T>
+    where
+        T: 'a,
+        Self: 'a;
+    type ReverseIter<'a>
+        = core::iter::Rev<core::slice::Iter<'a, T>>
+    where
+        Self::Item: 'a,
+        Self: 'a;
 
     #[inline]
     fn len(&self) -> usize {
@@ -790,14 +802,16 @@ impl<A: tinyvec::Array> EmptyState for tinyvec::TinyVec<A> {
 #[cfg(feature = "tinyvec")]
 impl<T, A: tinyvec::Array<Item = T>> Collection for tinyvec::TinyVec<A> {
     type Item = T;
-    type RefIter<'a> = core::slice::Iter<'a, T>
-        where
-            T: 'a,
-            Self: 'a;
-    type ReverseIter<'a> = core::iter::Rev<core::slice::Iter<'a, T>>
-        where
-            Self::Item: 'a,
-            Self: 'a;
+    type RefIter<'a>
+        = core::slice::Iter<'a, T>
+    where
+        T: 'a,
+        Self: 'a;
+    type ReverseIter<'a>
+        = core::iter::Rev<core::slice::Iter<'a, T>>
+    where
+        Self::Item: 'a,
+        Self: 'a;
 
     #[inline]
     fn len(&self) -> usize {
@@ -843,14 +857,16 @@ where
     T: Ord,
 {
     type Item = T;
-    type RefIter<'a> = btree_set::Iter<'a, T>
-        where
-            Self::Item: 'a,
-            Self: 'a;
-    type ReverseIter<'a> = core::iter::Rev<btree_set::Iter<'a, T>>
-        where
-            Self::Item: 'a,
-            Self: 'a;
+    type RefIter<'a>
+        = btree_set::Iter<'a, T>
+    where
+        Self::Item: 'a,
+        Self: 'a;
+    type ReverseIter<'a>
+        = core::iter::Rev<btree_set::Iter<'a, T>>
+    where
+        Self::Item: 'a,
+        Self: 'a;
 
     #[inline]
     fn len(&self) -> usize {
@@ -928,14 +944,16 @@ where
     S: Default + core::hash::BuildHasher,
 {
     type Item = T;
-    type RefIter<'a> = hash_set::Iter<'a, T>
-        where
-            Self::Item: 'a,
-            Self: 'a;
-    type ReverseIter<'a> = Self::RefIter<'a>
-        where
-            Self::Item: 'a,
-            Self: 'a;
+    type RefIter<'a>
+        = hash_set::Iter<'a, T>
+    where
+        Self::Item: 'a,
+        Self: 'a;
+    type ReverseIter<'a>
+        = Self::RefIter<'a>
+    where
+        Self::Item: 'a,
+        Self: 'a;
 
     #[inline]
     fn len(&self) -> usize {
@@ -989,14 +1007,16 @@ where
     S: Default + core::hash::BuildHasher,
 {
     type Item = T;
-    type RefIter<'a> = hashbrown::hash_set::Iter<'a, T>
-        where
-            Self::Item: 'a,
-            Self: 'a;
-    type ReverseIter<'a> = Self::RefIter<'a>
-        where
-            Self::Item: 'a,
-            Self: 'a;
+    type RefIter<'a>
+        = hashbrown::hash_set::Iter<'a, T>
+    where
+        Self::Item: 'a,
+        Self: 'a;
+    type ReverseIter<'a>
+        = Self::RefIter<'a>
+    where
+        Self::Item: 'a,
+        Self: 'a;
 
     #[inline]
     fn len(&self) -> usize {
@@ -1042,16 +1062,18 @@ where
 {
     type Key = K;
     type Value = V;
-    type RefIter<'a> = btree_map::Iter<'a, K, V>
-        where
-            K: 'a,
-            V: 'a,
-            Self: 'a;
-    type ReverseIter<'a> = core::iter::Rev<btree_map::Iter<'a, K, V>>
-        where
-            K: 'a,
-            V: 'a,
-            Self: 'a;
+    type RefIter<'a>
+        = btree_map::Iter<'a, K, V>
+    where
+        K: 'a,
+        V: 'a,
+        Self: 'a;
+    type ReverseIter<'a>
+        = core::iter::Rev<btree_map::Iter<'a, K, V>>
+    where
+        K: 'a,
+        V: 'a,
+        Self: 'a;
 
     #[inline]
     fn len(&self) -> usize {
@@ -1136,16 +1158,18 @@ where
 {
     type Key = K;
     type Value = V;
-    type RefIter<'a> = hash_map::Iter<'a, K, V>
-        where
-            K: 'a,
-            V: 'a,
-            Self: 'a;
-    type ReverseIter<'a> = Self::RefIter<'a>
-        where
-            K: 'a,
-            V: 'a,
-            Self: 'a;
+    type RefIter<'a>
+        = hash_map::Iter<'a, K, V>
+    where
+        K: 'a,
+        V: 'a,
+        Self: 'a;
+    type ReverseIter<'a>
+        = Self::RefIter<'a>
+    where
+        K: 'a,
+        V: 'a,
+        Self: 'a;
 
     #[inline]
     fn len(&self) -> usize {
@@ -1202,16 +1226,18 @@ where
 {
     type Key = K;
     type Value = V;
-    type RefIter<'a> = hashbrown::hash_map::Iter<'a, K, V>
-        where
-            K: 'a,
-            V: 'a,
-            Self: 'a;
-    type ReverseIter<'a> = Self::RefIter<'a>
-        where
-            K: 'a,
-            V: 'a,
-            Self: 'a;
+    type RefIter<'a>
+        = hashbrown::hash_map::Iter<'a, K, V>
+    where
+        K: 'a,
+        V: 'a,
+        Self: 'a;
+    type ReverseIter<'a>
+        = Self::RefIter<'a>
+    where
+        K: 'a,
+        V: 'a,
+        Self: 'a;
 
     #[inline]
     fn len(&self) -> usize {
