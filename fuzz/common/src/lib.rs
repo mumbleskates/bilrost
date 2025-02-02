@@ -55,6 +55,7 @@ pub fn test_borrowed_support(data: &[u8]) {
     }
 }
 
+#[allow(clippy::declare_interior_mutable_const)]
 static DATE_RE: Lazy<Regex> = Lazy::new(|| {
     // exactly four digits, or +/- followed by any number
     let year = r"(\d{4}|[+-]\d+)";
