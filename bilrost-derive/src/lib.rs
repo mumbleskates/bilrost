@@ -824,7 +824,7 @@ fn message_via_oneof(input: DeriveInput) -> Result<TokenStream, Error> {
                         ctx,
                     )
                 } else {
-                    ::core::result::Result::Ok(())
+                    ::bilrost::encoding::skip_field(wire_type, buf)
                 }
             }
 
@@ -984,6 +984,7 @@ fn distinguished_message_via_oneof(input: DeriveInput) -> Result<TokenStream, Er
                         ctx,
                     )
                 } else {
+                    ::bilrost::encoding::skip_field(wire_type, buf)?;
                     ::core::result::Result::Ok(::bilrost::Canonicity::HasExtensions)
                 }
             }
