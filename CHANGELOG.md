@@ -1,3 +1,10 @@
+## v0.1012.3
+
+### Fixes
+
+* Loosened some erroneous constraints on `Option<T>` that prevented borrow-only
+  types from being decodable when wrapped in `Option`.
+
 ## v0.1012.2
 
 ### Fixes
