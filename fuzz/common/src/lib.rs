@@ -1,7 +1,8 @@
 use bilrost::Canonicity::{Canonical, HasExtensions, NotCanonical};
-#[cfg(feature = "compare-borrowed")]
-use bilrost::{BorrowedMessage, DistinguishedBorrowedMessage};
-use bilrost::{DecodeError, DecodeErrorKind, DistinguishedOwnedMessage, OwnedMessage};
+use bilrost::{
+    BorrowedMessage, DecodeError, DecodeErrorKind, DistinguishedBorrowedMessage,
+    DistinguishedOwnedMessage, Message, OwnedMessage,
+};
 use bytes::BufMut;
 use eyre::{eyre as err, Report};
 use once_cell::sync::Lazy;
@@ -52,6 +53,77 @@ pub fn test_borrowed_support(data: &[u8]) {
         check_fuzz_result(fuzz_borrowing_distinguished::<
             test_messages::TestTypeSupportBorrowable,
         >(data));
+    }
+}
+
+pub fn test_message_via_oneof(data: &[u8]) {
+    match test_messages::TestOneofMessage::decode_borrowed(data) {
+        Ok(oneof) => {
+            let mock = test_messages::TestOneofMessageMock::decode_borrowed(data)
+                .expect("oneof decoded but mock didn't");
+            // make sure at most one field is set in the mock struct
+            assert!(
+                [
+                    mock.varint.is_some(),
+                    mock.delimited.is_some(),
+                    mock.fixed4.is_some(),
+                    mock.fixed8.is_some()
+                ]
+                .into_iter()
+                .filter(|b| *b)
+                .count()
+                    <= 1
+            );
+            assert_eq!(oneof.encode_to_vec(), mock.encode_to_vec());
+        }
+        Err(err) => match err.kind() {
+            DecodeErrorKind::ConflictingFields => {
+                // If the oneof aborted due to conflicting fields we can't guarantee there wasn't a
+                // different problem later on in the mock.
+                return;
+            }
+            other_kind => {
+                assert!(matches!(
+                    test_messages::TestOneofMessageMock::decode_borrowed(data),
+                    Err(err) if err.kind() == other_kind
+                ));
+                return;
+            }
+        },
+    }
+
+    match test_messages::TestOneofMessage::decode_distinguished_borrowed(data) {
+        Ok((_, oneof_canon)) => {
+            let (mock, mock_canon) =
+                test_messages::TestOneofMessageMock::decode_distinguished_borrowed(data)
+                    .expect("oneof decoded distinguished but mock didn't");
+            assert_eq!(oneof_canon, mock_canon);
+            // make sure at most one field is set in the mock struct
+            assert!(
+                [
+                    mock.varint.is_some(),
+                    mock.delimited.is_some(),
+                    mock.fixed4.is_some(),
+                    mock.fixed8.is_some()
+                ]
+                .into_iter()
+                .filter(|b| *b)
+                .count()
+                    <= 1
+            );
+        }
+        Err(err) => match err.kind() {
+            DecodeErrorKind::ConflictingFields => {
+                // If the oneof aborted due to conflicting fields we can't guarantee there wasn't a
+                // different problem later on in the mock.
+            }
+            other_kind => {
+                assert!(matches!(
+                    test_messages::TestOneofMessageMock::decode_distinguished_borrowed(data),
+                    Err(err) if err.kind() == other_kind
+                ));
+            }
+        },
     }
 }
 

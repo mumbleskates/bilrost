@@ -648,3 +648,30 @@ pub struct TestTypeSupportBorrowable<'a> {
     #[bilrost(tag(5), encoding(plainbytes))]
     bigger_array: Cow<'a, [u8; 16]>,
 }
+
+#[derive(Debug, PartialEq, Eq, Oneof, Message)]
+#[bilrost(distinguished)]
+pub enum TestOneofMessage<'a> {
+    Empty,
+    #[bilrost(1)]
+    Varint(u64),
+    #[bilrost(tag(2), encoding(plainbytes))]
+    Delimited(&'a [u8]),
+    #[bilrost(tag(3), encoding(fixed))]
+    Fixed4(u32),
+    #[bilrost(tag(4), encoding(fixed))]
+    Fixed8(u64),
+}
+
+#[derive(Debug, PartialEq, Eq, Message)]
+#[bilrost(distinguished)]
+pub struct TestOneofMessageMock<'a> {
+    #[bilrost(1)]
+    pub varint: Option<u64>,
+    #[bilrost(tag(2), encoding(plainbytes))]
+    pub delimited: Option<&'a [u8]>,
+    #[bilrost(tag(3), encoding(fixed))]
+    pub fixed4: Option<u32>,
+    #[bilrost(tag(4), encoding(fixed))]
+    pub fixed8: Option<u64>,
+}
