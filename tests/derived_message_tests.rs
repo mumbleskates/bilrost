@@ -4421,3 +4421,18 @@ fn proxied_underived_error_propagation() {
         "Foo.proxied/TimeDelta.secs",
     );
 }
+
+#[test]
+fn borrow_traits_function_through_option() {
+    #[derive(PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
+    struct Foo<'a>(
+        #[bilrost(encoding(plainbytes))] Option<&'a [u8]>,
+        Option<&'a str>,
+    );
+
+    let buf: &[u8] = &[];
+
+    Foo::decode_borrowed(buf).unwrap();
+    Foo::decode_canonical_borrowed(buf).unwrap();
+}
