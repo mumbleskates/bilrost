@@ -977,30 +977,32 @@ trivial to derive for any compatible type.
 
 ```rust,
 use bilrost::{Message, Oneof};
+use std::borrow::Cow;
+
 #[derive(Debug, PartialEq, Eq, Message)]
 #[bilrost(distinguished)] // <---- Add this attribute to the type!
-struct DistinguishedFoo {
+struct DistinguishedFoo<'a> {
     #[bilrost(1)]
     bar: i64,
     #[bilrost(2)]
-    baz: String,
+    baz: Cow<'a, str>,
     #[bilrost(oneof(3, 4))]
-    designation: Designation,
+    designation: Designation<'a>,
 }
 
 #[derive(Debug, PartialEq, Eq, Oneof)]
 #[bilrost(distinguished)] // <---- Add this attribute to the type!
-enum Designation {
+enum Designation<'a> {
     None,
     #[bilrost(3)]
-    Name(String),
+    Name(Cow<'a, str>),
     #[bilrost(4)]
     Id(u64),
 }
 
 let original = DistinguishedFoo {
     bar: 100020003,
-    baz: "bear".to_owned(),
+    baz: "bear".into(),
     designation: Designation::Id(555),
 };
 
