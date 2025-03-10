@@ -17,10 +17,20 @@ llvm-profdata merge -sparse \
  coverage/tests/profdata/*.profraw \
  -o coverage/tests/profdata/merged.profdata
 
+set +x
+BINARIES=()
+for f in target/debug/deps/*
+do
+  if echo "$f" | grep -Pq '^target/debug/deps/(bilrost|derived_message_tests)-[0-9a-f]+$' ;
+  then
+    BINARIES+=("$f")
+  fi
+done
+set -x
+
 llvm-cov show --format=html -Xdemangler=rustfilt \
  --instr-profile=coverage/tests/profdata/merged.profdata \
- -object "$(ls target/debug/deps/* | \
-    grep -P '^target/debug/deps/(bilrost|derived_message_tests)-[0-9a-f]+$')" \
+ -object "${BINARIES[@]}" \
  -sources src \
  --show-line-counts-or-regions \
  --output-dir=coverage/tests
