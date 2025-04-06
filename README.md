@@ -672,10 +672,9 @@ from minimum to maximum separated with a dash (like `1-5`). For both
 ranges, spelled like `10..` and `..=10`.
 
 The field tags in the oneof must be unique, both within the oneof itself and
-within any message containing it. Oneof variants can only contain types that
-can be nested (so "unpacked" collections cannot be supported). On the wire, a
-oneof works exactly the same as if there were an `Option<T>` field for each of
-its variants, except at most one of them can be `Some`.
+within any message containing it. On the wire, a oneof works exactly the same as
+if there were an `Option<T>` field for each of its variants, except at most one
+of them can be `Some`.
 
 In the example above, the `NameOrUUID` oneof must be nested in an `Option` to
 enable it to represent the empty state where none of its fields are present. It
@@ -714,6 +713,16 @@ struct Widget {
 When a oneof enum type has the empty variant, it can only be included in a
 message directly; when it has none, it can only be included when it's nested
 within an `Option` so that `None` stands for the empty state.
+
+#### Repeated values in Oneof fields
+
+Oneof variants must contain values that encode as a single field on the wire.
+This means that for collection types like `Vec`, `HashSet`, arrays, etc. the
+`packed` encoding must always be used.
+
+This is the same requirement that is needed to make these types re-nest in any
+other collection or `Option`; see the notes and table in the section on
+[encodings for container types](#containers).
 
 #### Boxing Oneof fields
 
@@ -1592,8 +1601,17 @@ Any of these types may be included directly in a `bilrost` message struct. If
 that field's value is [empty](#empty-values), no bytes will be emitted when it
 is encoded.
 
-In addition to including them directly, these types can also be nested within
-several different containers:
+#### Containers
+
+In addition to including them directly, the types listed above can also be
+nested within several different containers, including the types listed here and
+the variants of a `Oneof`. These types may also be re-nested in one of these
+container types again if the type and encoding supports it, typically as many
+times as needed.
+
+Note that `Option` cannot be nested again. Semantically, `Option` gives the
+ability to detect the difference between an zeroed-out "empty" value and a
+missing field that was not included.
 
 | Encoding      | Value type                              | Encoded representation                                                         | Re-nestable | Distinguished      |
 |---------------|-----------------------------------------|--------------------------------------------------------------------------------|-------------|--------------------|
