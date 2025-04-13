@@ -25,8 +25,8 @@ use core::str;
 
 #[repr(u8)]
 pub enum GeneralEncodingContext {
-    PreferPacked,
-    PreferUnpacked,
+    PreferUnpacked = 0,
+    PreferPacked = 1,
 }
 use GeneralEncodingContext::{PreferPacked, PreferUnpacked};
 
