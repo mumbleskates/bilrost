@@ -76,7 +76,7 @@ delegate_value_encoding!(
     delegate from (GeneralInOneof) to (Packed<GeneralInsidePacked>)
     for type (Cow<'a, [T]>) including distinguished
     with where clause (T: Clone)
-    with generics ('a, T)
+    with generics ('a, T: 'a)
 );
 delegate_value_encoding!(
     delegate from (GeneralInOneof) to (Packed<GeneralInsidePacked>)
