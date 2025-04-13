@@ -2,8 +2,8 @@ use crate::buf::ReverseBuf;
 use crate::encoding::value_traits::for_overwrite_via_default;
 use crate::encoding::{
     delegate_value_encoding, encode_varint, encoded_len_varint, prepend_varint, Capped,
-    DecodeContext, DistinguishedValueDecoder, EmptyState, General, RestrictedDecodeContext,
-    ValueDecoder, ValueEncoder, WireType, Wiretyped,
+    DecodeContext, DistinguishedValueDecoder, EmptyState, General,
+    RestrictedDecodeContext, ValueDecoder, ValueEncoder, WireType, Wiretyped,
 };
 use crate::DecodeErrorKind::InvalidValue;
 use crate::{Canonicity, DecodeError};
@@ -23,11 +23,11 @@ impl EmptyState for bytestring::ByteString {
     }
 }
 
-impl Wiretyped<General> for bytestring::ByteString {
+impl<const G: u8> Wiretyped<General<G>> for bytestring::ByteString {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
 }
 
-impl ValueEncoder<General> for bytestring::ByteString {
+impl<const G: u8> ValueEncoder<General<G>> for bytestring::ByteString {
     #[inline]
     fn encode_value<B: BufMut + ?Sized>(value: &bytestring::ByteString, buf: &mut B) {
         encode_varint(value.len() as u64, buf);
@@ -46,7 +46,7 @@ impl ValueEncoder<General> for bytestring::ByteString {
     }
 }
 
-impl ValueDecoder<General> for bytestring::ByteString {
+impl<const G: u8> ValueDecoder<General<G>> for bytestring::ByteString {
     #[inline]
     fn decode_value<B: Buf + ?Sized>(
         value: &mut bytestring::ByteString,
@@ -61,7 +61,7 @@ impl ValueDecoder<General> for bytestring::ByteString {
     }
 }
 
-impl DistinguishedValueDecoder<General> for bytestring::ByteString {
+impl<const G: u8> DistinguishedValueDecoder<General<G>> for bytestring::ByteString {
     const CHECKS_EMPTY: bool = false;
 
     #[inline]
@@ -70,22 +70,23 @@ impl DistinguishedValueDecoder<General> for bytestring::ByteString {
         buf: Capped<impl Buf + ?Sized>,
         ctx: RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
-        Self::decode_value(value, buf, ctx.into_inner())?;
+        ValueDecoder::<General<G>>::decode_value(value, buf, ctx.into_inner())?;
         Ok(Canonicity::Canonical)
     }
 }
 
 delegate_value_encoding!(
-    encoding (General) borrows type (bytestring::ByteString) as owned including distinguished
+    encoding (General<G>) borrows type (bytestring::ByteString) as owned including distinguished
+    with generics (const G: u8)
 );
 
 #[cfg(test)]
 mod test {
-    use super::General;
+    use crate::encoding::GeneralInMessage;
     use crate::encoding::test::check_type_test;
     use alloc::string::String;
-    check_type_test!(General, relaxed, from String,
+    check_type_test!(GeneralInMessage, relaxed, from String,
         into bytestring::ByteString, WireType::LengthDelimited);
-    check_type_test!(General, distinguished, from String, into bytestring::ByteString,
+    check_type_test!(GeneralInMessage, distinguished, from String, into bytestring::ByteString,
         WireType::LengthDelimited);
 }

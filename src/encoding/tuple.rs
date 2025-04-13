@@ -533,75 +533,75 @@ impl_tuple!(
 );
 
 delegate_value_encoding!(
-    delegate from (General<Gctx>) to ((GeneralInMessage,))
+    delegate from (General<__G>) to ((GeneralInMessage,))
     for type ((A,)) including distinguished
-    with generics (const Gctx: u8, A)
+    with generics (const __G: u8, A)
 );
 delegate_value_encoding!(
-    delegate from (General<Gctx>) to ((GeneralInMessage, GeneralInMessage))
+    delegate from (General<__G>) to ((GeneralInMessage, GeneralInMessage))
     for type ((A, B)) including distinguished
-    with generics (const Gctx: u8, A, B)
+    with generics (const __G: u8, A, B)
 );
 delegate_value_encoding!(
-    delegate from (General<Gctx>) to ((GeneralInMessage, GeneralInMessage, GeneralInMessage))
+    delegate from (General<__G>) to ((GeneralInMessage, GeneralInMessage, GeneralInMessage))
     for type ((A, B, C)) including distinguished
-    with generics (const Gctx: u8, A, B, C)
+    with generics (const __G: u8, A, B, C)
 );
 delegate_value_encoding!(
-    delegate from (General<Gctx>) to ((GeneralInMessage, GeneralInMessage, GeneralInMessage,
+    delegate from (General<__G>) to ((GeneralInMessage, GeneralInMessage, GeneralInMessage,
         GeneralInMessage))
     for type ((A, B, C, D)) including distinguished
-    with generics (const Gctx: u8, A, B, C, D)
+    with generics (const __G: u8, A, B, C, D)
 );
 delegate_value_encoding!(
-    delegate from (General<Gctx>) to ((GeneralInMessage, GeneralInMessage, GeneralInMessage,
+    delegate from (General<__G>) to ((GeneralInMessage, GeneralInMessage, GeneralInMessage,
         GeneralInMessage, GeneralInMessage))
     for type ((A, B, C, D, E)) including distinguished
-    with generics (const Gctx: u8, A, B, C, D, E)
+    with generics (const __G: u8, A, B, C, D, E)
 );
 delegate_value_encoding!(
-    delegate from (General<Gctx>) to ((GeneralInMessage, GeneralInMessage, GeneralInMessage,
+    delegate from (General<__G>) to ((GeneralInMessage, GeneralInMessage, GeneralInMessage,
         GeneralInMessage, GeneralInMessage, GeneralInMessage))
     for type ((A, B, C, D, E, F)) including distinguished
-    with generics (const Gctx: u8, A, B, C, D, E, F)
+    with generics (const __G: u8, A, B, C, D, E, F)
 );
 delegate_value_encoding!(
-    delegate from (General<Gctx>) to ((GeneralInMessage, GeneralInMessage, GeneralInMessage,
+    delegate from (General<__G>) to ((GeneralInMessage, GeneralInMessage, GeneralInMessage,
         GeneralInMessage, GeneralInMessage, GeneralInMessage, GeneralInMessage))
     for type ((A, B, C, D, E, F, G)) including distinguished
-    with generics (const Gctx: u8, A, B, C, D, E, F, G)
+    with generics (const __G: u8, A, B, C, D, E, F, G)
 );
 delegate_value_encoding!(
-    delegate from (General<Gctx>) to ((GeneralInMessage, GeneralInMessage, GeneralInMessage,
+    delegate from (General<__G>) to ((GeneralInMessage, GeneralInMessage, GeneralInMessage,
         GeneralInMessage, GeneralInMessage, GeneralInMessage, GeneralInMessage, GeneralInMessage))
     for type ((A, B, C, D, E, F, G, H)) including distinguished
-    with generics (const Gctx: u8, A, B, C, D, E, F, G, H)
+    with generics (const __G: u8, A, B, C, D, E, F, G, H)
 );
 delegate_value_encoding!(
-    delegate from (General<Gctx>) to ((GeneralInMessage, GeneralInMessage, GeneralInMessage,
+    delegate from (General<__G>) to ((GeneralInMessage, GeneralInMessage, GeneralInMessage,
         GeneralInMessage, GeneralInMessage, GeneralInMessage, GeneralInMessage, GeneralInMessage,
         GeneralInMessage))
     for type ((A, B, C, D, E, F, G, H, I)) including distinguished
-    with generics (const Gctx: u8, A, B, C, D, E, F, G, H, I)
+    with generics (const __G: u8, A, B, C, D, E, F, G, H, I)
 );
 delegate_value_encoding!(
-    delegate from (General<Gctx>) to ((GeneralInMessage, GeneralInMessage, GeneralInMessage,
+    delegate from (General<__G>) to ((GeneralInMessage, GeneralInMessage, GeneralInMessage,
         GeneralInMessage, GeneralInMessage, GeneralInMessage, GeneralInMessage, GeneralInMessage,
         GeneralInMessage, GeneralInMessage))
     for type ((A, B, C, D, E, F, G, H, I, J)) including distinguished
-    with generics (const Gctx: u8, A, B, C, D, E, F, G, H, I, J)
+    with generics (const __G: u8, A, B, C, D, E, F, G, H, I, J)
 );
 delegate_value_encoding!(
-    delegate from (General<Gctx>) to ((GeneralInMessage, GeneralInMessage, GeneralInMessage,
+    delegate from (General<__G>) to ((GeneralInMessage, GeneralInMessage, GeneralInMessage,
         GeneralInMessage, GeneralInMessage, GeneralInMessage, GeneralInMessage, GeneralInMessage,
         GeneralInMessage, GeneralInMessage, GeneralInMessage))
     for type ((A, B, C, D, E, F, G, H, I, J, K)) including distinguished
-    with generics (const Gctx: u8, A, B, C, D, E, F, G, H, I, J, K)
+    with generics (const __G: u8, A, B, C, D, E, F, G, H, I, J, K)
 );
 delegate_value_encoding!(
-    delegate from (General<Gctx>) to ((GeneralInMessage, GeneralInMessage, GeneralInMessage,
+    delegate from (General<__G>) to ((GeneralInMessage, GeneralInMessage, GeneralInMessage,
         GeneralInMessage, GeneralInMessage, GeneralInMessage, GeneralInMessage, GeneralInMessage,
         GeneralInMessage, GeneralInMessage, GeneralInMessage, GeneralInMessage))
     for type ((A, B, C, D, E, F, G, H, I, J, K, L)) including distinguished
-    with generics (const Gctx: u8, A, B, C, D, E, F, G, H, I, J, K, L)
+    with generics (const __G: u8, A, B, C, D, E, F, G, H, I, J, K, L)
 );

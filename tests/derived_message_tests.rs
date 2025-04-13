@@ -4506,7 +4506,7 @@ fn implicit_encoding_ergonomics() {
         struct MessageWithNestedRepeateds {
             #[bilrost(encoding(packed))]
             a1: Vec<hashbrown::HashSet<u32>>,
-            a2: BTreeMap<hashbrown::HashSet<u32>, hashbrown::HashSet<u32>>,
+            a2: BTreeMap<u32, hashbrown::HashSet<u32>>,
         }
     }
     #[cfg(feature = "smallvec")]

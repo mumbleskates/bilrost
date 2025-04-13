@@ -203,8 +203,8 @@ impl Proxiable<SealedBilrostTag> for SystemTime {
     }
 }
 
-delegate_value_encoding!(delegate from (General<Gctx>) to (Proxied<Packed<Varint>, SealedBilrostTag>)
-    for type (SystemTime) with generics (const Gctx: u8));
+delegate_value_encoding!(delegate from (General<G>) to (Proxied<Packed<Varint>, SealedBilrostTag>)
+    for type (SystemTime) with generics (const G: u8));
 
 #[cfg(test)]
 mod systemtime {
@@ -234,10 +234,10 @@ delegate_value_encoding!(
 );
 
 delegate_value_encoding!(
-    delegate from (General<Gctx>) to (Map<GeneralInsidePacked, GeneralInsidePacked>)
+    delegate from (General<G>) to (Map<GeneralInsidePacked, GeneralInsidePacked>)
     for type (HashMap<K, V, S>)
     with where clause (K: Eq + core::hash::Hash, S: Default + core::hash::BuildHasher)
-    with generics (const Gctx: u8, K, V, S)
+    with generics (const G: u8, K, V, S)
 );
 
 #[cfg(test)]

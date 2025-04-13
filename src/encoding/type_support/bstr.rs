@@ -11,11 +11,11 @@ use bytes::{Buf, BufMut};
 
 empty_state_via_default!(&bstr::BStr);
 
-impl Wiretyped<General> for &bstr::BStr {
+impl<const G: u8> Wiretyped<General<G>> for &bstr::BStr {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
 }
 
-impl ValueEncoder<General> for &bstr::BStr {
+impl<const G: u8> ValueEncoder<General<G>> for &bstr::BStr {
     #[inline]
     fn encode_value<B: BufMut + ?Sized>(value: &&bstr::BStr, buf: &mut B) {
         ValueEncoder::<PlainBytes>::encode_value(&&***value, buf)
@@ -32,7 +32,7 @@ impl ValueEncoder<General> for &bstr::BStr {
     }
 }
 
-impl<'a> ValueBorrowDecoder<'a, General> for &'a bstr::BStr {
+impl<'a, const G: u8> ValueBorrowDecoder<'a, General<G>> for &'a bstr::BStr {
     #[inline]
     fn borrow_decode_value(
         value: &mut &'a bstr::BStr,
@@ -44,7 +44,7 @@ impl<'a> ValueBorrowDecoder<'a, General> for &'a bstr::BStr {
     }
 }
 
-impl<'a> DistinguishedValueBorrowDecoder<'a, General> for &'a bstr::BStr {
+impl<'a, const G: u8> DistinguishedValueBorrowDecoder<'a, General<G>> for &'a bstr::BStr {
     const CHECKS_EMPTY: bool = false;
 
     #[inline]
@@ -53,7 +53,7 @@ impl<'a> DistinguishedValueBorrowDecoder<'a, General> for &'a bstr::BStr {
         buf: Capped<&'a [u8]>,
         ctx: RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
-        ValueBorrowDecoder::<General>::borrow_decode_value(value, buf, ctx.into_inner())?;
+        ValueBorrowDecoder::<General<G>>::borrow_decode_value(value, buf, ctx.into_inner())?;
         Ok(Canonicity::Canonical)
     }
 }
@@ -62,7 +62,7 @@ impl<'a> DistinguishedValueBorrowDecoder<'a, General> for &'a bstr::BStr {
 mod ref_bstr {
     crate::encoding::test::check_borrowable!(
         borrowed: bstr::BStr,
-        encoding: crate::encoding::General,
+        encoding: crate::encoding::GeneralInMessage,
         converter(s: Vec<u8>) { bstr::BString::new(s) },
     );
 }
@@ -81,11 +81,11 @@ impl EmptyState for bstr::BString {
     }
 }
 
-impl Wiretyped<General> for bstr::BString {
+impl<const G: u8> Wiretyped<General<G>> for bstr::BString {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
 }
 
-impl ValueEncoder<General> for bstr::BString {
+impl<const G: u8> ValueEncoder<General<G>> for bstr::BString {
     #[inline(always)]
     fn encode_value<B: BufMut + ?Sized>(value: &bstr::BString, buf: &mut B) {
         ValueEncoder::<PlainBytes>::encode_value(&**value, buf);
@@ -102,7 +102,7 @@ impl ValueEncoder<General> for bstr::BString {
     }
 }
 
-impl ValueDecoder<General> for bstr::BString {
+impl<const G: u8> ValueDecoder<General<G>> for bstr::BString {
     #[inline(always)]
     fn decode_value<B: Buf + ?Sized>(
         value: &mut bstr::BString,
@@ -113,7 +113,7 @@ impl ValueDecoder<General> for bstr::BString {
     }
 }
 
-impl DistinguishedValueDecoder<General> for bstr::BString {
+impl<const G: u8> DistinguishedValueDecoder<General<G>> for bstr::BString {
     const CHECKS_EMPTY: bool = <Vec<u8> as DistinguishedValueDecoder<PlainBytes>>::CHECKS_EMPTY;
 
     #[inline(always)]
@@ -130,14 +130,20 @@ impl DistinguishedValueDecoder<General> for bstr::BString {
     }
 }
 
-impl_cow_value_encoding!(borrowed bstr::BStr, owned bstr::BString, encoding General);
+impl_cow_value_encoding!(
+    borrowed bstr::BStr,
+    owned bstr::BString,
+    encoding General<G>,
+    with generic (const G: u8)
+);
 
 #[cfg(test)]
 mod test {
-    use super::{General, Vec};
+    use super::Vec;
+    use crate::encoding::GeneralInMessage;
     use crate::encoding::test::check_type_test;
-    check_type_test!(General, relaxed, from Vec<u8>, into bstr::BString,
+    check_type_test!(GeneralInMessage, relaxed, from Vec<u8>, into bstr::BString,
         WireType::LengthDelimited);
-    check_type_test!(General, distinguished, from Vec<u8>, into bstr::BString,
+    check_type_test!(GeneralInMessage, distinguished, from Vec<u8>, into bstr::BString,
         WireType::LengthDelimited);
 }

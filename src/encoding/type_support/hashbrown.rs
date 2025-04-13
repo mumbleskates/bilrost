@@ -147,10 +147,10 @@ delegate_value_encoding!(
     with generics (T, S)
 );
 delegate_value_encoding!(
-    delegate from (General<Gctx>) to (Map<GeneralInsidePacked, GeneralInsidePacked>)
+    delegate from (General<G>) to (Map<GeneralInsidePacked, GeneralInsidePacked>)
     for type (hashbrown::HashMap<K, V, S>)
     with where clause (K: Eq + Hash, S: Default + core::hash::BuildHasher)
-    with generics (const Gctx: u8, K, V, S)
+    with generics (const G: u8, K, V, S)
 );
 
 #[cfg(test)]
