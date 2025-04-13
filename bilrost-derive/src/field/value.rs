@@ -117,7 +117,11 @@ impl Field {
             None => bail!("missing tag attribute"),
         };
 
-        let encoding = encoding.unwrap_or(parse_str::<Type>("general")?);
+        let encoding = encoding.unwrap_or(parse_str::<Type>(if in_oneof {
+            "general_in_oneof"
+        } else {
+            "general"
+        })?);
 
         Ok(Some(Field {
             tag,
