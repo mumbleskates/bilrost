@@ -119,8 +119,8 @@ mod date {
     #[test]
     fn check_type() {
         for date in with_random_values(test_dates()) {
-            relaxed::check_type(date, 123, WireType::LengthDelimited).unwrap();
-            distinguished::check_type(date, 123, WireType::LengthDelimited).unwrap();
+            relaxed::check_type_general(date, 123, WireType::LengthDelimited).unwrap();
+            distinguished::check_type_general(date, 123, WireType::LengthDelimited).unwrap();
         }
     }
 
@@ -220,8 +220,8 @@ mod time_ty {
     #[test]
     fn check_type() {
         for date in with_random_values(test_times()) {
-            relaxed::check_type(date, 123, WireType::LengthDelimited).unwrap();
-            distinguished::check_type(date, 123, WireType::LengthDelimited).unwrap();
+            relaxed::check_type_general(date, 123, WireType::LengthDelimited).unwrap();
+            distinguished::check_type_general(date, 123, WireType::LengthDelimited).unwrap();
         }
     }
 
@@ -327,8 +327,8 @@ mod primitivedatetime {
     #[test]
     fn check_type() {
         for datetime in with_random_values(test_datetimes()) {
-            relaxed::check_type(datetime, 123, WireType::LengthDelimited).unwrap();
-            distinguished::check_type(datetime, 123, WireType::LengthDelimited).unwrap();
+            relaxed::check_type_general(datetime, 123, WireType::LengthDelimited).unwrap();
+            distinguished::check_type_general(datetime, 123, WireType::LengthDelimited).unwrap();
         }
     }
 
@@ -428,8 +428,8 @@ mod utcoffset {
     #[test]
     fn check_type() {
         for zone in with_random_values(test_zones()) {
-            relaxed::check_type(zone, 123, WireType::LengthDelimited).unwrap();
-            distinguished::check_type(zone, 123, WireType::LengthDelimited).unwrap();
+            relaxed::check_type_general(zone, 123, WireType::LengthDelimited).unwrap();
+            distinguished::check_type_general(zone, 123, WireType::LengthDelimited).unwrap();
         }
     }
 
@@ -539,8 +539,8 @@ mod offsetdatetime {
     fn check_type() {
         for (datetime, zone) in with_random_values(iproduct!(test_datetimes(), test_zones())) {
             let odt = odt_compose(datetime, zone);
-            relaxed::check_type(odt, 123, WireType::LengthDelimited).unwrap();
-            distinguished::check_type(odt, 123, WireType::LengthDelimited).unwrap();
+            relaxed::check_type_general(odt, 123, WireType::LengthDelimited).unwrap();
+            distinguished::check_type_general(odt, 123, WireType::LengthDelimited).unwrap();
         }
     }
 
@@ -615,8 +615,8 @@ mod duration {
     #[test]
     fn check_type() {
         for duration in with_random_values(test_durations()) {
-            relaxed::check_type(duration, 123, WireType::LengthDelimited).unwrap();
-            distinguished::check_type(duration, 123, WireType::LengthDelimited).unwrap();
+            relaxed::check_type_general(duration, 123, WireType::LengthDelimited).unwrap();
+            distinguished::check_type_general(duration, 123, WireType::LengthDelimited).unwrap();
         }
     }
 

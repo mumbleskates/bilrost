@@ -102,8 +102,8 @@ mod naivedate {
     #[test]
     fn check_type() {
         for date in test_dates() {
-            relaxed::check_type(date, 123, WireType::LengthDelimited).unwrap();
-            distinguished::check_type(date, 123, WireType::LengthDelimited).unwrap();
+            relaxed::check_type_general(date, 123, WireType::LengthDelimited).unwrap();
+            distinguished::check_type_general(date, 123, WireType::LengthDelimited).unwrap();
         }
     }
 
@@ -217,8 +217,8 @@ mod naivetime {
     #[test]
     fn check_type() {
         for time in test_times() {
-            relaxed::check_type(time, 123, WireType::LengthDelimited).unwrap();
-            distinguished::check_type(time, 123, WireType::LengthDelimited).unwrap();
+            relaxed::check_type_general(time, 123, WireType::LengthDelimited).unwrap();
+            distinguished::check_type_general(time, 123, WireType::LengthDelimited).unwrap();
         }
     }
 
@@ -371,8 +371,8 @@ mod naivedatetime {
     #[test]
     fn check_type() {
         for datetime in test_datetimes() {
-            relaxed::check_type(datetime, 123, WireType::LengthDelimited).unwrap();
-            distinguished::check_type(datetime, 123, WireType::LengthDelimited).unwrap();
+            relaxed::check_type_general(datetime, 123, WireType::LengthDelimited).unwrap();
+            distinguished::check_type_general(datetime, 123, WireType::LengthDelimited).unwrap();
         }
     }
 
@@ -626,8 +626,8 @@ mod fixedoffset {
     #[test]
     fn check_type() {
         for zone in test_zones() {
-            relaxed::check_type(zone, 123, WireType::LengthDelimited).unwrap();
-            distinguished::check_type(zone, 123, WireType::LengthDelimited).unwrap();
+            relaxed::check_type_general(zone, 123, WireType::LengthDelimited).unwrap();
+            distinguished::check_type_general(zone, 123, WireType::LengthDelimited).unwrap();
         }
     }
 
@@ -797,8 +797,8 @@ mod datetime {
     fn check_type() {
         for (naivedatetime, zone) in iproduct!(test_datetimes(), test_zones()) {
             let datetime = DateTime::<FixedOffset>::from_naive_utc_and_offset(naivedatetime, zone);
-            relaxed::check_type(datetime, 123, WireType::LengthDelimited).unwrap();
-            distinguished::check_type(datetime, 123, WireType::LengthDelimited).unwrap();
+            relaxed::check_type_general(datetime, 123, WireType::LengthDelimited).unwrap();
+            distinguished::check_type_general(datetime, 123, WireType::LengthDelimited).unwrap();
         }
     }
 
@@ -888,7 +888,7 @@ delegate_value_encoding!(
 mod timedelta {
     use super::SealedBilrostTag;
     use crate::encoding::test::{check_type_empty, distinguished, relaxed};
-    use crate::encoding::{EmptyState, GeneralInMessage, WireType};
+    use crate::encoding::{EmptyState, WireType};
     use chrono::TimeDelta;
     use proptest::prelude::*;
 
@@ -910,8 +910,8 @@ mod timedelta {
     #[test]
     fn check_type() {
         for td in test_timedeltas() {
-            relaxed::check_type(td, 123, WireType::LengthDelimited).unwrap();
-            distinguished::check_type(td, 123, WireType::LengthDelimited).unwrap();
+            relaxed::check_type_general(td, 123, WireType::LengthDelimited).unwrap();
+            distinguished::check_type_general(td, 123, WireType::LengthDelimited).unwrap();
         }
     }
 
@@ -948,7 +948,7 @@ mod timedelta {
             negative: bool,
             tag: u32,
         ) {
-            relaxed::check_type::<TimeDelta, GeneralInMessage>(
+            relaxed::check_type_general(
                 milli_nanos_to_timedelta(millis, submilli_nanos, negative),
                 tag,
                 WireType::LengthDelimited,
@@ -961,7 +961,7 @@ mod timedelta {
             negative: bool,
             tag: u32,
         ) {
-            distinguished::check_type::<TimeDelta, GeneralInMessage>(
+            distinguished::check_type_general(
                 milli_nanos_to_timedelta(millis, submilli_nanos, negative),
                 tag,
                 WireType::LengthDelimited,

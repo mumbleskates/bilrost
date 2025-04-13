@@ -183,6 +183,7 @@ macro_rules! check_type {
         pub mod $kind {
             use super::*;
             use crate::buf::ReverseBuffer;
+            use crate::encoding::{GeneralInMessage, GeneralInOneof};
 
             pub fn check_type<T, E>(value: T, tag: u32, wire_type: WireType) -> TestCaseResult
             where
@@ -263,6 +264,23 @@ macro_rules! check_type {
                 }
 
                 Ok(())
+            }
+
+            pub fn check_type_general<T>(value: T, tag: u32, wire_type: WireType) -> TestCaseResult
+            where
+                T: Debug
+                    + Clone
+                    + ForOverwrite
+                    + PartialEq
+                    + $decoder_trait<GeneralInMessage>
+                    + $decoder_trait<GeneralInOneof>,
+            {
+                check_type::<T, GeneralInMessage>(value.clone(), tag, wire_type).or(check_type::<
+                    T,
+                    GeneralInOneof,
+                >(
+                    value, tag, wire_type
+                ))
             }
 
             pub fn check_type_unpacked<T, E>(
