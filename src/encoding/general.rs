@@ -487,6 +487,8 @@ mod core_time {
     );
 }
 
+// TODO(widders): add a "message" encoding for attrs, and a feature switch to choose *between*
+//  automatic message delegation and making `Box` transparent to value-encoding traits
 mod delegate_to_message_encoding {
     use super::*;
 
