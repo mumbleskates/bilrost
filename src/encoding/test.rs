@@ -266,6 +266,9 @@ macro_rules! check_type {
                 Ok(())
             }
 
+            /// Helper function for `check_type` to disambiguate the variant of General so that
+            /// this test helper can still be called without explicit generics.
+            #[allow(dead_code)]
             pub fn check_type_general<T>(value: T, tag: u32, wire_type: WireType) -> TestCaseResult
             where
                 T: Debug
