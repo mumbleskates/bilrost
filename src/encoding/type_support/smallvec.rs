@@ -69,7 +69,7 @@ delegate_encoding!(
 delegate_value_encoding!(
     delegate from (GeneralInOneof) to (Packed<GeneralInsidePacked>)
     for type (smallvec::SmallVec<A>) including distinguished
-    with where clause (A: smallvec::Array<Item = T>)
+    with where clause for relaxed (A: smallvec::Array<Item = T>)
     with generics (T, A)
 );
 

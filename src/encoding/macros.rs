@@ -245,21 +245,6 @@ macro_rules! delegate_value_encoding {
 
     (
         delegate from ($from_ty:ty) to ($to_ty:ty) for type ($value_ty:ty) including distinguished
-        with where clause ($($where_clause:tt)+)
-        $(with generics ($($value_generics:tt)*))?
-    ) => {
-        // This call just duplicates the where clause, for cases where it can be the same in both
-        // relaxed and distinguished modes.
-        delegate_value_encoding!(
-            delegate from ($from_ty) to ($to_ty) for type ($value_ty) including distinguished
-            with where clause for relaxed ($($where_clause)*)
-            with where clause for distinguished ($($where_clause)*)
-            $(with generics ($($value_generics)*))?
-        );
-    };
-
-    (
-        delegate from ($from_ty:ty) to ($to_ty:ty) for type ($value_ty:ty) including distinguished
         $(with where clause for relaxed ($($relaxed_where:tt)+))?
         $(with where clause for distinguished ($($distinguished_where:tt)+))?
         $(with generics ($($value_generics:tt)*))?

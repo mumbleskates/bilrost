@@ -131,13 +131,13 @@ delegate_encoding!(
 delegate_value_encoding!(
     delegate from (GeneralInOneof) to (Packed<GeneralInsidePacked>)
     for type (tinyvec::ArrayVec<A>) including distinguished
-    with where clause (A: tinyvec::Array<Item = T>)
+    with where clause for relaxed (A: tinyvec::Array<Item = T>)
     with generics (T, A)
 );
 delegate_value_encoding!(
     delegate from (GeneralInOneof) to (Packed<GeneralInsidePacked>)
     for type (tinyvec::TinyVec<A>) including distinguished
-    with where clause (A: tinyvec::Array<Item = T>)
+    with where clause for relaxed (A: tinyvec::Array<Item = T>)
     with generics (T, A)
 );
 
