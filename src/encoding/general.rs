@@ -5,12 +5,12 @@ use crate::encoding::{
     delegate_encoding, delegate_value_encoding, encoding_implemented_via_value_encoding,
     impl_cow_value_encoding, Canonicity, Capped, DecodeContext, DecodeError,
     DistinguishedProxiable, DistinguishedValueBorrowDecoder, DistinguishedValueDecoder, Fixed, Map,
-    MessageEncoding, Packed, PlainBytes, Proxiable, Proxied, RawDistinguishedMessageBorrowDecoder,
+    MessageEncoding, Packed, PlainBytes, Proxiable, RawDistinguishedMessageBorrowDecoder,
     RawMessageBorrowDecoder, RawMessageDecoder, RestrictedDecodeContext, Unpacked,
     ValueBorrowDecoder, ValueDecoder, ValueEncoder, Varint, WireType, Wiretyped,
 };
 use crate::DecodeErrorKind::InvalidValue;
-use crate::{Blob, DecodeErrorKind};
+use crate::{delegate_proxied_encoding, Blob, DecodeErrorKind};
 use alloc::borrow::Cow;
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::string::String;
@@ -456,10 +456,10 @@ impl DistinguishedProxiable<SealedBilrostTag> for core::time::Duration {
     }
 }
 
-delegate_value_encoding!(
-    delegate from (General<G>) to (Proxied<Packed<Varint>, SealedBilrostTag>)
-    for type (core::time::Duration) including distinguished
-    with generics (const G: u8)
+delegate_proxied_encoding!(
+    use encoding (Packed<Varint>) to encode proxied type (core::time::Duration)
+    using proxy tag (SealedBilrostTag)
+    with general encodings including distinguished
 );
 
 #[cfg(test)]

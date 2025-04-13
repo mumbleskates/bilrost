@@ -2,9 +2,9 @@ use crate::encoding::local_proxy::LocalProxy;
 use crate::encoding::proxy::SealedBilrostTag;
 use crate::encoding::type_support::common::time_proxies::TimeDeltaProxy;
 use crate::encoding::{
-    delegate_value_encoding, empty_state_via_default, Canonicity, DecodeErrorKind,
-    DistinguishedProxiable, EmptyState, ForOverwrite, General, GeneralInMessage, Packed, Proxiable,
-    Proxied, Varint,
+    delegate_proxied_encoding, delegate_value_encoding, empty_state_via_default, Canonicity,
+    DecodeErrorKind, DistinguishedProxiable, EmptyState, ForOverwrite, GeneralInMessage, Packed,
+    Proxiable, Varint,
 };
 use crate::Canonicity::Canonical;
 use crate::DecodeErrorKind::{InvalidValue, OutOfDomainValue};
@@ -75,10 +75,10 @@ impl DistinguishedProxiable<SealedBilrostTag> for NaiveDate {
 // NaiveDate encodes as a packed sequence of signed varints with trailing zeros cut off:
 // [year, ordinal day in year (starting at zero)]. The empty value is January 1st on the year 0,
 // not 1970.
-delegate_value_encoding!(
-    delegate from (General<G>) to (Proxied<Packed<Varint>, SealedBilrostTag>)
-    for type (NaiveDate) including distinguished
-    with generics (const G: u8)
+delegate_proxied_encoding!(
+    use encoding (Packed<Varint>) to encode proxied type (NaiveDate)
+    using proxy tag (SealedBilrostTag)
+    with general encodings including distinguished
 );
 
 #[cfg(test)]
@@ -190,10 +190,10 @@ impl DistinguishedProxiable<SealedBilrostTag> for NaiveTime {
 
 // NaiveTime encodes as a packed sequence of UNsigned varints with trailing zeros cut off:
 // [hour, minute, second, nanosecond].
-delegate_value_encoding!(
-    delegate from (General<G>) to (Proxied<Packed<Varint>, SealedBilrostTag>)
-    for type (NaiveTime) including distinguished
-    with generics (const G: u8)
+delegate_proxied_encoding!(
+    use encoding (Packed<Varint>) to encode proxied type (NaiveTime)
+    using proxy tag (SealedBilrostTag)
+    with general encodings including distinguished
 );
 
 #[cfg(test)]
@@ -330,10 +330,10 @@ impl DistinguishedProxiable<SealedBilrostTag> for NaiveDateTime {
 // [year, ordinal day in year (starting at zero), hour, minute, second, nanosecond]. It can decode
 // NaiveDate values as if they were truncated NaiveDateTimes. The empty value is midnight on January
 // 1st of the year 0, not 1970.
-delegate_value_encoding!(
-    delegate from (General<G>) to (Proxied<Packed<Varint>, SealedBilrostTag>)
-    for type (NaiveDateTime) including distinguished
-    with generics (const G: u8)
+delegate_proxied_encoding!(
+    use encoding (Packed<Varint>) to encode proxied type (NaiveDateTime)
+    using proxy tag (SealedBilrostTag)
+    with general encodings including distinguished
 );
 
 #[cfg(test)]
@@ -454,10 +454,10 @@ impl DistinguishedProxiable<SealedBilrostTag> for Utc {
 // The encoding for Utc is the same as the encoding for FixedOffset: it's a tuple of three signed
 // varints (hour, minute, second) which are always zero. It always fails to decode when they are not
 // all zero.
-delegate_value_encoding!(
-    delegate from (General<G>) to (Proxied<(Varint, Varint, Varint), SealedBilrostTag>)
-    for type (Utc) including distinguished
-    with generics (const G: u8)
+delegate_proxied_encoding!(
+    use encoding ((Varint, Varint, Varint)) to encode proxied type (Utc)
+    using proxy tag (SealedBilrostTag)
+    with general encodings including distinguished
 );
 
 #[cfg(test)]
@@ -593,10 +593,10 @@ impl DistinguishedProxiable<SealedBilrostTag> for FixedOffset {
 
 // The encoding for FixedOffset is (hour, minute, second) as a basic tuple of signed varints. It
 // It fails to decode whenever the components have mixed signs or are out of range.
-delegate_value_encoding!(
-    delegate from (General<G>) to (Proxied<(Varint, Varint, Varint), SealedBilrostTag>)
-    for type (FixedOffset) including distinguished
-    with generics (const G: u8)
+delegate_proxied_encoding!(
+    use encoding ((Varint, Varint, Varint)) to encode proxied type (FixedOffset)
+    using proxy tag (SealedBilrostTag)
+    with general encodings including distinguished
 );
 
 #[cfg(test)]
@@ -776,11 +776,12 @@ where
 
 // The encoding for DateTime<Tz> is the same as the (NaiveDateTime, Tz::Offset) that it is composed
 // of.
-delegate_value_encoding!(
-    delegate from (General<G>) to (Proxied<GeneralInMessage, SealedBilrostTag>)
-    for type (DateTime<Z>) including distinguished
-    with where clause for relaxed (Z: TimeZone, Z::Offset: EmptyState)
-    with generics (const G: u8, Z)
+delegate_proxied_encoding!(
+    use encoding (GeneralInMessage) to encode proxied type (DateTime<Z>)
+    using proxy tag (SealedBilrostTag)
+    with general encodings including distinguished
+    with where clause for relaxed (Z::Offset: EmptyState)
+    with generics (Z: TimeZone)
 );
 
 #[cfg(test)]
@@ -879,10 +880,10 @@ impl DistinguishedProxiable<SealedBilrostTag> for TimeDelta {
 }
 
 // The encoding for TimeDelta matches that of bilrost_types::Duration.
-delegate_value_encoding!(
-    delegate from (General<G>) to (Proxied<GeneralInMessage, SealedBilrostTag>)
-    for type (TimeDelta) including distinguished
-    with generics (const G: u8)
+delegate_proxied_encoding!(
+    use encoding (GeneralInMessage) to encode proxied type (TimeDelta)
+    using proxy tag (SealedBilrostTag)
+    with general encodings including distinguished
 );
 
 #[cfg(test)]

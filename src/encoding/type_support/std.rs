@@ -1,12 +1,11 @@
 use crate::encoding::proxy::SealedBilrostTag;
 use crate::encoding::value_traits::for_overwrite_via_default;
 use crate::encoding::{
-    delegate_encoding, delegate_value_encoding, Collection, EmptyState, ForOverwrite, General,
-    GeneralInMessage, GeneralInOneof, GeneralInsidePacked, Map, Mapping, Packed, Proxiable,
-    Proxied, Unpacked, Varint,
+    delegate_encoding, delegate_proxied_encoding, delegate_value_encoding, Collection, EmptyState,
+    ForOverwrite, General, GeneralInMessage, GeneralInOneof, GeneralInsidePacked, Map, Mapping,
+    Packed, Proxiable, Unpacked, Varint,
 };
-use crate::DecodeErrorKind;
-use crate::DecodeErrorKind::{InvalidValue, OutOfDomainValue, UnexpectedlyRepeated};
+use crate::DecodeErrorKind::{self, InvalidValue, OutOfDomainValue, UnexpectedlyRepeated};
 use core::cmp::Ordering;
 use std::collections::{hash_map, hash_set, HashMap, HashSet};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -203,10 +202,10 @@ impl Proxiable<SealedBilrostTag> for SystemTime {
     }
 }
 
-delegate_value_encoding!(
-    delegate from (General<G>) to (Proxied<Packed<Varint>, SealedBilrostTag>)
-    for type (SystemTime)
-    with generics (const G: u8)
+delegate_proxied_encoding!(
+    use encoding (Packed<Varint>) to encode proxied type (SystemTime)
+    using proxy tag (SealedBilrostTag)
+    with general encodings
 );
 
 #[cfg(test)]
