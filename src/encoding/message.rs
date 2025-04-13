@@ -1,11 +1,19 @@
 use crate::buf::ReverseBuf;
 use crate::encoding::{
-    Canonicity, Capped, DecodeContext, EmptyState, RestrictedDecodeContext, TagReader, WireType,
+    encode_varint, encoded_len_varint, prepend_varint, Canonicity, Capped, DecodeContext,
+    DistinguishedValueBorrowDecoder, DistinguishedValueDecoder, EmptyState,
+    RestrictedDecodeContext, TagReader, ValueBorrowDecoder, ValueDecoder, ValueEncoder, WireType,
+    Wiretyped,
 };
 use crate::Canonicity::Canonical;
 use crate::DecodeError;
 use alloc::boxed::Box;
 use bytes::{Buf, BufMut};
+
+/// Encoding that performs the actual value-encoding of messages, to and from `RawMessage`-family
+/// traits into length-delineated values on the wire. By default this is directly delegated to by
+/// the general encodings.
+pub struct MessageEncoding;
 
 /// Merges fields from the given buffer, to its cap, into the given owned message value.
 /// Implemented as a private standalone method to discourage "merging" as a usage pattern.
@@ -278,5 +286,114 @@ where
         Self: Sized,
     {
         (**self).raw_borrow_decode_field_distinguished(tag, wire_type, duplicated, buf, ctx)
+    }
+}
+
+impl<T> Wiretyped<MessageEncoding> for T
+where
+    T: RawMessage,
+{
+    const WIRE_TYPE: WireType = WireType::LengthDelimited;
+}
+
+impl<T> ValueEncoder<MessageEncoding> for T
+where
+    T: RawMessage,
+{
+    #[inline]
+    fn encode_value<B: BufMut + ?Sized>(value: &T, buf: &mut B) {
+        encode_varint(value.raw_encoded_len() as u64, buf);
+        value.raw_encode(buf);
+    }
+
+    #[inline]
+    fn prepend_value<B: ReverseBuf + ?Sized>(value: &T, buf: &mut B) {
+        let end = buf.remaining();
+        value.raw_prepend(buf);
+        prepend_varint((buf.remaining() - end) as u64, buf);
+    }
+
+    #[inline]
+    fn value_encoded_len(value: &T) -> usize {
+        let inner_len = value.raw_encoded_len();
+        encoded_len_varint(inner_len as u64) + inner_len
+    }
+}
+
+impl<T> ValueDecoder<MessageEncoding> for T
+where
+    T: RawMessageDecoder,
+{
+    #[inline]
+    fn decode_value<B: Buf + ?Sized>(
+        value: &mut T,
+        mut buf: Capped<B>,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError> {
+        ctx.limit_reached()?;
+        merge(value, buf.take_length_delimited()?, ctx.enter_recursion())
+    }
+}
+
+impl<T> DistinguishedValueDecoder<MessageEncoding> for T
+where
+    T: RawDistinguishedMessageDecoder + Eq,
+{
+    const CHECKS_EMPTY: bool = true; // Empty messages are always zero-length
+
+    #[inline]
+    fn decode_value_distinguished<const ALLOW_EMPTY: bool>(
+        value: &mut T,
+        mut buf: Capped<impl Buf + ?Sized>,
+        ctx: RestrictedDecodeContext,
+    ) -> Result<Canonicity, DecodeError> {
+        ctx.limit_reached()?;
+        let buf = buf.take_length_delimited()?;
+        // Empty message types always encode and decode from zero bytes. It is far cheaper to check
+        // here than to check after the value has been decoded and checking the message's
+        // `is_empty()`.
+        if !ALLOW_EMPTY && buf.remaining_before_cap() == 0 {
+            return ctx.check(Canonicity::NotCanonical);
+        }
+        merge_distinguished(value, buf, ctx.enter_recursion())
+    }
+}
+
+impl<'a, T> ValueBorrowDecoder<'a, MessageEncoding> for T
+where
+    T: RawMessageBorrowDecoder<'a>,
+{
+    #[inline]
+    fn borrow_decode_value(
+        value: &mut T,
+        mut buf: Capped<&'a [u8]>,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError> {
+        ctx.limit_reached()?;
+        borrow_merge(value, buf.take_length_delimited()?, ctx.enter_recursion())
+    }
+}
+
+impl<'a, T> DistinguishedValueBorrowDecoder<'a, MessageEncoding> for T
+where
+    T: RawDistinguishedMessageBorrowDecoder<'a> + Eq,
+{
+    const CHECKS_EMPTY: bool = true; // Empty messages are always zero-length
+
+    #[inline]
+    fn borrow_decode_value_distinguished<const ALLOW_EMPTY: bool>(
+        value: &mut T,
+        mut buf: Capped<&'a [u8]>,
+        ctx: RestrictedDecodeContext,
+    ) -> Result<Canonicity, DecodeError> {
+        ctx.limit_reached()?;
+        let buf = buf.take_length_delimited()?;
+        // Empty message types always encode and decode from zero bytes. It is far cheaper to check
+        // here than to check after the value has been decoded and checking the message's
+        // `is_empty()`.
+        if !ALLOW_EMPTY && buf.remaining_before_cap() == 0 {
+            return ctx.check(Canonicity::NotCanonical);
+        }
+        borrow_merge_distinguished(value, buf, ctx.enter_recursion())
     }
 }

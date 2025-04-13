@@ -145,8 +145,8 @@ pub(crate) use macros::{
 };
 pub use macros::{delegate_encoding, delegate_value_encoding};
 pub use message::{
-    RawDistinguishedMessageBorrowDecoder, RawDistinguishedMessageDecoder, RawMessage,
-    RawMessageBorrowDecoder, RawMessageDecoder,
+    MessageEncoding, RawDistinguishedMessageBorrowDecoder, RawDistinguishedMessageDecoder,
+    RawMessage, RawMessageBorrowDecoder, RawMessageDecoder,
 };
 pub use oneof::{
     DistinguishedOneofBorrowDecoder, DistinguishedOneofDecoder, Oneof, OneofBorrowDecoder,

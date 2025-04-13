@@ -1,17 +1,13 @@
 use crate::buf::ReverseBuf;
-use crate::encoding::message::{
-    borrow_merge, borrow_merge_distinguished, merge, merge_distinguished,
-    RawDistinguishedMessageDecoder, RawMessage,
-};
+use crate::encoding::message::{RawDistinguishedMessageDecoder, RawMessage};
 use crate::encoding::proxy::SealedBilrostTag;
 use crate::encoding::{
-    delegate_encoding, delegate_value_encoding, encode_varint, encoded_len_varint,
-    encoding_implemented_via_value_encoding, impl_cow_value_encoding, prepend_varint, Canonicity,
-    Capped, DecodeContext, DecodeError, DistinguishedProxiable, DistinguishedValueBorrowDecoder,
-    DistinguishedValueDecoder, Fixed, Map, Packed, PlainBytes, Proxiable, Proxied,
-    RawDistinguishedMessageBorrowDecoder, RawMessageBorrowDecoder, RawMessageDecoder,
-    RestrictedDecodeContext, Unpacked, ValueBorrowDecoder, ValueDecoder, ValueEncoder, Varint,
-    WireType, Wiretyped,
+    delegate_encoding, delegate_value_encoding, encoding_implemented_via_value_encoding,
+    impl_cow_value_encoding, Canonicity, Capped, DecodeContext, DecodeError,
+    DistinguishedProxiable, DistinguishedValueBorrowDecoder, DistinguishedValueDecoder, Fixed, Map,
+    MessageEncoding, Packed, PlainBytes, Proxiable, Proxied, RawDistinguishedMessageBorrowDecoder,
+    RawMessageBorrowDecoder, RawMessageDecoder, RestrictedDecodeContext, Unpacked,
+    ValueBorrowDecoder, ValueDecoder, ValueEncoder, Varint, WireType, Wiretyped,
 };
 use crate::DecodeErrorKind::InvalidValue;
 use crate::{Blob, DecodeErrorKind};
@@ -466,7 +462,9 @@ impl DistinguishedProxiable<SealedBilrostTag> for core::time::Duration {
 
 delegate_value_encoding!(
     delegate from (General<G>) to (Proxied<Packed<Varint>, SealedBilrostTag>)
-    for type (core::time::Duration) including distinguished with generics (const G: u8));
+    for type (core::time::Duration) including distinguished
+    with generics (const G: u8)
+);
 
 #[cfg(test)]
 mod core_time {
@@ -489,111 +487,99 @@ mod core_time {
     );
 }
 
-impl<const G: u8, T> Wiretyped<General<G>> for T
-where
-    T: RawMessage,
-{
-    const WIRE_TYPE: WireType = WireType::LengthDelimited;
-}
+mod delegate_to_message_encoding {
+    use super::*;
 
-impl<const G: u8, T> ValueEncoder<General<G>> for T
-where
-    T: RawMessage,
-{
-    #[inline]
-    fn encode_value<B: BufMut + ?Sized>(value: &T, buf: &mut B) {
-        encode_varint(value.raw_encoded_len() as u64, buf);
-        value.raw_encode(buf);
+    impl<const G: u8, T> Wiretyped<General<G>> for T
+    where
+        T: RawMessage,
+    {
+        const WIRE_TYPE: WireType = <Self as Wiretyped<MessageEncoding>>::WIRE_TYPE;
     }
 
-    #[inline]
-    fn prepend_value<B: ReverseBuf + ?Sized>(value: &T, buf: &mut B) {
-        let end = buf.remaining();
-        value.raw_prepend(buf);
-        prepend_varint((buf.remaining() - end) as u64, buf);
-    }
-
-    #[inline]
-    fn value_encoded_len(value: &T) -> usize {
-        let inner_len = value.raw_encoded_len();
-        encoded_len_varint(inner_len as u64) + inner_len
-    }
-}
-
-impl<const G: u8, T> ValueDecoder<General<G>> for T
-where
-    T: RawMessageDecoder,
-{
-    #[inline]
-    fn decode_value<B: Buf + ?Sized>(
-        value: &mut T,
-        mut buf: Capped<B>,
-        ctx: DecodeContext,
-    ) -> Result<(), DecodeError> {
-        ctx.limit_reached()?;
-        merge(value, buf.take_length_delimited()?, ctx.enter_recursion())
-    }
-}
-
-impl<const G: u8, T> DistinguishedValueDecoder<General<G>> for T
-where
-    T: RawDistinguishedMessageDecoder + Eq,
-{
-    const CHECKS_EMPTY: bool = true; // Empty messages are always zero-length
-
-    #[inline]
-    fn decode_value_distinguished<const ALLOW_EMPTY: bool>(
-        value: &mut T,
-        mut buf: Capped<impl Buf + ?Sized>,
-        ctx: RestrictedDecodeContext,
-    ) -> Result<Canonicity, DecodeError> {
-        ctx.limit_reached()?;
-        let buf = buf.take_length_delimited()?;
-        // Empty message types always encode and decode from zero bytes. It is far cheaper to check
-        // here than to check after the value has been decoded and checking the message's
-        // `is_empty()`.
-        if !ALLOW_EMPTY && buf.remaining_before_cap() == 0 {
-            return ctx.check(Canonicity::NotCanonical);
+    impl<const G: u8, T> ValueEncoder<General<G>> for T
+    where
+        T: RawMessage,
+    {
+        #[inline(always)]
+        fn encode_value<B: BufMut + ?Sized>(value: &T, buf: &mut B) {
+            ValueEncoder::<MessageEncoding>::encode_value(value, buf)
         }
-        merge_distinguished(value, buf, ctx.enter_recursion())
-    }
-}
 
-impl<'a, const G: u8, T> ValueBorrowDecoder<'a, General<G>> for T
-where
-    T: RawMessageBorrowDecoder<'a>,
-{
-    #[inline]
-    fn borrow_decode_value(
-        value: &mut T,
-        mut buf: Capped<&'a [u8]>,
-        ctx: DecodeContext,
-    ) -> Result<(), DecodeError> {
-        ctx.limit_reached()?;
-        borrow_merge(value, buf.take_length_delimited()?, ctx.enter_recursion())
-    }
-}
-
-impl<'a, const G: u8, T> DistinguishedValueBorrowDecoder<'a, General<G>> for T
-where
-    T: RawDistinguishedMessageBorrowDecoder<'a> + Eq,
-{
-    const CHECKS_EMPTY: bool = true; // Empty messages are always zero-length
-
-    #[inline]
-    fn borrow_decode_value_distinguished<const ALLOW_EMPTY: bool>(
-        value: &mut T,
-        mut buf: Capped<&'a [u8]>,
-        ctx: RestrictedDecodeContext,
-    ) -> Result<Canonicity, DecodeError> {
-        ctx.limit_reached()?;
-        let buf = buf.take_length_delimited()?;
-        // Empty message types always encode and decode from zero bytes. It is far cheaper to check
-        // here than to check after the value has been decoded and checking the message's
-        // `is_empty()`.
-        if !ALLOW_EMPTY && buf.remaining_before_cap() == 0 {
-            return ctx.check(Canonicity::NotCanonical);
+        #[inline(always)]
+        fn prepend_value<B: ReverseBuf + ?Sized>(value: &T, buf: &mut B) {
+            ValueEncoder::<MessageEncoding>::prepend_value(value, buf)
         }
-        borrow_merge_distinguished(value, buf, ctx.enter_recursion())
+
+        #[inline(always)]
+        fn value_encoded_len(value: &T) -> usize {
+            ValueEncoder::<MessageEncoding>::value_encoded_len(value)
+        }
+    }
+
+    impl<const G: u8, T> ValueDecoder<General<G>> for T
+    where
+        T: RawMessageDecoder,
+    {
+        #[inline(always)]
+        fn decode_value<B: Buf + ?Sized>(
+            value: &mut T,
+            buf: Capped<B>,
+            ctx: DecodeContext,
+        ) -> Result<(), DecodeError> {
+            ValueDecoder::<MessageEncoding>::decode_value(value, buf, ctx)
+        }
+    }
+
+    impl<const G: u8, T> DistinguishedValueDecoder<General<G>> for T
+    where
+        T: RawDistinguishedMessageDecoder + Eq,
+    {
+        const CHECKS_EMPTY: bool =
+            <Self as DistinguishedValueDecoder<MessageEncoding>>::CHECKS_EMPTY;
+
+        #[inline(always)]
+        fn decode_value_distinguished<const ALLOW_EMPTY: bool>(
+            value: &mut T,
+            buf: Capped<impl Buf + ?Sized>,
+            ctx: RestrictedDecodeContext,
+        ) -> Result<Canonicity, DecodeError> {
+            DistinguishedValueDecoder::<MessageEncoding>::decode_value_distinguished::<ALLOW_EMPTY>(
+                value, buf, ctx,
+            )
+        }
+    }
+
+    impl<'a, const G: u8, T> ValueBorrowDecoder<'a, General<G>> for T
+    where
+        T: RawMessageBorrowDecoder<'a>,
+    {
+        #[inline(always)]
+        fn borrow_decode_value(
+            value: &mut T,
+            buf: Capped<&'a [u8]>,
+            ctx: DecodeContext,
+        ) -> Result<(), DecodeError> {
+            ValueBorrowDecoder::<MessageEncoding>::borrow_decode_value(value, buf, ctx)
+        }
+    }
+
+    impl<'a, const G: u8, T> DistinguishedValueBorrowDecoder<'a, General<G>> for T
+    where
+        T: RawDistinguishedMessageBorrowDecoder<'a> + Eq,
+    {
+        const CHECKS_EMPTY: bool =
+            <Self as DistinguishedValueBorrowDecoder<MessageEncoding>>::CHECKS_EMPTY;
+
+        #[inline(always)]
+        fn borrow_decode_value_distinguished<const ALLOW_EMPTY: bool>(
+            value: &mut T,
+            buf: Capped<&'a [u8]>,
+            ctx: RestrictedDecodeContext,
+        ) -> Result<Canonicity, DecodeError> {
+            DistinguishedValueBorrowDecoder::<MessageEncoding>::borrow_decode_value_distinguished::<
+                ALLOW_EMPTY,
+            >(value, buf, ctx)
+        }
     }
 }
