@@ -126,9 +126,9 @@ macro_rules! fixed_width_float {
             crate::encoding::test::check_type_test!(Fixed, relaxed, $ty, WireType::$wire_type);
 
             mod delegated_from_general {
-                use crate::encoding::General;
+                use crate::encoding::GeneralInMessage;
                 crate::encoding::test::check_type_test!(
-                    General,
+                    GeneralInMessage,
                     relaxed,
                     $ty,
                     WireType::$wire_type

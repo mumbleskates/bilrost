@@ -1,8 +1,9 @@
 use crate::encoding::proxy::SealedBilrostTag;
 use crate::encoding::value_traits::for_overwrite_via_default;
 use crate::encoding::{
-    delegate_encoding, delegate_value_encoding, Collection, EmptyState, ForOverwrite, General, Map,
-    Mapping, Packed, Proxiable, Proxied, Unpacked, Varint,
+    delegate_encoding, delegate_value_encoding, Collection, EmptyState, ForOverwrite, General,
+    GeneralInMessage, GeneralInOneof, GeneralInsidePacked, Map, Mapping, Packed, Proxiable,
+    Proxied, Unpacked, Varint,
 };
 use crate::DecodeErrorKind;
 use crate::DecodeErrorKind::{InvalidValue, OutOfDomainValue, UnexpectedlyRepeated};
@@ -202,8 +203,8 @@ impl Proxiable<SealedBilrostTag> for SystemTime {
     }
 }
 
-delegate_value_encoding!(delegate from (General) to (Proxied<Packed<Varint>, SealedBilrostTag>)
-    for type (SystemTime));
+delegate_value_encoding!(delegate from (General<Gctx>) to (Proxied<Packed<Varint>, SealedBilrostTag>)
+    for type (SystemTime) with generics (const Gctx: u8));
 
 #[cfg(test)]
 mod systemtime {
@@ -211,27 +212,43 @@ mod systemtime {
     use crate::encoding::test::{check_type_empty, check_type_test};
 
     check_type_empty!(SystemTime, via proxy with tag SealedBilrostTag);
-    check_type_test!(General, relaxed, SystemTime, WireType::LengthDelimited);
+    check_type_test!(
+        GeneralInMessage,
+        relaxed,
+        SystemTime,
+        WireType::LengthDelimited
+    );
 }
 
-delegate_encoding!(delegate from (General) to (Unpacked<General>)
+delegate_encoding!(
+    delegate from (GeneralInMessage) to (Unpacked<GeneralInMessage>)
     for type (HashSet<T, S>)
     with where clause (S: Default + core::hash::BuildHasher)
-    with generics (T, S));
-delegate_value_encoding!(delegate from (General) to (Map<General, General>)
+    with generics (T, S)
+);
+delegate_encoding!(
+    delegate from (GeneralInOneof) to (Packed<GeneralInsidePacked>)
+    for type (HashSet<T, S>)
+    with where clause (S: Default + core::hash::BuildHasher)
+    with generics (T, S)
+);
+
+delegate_value_encoding!(
+    delegate from (General<Gctx>) to (Map<GeneralInsidePacked, GeneralInsidePacked>)
     for type (HashMap<K, V, S>)
     with where clause (K: Eq + core::hash::Hash, S: Default + core::hash::BuildHasher)
-    with generics (K, V, S));
+    with generics (const Gctx: u8, K, V, S)
+);
 
 #[cfg(test)]
 mod test {
     mod hash_map {
         mod general {
             use crate::encoding::test::check_type_test;
-            use crate::encoding::{General, Map};
+            use crate::encoding::{GeneralInMessage, Map};
             use std::collections::HashMap;
             check_type_test!(
-                Map<General, General>,
+                Map<GeneralInMessage, GeneralInMessage>,
                 relaxed,
                 HashMap<u64, f32>,
                 WireType::LengthDelimited
@@ -252,10 +269,22 @@ mod test {
 
         mod delegated_from_general {
             use crate::encoding::test::check_type_test;
-            use crate::encoding::General;
+            use crate::encoding::GeneralInMessage;
             use std::collections::HashMap;
             check_type_test!(
-                General,
+                GeneralInMessage,
+                relaxed,
+                HashMap<bool, u32>,
+                WireType::LengthDelimited
+            );
+        }
+
+        mod delegated_from_general_in_oneof {
+            use crate::encoding::test::check_type_test;
+            use crate::encoding::GeneralInOneof;
+            use std::collections::HashMap;
+            check_type_test!(
+                GeneralInOneof,
                 relaxed,
                 HashMap<bool, u32>,
                 WireType::LengthDelimited

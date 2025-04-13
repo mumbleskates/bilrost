@@ -855,7 +855,7 @@ practical reason to do this, but as a demonstration:
 #[derive(Message)]
 struct Bar(
     // This is the same type as "general"
-    #[bilrost(encoding = "::bilrost::encoding::General")] String,
+    #[bilrost(encoding = "::bilrost::encoding::GeneralInMessage")] String,
 );
 
 assert_eq!(

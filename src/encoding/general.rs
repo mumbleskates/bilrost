@@ -23,55 +23,108 @@ use bytes::{Buf, BufMut, Bytes};
 use core::mem;
 use core::str;
 
-pub struct General;
+#[repr(u8)]
+pub enum GeneralEncodingContext {
+    PreferPacked,
+    PreferUnpacked,
+}
+use GeneralEncodingContext::{PreferPacked, PreferUnpacked};
 
-encoding_implemented_via_value_encoding!(General);
+/// The generic `General` struct is parametrized by its location, whether it's in a message or a
+/// oneof. Different defaults make sense in different contexts; `General<PreferUnpacked>` becomes
+/// the `general` encoding in message attributes and is the implicit default for non-annotated
+/// fields in Messages, and `General<PreferPacked>` likewise becomes the `general_in_oneof` encoding
+/// and is the implicit default for variants with no annotated encoding in `Oneof` enums, as well as
+/// the default for fields nested inside already packed fields.
+///
+/// These are also available as the type aliases `GeneralInMessage`, `GeneralInOneof`, and
+/// `GeneralInsidePacked`; `General` is still public to allow for generic implementations that are
+/// the same when packedness does not matter, which is most of the time.
+pub struct General<const Gctx: u8>;
+pub type GeneralInMessage = General<{ PreferUnpacked as u8 }>;
+pub type GeneralInOneof = General<{ PreferPacked as u8 }>;
+pub type GeneralInsidePacked = General<{ PreferPacked as u8 }>;
 
-// General implements unpacked encodings by default, but only for select collection types. Other
-// implementers of the `Collection` trait must use Unpacked or Packed.
-delegate_encoding!(delegate from (General) to (Unpacked<General>)
-    for type (Vec<T>) including distinguished with generics (T));
-delegate_encoding!(delegate from (General) to (Unpacked<General>)
+encoding_implemented_via_value_encoding!(General<Gctx>, with generics (const Gctx: u8));
+
+// `general` and `general_in_oneof` delegate to the `unpacked` and `packed` encodings respectively
+// by default, but only for select collection types. Other implementers of the `Collection` trait
+// must choose an encoding explicitly.
+delegate_encoding!(
+    delegate from (GeneralInMessage) to (Unpacked<GeneralInMessage>)
+    for type (Vec<T>) including distinguished
+    with generics (T)
+);
+delegate_encoding!(
+    delegate from (GeneralInMessage) to (Unpacked<GeneralInMessage>)
     for type (Cow<'a, [T]>) including distinguished
     with where clause (T: Clone)
-    with generics ('a, T));
-delegate_encoding!(delegate from (General) to (Unpacked<General>)
-    for type (BTreeSet<T>) including distinguished with generics (T));
-delegate_value_encoding!(delegate from (General) to (Map<General, General>)
-    for type (BTreeMap<K, V>) including distinguished
+    with generics ('a, T)
+);
+delegate_encoding!(
+    delegate from (GeneralInMessage) to (Unpacked<GeneralInMessage>)
+    for type (BTreeSet<T>) including distinguished
+    with generics (T)
+);
+
+delegate_encoding!(
+    delegate from (GeneralInOneof) to (Packed<GeneralInsidePacked>)
+    for type (Vec<T>) including distinguished
+    with generics (T)
+);
+delegate_encoding!(
+    delegate from (GeneralInOneof) to (Packed<GeneralInsidePacked>)
+    for type (Cow<'a, [T]>) including distinguished
+    with where clause (T: Clone)
+    with generics ('a, T)
+);
+delegate_encoding!(
+    delegate from (GeneralInOneof) to (Packed<GeneralInsidePacked>)
+    for type (BTreeSet<T>) including distinguished
+    with generics (T)
+);
+
+delegate_value_encoding!(
+    delegate from (General<Gctx>)
+    to (Map<GeneralInsidePacked, GeneralInsidePacked>)
+    for type (BTreeMap<K, V>)
+    including distinguished
     with where clause for relaxed (K: Ord)
     with where clause for distinguished (V: Eq)
-    with generics (K, V));
+    with generics (const Gctx: u8, K, V)
+);
 
 // General encodes bool and integers as varints.
-delegate_value_encoding!(delegate from (General) to (Varint)
-    for type (bool) including distinguished);
-delegate_value_encoding!(delegate from (General) to (Varint)
-    for type (u16) including distinguished);
-delegate_value_encoding!(delegate from (General) to (Varint)
-    for type (i16) including distinguished);
-delegate_value_encoding!(delegate from (General) to (Varint)
-    for type (u32) including distinguished);
-delegate_value_encoding!(delegate from (General) to (Varint)
-    for type (i32) including distinguished);
-delegate_value_encoding!(delegate from (General) to (Varint)
-    for type (u64) including distinguished);
-delegate_value_encoding!(delegate from (General) to (Varint)
-    for type (i64) including distinguished);
-delegate_value_encoding!(delegate from (General) to (Varint)
-    for type (usize) including distinguished);
-delegate_value_encoding!(delegate from (General) to (Varint)
-    for type (isize) including distinguished);
+delegate_value_encoding!(delegate from (General<Gctx>) to (Varint)
+    for type (bool) including distinguished with generics (const Gctx: u8));
+delegate_value_encoding!(delegate from (General<Gctx>) to (Varint)
+    for type (u16) including distinguished with generics (const Gctx: u8));
+delegate_value_encoding!(delegate from (General<Gctx>) to (Varint)
+    for type (i16) including distinguished with generics (const Gctx: u8));
+delegate_value_encoding!(delegate from (General<Gctx>) to (Varint)
+    for type (u32) including distinguished with generics (const Gctx: u8));
+delegate_value_encoding!(delegate from (General<Gctx>) to (Varint)
+    for type (i32) including distinguished with generics (const Gctx: u8));
+delegate_value_encoding!(delegate from (General<Gctx>) to (Varint)
+    for type (u64) including distinguished with generics (const Gctx: u8));
+delegate_value_encoding!(delegate from (General<Gctx>) to (Varint)
+    for type (i64) including distinguished with generics (const Gctx: u8));
+delegate_value_encoding!(delegate from (General<Gctx>) to (Varint)
+    for type (usize) including distinguished with generics (const Gctx: u8));
+delegate_value_encoding!(delegate from (General<Gctx>) to (Varint)
+    for type (isize) including distinguished with generics (const Gctx: u8));
 
 // General also encodes floating point values.
-delegate_value_encoding!(delegate from (General) to (Fixed) for type (f32));
-delegate_value_encoding!(delegate from (General) to (Fixed) for type (f64));
+delegate_value_encoding!(delegate from (General<Gctx>) to (Fixed)
+    for type (f32) with generics (const Gctx: u8));
+delegate_value_encoding!(delegate from (General<Gctx>) to (Fixed)
+    for type (f64) with generics (const Gctx: u8));
 
-impl Wiretyped<General> for &str {
+impl<const Gctx: u8> Wiretyped<General<Gctx>> for &str {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
 }
 
-impl ValueEncoder<General> for &str {
+impl<const Gctx: u8> ValueEncoder<General<Gctx>> for &str {
     #[inline]
     fn encode_value<B: BufMut + ?Sized>(value: &&str, buf: &mut B) {
         ValueEncoder::<PlainBytes>::encode_value(&value.as_bytes(), buf)
@@ -88,7 +141,7 @@ impl ValueEncoder<General> for &str {
     }
 }
 
-impl<'a> ValueBorrowDecoder<'a, General> for &'a str {
+impl<'a, const Gctx: u8> ValueBorrowDecoder<'a, General<Gctx>> for &'a str {
     #[inline]
     fn borrow_decode_value(
         value: &mut Self,
@@ -100,7 +153,7 @@ impl<'a> ValueBorrowDecoder<'a, General> for &'a str {
     }
 }
 
-impl<'a> DistinguishedValueBorrowDecoder<'a, General> for &'a str {
+impl<'a, const Gctx: u8> DistinguishedValueBorrowDecoder<'a, General<Gctx>> for &'a str {
     const CHECKS_EMPTY: bool = false;
 
     #[inline]
@@ -109,21 +162,22 @@ impl<'a> DistinguishedValueBorrowDecoder<'a, General> for &'a str {
         buf: Capped<&'a [u8]>,
         ctx: RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
-        ValueBorrowDecoder::<General>::borrow_decode_value(value, buf, ctx.into_inner())?;
+        ValueBorrowDecoder::<General<Gctx>>::borrow_decode_value(value, buf, ctx.into_inner())?;
         Ok(Canonicity::Canonical)
     }
 }
 
 #[cfg(test)]
 mod ref_str {
-    crate::encoding::test::check_borrowable!(borrowed: str, encoding: crate::encoding::General);
+    crate::encoding::test::check_borrowable!(
+        borrowed: str, encoding: crate::encoding::GeneralInMessage);
 }
 
-impl Wiretyped<General> for String {
+impl<const Gctx: u8> Wiretyped<General<Gctx>> for String {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
 }
 
-impl ValueEncoder<General> for String {
+impl<const Gctx: u8> ValueEncoder<General<Gctx>> for String {
     #[inline]
     fn encode_value<B: BufMut + ?Sized>(value: &String, buf: &mut B) {
         ValueEncoder::<PlainBytes>::encode_value(&value.as_bytes(), buf)
@@ -140,7 +194,7 @@ impl ValueEncoder<General> for String {
     }
 }
 
-impl ValueDecoder<General> for String {
+impl<const Gctx: u8> ValueDecoder<General<Gctx>> for String {
     #[inline]
     fn decode_value<B: Buf + ?Sized>(
         value: &mut String,
@@ -187,7 +241,7 @@ impl ValueDecoder<General> for String {
     }
 }
 
-impl DistinguishedValueDecoder<General> for String {
+impl<const Gctx: u8> DistinguishedValueDecoder<General<Gctx>> for String {
     const CHECKS_EMPTY: bool = false;
 
     #[inline]
@@ -196,36 +250,61 @@ impl DistinguishedValueDecoder<General> for String {
         buf: Capped<impl Buf + ?Sized>,
         ctx: RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
-        Self::decode_value(value, buf, ctx.into_inner())?;
+        ValueDecoder::<General<Gctx>>::decode_value(value, buf, ctx.into_inner())?;
         Ok(Canonicity::Canonical)
     }
 }
 
-delegate_value_encoding!(encoding (General) borrows type (String) as owned including distinguished);
+delegate_value_encoding!(
+    encoding (General<Gctx>)
+    borrows type (String) as owned
+    including distinguished
+    with generics (const Gctx: u8)
+);
 
 #[cfg(test)]
 mod string {
-    use super::{General, String};
+    use super::{GeneralInMessage, String};
     use crate::encoding::test::check_type_test;
-    check_type_test!(General, relaxed, String, WireType::LengthDelimited);
-    check_type_test!(General, distinguished, String, WireType::LengthDelimited);
+    check_type_test!(GeneralInMessage, relaxed, String, WireType::LengthDelimited);
+    check_type_test!(
+        GeneralInMessage,
+        distinguished,
+        String,
+        WireType::LengthDelimited
+    );
 }
 
-impl_cow_value_encoding!(borrowed str, owned String, encoding General);
+impl_cow_value_encoding!(
+    borrowed str,
+    owned String,
+    encoding General<Gctx>,
+    with generic (const Gctx: u8)
+);
 
 #[cfg(test)]
 mod cow_string {
-    use super::{Cow, General};
+    use super::{Cow, GeneralInMessage};
     use crate::encoding::test::check_type_test;
-    check_type_test!(General, relaxed, Cow<str>, WireType::LengthDelimited);
-    check_type_test!(General, distinguished, Cow<str>, WireType::LengthDelimited);
+    check_type_test!(
+        GeneralInMessage,
+        relaxed,
+        Cow<str>,
+        WireType::LengthDelimited
+    );
+    check_type_test!(
+        GeneralInMessage,
+        distinguished,
+        Cow<str>,
+        WireType::LengthDelimited
+    );
 }
 
-impl Wiretyped<General> for Bytes {
+impl<const Gctx: u8> Wiretyped<General<Gctx>> for Bytes {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
 }
 
-impl ValueEncoder<General> for Bytes {
+impl<const Gctx: u8> ValueEncoder<General<Gctx>> for Bytes {
     #[inline]
     fn encode_value<B: BufMut + ?Sized>(value: &Bytes, buf: &mut B) {
         ValueEncoder::<PlainBytes>::encode_value(&&**value, buf)
@@ -242,7 +321,7 @@ impl ValueEncoder<General> for Bytes {
     }
 }
 
-impl ValueDecoder<General> for Bytes {
+impl<const Gctx: u8> ValueDecoder<General<Gctx>> for Bytes {
     #[inline]
     fn decode_value<B: Buf + ?Sized>(
         value: &mut Bytes,
@@ -256,7 +335,7 @@ impl ValueDecoder<General> for Bytes {
     }
 }
 
-impl DistinguishedValueDecoder<General> for Bytes {
+impl<const Gctx: u8> DistinguishedValueDecoder<General<Gctx>> for Bytes {
     const CHECKS_EMPTY: bool = false;
 
     #[inline]
@@ -265,26 +344,31 @@ impl DistinguishedValueDecoder<General> for Bytes {
         buf: Capped<impl Buf + ?Sized>,
         ctx: RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
-        Self::decode_value(value, buf, ctx.into_inner())?;
+        ValueDecoder::<General<Gctx>>::decode_value(value, buf, ctx.into_inner())?;
         Ok(Canonicity::Canonical)
     }
 }
 
-delegate_value_encoding!(encoding (General) borrows type (Bytes) as owned including distinguished);
+delegate_value_encoding!(
+    encoding (General<Gctx>) borrows type (Bytes) as owned
+    including distinguished with generics (const Gctx: u8)
+);
 
 #[cfg(test)]
 mod bytes_blob {
-    use super::{Bytes, General, Vec};
+    use super::{Bytes, GeneralInMessage, Vec};
     use crate::encoding::test::check_type_test;
-    check_type_test!(General, relaxed, from Vec<u8>, into Bytes, WireType::LengthDelimited);
-    check_type_test!(General, distinguished, from Vec<u8>, into Bytes, WireType::LengthDelimited);
+    check_type_test!(GeneralInMessage, relaxed, from Vec<u8>, into Bytes,
+        WireType::LengthDelimited);
+    check_type_test!(GeneralInMessage, distinguished, from Vec<u8>, into Bytes,
+        WireType::LengthDelimited);
 }
 
-impl Wiretyped<General> for Blob {
+impl<const Gctx: u8> Wiretyped<General<Gctx>> for Blob {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
 }
 
-impl ValueEncoder<General> for Blob {
+impl<const Gctx: u8> ValueEncoder<General<Gctx>> for Blob {
     #[inline]
     fn encode_value<B: BufMut + ?Sized>(value: &Blob, buf: &mut B) {
         ValueEncoder::<PlainBytes>::encode_value(&value.as_slice(), buf)
@@ -301,7 +385,7 @@ impl ValueEncoder<General> for Blob {
     }
 }
 
-impl ValueDecoder<General> for Blob {
+impl<const Gctx: u8> ValueDecoder<General<Gctx>> for Blob {
     #[inline]
     fn decode_value<B: Buf + ?Sized>(
         value: &mut Blob,
@@ -312,7 +396,7 @@ impl ValueDecoder<General> for Blob {
     }
 }
 
-impl DistinguishedValueDecoder<General> for Blob {
+impl<const Gctx: u8> DistinguishedValueDecoder<General<Gctx>> for Blob {
     const CHECKS_EMPTY: bool = <Vec<u8> as DistinguishedValueDecoder<PlainBytes>>::CHECKS_EMPTY;
 
     #[inline]
@@ -329,14 +413,22 @@ impl DistinguishedValueDecoder<General> for Blob {
     }
 }
 
-delegate_value_encoding!(encoding (General) borrows type (Blob) as owned including distinguished);
+delegate_value_encoding!(
+    encoding (General<Gctx>) borrows type (Blob) as owned
+    including distinguished with generics (const Gctx: u8)
+);
 
 #[cfg(test)]
 mod blob {
-    use super::{Blob, General};
+    use super::{Blob, GeneralInMessage};
     use crate::encoding::test::check_type_test;
-    check_type_test!(General, relaxed, Blob, WireType::LengthDelimited);
-    check_type_test!(General, distinguished, Blob, WireType::LengthDelimited);
+    check_type_test!(GeneralInMessage, relaxed, Blob, WireType::LengthDelimited);
+    check_type_test!(
+        GeneralInMessage,
+        distinguished,
+        Blob,
+        WireType::LengthDelimited
+    );
 }
 
 impl Proxiable<SealedBilrostTag> for core::time::Duration {
@@ -372,8 +464,9 @@ impl DistinguishedProxiable<SealedBilrostTag> for core::time::Duration {
     }
 }
 
-delegate_value_encoding!(delegate from (General) to (Proxied<Packed<Varint>, SealedBilrostTag>)
-    for type (core::time::Duration) including distinguished);
+delegate_value_encoding!(
+    delegate from (General<Gctx>) to (Proxied<Packed<Varint>, SealedBilrostTag>)
+    for type (core::time::Duration) including distinguished with generics (const Gctx: u8));
 
 #[cfg(test)]
 mod core_time {
@@ -382,28 +475,28 @@ mod core_time {
 
     check_type_empty!(core::time::Duration, via proxy with tag SealedBilrostTag);
     check_type_test!(
-        General,
+        GeneralInMessage,
         relaxed,
         core::time::Duration,
         WireType::LengthDelimited
     );
     check_type_empty!(core::time::Duration, via distinguished proxy with tag SealedBilrostTag);
     check_type_test!(
-        General,
+        GeneralInMessage,
         distinguished,
         core::time::Duration,
         WireType::LengthDelimited
     );
 }
 
-impl<T> Wiretyped<General> for T
+impl<const Gctx: u8, T> Wiretyped<General<Gctx>> for T
 where
     T: RawMessage,
 {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
 }
 
-impl<T> ValueEncoder<General> for T
+impl<const Gctx: u8, T> ValueEncoder<General<Gctx>> for T
 where
     T: RawMessage,
 {
@@ -427,7 +520,7 @@ where
     }
 }
 
-impl<T> ValueDecoder<General> for T
+impl<const Gctx: u8, T> ValueDecoder<General<Gctx>> for T
 where
     T: RawMessageDecoder,
 {
@@ -442,7 +535,7 @@ where
     }
 }
 
-impl<T> DistinguishedValueDecoder<General> for T
+impl<const Gctx: u8, T> DistinguishedValueDecoder<General<Gctx>> for T
 where
     T: RawDistinguishedMessageDecoder + Eq,
 {
@@ -466,7 +559,7 @@ where
     }
 }
 
-impl<'a, T> ValueBorrowDecoder<'a, General> for T
+impl<'a, const Gctx: u8, T> ValueBorrowDecoder<'a, General<Gctx>> for T
 where
     T: RawMessageBorrowDecoder<'a>,
 {
@@ -481,7 +574,7 @@ where
     }
 }
 
-impl<'a, T> DistinguishedValueBorrowDecoder<'a, General> for T
+impl<'a, const Gctx: u8, T> DistinguishedValueBorrowDecoder<'a, General<Gctx>> for T
 where
     T: RawDistinguishedMessageBorrowDecoder<'a> + Eq,
 {

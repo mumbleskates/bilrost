@@ -4,8 +4,8 @@
 
 use bilrost::encoding::opaque::{OpaqueMessage, OpaqueValue as OV};
 use bilrost::encoding::{
-    encode_varint, Collection, DistinguishedOneofDecoder, EmptyState, General, Oneof, OneofDecoder,
-    Varint,
+    encode_varint, Collection, DistinguishedOneofDecoder, EmptyState, GeneralInMessage, Oneof,
+    OneofDecoder, Varint,
 };
 use bilrost::Canonicity::{Canonical, HasExtensions, NotCanonical};
 use bilrost::DecodeErrorKind::{
@@ -1199,8 +1199,8 @@ fn generic_encodings() {
         }
     }
 
-    static_assertions::assert_impl_all!(Foo<String, General>: OwnedMessage);
-    static_assertions::assert_not_impl_any!(Foo<u8, General>: Message);
+    static_assertions::assert_impl_all!(Foo<String, GeneralInMessage>: OwnedMessage);
+    static_assertions::assert_not_impl_any!(Foo<u8, GeneralInMessage>: Message);
     static_assertions::assert_impl_all!(Foo<u8, Varint>: OwnedMessage);
 }
 

@@ -5,15 +5,15 @@ use crate::encoding::value_traits::{
 use crate::encoding::{
     check_wire_type, decoding_modes, peek_repeated_field, BorrowDecoder, Capped, DecodeContext,
     Decoder, DistinguishedBorrowDecoder, DistinguishedDecoder, DistinguishedValueBorrowDecoder,
-    DistinguishedValueDecoder, Encoder, FieldEncoder, General, Packed, RestrictedDecodeContext,
-    TagMeasurer, TagRevWriter, TagWriter, ValueBorrowDecoder, ValueDecoder, ValueEncoder, WireType,
-    Wiretyped,
+    DistinguishedValueDecoder, Encoder, FieldEncoder, GeneralInMessage, Packed,
+    RestrictedDecodeContext, TagMeasurer, TagRevWriter, TagWriter, ValueBorrowDecoder,
+    ValueDecoder, ValueEncoder, WireType, Wiretyped,
 };
 use crate::DecodeErrorKind::InvalidValue;
 use crate::{Canonicity, DecodeError};
 use bytes::BufMut;
 
-pub struct Unpacked<E = General>(E);
+pub struct Unpacked<E = GeneralInMessage>(E);
 
 macro_rules! define_decoders {
     (

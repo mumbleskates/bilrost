@@ -1,6 +1,9 @@
 use crate::encoding::plain_bytes::plain_bytes_vec_impl;
 use crate::encoding::value_traits::{for_overwrite_via_default, TriviallyDistinguishedCollection};
-use crate::encoding::{delegate_encoding, Collection, EmptyState, General, Unpacked};
+use crate::encoding::{
+    delegate_encoding, Collection, EmptyState, GeneralInMessage, GeneralInOneof,
+    GeneralInsidePacked, Packed, Unpacked,
+};
 use crate::DecodeErrorKind;
 use bytes::Buf;
 
@@ -57,10 +60,18 @@ impl<T, A: smallvec::Array<Item = T>> Collection for smallvec::SmallVec<A> {
 
 impl<A: smallvec::Array> TriviallyDistinguishedCollection for smallvec::SmallVec<A> {}
 
-delegate_encoding!(delegate from (General) to (Unpacked<General>)
+delegate_encoding!(
+    delegate from (GeneralInMessage) to (Unpacked<GeneralInMessage>)
     for type (smallvec::SmallVec<A>) including distinguished
     with where clause (A: smallvec::Array<Item = T>)
-    with generics (T, A));
+    with generics (T, A)
+);
+delegate_encoding!(
+    delegate from (GeneralInOneof) to (Packed<GeneralInsidePacked>)
+    for type (smallvec::SmallVec<A>) including distinguished
+    with where clause (A: smallvec::Array<Item = T>)
+    with generics (T, A)
+);
 
 plain_bytes_vec_impl!(
     smallvec::SmallVec<A>,

@@ -165,7 +165,7 @@ pub use value_traits::{
 pub use fixed::Fixed;
 /// General encoder. Encodes strings and byte blobs, numbers as varints, floats as fixed size,
 /// repeated types unpacked, maps with its own encoding for keys and values, and message types.
-pub use general::General;
+pub use general::{General, GeneralInMessage, GeneralInOneof, GeneralInsidePacked};
 /// Encoder for mapping types. Encodes alternating keys and values in packed format.
 pub use map::Map;
 /// Packed encoder. Encodes repeated types in packed format.
