@@ -203,8 +203,11 @@ impl Proxiable<SealedBilrostTag> for SystemTime {
     }
 }
 
-delegate_value_encoding!(delegate from (General<G>) to (Proxied<Packed<Varint>, SealedBilrostTag>)
-    for type (SystemTime) with generics (const G: u8));
+delegate_value_encoding!(
+    delegate from (General<G>) to (Proxied<Packed<Varint>, SealedBilrostTag>)
+    for type (SystemTime)
+    with generics (const G: u8)
+);
 
 #[cfg(test)]
 mod systemtime {
