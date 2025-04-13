@@ -19,12 +19,8 @@ use bytes::{Buf, BufMut, Bytes};
 use core::mem;
 use core::str;
 
-#[repr(u8)]
-pub enum GeneralEncodingContext {
-    PreferUnpacked = 0,
-    PreferPacked = 1,
-}
-use GeneralEncodingContext::{PreferPacked, PreferUnpacked};
+const PREFER_UNPACKED: u8 = 0;
+const PREFER_PACKED: u8 = 1;
 
 /// The generic `General` struct is parametrized by its location, whether it's in a message or a
 /// oneof. Different defaults make sense in different contexts; `General<PreferUnpacked>` becomes
@@ -37,9 +33,9 @@ use GeneralEncodingContext::{PreferPacked, PreferUnpacked};
 /// `GeneralInsidePacked`; `General` is still public to allow for generic implementations that are
 /// the same when packedness does not matter, which is most of the time.
 pub struct General<const G: u8>;
-pub type GeneralInMessage = General<{ PreferUnpacked as u8 }>;
-pub type GeneralInOneof = General<{ PreferPacked as u8 }>;
-pub type GeneralInsidePacked = General<{ PreferPacked as u8 }>;
+pub type GeneralInMessage = General<PREFER_UNPACKED>;
+pub type GeneralInOneof = General<PREFER_PACKED>;
+pub type GeneralInsidePacked = General<PREFER_PACKED>;
 
 encoding_implemented_via_value_encoding!(General<G>, with generics (const G: u8));
 
