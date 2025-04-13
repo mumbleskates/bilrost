@@ -4442,52 +4442,118 @@ fn implicit_encoding_ergonomics() {
     // As of 0.1013, fields with no annotated encodings should *by default* have a packed encoding
     // when they're placed in a oneof variant. Previously they needed to be explicitly annotated,
     // otherwise there would be a pretty confusing error.
+    use std::collections::{BTreeMap, BTreeSet};
 
-    #[derive(Oneof)]
-    enum OneofWithRepeatedVariants<'a> {
-        #[bilrost(1)]
-        A(Vec<u32>),
-        #[bilrost(2)]
-        B(Cow<'a, [u32]>),
-        #[bilrost(3)]
-        C(std::collections::BTreeSet<u32>),
+    {
+        #[derive(Oneof)]
+        enum OneofWithRepeatedVariants<'a> {
+            #[bilrost(1)]
+            A(Vec<u32>),
+            #[bilrost(2)]
+            B(Cow<'a, [u32]>),
+            #[bilrost(3)]
+            C(BTreeSet<u32>),
+        }
+        #[derive(Message)]
+        struct MessageWithNestedRepeateds<'a> {
+            #[bilrost(encoding(packed))]
+            a1: Vec<Vec<u32>>,
+            a2: BTreeMap<Vec<u32>, Vec<u32>>,
+            #[bilrost(encoding(packed))]
+            b1: Vec<Cow<'a, [u32]>>,
+            b2: BTreeMap<Cow<'a, [u32]>, Cow<'a, [u32]>>,
+            #[bilrost(encoding(packed))]
+            c1: Vec<BTreeSet<u32>>,
+            c2: BTreeMap<BTreeSet<u32>, BTreeSet<u32>>,
+        }
     }
     #[cfg(feature = "std")]
-    #[derive(Oneof)]
-    enum OneofWithRepeatedVariants2 {
-        #[bilrost(1)]
-        A(std::collections::HashSet<u32>),
+    {
+        #[derive(Oneof)]
+        enum OneofWithRepeatedVariants {
+            #[bilrost(1)]
+            A(std::collections::HashSet<u32>),
+        }
+        #[derive(Message)]
+        struct MessageWithNestedRepeateds {
+            #[bilrost(encoding(packed))]
+            a1: Vec<std::collections::HashSet<u32>>,
+            a2: BTreeMap<u32, std::collections::HashSet<u32>>,
+        }
     }
     #[cfg(feature = "arrayvec")]
-    #[derive(Oneof)]
-    enum OneofWithRepeatedVariants3 {
-        #[bilrost(1)]
-        A(arrayvec::ArrayVec<u32, 10>),
+    {
+        #[derive(Oneof)]
+        enum OneofWithRepeatedVariants {
+            #[bilrost(1)]
+            A(arrayvec::ArrayVec<u32, 10>),
+        }
+        #[derive(Message)]
+        struct MessageWithNestedRepeateds {
+            #[bilrost(encoding(packed))]
+            a1: Vec<arrayvec::ArrayVec<u32, 10>>,
+            a2: BTreeMap<arrayvec::ArrayVec<u32, 10>, arrayvec::ArrayVec<u32, 10>>,
+        }
     }
     #[cfg(feature = "hashbrown")]
-    #[derive(Oneof)]
-    enum OneofWithRepeatedVariants4 {
-        #[bilrost(1)]
-        A(hashbrown::HashSet<u32>),
+    {
+        #[derive(Oneof)]
+        enum OneofWithRepeatedVariants {
+            #[bilrost(1)]
+            A(hashbrown::HashSet<u32>),
+        }
+        #[derive(Message)]
+        struct MessageWithNestedRepeateds {
+            #[bilrost(encoding(packed))]
+            a1: Vec<hashbrown::HashSet<u32>>,
+            a2: BTreeMap<hashbrown::HashSet<u32>, hashbrown::HashSet<u32>>,
+        }
     }
     #[cfg(feature = "smallvec")]
-    #[derive(Oneof)]
-    enum OneofWithRepeatedVariants5 {
-        #[bilrost(1)]
-        A(smallvec::SmallVec<[u32; 10]>),
+    {
+        #[derive(Oneof)]
+        enum OneofWithRepeatedVariants {
+            #[bilrost(1)]
+            A(smallvec::SmallVec<[u32; 10]>),
+        }
+        #[derive(Message)]
+        struct MessageWithNestedRepeateds {
+            #[bilrost(encoding(packed))]
+            a1: Vec<smallvec::SmallVec<[u32; 10]>>,
+            a2: BTreeMap<smallvec::SmallVec<[u32; 10]>, smallvec::SmallVec<[u32; 10]>>,
+        }
     }
     #[cfg(feature = "thin-vec")]
-    #[derive(Oneof)]
-    enum OneofWithRepeatedVariants6 {
-        #[bilrost(1)]
-        A(thin_vec::ThinVec<u32>),
+    {
+        #[derive(Oneof)]
+        enum OneofWithRepeatedVariants {
+            #[bilrost(1)]
+            A(thin_vec::ThinVec<u32>),
+        }
+        #[derive(Message)]
+        struct MessageWithNestedRepeateds {
+            #[bilrost(encoding(packed))]
+            a1: Vec<thin_vec::ThinVec<u32>>,
+            a2: BTreeMap<thin_vec::ThinVec<u32>, thin_vec::ThinVec<u32>>,
+        }
     }
     #[cfg(feature = "tinyvec")]
-    #[derive(Oneof)]
-    enum OneofWithRepeatedVariants7 {
-        #[bilrost(1)]
-        A(tinyvec::ArrayVec<[u32; 10]>),
-        #[bilrost(2)]
-        B(tinyvec::TinyVec<[u32; 10]>),
+    {
+        #[derive(Oneof)]
+        enum OneofWithRepeatedVariants {
+            #[bilrost(1)]
+            A(tinyvec::ArrayVec<[u32; 10]>),
+            #[bilrost(2)]
+            B(tinyvec::TinyVec<[u32; 10]>),
+        }
+        #[derive(Message)]
+        struct MessageWithNestedRepeateds {
+            #[bilrost(encoding(packed))]
+            a1: Vec<tinyvec::ArrayVec<[u32; 10]>>,
+            a2: BTreeMap<tinyvec::ArrayVec<[u32; 10]>, tinyvec::ArrayVec<[u32; 10]>>,
+            #[bilrost(encoding(packed))]
+            b1: Vec<tinyvec::TinyVec<[u32; 10]>>,
+            b2: BTreeMap<tinyvec::TinyVec<[u32; 10]>, tinyvec::TinyVec<[u32; 10]>>,
+        }
     }
 }
