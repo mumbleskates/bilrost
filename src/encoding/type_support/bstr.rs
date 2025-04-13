@@ -140,8 +140,8 @@ impl_cow_value_encoding!(
 #[cfg(test)]
 mod test {
     use super::Vec;
-    use crate::encoding::GeneralInMessage;
     use crate::encoding::test::check_type_test;
+    use crate::encoding::GeneralInMessage;
     check_type_test!(GeneralInMessage, relaxed, from Vec<u8>, into bstr::BString,
         WireType::LengthDelimited);
     check_type_test!(GeneralInMessage, distinguished, from Vec<u8>, into bstr::BString,

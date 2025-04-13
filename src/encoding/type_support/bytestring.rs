@@ -2,8 +2,8 @@ use crate::buf::ReverseBuf;
 use crate::encoding::value_traits::for_overwrite_via_default;
 use crate::encoding::{
     delegate_value_encoding, encode_varint, encoded_len_varint, prepend_varint, Capped,
-    DecodeContext, DistinguishedValueDecoder, EmptyState, General,
-    RestrictedDecodeContext, ValueDecoder, ValueEncoder, WireType, Wiretyped,
+    DecodeContext, DistinguishedValueDecoder, EmptyState, General, RestrictedDecodeContext,
+    ValueDecoder, ValueEncoder, WireType, Wiretyped,
 };
 use crate::DecodeErrorKind::InvalidValue;
 use crate::{Canonicity, DecodeError};
@@ -82,8 +82,8 @@ delegate_value_encoding!(
 
 #[cfg(test)]
 mod test {
-    use crate::encoding::GeneralInMessage;
     use crate::encoding::test::check_type_test;
+    use crate::encoding::GeneralInMessage;
     use alloc::string::String;
     check_type_test!(GeneralInMessage, relaxed, from String,
         into bytestring::ByteString, WireType::LengthDelimited);

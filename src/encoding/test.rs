@@ -279,7 +279,7 @@ macro_rules! check_type {
                     T,
                     GeneralInOneof,
                 >(
-                    value, tag, wire_type
+                    value, tag, wire_type,
                 ))
             }
 

@@ -3,7 +3,8 @@ use crate::encoding::proxy::SealedBilrostTag;
 use crate::encoding::type_support::common::time_proxies::TimeDeltaProxy;
 use crate::encoding::{
     delegate_value_encoding, empty_state_via_default, Canonicity, DecodeErrorKind,
-    DistinguishedProxiable, EmptyState, ForOverwrite, General, GeneralInMessage, Packed, Proxiable, Proxied, Varint,
+    DistinguishedProxiable, EmptyState, ForOverwrite, General, GeneralInMessage, Packed, Proxiable,
+    Proxied, Varint,
 };
 use crate::Canonicity::Canonical;
 use crate::DecodeErrorKind::{InvalidValue, OutOfDomainValue};
@@ -406,8 +407,8 @@ mod utcoffset {
     use super::SealedBilrostTag;
     use crate::encoding::test::{check_type_empty, distinguished, relaxed};
     use crate::encoding::{
-        Capped, DecodeContext, DistinguishedValueDecoder, EmptyState, ForOverwrite, GeneralInMessage,
-        RestrictedDecodeContext, ValueDecoder, ValueEncoder, WireType,
+        Capped, DecodeContext, DistinguishedValueDecoder, EmptyState, ForOverwrite,
+        GeneralInMessage, RestrictedDecodeContext, ValueDecoder, ValueEncoder, WireType,
     };
     use crate::Canonicity::NotCanonical;
     use crate::DecodeError;
