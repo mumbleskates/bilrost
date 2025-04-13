@@ -67,18 +67,18 @@ delegate_encoding!(
     with generics (T)
 );
 
-delegate_encoding!(
+delegate_value_encoding!(
     delegate from (GeneralInOneof) to (Packed<GeneralInsidePacked>)
     for type (Vec<T>) including distinguished
     with generics (T)
 );
-delegate_encoding!(
+delegate_value_encoding!(
     delegate from (GeneralInOneof) to (Packed<GeneralInsidePacked>)
     for type (Cow<'a, [T]>) including distinguished
     with where clause (T: Clone)
     with generics ('a, T)
 );
-delegate_encoding!(
+delegate_value_encoding!(
     delegate from (GeneralInOneof) to (Packed<GeneralInsidePacked>)
     for type (BTreeSet<T>) including distinguished
     with generics (T)

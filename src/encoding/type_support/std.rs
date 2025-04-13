@@ -226,7 +226,7 @@ delegate_encoding!(
     with where clause (S: Default + core::hash::BuildHasher)
     with generics (T, S)
 );
-delegate_encoding!(
+delegate_value_encoding!(
     delegate from (GeneralInOneof) to (Packed<GeneralInsidePacked>)
     for type (HashSet<T, S>)
     with where clause (S: Default + core::hash::BuildHasher)

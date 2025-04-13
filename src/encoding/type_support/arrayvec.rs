@@ -1,8 +1,8 @@
 use crate::encoding::plain_bytes::plain_bytes_vec_impl;
 use crate::encoding::value_traits::{for_overwrite_via_default, TriviallyDistinguishedCollection};
 use crate::encoding::{
-    delegate_encoding, Collection, EmptyState, GeneralInMessage, GeneralInOneof,
-    GeneralInsidePacked, Unpacked,
+    delegate_encoding, delegate_value_encoding, Collection, EmptyState, GeneralInMessage,
+    GeneralInOneof, GeneralInsidePacked, Packed, Unpacked,
 };
 use crate::DecodeErrorKind::InvalidValue;
 use crate::{DecodeError, DecodeErrorKind};
@@ -63,7 +63,7 @@ delegate_encoding!(
     for type (arrayvec::ArrayVec<T, N>) including distinguished
     with generics (T, const N: usize)
 );
-delegate_encoding!(
+delegate_value_encoding!(
     delegate from (GeneralInOneof) to (Packed<GeneralInsidePacked>)
     for type (arrayvec::ArrayVec<T, N>) including distinguished
     with generics (T, const N: usize)
