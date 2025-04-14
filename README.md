@@ -898,9 +898,9 @@ to collide with other type names that are in scope. These standard aliases are:
   compatibility between a packed repeated field and any other representation:
   the schema of the field needs to be fully understood for it to be read
   correctly.
-* `map<KE, VE>`: encodes mappings with their keys (encoded with parametrized
-  encoding `KE`) and values (encoded with `VE`) packed alternating into a single
-  length-delimited value.
+* `map<KE = general_packed, VE = general_packed>`: encodes mappings with their
+  keys (encoded with parametrized encoding `KE`) and values (encoded with `VE`)
+  packed alternating into a single length-delimited value.
 
 It's possible that more standard encodings may be added in the future, but they
 will be similarly lower-cased.
@@ -1634,14 +1634,15 @@ missing field that was not included.
 | any encoding      | [`Option<T>`][opt]                      | identical; at least some bytes are always encoded if `Some`, nothing if `None`             | no          | when `T` is        |
 | `unpacked<E>`     | [`Vec<T>`][vec], [`BTreeSet<T>`][btset] | the same as encoding `E`, one field per value                                              | no          | when `T` is        |
 | `unpacked<E>`     | [`[T; N]`][array][^arrays]              | the same as encoding `E`, one field per value                                              | no          | when `T` is        |
-| `unpacked`        | *                                       | (the same as `unpacked<general>`)                                                          | no          | *                  |
+| `unpacked`        | *                                       | (this means `unpacked<general_packed>`)                                                    | no          | *                  |
 | `packed<E>`       | [`Vec<T>`][vec], [`BTreeSet<T>`][btset] | always length-delimited, successively encoded with `E`                                     | yes         | when `T` is        |
 | `packed<E>`       | [`[T; N]`][array][^arrays]              | always length-delimited, successively encoded with `E`                                     | yes         | when `T` is        |
-| `packed`          | *                                       | (the same as `packed<general_packed>`)                                                     | yes         | *                  |
+| `packed`          | *                                       | (this means `packed<general_packed>`)                                                      | yes         | *                  |
 | `map<KE, VE>`     | [`BTreeMap<K, V>`][btmap]               | always length-delimited, alternately encoded with keys by encoding `KE` and values by `VE` | yes         | when `K` & `V` are |
+| `map`             | *                                       | (this means `map<general_packed, general_packed>`)                                         | yes         | *                  |
 | `general`         | [`Vec<T>`][vec], [`BTreeSet<T>`][btset] | (the same as `unpacked`)                                                                   | no          | *                  |
 | `general_packed`  | `Vec<T>`, `BTreeSet<T>`                 | (the same as `packed`)                                                                     | yes         | *                  |
-| general encodings | [`BTreeMap`][btmap]                     | (the same as `map<general_packed, general_packed>`)                                        | yes         | *                  |
+| general encodings | [`BTreeMap`][btmap]                     | (the same as `map`)                                                                        | yes         | *                  |
 
 [^arrays]: Fixed-size array types (`[T; N]`) act similarly to collections that
 additionally require an exact number of items. Where other kinds of collections
