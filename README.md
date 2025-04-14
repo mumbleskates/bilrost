@@ -871,11 +871,12 @@ available as aliases, all-lower-cased to ensure that these aliases are unlikely
 to collide with other type names that are in scope. These standard aliases are:
 
 * `general`: the default encoding in messages, suitable for most field types.
-  Delegates encoding of collections (vecs and sets) to
-  `unpacked<general_packed>` and mapping types to
-  `map<general_packed, general_packed>`.
+  Delegates encoding of common collection types (vecs and sets) to `unpacked`
+  and common mapping types to `map`.
 * `general_packed`: the default encoding for `oneof` variant values and in the
-  nested values of fields that are already repeated collections.
+  nested values of fields that are already repeated collections. Identical to
+  `general`, except that the common collection types use the `packed` encoding
+  instead of `unpacked`.
 * `varint`: primitive numeric types and bool, encodes as varint.
 * `fixed`: fixed-width four- and eight-byte values for integers, floats, and
   byte arrays. Delegates encoding of collections to `unpacked<fixed>`
