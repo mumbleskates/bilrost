@@ -43,44 +43,42 @@ encoding_implemented_via_value_encoding!(GeneralGeneric<P>, with generics (const
 // by default, but only for select collection types. Other implementers of the `Collection` trait
 // must choose an encoding explicitly.
 delegate_encoding!(
-    delegate from (General) to (Unpacked<GeneralPacked>)
+    delegate from (General) to (Unpacked)
     for type (Vec<T>) including distinguished
     with generics (T)
 );
 delegate_encoding!(
-    delegate from (General) to (Unpacked<GeneralPacked>)
+    delegate from (General) to (Unpacked)
     for type (Cow<'a, [T]>) including distinguished
     with where clause (T: Clone)
     with generics ('a, T)
 );
 delegate_encoding!(
-    delegate from (General) to (Unpacked<GeneralPacked>)
+    delegate from (General) to (Unpacked)
     for type (BTreeSet<T>) including distinguished
     with generics (T)
 );
 
 delegate_value_encoding!(
-    delegate from (GeneralPacked) to (Packed<GeneralPacked>)
+    delegate from (GeneralPacked) to (Packed)
     for type (Vec<T>) including distinguished
     with generics (T)
 );
 delegate_value_encoding!(
-    delegate from (GeneralPacked) to (Packed<GeneralPacked>)
+    delegate from (GeneralPacked) to (Packed)
     for type (Cow<'a, [T]>) including distinguished
     with where clause for relaxed (T: Clone)
     with generics ('a, T: 'a)
 );
 delegate_value_encoding!(
-    delegate from (GeneralPacked) to (Packed<GeneralPacked>)
+    delegate from (GeneralPacked) to (Packed)
     for type (BTreeSet<T>) including distinguished
     with generics (T)
 );
 
 delegate_value_encoding!(
-    delegate from (GeneralGeneric<P>)
-    to (Map<GeneralPacked, GeneralPacked>)
-    for type (BTreeMap<K, V>)
-    including distinguished
+    delegate from (GeneralGeneric<P>) to (Map)
+    for type (BTreeMap<K, V>) including distinguished
     with where clause for relaxed (K: Ord)
     with where clause for distinguished (V: Eq)
     with generics (const P: u8, K, V)

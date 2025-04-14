@@ -59,11 +59,11 @@ impl<T> Collection for thin_vec::ThinVec<T> {
 impl<T> TriviallyDistinguishedCollection for thin_vec::ThinVec<T> {}
 
 delegate_encoding!(
-    delegate from (General) to (Unpacked<GeneralPacked>)
+    delegate from (General) to (Unpacked)
     for type (thin_vec::ThinVec<T>) including distinguished with generics (T)
 );
 delegate_value_encoding!(
-    delegate from (GeneralPacked) to (Packed<GeneralPacked>)
+    delegate from (GeneralPacked) to (Packed)
     for type (thin_vec::ThinVec<T>) including distinguished with generics (T)
 );
 

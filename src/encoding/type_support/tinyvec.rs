@@ -117,25 +117,25 @@ impl<T, A: tinyvec::Array<Item = T>> Collection for tinyvec::TinyVec<A> {
 impl<A: tinyvec::Array> TriviallyDistinguishedCollection for tinyvec::TinyVec<A> {}
 
 delegate_encoding!(
-    delegate from (General) to (Unpacked<GeneralPacked>)
+    delegate from (General) to (Unpacked)
     for type (tinyvec::ArrayVec<A>) including distinguished
     with where clause (A: tinyvec::Array<Item = T>)
     with generics (T, A)
 );
 delegate_encoding!(
-    delegate from (General) to (Unpacked<GeneralPacked>)
+    delegate from (General) to (Unpacked)
     for type (tinyvec::TinyVec<A>) including distinguished
     with where clause (A: tinyvec::Array<Item = T>)
     with generics (T, A)
 );
 delegate_value_encoding!(
-    delegate from (GeneralPacked) to (Packed<GeneralPacked>)
+    delegate from (GeneralPacked) to (Packed)
     for type (tinyvec::ArrayVec<A>) including distinguished
     with where clause for relaxed (A: tinyvec::Array<Item = T>)
     with generics (T, A)
 );
 delegate_value_encoding!(
-    delegate from (GeneralPacked) to (Packed<GeneralPacked>)
+    delegate from (GeneralPacked) to (Packed)
     for type (tinyvec::TinyVec<A>) including distinguished
     with where clause for relaxed (A: tinyvec::Array<Item = T>)
     with generics (T, A)

@@ -3,13 +3,13 @@ use crate::encoding::value_traits::{DistinguishedMapping, Mapping};
 use crate::encoding::{
     decoding_modes, encode_varint, encoded_len_varint, encoding_implemented_via_value_encoding,
     prepend_varint, Canonicity, Capped, DecodeContext, DecodeError,
-    DistinguishedValueBorrowDecoder, DistinguishedValueDecoder, ForOverwrite,
+    DistinguishedValueBorrowDecoder, DistinguishedValueDecoder, ForOverwrite, GeneralPacked,
     RestrictedDecodeContext, ValueBorrowDecoder, ValueDecoder, ValueEncoder, WireType, Wiretyped,
 };
 use crate::DecodeErrorKind::Truncated;
 use bytes::{Buf, BufMut};
 
-pub struct Map<KE, VE>(KE, VE);
+pub struct Map<KE = GeneralPacked, VE = GeneralPacked>(KE, VE);
 
 encoding_implemented_via_value_encoding!(
     Map<KE, VE>,
@@ -192,16 +192,16 @@ mod test {
     mod btree {
         mod general {
             use crate::encoding::test::check_type_test;
-            use crate::encoding::{General, Map};
+            use crate::encoding::Map;
             use alloc::collections::BTreeMap;
             check_type_test!(
-                Map<General, General>,
+                Map,
                 relaxed,
                 BTreeMap<u64, f32>,
                 WireType::LengthDelimited
             );
             check_type_test!(
-                Map<General, General>,
+                Map,
                 distinguished,
                 BTreeMap<u32, i32>,
                 WireType::LengthDelimited

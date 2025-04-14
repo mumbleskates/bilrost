@@ -248,7 +248,7 @@ pub struct TestAllTypes {
     pub optional_packed_set_string: Option<BTreeSet<String>>,
     #[bilrost(tag(112), encoding(packed<plainbytes>))]
     pub optional_packed_set_bytes: Option<BTreeSet<Vec<u8>>>,
-    #[bilrost(tag(113), encoding(map<packed, general>))]
+    #[bilrost(113)]
     pub optional_map_set_enum_f32: Option<BTreeMap<BTreeSet<test_message::NestedEnum>, f32>>,
     /// Recursive message
     #[bilrost(tag(114), recurses)]

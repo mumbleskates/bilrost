@@ -59,12 +59,12 @@ impl<T, const N: usize> Collection for arrayvec::ArrayVec<T, N> {
 impl<T, const N: usize> TriviallyDistinguishedCollection for arrayvec::ArrayVec<T, N> {}
 
 delegate_encoding!(
-    delegate from (General) to (Unpacked<GeneralPacked>)
+    delegate from (General) to (Unpacked)
     for type (arrayvec::ArrayVec<T, N>) including distinguished
     with generics (T, const N: usize)
 );
 delegate_value_encoding!(
-    delegate from (GeneralPacked) to (Packed<GeneralPacked>)
+    delegate from (GeneralPacked) to (Packed)
     for type (arrayvec::ArrayVec<T, N>) including distinguished
     with generics (T, const N: usize)
 );

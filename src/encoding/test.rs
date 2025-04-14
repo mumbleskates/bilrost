@@ -542,30 +542,30 @@ fn test_present_and_empty() {
     present_empty_not_canon::<BTreeSet<Blob>, Packed<General>>();
     present_empty_not_canon::<BTreeSet<Vec<u8>>, Packed<PlainBytes>>();
 
-    present_empty_not_canon::<BTreeMap<u32, u32>, Map<General, General>>();
-    present_empty_not_canon::<BTreeMap<u64, u64>, Map<General, General>>();
-    present_empty_not_canon::<BTreeMap<i32, i32>, Map<General, General>>();
-    present_empty_not_canon::<BTreeMap<i64, i64>, Map<General, General>>();
+    present_empty_not_canon::<BTreeMap<u32, u32>, Map>();
+    present_empty_not_canon::<BTreeMap<u64, u64>, Map>();
+    present_empty_not_canon::<BTreeMap<i32, i32>, Map>();
+    present_empty_not_canon::<BTreeMap<i64, i64>, Map>();
     present_empty_not_canon::<BTreeMap<u32, u32>, Map<Fixed, Fixed>>();
     present_empty_not_canon::<BTreeMap<u64, u64>, Map<Fixed, Fixed>>();
     present_empty_not_canon::<BTreeMap<i32, i32>, Map<Fixed, Fixed>>();
     present_empty_not_canon::<BTreeMap<i64, i64>, Map<Fixed, Fixed>>();
-    present_empty_not_canon::<BTreeMap<bool, bool>, Map<General, General>>();
-    present_empty_not_canon::<BTreeMap<String, String>, Map<General, General>>();
-    present_empty_not_canon::<BTreeMap<Blob, Blob>, Map<General, General>>();
+    present_empty_not_canon::<BTreeMap<bool, bool>, Map>();
+    present_empty_not_canon::<BTreeMap<String, String>, Map>();
+    present_empty_not_canon::<BTreeMap<Blob, Blob>, Map>();
     present_empty_not_canon::<BTreeMap<Vec<u8>, Vec<u8>>, Map<PlainBytes, PlainBytes>>();
 
-    present_empty_not_canon::<Vec<BTreeMap<u32, u32>>, Packed<Map<General, General>>>();
-    present_empty_not_canon::<Vec<BTreeMap<u64, u64>>, Packed<Map<General, General>>>();
-    present_empty_not_canon::<Vec<BTreeMap<i32, i32>>, Packed<Map<General, General>>>();
-    present_empty_not_canon::<Vec<BTreeMap<i64, i64>>, Packed<Map<General, General>>>();
+    present_empty_not_canon::<Vec<BTreeMap<u32, u32>>, Packed<Map>>();
+    present_empty_not_canon::<Vec<BTreeMap<u64, u64>>, Packed<Map>>();
+    present_empty_not_canon::<Vec<BTreeMap<i32, i32>>, Packed<Map>>();
+    present_empty_not_canon::<Vec<BTreeMap<i64, i64>>, Packed<Map>>();
     present_empty_not_canon::<Vec<BTreeMap<u32, u32>>, Packed<Map<Fixed, Fixed>>>();
     present_empty_not_canon::<Vec<BTreeMap<u64, u64>>, Packed<Map<Fixed, Fixed>>>();
     present_empty_not_canon::<Vec<BTreeMap<i32, i32>>, Packed<Map<Fixed, Fixed>>>();
     present_empty_not_canon::<Vec<BTreeMap<i64, i64>>, Packed<Map<Fixed, Fixed>>>();
-    present_empty_not_canon::<Vec<BTreeMap<bool, bool>>, Packed<Map<General, General>>>();
-    present_empty_not_canon::<Vec<BTreeMap<String, String>>, Packed<Map<General, General>>>();
-    present_empty_not_canon::<Vec<BTreeMap<Blob, Blob>>, Packed<Map<General, General>>>();
+    present_empty_not_canon::<Vec<BTreeMap<bool, bool>>, Packed<Map>>();
+    present_empty_not_canon::<Vec<BTreeMap<String, String>>, Packed<Map>>();
+    present_empty_not_canon::<Vec<BTreeMap<Blob, Blob>>, Packed<Map>>();
     present_empty_not_canon::<Vec<BTreeMap<Vec<u8>, Vec<u8>>>, Packed<Map<PlainBytes, PlainBytes>>>(
     );
 
