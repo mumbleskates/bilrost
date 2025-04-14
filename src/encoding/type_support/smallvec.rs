@@ -61,7 +61,7 @@ impl<T, A: smallvec::Array<Item = T>> Collection for smallvec::SmallVec<A> {
 impl<A: smallvec::Array> TriviallyDistinguishedCollection for smallvec::SmallVec<A> {}
 
 delegate_encoding!(
-    delegate from (General) to (Unpacked<General>)
+    delegate from (General) to (Unpacked<GeneralPacked>)
     for type (smallvec::SmallVec<A>) including distinguished
     with where clause (A: smallvec::Array<Item = T>)
     with generics (T, A)

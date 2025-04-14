@@ -135,7 +135,7 @@ where
 }
 
 delegate_encoding!(
-    delegate from (General) to (Unpacked<General>)
+    delegate from (General) to (Unpacked<GeneralPacked>)
     for type (hashbrown::HashSet<T, S>)
     with where clause (T: Eq + Hash, S: Default + core::hash::BuildHasher)
     with generics (T, S)

@@ -218,7 +218,7 @@ mod systemtime {
 }
 
 delegate_encoding!(
-    delegate from (General) to (Unpacked<General>)
+    delegate from (General) to (Unpacked<GeneralPacked>)
     for type (HashSet<T, S>)
     with where clause (S: Default + core::hash::BuildHasher)
     with generics (T, S)

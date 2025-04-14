@@ -28,7 +28,7 @@ const PREFER_PACKED: u8 = 1;
 /// the `general` encoding in message attributes and is the implicit default for non-annotated
 /// fields in Messages, and `General<PreferPacked>` likewise becomes the `general_packed` encoding
 /// and is the implicit default for variants with no annotated encoding in `Oneof` enums, as well as
-/// the default for fields nested inside already packed fields.
+/// the default for fields nested inside fields that are already collections.
 ///
 /// These are also available as the type aliases `General` and `GeneralPacked`; `GeneralGeneric` is
 /// still public to allow for generic implementations that are the same when packedness does not
@@ -43,18 +43,18 @@ encoding_implemented_via_value_encoding!(GeneralGeneric<P>, with generics (const
 // by default, but only for select collection types. Other implementers of the `Collection` trait
 // must choose an encoding explicitly.
 delegate_encoding!(
-    delegate from (General) to (Unpacked<General>)
+    delegate from (General) to (Unpacked<GeneralPacked>)
     for type (Vec<T>) including distinguished
     with generics (T)
 );
 delegate_encoding!(
-    delegate from (General) to (Unpacked<General>)
+    delegate from (General) to (Unpacked<GeneralPacked>)
     for type (Cow<'a, [T]>) including distinguished
     with where clause (T: Clone)
     with generics ('a, T)
 );
 delegate_encoding!(
-    delegate from (General) to (Unpacked<General>)
+    delegate from (General) to (Unpacked<GeneralPacked>)
     for type (BTreeSet<T>) including distinguished
     with generics (T)
 );
