@@ -498,7 +498,7 @@ mod tests {
 
     #[test]
     fn check_overflowing_datetimes() {
-        // These DateTimes cause overflows and crashes in the prost crate.
+        // These DateTimes cause(d) overflows and crashes in the prost crate.
         assert_eq!(
             Timestamp::try_from(DateTime {
                 year: i64::from_le_bytes([178, 2, 0, 0, 0, 0, 0, 128]),
@@ -648,14 +648,14 @@ mod tests {
             prop_assert_eq!(time::Duration::try_from(bilrost_duration.clone())?, std_duration);
 
             if std_duration != time::Duration::default() {
-                let neg_prost_duration = Duration {
+                let neg_bilrost_duration = Duration {
                     seconds: -bilrost_duration.seconds,
                     nanos: -bilrost_duration.nanos,
                 };
 
                 prop_assert!(
                     matches!(
-                        time::Duration::try_from(neg_prost_duration),
+                        time::Duration::try_from(neg_bilrost_duration),
                         Err(DurationError::NegativeDuration(d)) if d == std_duration,
                     )
                 )
@@ -675,14 +675,14 @@ mod tests {
             prop_assert_eq!(time::Duration::try_from(bilrost_duration.clone())?, std_duration);
 
             if std_duration != time::Duration::default() {
-                let neg_prost_duration = Duration {
+                let neg_bilrost_duration = Duration {
                     seconds: -bilrost_duration.seconds,
                     nanos: -bilrost_duration.nanos,
                 };
 
                 prop_assert!(
                     matches!(
-                        time::Duration::try_from(neg_prost_duration),
+                        time::Duration::try_from(neg_bilrost_duration),
                         Err(DurationError::NegativeDuration(d)) if d == std_duration,
                     )
                 )
@@ -789,13 +789,13 @@ mod tests {
         let nanos: u32 = 1;
         let std_duration = time::Duration::new(seconds, nanos);
 
-        let neg_prost_duration = Duration {
+        let neg_bilrost_duration = Duration {
             seconds: 0,
             nanos: -1,
         };
 
         assert!(matches!(
-           time::Duration::try_from(neg_prost_duration),
+           time::Duration::try_from(neg_bilrost_duration),
            Err(DurationError::NegativeDuration(d)) if d == std_duration,
         ))
     }
