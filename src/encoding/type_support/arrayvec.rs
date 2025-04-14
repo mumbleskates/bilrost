@@ -1,8 +1,8 @@
 use crate::encoding::plain_bytes::plain_bytes_vec_impl;
 use crate::encoding::value_traits::{for_overwrite_via_default, TriviallyDistinguishedCollection};
 use crate::encoding::{
-    delegate_encoding, delegate_value_encoding, Collection, EmptyState, General,
-    GeneralPacked, Packed, Unpacked,
+    delegate_encoding, delegate_value_encoding, Collection, EmptyState, General, GeneralPacked,
+    Packed, Unpacked,
 };
 use crate::DecodeErrorKind::InvalidValue;
 use crate::{DecodeError, DecodeErrorKind};

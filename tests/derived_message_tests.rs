@@ -4,8 +4,8 @@
 
 use bilrost::encoding::opaque::{OpaqueMessage, OpaqueValue as OV};
 use bilrost::encoding::{
-    encode_varint, Collection, DistinguishedOneofDecoder, EmptyState, General, Oneof,
-    OneofDecoder, Varint,
+    encode_varint, Collection, DistinguishedOneofDecoder, EmptyState, General, Oneof, OneofDecoder,
+    Varint,
 };
 use bilrost::Canonicity::{Canonical, HasExtensions, NotCanonical};
 use bilrost::DecodeErrorKind::{

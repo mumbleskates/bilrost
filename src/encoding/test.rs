@@ -1,9 +1,9 @@
 use crate::encoding::{
     const_varint, decode_varint, decode_varint_slow, encode_varint, encoded_len_varint, Capped,
     DecodeContext, Decoder, DistinguishedDecoder, DistinguishedProxiable,
-    DistinguishedValueDecoder, EmptyState, Encoder, Fixed, ForOverwrite, General, Map,
-    Packed, PlainBytes, Proxiable, RestrictedDecodeContext, RuntimeTagMeasurer, TagReader,
-    TagRevWriter, TagWriter, ValueDecoder, ValueEncoder, Varint, WireType,
+    DistinguishedValueDecoder, EmptyState, Encoder, Fixed, ForOverwrite, General, Map, Packed,
+    PlainBytes, Proxiable, RestrictedDecodeContext, RuntimeTagMeasurer, TagReader, TagRevWriter,
+    TagWriter, ValueDecoder, ValueEncoder, Varint, WireType,
 };
 use crate::DecodeErrorKind::{
     InvalidVarint, OutOfDomainValue, TagOverflowed, Truncated, WrongWireType,
@@ -282,7 +282,7 @@ macro_rules! check_type {
                     T,
                     GeneralPacked,
                 >(
-                    value, tag, wire_type,
+                    value, tag, wire_type
                 ))
             }
 
@@ -555,38 +555,17 @@ fn test_present_and_empty() {
     present_empty_not_canon::<BTreeMap<Blob, Blob>, Map<General, General>>();
     present_empty_not_canon::<BTreeMap<Vec<u8>, Vec<u8>>, Map<PlainBytes, PlainBytes>>();
 
-    present_empty_not_canon::<
-        Vec<BTreeMap<u32, u32>>,
-        Packed<Map<General, General>>,
-    >();
-    present_empty_not_canon::<
-        Vec<BTreeMap<u64, u64>>,
-        Packed<Map<General, General>>,
-    >();
-    present_empty_not_canon::<
-        Vec<BTreeMap<i32, i32>>,
-        Packed<Map<General, General>>,
-    >();
-    present_empty_not_canon::<
-        Vec<BTreeMap<i64, i64>>,
-        Packed<Map<General, General>>,
-    >();
+    present_empty_not_canon::<Vec<BTreeMap<u32, u32>>, Packed<Map<General, General>>>();
+    present_empty_not_canon::<Vec<BTreeMap<u64, u64>>, Packed<Map<General, General>>>();
+    present_empty_not_canon::<Vec<BTreeMap<i32, i32>>, Packed<Map<General, General>>>();
+    present_empty_not_canon::<Vec<BTreeMap<i64, i64>>, Packed<Map<General, General>>>();
     present_empty_not_canon::<Vec<BTreeMap<u32, u32>>, Packed<Map<Fixed, Fixed>>>();
     present_empty_not_canon::<Vec<BTreeMap<u64, u64>>, Packed<Map<Fixed, Fixed>>>();
     present_empty_not_canon::<Vec<BTreeMap<i32, i32>>, Packed<Map<Fixed, Fixed>>>();
     present_empty_not_canon::<Vec<BTreeMap<i64, i64>>, Packed<Map<Fixed, Fixed>>>();
-    present_empty_not_canon::<
-        Vec<BTreeMap<bool, bool>>,
-        Packed<Map<General, General>>,
-    >();
-    present_empty_not_canon::<
-        Vec<BTreeMap<String, String>>,
-        Packed<Map<General, General>>,
-    >();
-    present_empty_not_canon::<
-        Vec<BTreeMap<Blob, Blob>>,
-        Packed<Map<General, General>>,
-    >();
+    present_empty_not_canon::<Vec<BTreeMap<bool, bool>>, Packed<Map<General, General>>>();
+    present_empty_not_canon::<Vec<BTreeMap<String, String>>, Packed<Map<General, General>>>();
+    present_empty_not_canon::<Vec<BTreeMap<Blob, Blob>>, Packed<Map<General, General>>>();
     present_empty_not_canon::<Vec<BTreeMap<Vec<u8>, Vec<u8>>>, Packed<Map<PlainBytes, PlainBytes>>>(
     );
 
@@ -598,41 +577,22 @@ fn test_present_and_empty() {
     present_empty_not_canon::<(bool, bool, bool, bool, bool, bool), General>();
     present_empty_not_canon::<(bool, bool, bool, bool, bool, bool, bool), General>();
     present_empty_not_canon::<(bool, bool, bool, bool, bool, bool, bool, bool), General>();
-    present_empty_not_canon::<
-        (bool, bool, bool, bool, bool, bool, bool, bool, bool),
-        General,
-    >();
-    present_empty_not_canon::<(u16, u16, u16, u16, u16, u16, u16, u16, u16, u16), General>(
+    present_empty_not_canon::<(bool, bool, bool, bool, bool, bool, bool, bool, bool), General>();
+    present_empty_not_canon::<(u16, u16, u16, u16, u16, u16, u16, u16, u16, u16), General>();
+    present_empty_not_canon::<(u16, u16, u16, u16, u16, u16, u16, u16, u16, u16, u16), General>();
+    present_empty_not_canon::<(u16, u16, u16, u16, u16, u16, u16, u16, u16, u16, u16, u16), General>(
     );
-    present_empty_not_canon::<
-        (u16, u16, u16, u16, u16, u16, u16, u16, u16, u16, u16),
-        General,
-    >();
-    present_empty_not_canon::<
-        (u16, u16, u16, u16, u16, u16, u16, u16, u16, u16, u16, u16),
-        General,
-    >();
     present_empty_not_canon::<(bool,), General>();
     present_empty_not_canon::<(bool, u32), General>();
     present_empty_not_canon::<(bool, bool, String), General>();
     present_empty_not_canon::<(bool, i64, Blob, bool), General>();
     present_empty_not_canon::<(bool, bool, bool, bool, bool), General>();
     present_empty_not_canon::<(bool, bool, (), bool, bool, bool), General>();
-    present_empty_not_canon::<(bool, bool, bytes::Bytes, bool, bool, bool, bool), General>(
-    );
+    present_empty_not_canon::<(bool, bool, bytes::Bytes, bool, bool, bool, bool), General>();
     present_empty_not_canon::<(bool, bool, u16, bool, i16, bool, bool, bool), General>();
-    present_empty_not_canon::<
-        (bool, String, bool, bool, bool, bool, bool, bool, bool),
-        General,
-    >();
-    present_empty_not_canon::<
-        (String, u16, u16, u16, u16, u16, i64, u16, u16, u16),
-        General,
-    >();
-    present_empty_not_canon::<
-        (u16, u16, u16, bool, u16, u16, u16, u16, bool, u16, u16),
-        General,
-    >();
+    present_empty_not_canon::<(bool, String, bool, bool, bool, bool, bool, bool, bool), General>();
+    present_empty_not_canon::<(String, u16, u16, u16, u16, u16, i64, u16, u16, u16), General>();
+    present_empty_not_canon::<(u16, u16, u16, bool, u16, u16, u16, u16, bool, u16, u16), General>();
     present_empty_not_canon::<
         (
             u16,

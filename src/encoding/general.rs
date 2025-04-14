@@ -259,12 +259,7 @@ mod string {
     use super::{General, String};
     use crate::encoding::test::check_type_test;
     check_type_test!(General, relaxed, String, WireType::LengthDelimited);
-    check_type_test!(
-        General,
-        distinguished,
-        String,
-        WireType::LengthDelimited
-    );
+    check_type_test!(General, distinguished, String, WireType::LengthDelimited);
 }
 
 impl_cow_value_encoding!(
@@ -278,18 +273,8 @@ impl_cow_value_encoding!(
 mod cow_string {
     use super::{Cow, General};
     use crate::encoding::test::check_type_test;
-    check_type_test!(
-        General,
-        relaxed,
-        Cow<str>,
-        WireType::LengthDelimited
-    );
-    check_type_test!(
-        General,
-        distinguished,
-        Cow<str>,
-        WireType::LengthDelimited
-    );
+    check_type_test!(General, relaxed, Cow<str>, WireType::LengthDelimited);
+    check_type_test!(General, distinguished, Cow<str>, WireType::LengthDelimited);
 }
 
 impl<const P: u8> Wiretyped<GeneralGeneric<P>> for Bytes {
@@ -415,12 +400,7 @@ mod blob {
     use super::{Blob, General};
     use crate::encoding::test::check_type_test;
     check_type_test!(General, relaxed, Blob, WireType::LengthDelimited);
-    check_type_test!(
-        General,
-        distinguished,
-        Blob,
-        WireType::LengthDelimited
-    );
+    check_type_test!(General, distinguished, Blob, WireType::LengthDelimited);
 }
 
 impl Proxiable<SealedBilrostTag> for core::time::Duration {

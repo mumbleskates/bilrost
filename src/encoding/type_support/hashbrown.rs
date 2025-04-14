@@ -1,7 +1,7 @@
 use crate::encoding::value_traits::for_overwrite_via_default;
 use crate::encoding::{
-    delegate_encoding, delegate_value_encoding, Collection, EmptyState, GeneralGeneric,
-    General, GeneralPacked, Map, Mapping, Packed, Unpacked,
+    delegate_encoding, delegate_value_encoding, Collection, EmptyState, General, GeneralGeneric,
+    GeneralPacked, Map, Mapping, Packed, Unpacked,
 };
 use crate::DecodeErrorKind;
 use crate::DecodeErrorKind::UnexpectedlyRepeated;

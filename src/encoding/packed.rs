@@ -6,8 +6,8 @@ use crate::encoding::{
     decoding_modes, encode_varint, encoded_len_varint, prepend_varint, unpacked, BorrowDecoder,
     Canonicity, Capped, DecodeContext, DecodeError, Decoder, DistinguishedBorrowDecoder,
     DistinguishedDecoder, DistinguishedValueBorrowDecoder, DistinguishedValueDecoder, Encoder,
-    FieldEncoder, GeneralPacked, RestrictedDecodeContext, TagMeasurer, TagRevWriter,
-    TagWriter, ValueBorrowDecoder, ValueDecoder, ValueEncoder, WireType, Wiretyped,
+    FieldEncoder, GeneralPacked, RestrictedDecodeContext, TagMeasurer, TagRevWriter, TagWriter,
+    ValueBorrowDecoder, ValueDecoder, ValueEncoder, WireType, Wiretyped,
 };
 use crate::DecodeErrorKind::{InvalidValue, Truncated};
 use bytes::{Buf, BufMut};

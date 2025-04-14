@@ -2,8 +2,8 @@ use crate::encoding::proxy::SealedBilrostTag;
 use crate::encoding::value_traits::for_overwrite_via_default;
 use crate::encoding::{
     delegate_encoding, delegate_proxied_encoding, delegate_value_encoding, Collection, EmptyState,
-    ForOverwrite, GeneralGeneric, General, GeneralPacked, Map,
-    Mapping, Packed, Proxiable, Unpacked, Varint,
+    ForOverwrite, General, GeneralGeneric, GeneralPacked, Map, Mapping, Packed, Proxiable,
+    Unpacked, Varint,
 };
 use crate::DecodeErrorKind::{self, InvalidValue, OutOfDomainValue, UnexpectedlyRepeated};
 use core::cmp::Ordering;
@@ -214,12 +214,7 @@ mod systemtime {
     use crate::encoding::test::{check_type_empty, check_type_test};
 
     check_type_empty!(SystemTime, via proxy with tag SealedBilrostTag);
-    check_type_test!(
-        General,
-        relaxed,
-        SystemTime,
-        WireType::LengthDelimited
-    );
+    check_type_test!(General, relaxed, SystemTime, WireType::LengthDelimited);
 }
 
 delegate_encoding!(

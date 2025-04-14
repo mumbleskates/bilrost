@@ -22,8 +22,8 @@ use crate::encoding::{
     delegate_value_encoding, encode_varint, encoded_len_varint,
     encoding_implemented_via_value_encoding, prepend_varint, skip_field, BorrowDecoder, Canonicity,
     Capped, DecodeContext, Decoder, DistinguishedBorrowDecoder, DistinguishedDecoder,
-    DistinguishedValueBorrowDecoder, DistinguishedValueDecoder, EmptyState, Encoder,
-    GeneralGeneric, General, RestrictedDecodeContext, TagReader, TagRevWriter, TagWriter,
+    DistinguishedValueBorrowDecoder, DistinguishedValueDecoder, EmptyState, Encoder, General,
+    GeneralGeneric, RestrictedDecodeContext, TagReader, TagRevWriter, TagWriter,
     TrivialTagMeasurer, ValueBorrowDecoder, ValueDecoder, ValueEncoder, WireType, Wiretyped,
 };
 use crate::DecodeError;

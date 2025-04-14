@@ -7,8 +7,8 @@ pub(crate) mod time_proxies {
     };
     use crate::encoding::{
         delegate_value_encoding, empty_state_via_default, Capped, DecodeContext,
-        DistinguishedValueDecoder, Fixed, GeneralGeneric, General,
-        RestrictedDecodeContext, ValueDecoder, ValueEncoder, WireType, Wiretyped,
+        DistinguishedValueDecoder, Fixed, General, GeneralGeneric, RestrictedDecodeContext,
+        ValueDecoder, ValueEncoder, WireType, Wiretyped,
     };
     use crate::DecodeErrorKind::InvalidValue;
     use crate::{Canonicity, DecodeError};

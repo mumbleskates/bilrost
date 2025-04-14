@@ -3,8 +3,8 @@ use crate::encoding::proxy::SealedBilrostTag;
 use crate::encoding::type_support::common::time_proxies::TimeDeltaProxy;
 use crate::encoding::{
     delegate_proxied_encoding, delegate_value_encoding, empty_state_via_default, Canonicity,
-    DecodeErrorKind, DistinguishedProxiable, EmptyState, ForOverwrite, General, Packed,
-    Proxiable, Varint,
+    DecodeErrorKind, DistinguishedProxiable, EmptyState, ForOverwrite, General, Packed, Proxiable,
+    Varint,
 };
 use crate::Canonicity::Canonical;
 use crate::DecodeErrorKind::{InvalidValue, OutOfDomainValue};
