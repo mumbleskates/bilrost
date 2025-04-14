@@ -885,10 +885,18 @@ to collide with other type names that are in scope. These standard aliases are:
 * `unpacked` (`unpacked<E = general_packed>`): : encodes collections with their
   values unpacked as zero or more normally encoded fields, one per value. The
   fields are encoded with the parametrized encoding `E`, which defaults to
-  `general_packed`
+  `general_packed`. Unpacked representations may encode less efficiently when
+  there are more than one or two values, but the representation is also directly
+  compatible with that of `Option` values and non-repeated value fields.
 * `packed` (`packed<E = general_packed>`): encodes collections with their values
   packed into a single length-delimited value. The values are encoded with the
-  parametrized encoding `E`, which defaults to `general_packed`
+  parametrized encoding `E`, which defaults to `general_packed`. Packed field
+  values are usually more efficient when encoded when there are more than one or
+  two values and can represent the difference between an *empty* collection and
+  a collection that isn't present at all. But, there are few to no options for
+  compatibility between a packed repeated field and any other representation:
+  the schema of the field needs to be fully understood for it to be read
+  correctly.
 * `map<KE, VE>`: encodes mappings with their keys (encoded with parametrized
   encoding `KE`) and values (encoded with `VE`) packed alternating into a single
   length-delimited value.
