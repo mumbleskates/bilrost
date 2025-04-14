@@ -717,8 +717,10 @@ within an `Option` so that `None` stands for the empty state.
 #### Repeated values in Oneof fields
 
 Oneof variants must contain values that encode as a single field on the wire.
-This means that for collection types like `Vec`, `HashSet`, arrays, etc. the
-`packed` encoding must always be used.
+This means that collection types like `Vec`, `HashSet`, arrays, etc. must always
+be represented in a packed encoding, rather than as the same field repeated for
+each value in the collection ("unpacked", which is the default representation in
+messages).
 
 This is the same requirement that is needed to make these types re-nest in any
 other collection or `Option`; see the notes and table in the section on
@@ -869,19 +871,21 @@ available as aliases, all-lower-cased to ensure that these aliases are unlikely
 to collide with other type names that are in scope. These standard aliases are:
 
 * `general`: the default encoding in messages, suitable for most field types.
-  Delegates encoding of collections (vecs and sets) to `unpacked<general>` and
-  mapping types to `map<general_packed, general_packed>`.
+  Delegates encoding of collections (vecs and sets) to
+  `unpacked<general_packed>` and mapping types to
+  `map<general_packed, general_packed>`.
 * `general_packed`: the default encoding for `oneof` variant values and in the
-  nested values of already-packed fields.
+  nested values of fields that are already repeated collections.
 * `varint`: primitive numeric types and bool, encodes as varint.
 * `fixed`: fixed-width four- and eight-byte values for integers, floats, and
   byte arrays. Delegates encoding of collections to `unpacked<fixed>`
 * `plainbytes`: encodes byte arrays, `Vec<u8>`, and `Cow<[u8]>` as
   length-delimited values. Delegates encoding of `Vec<Vec<u8>>`
   and `Vec<Cow<[u8]>>` to `unpacked<plainbytes>`
-* `unpacked` (`unpacked<E = general>`): : encodes collections with their values
-  unpacked as zero or more normally encoded fields, one per value. The fields
-  are encoded with the parametrized encoding `E`, which defaults to `general`
+* `unpacked` (`unpacked<E = general_packed>`): : encodes collections with their
+  values unpacked as zero or more normally encoded fields, one per value. The
+  fields are encoded with the parametrized encoding `E`, which defaults to
+  `general_packed`
 * `packed` (`packed<E = general_packed>`): encodes collections with their values
   packed into a single length-delimited value. The values are encoded with the
   parametrized encoding `E`, which defaults to `general_packed`
@@ -1515,21 +1519,22 @@ assert_eq!(decoded, Ok(registry));
 
 ### Supported message field types
 
-`bilrost` structs can encode fields with a wide variety of types:
+`bilrost` structs can encode fields with a wide variety of types ("general
+encodings" refers to `general` & `general_packed`):
 
 | Encoding                      | Value type                                    | Encoded representation | Distinguished    |
 |-------------------------------|-----------------------------------------------|------------------------|------------------|
-| `general` & `fixed`           | [`f32`][prim]                                 | fixed-size 32 bits     | no               |
-| `general` & `fixed`           | [`u32`][prim], [`i32`][prim]                  | fixed-size 32 bits     | yes              |
-| `general` & `fixed`           | [`f64`][prim]                                 | fixed-size 64 bits     | no               |
-| `general` & `fixed`           | [`u64`][prim], [`i64`][prim]                  | fixed-size 64 bits     | yes              |
-| `general` & `varint`          | [`u64`][prim], [`u32`][prim], [`u16`][prim]   | varint                 | yes              |
-| `general` & `varint`          | [`i64`][prim], [`i32`][prim], [`i16`][prim]   | varint                 | yes              |
-| `general` & `varint`          | [`usize`][prim], [`isize`][prim]              | varint                 | yes              |
-| `general` & `varint`          | [`bool`][prim]                                | varint                 | yes              |
-| `general`                     | derived [`Enumeration`](#enumerations)[^enum] | varint                 | yes              |
-| `general`                     | [`String`][str]*                              | length-delimited       | yes              |
-| `general`                     | impl [`Message`](#derive-macros)[^boxmsg]     | length-delimited       | maybe            |
+| general encodings & `fixed`   | [`f32`][prim]                                 | fixed-size 32 bits     | no               |
+| general encodings & `fixed`   | [`u32`][prim], [`i32`][prim]                  | fixed-size 32 bits     | yes              |
+| general encodings & `fixed`   | [`f64`][prim]                                 | fixed-size 64 bits     | no               |
+| general encodings & `fixed`   | [`u64`][prim], [`i64`][prim]                  | fixed-size 64 bits     | yes              |
+| general encodings & `varint`  | [`u64`][prim], [`u32`][prim], [`u16`][prim]   | varint                 | yes              |
+| general encodings & `varint`  | [`i64`][prim], [`i32`][prim], [`i16`][prim]   | varint                 | yes              |
+| general encodings & `varint`  | [`usize`][prim], [`isize`][prim]              | varint                 | yes              |
+| general encodings & `varint`  | [`bool`][prim]                                | varint                 | yes              |
+| general encodings             | derived [`Enumeration`](#enumerations)[^enum] | varint                 | yes              |
+| general encodings             | [`String`][str]*                              | length-delimited       | yes              |
+| general encodings             | impl [`Message`](#derive-macros)[^boxmsg]     | length-delimited       | maybe            |
 | `varint`                      | [`u8`][prim], [`i8`][prim]                    | varint                 | yes              |
 | `plainbytes`                  | [`Vec<u8>`][vec]*                             | length-delimited       | yes              |
 | [`(E1, E2, ... EN)`](#tuples) | [`(T1, T2, ... TN)`][tuple]                   | length-delimited       | if each field is |
@@ -1546,28 +1551,28 @@ covering impl; message types [can nest recursively](#writing-recursive-messages)
 this way.
 
 With the relevant crate features enabled there is built in support for certain
-additional types as well:
+additional types as well, each supported by the general encodings:
 
-| Encoding  | Value type                                         | Empty value                            | Distinguished | Required feature |
-|-----------|----------------------------------------------------|----------------------------------------|---------------|------------------|
-| `general` | [`core::time::Duration`][coreduration]             | zero duration                          | yes           | (none)           |
-| `general` | [`std::time::SystemTime`][stdsystemtime]           | `UNIX_EPOCH` (1970-01-01 00:00:00 UTC) | no            | "std"            |
-| `general` | [`chrono::NaiveDate`][chrononaivedate]             | 0000-01-01                             | yes           | "chrono"         |
-| `general` | [`chrono::NaiveTime`][chrononaivetime]             | 00:00:00                               | yes           | "chrono"         |
-| `general` | [`chrono::NaiveDateTime`][chrononaivedatetime]     | 0000-01-01 00:00:00                    | yes           | "chrono"         |
-| `general` | [`chrono::Utc`][chronoutc]                         | Utc                                    | yes           | "chrono"         |
-| `general` | [`chrono::FixedOffset`][chronofixedoffset]         | UTC+00:00                              | yes           | "chrono"         |
-| `general` | [`chrono::DateTime<Tz>`][chronodatetime]*          | 0000-01-01 00:00:00 +00:00             | yes           | "chrono"         |
-| `general` | [`chrono::TimeDelta`][chronotimedelta]             | zero duration                          | yes           | "chrono"         |
-| `general` | [`time::Date`][timedate]                           | 0000-01-01                             | yes           | "time"           |
-| `general` | [`time::Time`][timetime]                           | 00:00:00                               | yes           | "time"           |
-| `general` | [`time::PrimitiveDateTime`][timeprimitivedatetime] | 0000-01-01 00:00:00                    | yes           | "time"           |
-| `general` | [`time::UtcOffset`][timeutcoffset]                 | UTC+00:00                              | yes           | "time"           |
-| `general` | [`time::OffsetDateTime`][timeoffsetdatetime]       | 0000-01-01 00:00:00 +00:00             | yes           | "time"           |
-| `general` | [`time::Duration`][timeduration]                   | zero duration                          | yes           | "time"           |
+| Value type                                         | Empty value                            | Distinguished | Required feature |
+|----------------------------------------------------|----------------------------------------|---------------|------------------|
+| [`core::time::Duration`][coreduration]             | zero duration                          | yes           | (none)           |
+| [`std::time::SystemTime`][stdsystemtime]           | `UNIX_EPOCH` (1970-01-01 00:00:00 UTC) | no            | "std"            |
+| [`chrono::NaiveDate`][chrononaivedate]             | 0000-01-01                             | yes           | "chrono"         |
+| [`chrono::NaiveTime`][chrononaivetime]             | 00:00:00                               | yes           | "chrono"         |
+| [`chrono::NaiveDateTime`][chrononaivedatetime]     | 0000-01-01 00:00:00                    | yes           | "chrono"         |
+| [`chrono::Utc`][chronoutc]                         | Utc                                    | yes           | "chrono"         |
+| [`chrono::FixedOffset`][chronofixedoffset]         | UTC+00:00                              | yes           | "chrono"         |
+| [`chrono::DateTime<Tz>`][chronodatetime]*          | 0000-01-01 00:00:00 +00:00             | yes           | "chrono"         |
+| [`chrono::TimeDelta`][chronotimedelta]             | zero duration                          | yes           | "chrono"         |
+| [`time::Date`][timedate]                           | 0000-01-01                             | yes           | "time"           |
+| [`time::Time`][timetime]                           | 00:00:00                               | yes           | "time"           |
+| [`time::PrimitiveDateTime`][timeprimitivedatetime] | 0000-01-01 00:00:00                    | yes           | "time"           |
+| [`time::UtcOffset`][timeutcoffset]                 | UTC+00:00                              | yes           | "time"           |
+| [`time::OffsetDateTime`][timeoffsetdatetime]       | 0000-01-01 00:00:00 +00:00             | yes           | "time"           |
+| [`time::Duration`][timeduration]                   | zero duration                          | yes           | "time"           |
 
 *`chrono::DateTime<Tz>` is supported whenever `Tz::Offset` is supported by the
-`general` encoding. Currently this means `Utc` and `FixedOffset`.
+encodings. Currently this means `Utc` and `FixedOffset`.
 
 [coreduration]: https://doc.rust-lang.org/core/time/struct.Duration.html
 
@@ -1615,18 +1620,19 @@ Note that `Option` cannot be nested again. Semantically, `Option` gives the
 ability to detect the difference between an zeroed-out "empty" value and a
 missing field that was not included.
 
-| Encoding      | Value type                              | Encoded representation                                                         | Re-nestable | Distinguished      |
-|---------------|-----------------------------------------|--------------------------------------------------------------------------------|-------------|--------------------|
-| any encoding  | [`Option<T>`][opt]                      | identical; at least some bytes are always encoded if `Some`, nothing if `None` | no          | when `T` is        |
-| `unpacked<E>` | [`Vec<T>`][vec], [`BTreeSet<T>`][btset] | the same as encoding `E`, one field per value                                  | no          | when `T` is        |
-| `unpacked<E>` | [`[T; N]`][array][^arrays]              | the same as encoding `E`, one field per value                                  | no          | when `T` is        |
-| `unpacked`    | *                                       | (the same as `unpacked<general>`)                                              | no          | *                  |
-| `packed<E>`   | [`Vec<T>`][vec], [`BTreeSet<T>`][btset] | always length-delimited, successively encoded with `E`                         | yes         | when `T` is        |
-| `packed<E>`   | [`[T; N]`][array][^arrays]              | always length-delimited, successively encoded with `E`                         | yes         | when `T` is        |
-| `packed`      | *                                       | (the same as `packed<general>`)                                                | yes         | *                  |
-| `map<KE, VE>` | [`BTreeMap<K, V>`][btmap]               | always length-delimited, alternately encoded with `KE` and `VE`                | yes         | when `K` & `V` are |
-| `general`     | [`Vec<T>`][vec], [`BTreeSet<T>`][btset] | (the same as `unpacked`)                                                       | no          | *                  |
-| `general`     | [`BTreeMap`][btmap]                     | (the same as `map<general, general>`)                                          | yes         | *                  |
+| Encoding          | Value type                              | Encoded representation                                                                     | Re-nestable | Distinguished      |
+|-------------------|-----------------------------------------|--------------------------------------------------------------------------------------------|-------------|--------------------|
+| any encoding      | [`Option<T>`][opt]                      | identical; at least some bytes are always encoded if `Some`, nothing if `None`             | no          | when `T` is        |
+| `unpacked<E>`     | [`Vec<T>`][vec], [`BTreeSet<T>`][btset] | the same as encoding `E`, one field per value                                              | no          | when `T` is        |
+| `unpacked<E>`     | [`[T; N]`][array][^arrays]              | the same as encoding `E`, one field per value                                              | no          | when `T` is        |
+| `unpacked`        | *                                       | (the same as `unpacked<general>`)                                                          | no          | *                  |
+| `packed<E>`       | [`Vec<T>`][vec], [`BTreeSet<T>`][btset] | always length-delimited, successively encoded with `E`                                     | yes         | when `T` is        |
+| `packed<E>`       | [`[T; N]`][array][^arrays]              | always length-delimited, successively encoded with `E`                                     | yes         | when `T` is        |
+| `packed`          | *                                       | (the same as `packed<general_packed>`)                                                     | yes         | *                  |
+| `map<KE, VE>`     | [`BTreeMap<K, V>`][btmap]               | always length-delimited, alternately encoded with keys by encoding `KE` and values by `VE` | yes         | when `K` & `V` are |
+| `general`         | [`Vec<T>`][vec], [`BTreeSet<T>`][btset] | (the same as `unpacked`)                                                                   | no          | *                  |
+| `general_packed`  | `Vec<T>`, `BTreeSet<T>`                 | (the same as `packed`)                                                                     | yes         | *                  |
+| general encodings | [`BTreeMap`][btmap]                     | (the same as `map<general_packed, general_packed>`)                                        | yes         | *                  |
 
 [^arrays]: Fixed-size array types (`[T; N]`) act similarly to collections that
 additionally require an exact number of items. Where other kinds of collections
@@ -1638,13 +1644,13 @@ Many alternative types are also available for both scalar values and containers!
 | Value type          | Alternative                                     | Supporting encoding | Distinguished | Feature to enable |
 |---------------------|-------------------------------------------------|---------------------|---------------|-------------------|
 | `u32`, `u64`        | [`[u8; 4]`][prim], [`[u8; 8]`][prim]            | `fixed`             | yes           | (none)            |
-| `Vec<u8>`           | `Blob`[^blob]                                   | `general`           | yes           | (none)            |
+| `Vec<u8>`           | `Blob`[^blob]                                   | general encodings   | yes           | (none)            |
 | `Vec<u8>`           | [`Cow<[u8]>`][cow]                              | `plainbytes`        | yes           | (none)            |
-| `Vec<u8>`           | [`bytes::Bytes`][bytes][^bzcopy]                | `general`           | yes           | (none)            |
+| `Vec<u8>`           | [`bytes::Bytes`][bytes][^bzcopy]                | general encodings   | yes           | (none)            |
 | `Vec<u8>`           | [`[u8; N]`][prim][^plainbytearr]                | `plainbytes`        | yes           | (none)            |
-| `String`/`Vec<u8>`* | [`bstr::BString`][bstr][^bstrnote]              | `general`           | yes           | "bstr"            |
-| `String`            | [`Cow<str>`][cow]                               | `general`           | yes           | (none)            |
-| `String`            | [`bytestring::ByteString`][bytestring][^bzcopy] | `general`           | yes           | "bytestring"      |
+| `String`/`Vec<u8>`* | [`bstr::BString`][bstr][^bstrnote]              | general encodings   | yes           | "bstr"            |
+| `String`            | [`Cow<str>`][cow]                               | general encodings   | yes           | (none)            |
+| `String`            | [`bytestring::ByteString`][bytestring][^bzcopy] | general encodings   | yes           | "bytestring"      |
 
 [^bstrnote]: [`bstr::BString`][bstr] is like `String` in that it has many useful
 features for working with text, yet it is also like `Vec<u8>` in that it can
