@@ -2,16 +2,34 @@
 
 ### Breaking changes
 
-* TODO: GeneralPacked
-  * now available generally
-  * now implicit default contextually
-* TODO: General becomes generic
+* The `bilrost::encoding::General` encoding type has become a specific
+  definition of a generic type, `bilrost::encoding::GeneralGeneric<P>`. Anything
+  that implements encoders specifically for `General` or sets up encoding
+  delegation for it may find that it no longer works inside nested values or in
+  `Oneof` variants, since those values are encoded with a specific definition of
+  the generic. If this is a problem, it can be solved one of two ways:
+  1. explicitly annotate the encodings of the values that aren't working with
+     the "general" encoding, overriding "general_packed"
+  2. change the implementation or delegation to be not just for `General`, but
+     for `GeneralGeneric<P>` for all `const P: u8` instead; this will include
+     both of the general encodings.
 * Renamed `OpaqueMessage::{borrowed, convert_to_owned}` to `to_borrowed` and
   `into_owned`, and `OpaqueValue::convert_to_owned` to `into_owned` to better
   match [common naming conventions](
   https://rust-lang.github.io/api-guidelines/naming.html#ad-hoc-conversions-follow-as_-to_-into_-conventions-c-conv)
 
 ### New features
+
+* There is a new encoding available, `general_packed` (exported as
+  `bilrost::encoding::GeneralPacked`) that defaults to packed representations
+  rather than unpacked for its supported collection types.
+  * `general_packed` is now the implicit default when no encoding is specified
+    for `Oneof` variants, as well as the default inner encoding for values
+    nested inside `packed`, `unpacked`, and `map` values.
+  * In all other ways, `general_packed` should behave the same as `general`.
+  * This means that *many* new types can now be encoded without specifying an
+    explicit field `encoding`. This can be very helpful as the compiler error
+    messages from the missing trait are unlikely to ever be very good.
 
 ### Fixes
 
