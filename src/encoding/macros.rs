@@ -417,7 +417,7 @@ macro_rules! delegate_proxied_encoding {
         $(with generics ($($impl_generics:tt)*))?
     ) => {
         $crate::delegate_value_encoding!(
-            delegate from ($crate::encoding::General<__G>)
+            delegate from ($crate::encoding::GeneralGeneric<__G>)
             to ($crate::encoding::Proxied<$to $(, $proxy_tag)?>)
             for type ($ty)
             $(with where clause ($($where_clause)*))?
@@ -435,7 +435,7 @@ macro_rules! delegate_proxied_encoding {
         $(with generics ($($impl_generics:tt)*))?
     ) => {
         $crate::delegate_value_encoding!(
-            delegate from ($crate::encoding::General<__G>)
+            delegate from ($crate::encoding::GeneralGeneric<__G>)
             to ($crate::encoding::Proxied<$to $(, $proxy_tag)?>)
             for type ($ty)
             including distinguished

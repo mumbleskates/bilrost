@@ -1271,12 +1271,14 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
 
         #creation_impl
 
-        impl #unborrowed_generics #crate_::encoding::Wiretyped<#crate_::encoding::General<__G>>
+        impl #unborrowed_generics
+        #crate_::encoding::Wiretyped<#crate_::encoding::GeneralGeneric<__G>>
         for #ident #ty_generics #where_clause {
             const WIRE_TYPE: #crate_::encoding::WireType = #crate_::encoding::WireType::Varint;
         }
 
-        impl #unborrowed_generics #crate_::encoding::ValueEncoder<#crate_::encoding::General<__G>>
+        impl #unborrowed_generics
+        #crate_::encoding::ValueEncoder<#crate_::encoding::GeneralGeneric<__G>>
         for #ident #ty_generics #where_clause {
             #[inline]
             fn encode_value<__B: #crate_::bytes::BufMut + ?Sized>(value: &Self, buf: &mut __B) {
@@ -1305,7 +1307,8 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
             }
         }
 
-        impl #unborrowed_generics #crate_::encoding::ValueDecoder<#crate_::encoding::General<__G>>
+        impl #unborrowed_generics
+        #crate_::encoding::ValueDecoder<#crate_::encoding::GeneralGeneric<__G>>
         for #ident #ty_generics #where_clause {
             #[inline]
             fn decode_value<__B: #crate_::bytes::Buf + ?Sized>(
@@ -1332,7 +1335,7 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
         }
 
         impl #unborrowed_generics
-        #crate_::encoding::DistinguishedValueDecoder<#crate_::encoding::General<__G>>
+        #crate_::encoding::DistinguishedValueDecoder<#crate_::encoding::GeneralGeneric<__G>>
         for #ident #ty_generics #where_clause {
             const CHECKS_EMPTY: bool = false;
 
@@ -1342,7 +1345,9 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
                 buf: #crate_::encoding::Capped<impl #crate_::bytes::Buf + ?Sized>,
                 ctx: #crate_::encoding::RestrictedDecodeContext,
             ) -> Result<#crate_::Canonicity, #crate_::DecodeError> {
-                #crate_::encoding::ValueDecoder::<#crate_::encoding::General<__G>>::decode_value(
+                #crate_::encoding::ValueDecoder::<
+                    #crate_::encoding::GeneralGeneric<__G>
+                >::decode_value(
                     value,
                     buf,
                     ctx.into_inner(),
@@ -1352,7 +1357,7 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
         }
 
         impl #borrow_generics
-        #crate_::encoding::ValueBorrowDecoder<'__a, #crate_::encoding::General<__G>>
+        #crate_::encoding::ValueBorrowDecoder<'__a, #crate_::encoding::GeneralGeneric<__G>>
         for #ident #ty_generics #where_clause {
             #[inline(always)]
             fn borrow_decode_value(
@@ -1360,7 +1365,9 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
                 mut buf: #crate_::encoding::Capped<&'__a [u8]>,
                 ctx: #crate_::encoding::DecodeContext,
             ) -> Result<(), #crate_::DecodeError> {
-                #crate_::encoding::ValueDecoder::<#crate_::encoding::General<__G>>::decode_value(
+                #crate_::encoding::ValueDecoder::<
+                    #crate_::encoding::GeneralGeneric<__G>
+                >::decode_value(
                     value,
                     buf,
                     ctx,
@@ -1369,7 +1376,10 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
         }
 
         impl #borrow_generics
-        #crate_::encoding::DistinguishedValueBorrowDecoder<'__a, #crate_::encoding::General<__G>>
+        #crate_::encoding::DistinguishedValueBorrowDecoder<
+            '__a,
+            #crate_::encoding::GeneralGeneric<__G>,
+        >
         for #ident #ty_generics #where_clause {
             const CHECKS_EMPTY: bool = false;
 
@@ -1379,7 +1389,9 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
                 buf: #crate_::encoding::Capped<&'__a [u8]>,
                 ctx: #crate_::encoding::RestrictedDecodeContext,
             ) -> Result<#crate_::Canonicity, #crate_::DecodeError> {
-                #crate_::encoding::ValueDecoder::<#crate_::encoding::General<__G>>::decode_value(
+                #crate_::encoding::ValueDecoder::<
+                    #crate_::encoding::GeneralGeneric<__G>
+                >::decode_value(
                     value,
                     buf,
                     ctx.into_inner(),

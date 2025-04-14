@@ -1,7 +1,7 @@
 use crate::encoding::value_traits::for_overwrite_via_default;
 use crate::encoding::{
-    delegate_encoding, delegate_value_encoding, Collection, EmptyState, General, GeneralInMessage,
-    GeneralInOneof, GeneralInsidePacked, Map, Mapping, Packed, Unpacked,
+    delegate_encoding, delegate_value_encoding, Collection, EmptyState, GeneralGeneric,
+    GeneralInMessage, GeneralInOneof, GeneralInsidePacked, Map, Mapping, Packed, Unpacked,
 };
 use crate::DecodeErrorKind;
 use crate::DecodeErrorKind::UnexpectedlyRepeated;
@@ -147,7 +147,7 @@ delegate_value_encoding!(
     with generics (T, S)
 );
 delegate_value_encoding!(
-    delegate from (General<G>) to (Map<GeneralInsidePacked, GeneralInsidePacked>)
+    delegate from (GeneralGeneric<G>) to (Map<GeneralInsidePacked, GeneralInsidePacked>)
     for type (hashbrown::HashMap<K, V, S>)
     with where clause (K: Eq + Hash, S: Default + core::hash::BuildHasher)
     with generics (const G: u8, K, V, S)

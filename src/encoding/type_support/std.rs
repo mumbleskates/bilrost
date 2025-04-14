@@ -2,8 +2,8 @@ use crate::encoding::proxy::SealedBilrostTag;
 use crate::encoding::value_traits::for_overwrite_via_default;
 use crate::encoding::{
     delegate_encoding, delegate_proxied_encoding, delegate_value_encoding, Collection, EmptyState,
-    ForOverwrite, General, GeneralInMessage, GeneralInOneof, GeneralInsidePacked, Map, Mapping,
-    Packed, Proxiable, Unpacked, Varint,
+    ForOverwrite, GeneralGeneric, GeneralInMessage, GeneralInOneof, GeneralInsidePacked, Map,
+    Mapping, Packed, Proxiable, Unpacked, Varint,
 };
 use crate::DecodeErrorKind::{self, InvalidValue, OutOfDomainValue, UnexpectedlyRepeated};
 use core::cmp::Ordering;
@@ -236,7 +236,7 @@ delegate_value_encoding!(
 );
 
 delegate_value_encoding!(
-    delegate from (General<G>) to (Map<GeneralInsidePacked, GeneralInsidePacked>)
+    delegate from (GeneralGeneric<G>) to (Map<GeneralInsidePacked, GeneralInsidePacked>)
     for type (HashMap<K, V, S>)
     with where clause (K: Eq + core::hash::Hash, S: Default + core::hash::BuildHasher)
     with generics (const G: u8, K, V, S)

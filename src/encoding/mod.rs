@@ -76,7 +76,8 @@
 //! include:
 //!
 //! * `Fixed`, for fixed-width encodings of either 4 or 8 bytes
-//! * `General`, the default encoding
+//! * `General`, the default encoding in messages
+//! * `GeneralPacked`, the default encoding in oneofs and inside already-packed values
 //! * `Map<KE, VE>`, which encodes key/value mappings where the keys are encoded by the given
 //!   encodings `KE` and `VE`
 //! * `Packed<E>`, which encodes homogenous containers as a value packed in a single field with the
@@ -165,7 +166,7 @@ pub use value_traits::{
 pub use fixed::Fixed;
 /// General encoder. Encodes strings and byte blobs, numbers as varints, floats as fixed size,
 /// repeated types unpacked, maps with its own encoding for keys and values, and message types.
-pub use general::{General, GeneralInMessage, GeneralInOneof, GeneralInsidePacked};
+pub use general::{GeneralGeneric, GeneralInMessage, GeneralInOneof, GeneralInsidePacked};
 /// Encoder for mapping types. Encodes alternating keys and values in packed format.
 pub use map::Map;
 /// Packed encoder. Encodes repeated types in packed format.

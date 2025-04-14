@@ -7,8 +7,8 @@ pub(crate) mod time_proxies {
     };
     use crate::encoding::{
         delegate_value_encoding, empty_state_via_default, Capped, DecodeContext,
-        DistinguishedValueDecoder, Fixed, General, GeneralInMessage, RestrictedDecodeContext,
-        ValueDecoder, ValueEncoder, WireType, Wiretyped,
+        DistinguishedValueDecoder, Fixed, GeneralGeneric, GeneralInMessage,
+        RestrictedDecodeContext, ValueDecoder, ValueEncoder, WireType, Wiretyped,
     };
     use crate::DecodeErrorKind::InvalidValue;
     use crate::{Canonicity, DecodeError};
@@ -22,11 +22,11 @@ pub(crate) mod time_proxies {
 
     empty_state_via_default!(TimeDeltaProxy);
 
-    impl<const G: u8> Wiretyped<General<G>> for TimeDeltaProxy {
+    impl<const G: u8> Wiretyped<GeneralGeneric<G>> for TimeDeltaProxy {
         const WIRE_TYPE: WireType = WireType::LengthDelimited;
     }
 
-    impl<const G: u8> ValueEncoder<General<G>> for TimeDeltaProxy {
+    impl<const G: u8> ValueEncoder<GeneralGeneric<G>> for TimeDeltaProxy {
         fn encode_value<B: BufMut + ?Sized>(value: &Self, buf: &mut B) {
             underived_encode!(TimeDelta {
                 1: GeneralInMessage => secs: &value.secs,
@@ -49,7 +49,7 @@ pub(crate) mod time_proxies {
         }
     }
 
-    impl<const G: u8> ValueDecoder<General<G>> for TimeDeltaProxy {
+    impl<const G: u8> ValueDecoder<GeneralGeneric<G>> for TimeDeltaProxy {
         fn decode_value<B: Buf + ?Sized>(
             value: &mut Self,
             mut buf: Capped<B>,
@@ -67,7 +67,7 @@ pub(crate) mod time_proxies {
         }
     }
 
-    impl<const G: u8> DistinguishedValueDecoder<General<G>> for TimeDeltaProxy {
+    impl<const G: u8> DistinguishedValueDecoder<GeneralGeneric<G>> for TimeDeltaProxy {
         const CHECKS_EMPTY: bool = true;
 
         fn decode_value_distinguished<const ALLOW_EMPTY: bool>(
@@ -83,7 +83,7 @@ pub(crate) mod time_proxies {
     }
 
     delegate_value_encoding!(
-        encoding (General<G>) borrows type (TimeDeltaProxy) as owned including distinguished
+        encoding (GeneralGeneric<G>) borrows type (TimeDeltaProxy) as owned including distinguished
         with generics (const G: u8)
     );
 }
