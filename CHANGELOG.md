@@ -11,10 +11,21 @@
 
 ### Fixes
 
+### Cleanups
+
+## v0.1012.3
+
+### Fixes
+
 * Loosened some erroneous constraints on `Option<T>` that prevented borrow-only
   types from being decodable when wrapped in `Option`.
 
-### Cleanups
+## v0.1012.2
+
+### Fixes
+
+* BUGFIX: Message implementations derived for oneof types no longer fail to skip
+  the data in unknown fields that the mssage also contains.
 
 ## v0.1012.1
 
