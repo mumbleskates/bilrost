@@ -855,7 +855,7 @@ practical reason to do this, but as a demonstration:
 #[derive(Message)]
 struct Bar(
     // This is the same type as "general"
-    #[bilrost(encoding = "::bilrost::encoding::GeneralInMessage")] String,
+    #[bilrost(encoding = "::bilrost::encoding::General")] String,
 );
 
 assert_eq!(
@@ -868,9 +868,11 @@ Where these encodings' type names are evaluated the standard encodings are made
 available as aliases, all-lower-cased to ensure that these aliases are unlikely
 to collide with other type names that are in scope. These standard aliases are:
 
-* `general`: the default encoding, suitable for most field types. Delegates
-  encoding of collections (vecs and sets) to `unpacked<general>` and mapping
-  types to `map<general, general>`.
+* `general`: the default encoding in messages, suitable for most field types.
+  Delegates encoding of collections (vecs and sets) to `unpacked<general>` and
+  mapping types to `map<general_packed, general_packed>`.
+* `general_packed`: the default encoding for `oneof` variant values and in the
+  nested values of already-packed fields.
 * `varint`: primitive numeric types and bool, encodes as varint.
 * `fixed`: fixed-width four- and eight-byte values for integers, floats, and
   byte arrays. Delegates encoding of collections to `unpacked<fixed>`
@@ -880,9 +882,9 @@ to collide with other type names that are in scope. These standard aliases are:
 * `unpacked` (`unpacked<E = general>`): : encodes collections with their values
   unpacked as zero or more normally encoded fields, one per value. The fields
   are encoded with the parametrized encoding `E`, which defaults to `general`
-* `packed` (`packed<E = general>`): encodes collections with their values packed
-  into a single length-delimited value. The values are encoded with the
-  parametrized encoding `E`, which defaults to `general`
+* `packed` (`packed<E = general_packed>`): encodes collections with their values
+  packed into a single length-delimited value. The values are encoded with the
+  parametrized encoding `E`, which defaults to `general_packed`
 * `map<KE, VE>`: encodes mappings with their keys (encoded with parametrized
   encoding `KE`) and values (encoded with `VE`) packed alternating into a single
   length-delimited value.

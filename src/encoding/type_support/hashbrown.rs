@@ -1,7 +1,7 @@
 use crate::encoding::value_traits::for_overwrite_via_default;
 use crate::encoding::{
     delegate_encoding, delegate_value_encoding, Collection, EmptyState, GeneralGeneric,
-    GeneralInMessage, GeneralInOneof, GeneralInsidePacked, Map, Mapping, Packed, Unpacked,
+    General, GeneralPacked, Map, Mapping, Packed, Unpacked,
 };
 use crate::DecodeErrorKind;
 use crate::DecodeErrorKind::UnexpectedlyRepeated;
@@ -135,22 +135,22 @@ where
 }
 
 delegate_encoding!(
-    delegate from (GeneralInMessage) to (Unpacked<GeneralInMessage>)
+    delegate from (General) to (Unpacked<General>)
     for type (hashbrown::HashSet<T, S>)
     with where clause (T: Eq + Hash, S: Default + core::hash::BuildHasher)
     with generics (T, S)
 );
 delegate_value_encoding!(
-    delegate from (GeneralInOneof) to (Packed<GeneralInsidePacked>)
+    delegate from (GeneralPacked) to (Packed<GeneralPacked>)
     for type (hashbrown::HashSet<T, S>)
     with where clause (T: Eq + Hash, S: Default + core::hash::BuildHasher)
     with generics (T, S)
 );
 delegate_value_encoding!(
-    delegate from (GeneralGeneric<G>) to (Map<GeneralInsidePacked, GeneralInsidePacked>)
+    delegate from (GeneralGeneric<P>) to (Map<GeneralPacked, GeneralPacked>)
     for type (hashbrown::HashMap<K, V, S>)
     with where clause (K: Eq + Hash, S: Default + core::hash::BuildHasher)
-    with generics (const G: u8, K, V, S)
+    with generics (const P: u8, K, V, S)
 );
 
 #[cfg(test)]
@@ -158,11 +158,11 @@ mod test {
     mod hashbrown_hashmap {
         mod general {
             use crate::encoding::test::check_type_test;
-            use crate::encoding::{GeneralInMessage, Map};
+            use crate::encoding::{General, Map};
             use alloc::collections::BTreeMap;
             use hashbrown::HashMap;
             check_type_test!(
-                Map<GeneralInMessage, GeneralInMessage>,
+                Map<General, General>,
                 relaxed,
                 from BTreeMap<u64, f32>,
                 into HashMap<u64, f32>,
@@ -192,11 +192,11 @@ mod test {
 
         mod delegated_from_general {
             use crate::encoding::test::check_type_test;
-            use crate::encoding::GeneralInMessage;
+            use crate::encoding::General;
             use alloc::collections::BTreeMap;
             use hashbrown::HashMap;
             check_type_test!(
-                GeneralInMessage,
+                General,
                 relaxed,
                 from BTreeMap<bool, u32>,
                 into HashMap<bool, u32>,

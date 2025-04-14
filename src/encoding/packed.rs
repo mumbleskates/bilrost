@@ -6,13 +6,13 @@ use crate::encoding::{
     decoding_modes, encode_varint, encoded_len_varint, prepend_varint, unpacked, BorrowDecoder,
     Canonicity, Capped, DecodeContext, DecodeError, Decoder, DistinguishedBorrowDecoder,
     DistinguishedDecoder, DistinguishedValueBorrowDecoder, DistinguishedValueDecoder, Encoder,
-    FieldEncoder, GeneralInsidePacked, RestrictedDecodeContext, TagMeasurer, TagRevWriter,
+    FieldEncoder, GeneralPacked, RestrictedDecodeContext, TagMeasurer, TagRevWriter,
     TagWriter, ValueBorrowDecoder, ValueDecoder, ValueEncoder, WireType, Wiretyped,
 };
 use crate::DecodeErrorKind::{InvalidValue, Truncated};
 use bytes::{Buf, BufMut};
 
-pub struct Packed<E = GeneralInsidePacked>(E);
+pub struct Packed<E = GeneralPacked>(E);
 
 /// Packed encodings always prefer to encode length delimited.
 impl<T, E> Wiretyped<Packed<E>> for T {

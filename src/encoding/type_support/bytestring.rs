@@ -23,11 +23,11 @@ impl EmptyState for bytestring::ByteString {
     }
 }
 
-impl<const G: u8> Wiretyped<GeneralGeneric<G>> for bytestring::ByteString {
+impl<const P: u8> Wiretyped<GeneralGeneric<P>> for bytestring::ByteString {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
 }
 
-impl<const G: u8> ValueEncoder<GeneralGeneric<G>> for bytestring::ByteString {
+impl<const P: u8> ValueEncoder<GeneralGeneric<P>> for bytestring::ByteString {
     #[inline]
     fn encode_value<B: BufMut + ?Sized>(value: &bytestring::ByteString, buf: &mut B) {
         encode_varint(value.len() as u64, buf);
@@ -46,7 +46,7 @@ impl<const G: u8> ValueEncoder<GeneralGeneric<G>> for bytestring::ByteString {
     }
 }
 
-impl<const G: u8> ValueDecoder<GeneralGeneric<G>> for bytestring::ByteString {
+impl<const P: u8> ValueDecoder<GeneralGeneric<P>> for bytestring::ByteString {
     #[inline]
     fn decode_value<B: Buf + ?Sized>(
         value: &mut bytestring::ByteString,
@@ -61,7 +61,7 @@ impl<const G: u8> ValueDecoder<GeneralGeneric<G>> for bytestring::ByteString {
     }
 }
 
-impl<const G: u8> DistinguishedValueDecoder<GeneralGeneric<G>> for bytestring::ByteString {
+impl<const P: u8> DistinguishedValueDecoder<GeneralGeneric<P>> for bytestring::ByteString {
     const CHECKS_EMPTY: bool = false;
 
     #[inline]
@@ -70,23 +70,23 @@ impl<const G: u8> DistinguishedValueDecoder<GeneralGeneric<G>> for bytestring::B
         buf: Capped<impl Buf + ?Sized>,
         ctx: RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
-        ValueDecoder::<GeneralGeneric<G>>::decode_value(value, buf, ctx.into_inner())?;
+        ValueDecoder::<GeneralGeneric<P>>::decode_value(value, buf, ctx.into_inner())?;
         Ok(Canonicity::Canonical)
     }
 }
 
 delegate_value_encoding!(
-    encoding (GeneralGeneric<G>) borrows type (bytestring::ByteString) as owned including distinguished
-    with generics (const G: u8)
+    encoding (GeneralGeneric<P>) borrows type (bytestring::ByteString) as owned including distinguished
+    with generics (const P: u8)
 );
 
 #[cfg(test)]
 mod test {
     use crate::encoding::test::check_type_test;
-    use crate::encoding::GeneralInMessage;
+    use crate::encoding::General;
     use alloc::string::String;
-    check_type_test!(GeneralInMessage, relaxed, from String,
+    check_type_test!(General, relaxed, from String,
         into bytestring::ByteString, WireType::LengthDelimited);
-    check_type_test!(GeneralInMessage, distinguished, from String, into bytestring::ByteString,
+    check_type_test!(General, distinguished, from String, into bytestring::ByteString,
         WireType::LengthDelimited);
 }

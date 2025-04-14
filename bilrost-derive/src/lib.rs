@@ -83,8 +83,8 @@ fn encoder_alias_header() -> TokenStream {
     quote! {
         use #crate_::encoding::{
             Fixed as fixed,
-            GeneralInMessage as general,
-            GeneralInOneof as general_in_oneof,
+            General as general,
+            GeneralPacked as general_packed,
             Map as map,
             Packed as packed,
             PlainBytes as plainbytes,

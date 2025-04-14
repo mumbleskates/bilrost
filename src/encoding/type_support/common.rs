@@ -7,7 +7,7 @@ pub(crate) mod time_proxies {
     };
     use crate::encoding::{
         delegate_value_encoding, empty_state_via_default, Capped, DecodeContext,
-        DistinguishedValueDecoder, Fixed, GeneralGeneric, GeneralInMessage,
+        DistinguishedValueDecoder, Fixed, GeneralGeneric, General,
         RestrictedDecodeContext, ValueDecoder, ValueEncoder, WireType, Wiretyped,
     };
     use crate::DecodeErrorKind::InvalidValue;
@@ -22,14 +22,14 @@ pub(crate) mod time_proxies {
 
     empty_state_via_default!(TimeDeltaProxy);
 
-    impl<const G: u8> Wiretyped<GeneralGeneric<G>> for TimeDeltaProxy {
+    impl<const P: u8> Wiretyped<GeneralGeneric<P>> for TimeDeltaProxy {
         const WIRE_TYPE: WireType = WireType::LengthDelimited;
     }
 
-    impl<const G: u8> ValueEncoder<GeneralGeneric<G>> for TimeDeltaProxy {
+    impl<const P: u8> ValueEncoder<GeneralGeneric<P>> for TimeDeltaProxy {
         fn encode_value<B: BufMut + ?Sized>(value: &Self, buf: &mut B) {
             underived_encode!(TimeDelta {
-                1: GeneralInMessage => secs: &value.secs,
+                1: General => secs: &value.secs,
                 2: Fixed => nanos: &value.nanos,
             }, buf)
         }
@@ -37,26 +37,26 @@ pub(crate) mod time_proxies {
         fn prepend_value<B: ReverseBuf + ?Sized>(value: &Self, buf: &mut B) {
             underived_prepend!(TimeDelta {
                 2: Fixed => nanos: &value.nanos,
-                1: GeneralInMessage => secs: &value.secs,
+                1: General => secs: &value.secs,
             }, buf)
         }
 
         fn value_encoded_len(value: &Self) -> usize {
             underived_encoded_len!(TimeDelta {
-                1: GeneralInMessage => secs: &value.secs,
+                1: General => secs: &value.secs,
                 2: Fixed => nanos: &value.nanos,
             })
         }
     }
 
-    impl<const G: u8> ValueDecoder<GeneralGeneric<G>> for TimeDeltaProxy {
+    impl<const P: u8> ValueDecoder<GeneralGeneric<P>> for TimeDeltaProxy {
         fn decode_value<B: Buf + ?Sized>(
             value: &mut Self,
             mut buf: Capped<B>,
             ctx: DecodeContext,
         ) -> Result<(), DecodeError> {
             underived_decode!(TimeDelta {
-                1: GeneralInMessage => secs: &mut value.secs,
+                1: General => secs: &mut value.secs,
                 2: Fixed => nanos: &mut value.nanos,
             }, buf, ctx)?;
             if value.secs.signum() as i32 * value.nanos.signum() == -1 {
@@ -67,7 +67,7 @@ pub(crate) mod time_proxies {
         }
     }
 
-    impl<const G: u8> DistinguishedValueDecoder<GeneralGeneric<G>> for TimeDeltaProxy {
+    impl<const P: u8> DistinguishedValueDecoder<GeneralGeneric<P>> for TimeDeltaProxy {
         const CHECKS_EMPTY: bool = true;
 
         fn decode_value_distinguished<const ALLOW_EMPTY: bool>(
@@ -76,15 +76,15 @@ pub(crate) mod time_proxies {
             ctx: RestrictedDecodeContext,
         ) -> Result<Canonicity, DecodeError> {
             underived_decode_distinguished!(TimeDelta {
-                1: GeneralInMessage => secs: &mut value.secs,
+                1: General => secs: &mut value.secs,
                 2: Fixed => nanos: &mut value.nanos,
             }, buf, ctx)
         }
     }
 
     delegate_value_encoding!(
-        encoding (GeneralGeneric<G>) borrows type (TimeDeltaProxy) as owned including distinguished
-        with generics (const G: u8)
+        encoding (GeneralGeneric<P>) borrows type (TimeDeltaProxy) as owned including distinguished
+        with generics (const P: u8)
     );
 }
 
@@ -93,7 +93,7 @@ pub(crate) mod time_proxies {
 mod chrono_time_value_compat {
     use crate::encoding::type_support::time::with_random_values;
     use crate::encoding::type_support::{chrono as impl_chrono, time as impl_time};
-    use crate::encoding::{EmptyState, GeneralInMessage, Proxiable, ValueEncoder};
+    use crate::encoding::{EmptyState, General, Proxiable, ValueEncoder};
     use alloc::fmt::Debug;
     use alloc::vec::Vec;
     use chrono::{Datelike, FixedOffset, Timelike};
@@ -101,8 +101,8 @@ mod chrono_time_value_compat {
 
     fn assert_same_encoding<T, U>(t: &T, u: &U)
     where
-        T: Debug + ValueEncoder<GeneralInMessage>,
-        U: Debug + ValueEncoder<GeneralInMessage>,
+        T: Debug + ValueEncoder<General>,
+        U: Debug + ValueEncoder<General>,
     {
         let mut tbuf = Vec::new();
         T::encode_value(t, &mut tbuf);

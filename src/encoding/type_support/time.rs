@@ -3,7 +3,7 @@ use crate::encoding::proxy::SealedBilrostTag;
 use crate::encoding::type_support::common::time_proxies::TimeDeltaProxy;
 use crate::encoding::{
     delegate_proxied_encoding, delegate_value_encoding, empty_state_via_default, Canonicity,
-    DecodeErrorKind, DistinguishedProxiable, EmptyState, ForOverwrite, GeneralInMessage, Packed,
+    DecodeErrorKind, DistinguishedProxiable, EmptyState, ForOverwrite, General, Packed,
     Proxiable, Varint,
 };
 use crate::Canonicity::Canonical;
@@ -408,7 +408,7 @@ mod utcoffset {
     use crate::encoding::test::{check_type_empty, distinguished, relaxed};
     use crate::encoding::{
         Capped, DecodeContext, DistinguishedValueDecoder, EmptyState, ForOverwrite,
-        GeneralInMessage, RestrictedDecodeContext, ValueDecoder, ValueEncoder, WireType,
+        General, RestrictedDecodeContext, ValueDecoder, ValueEncoder, WireType,
     };
     use crate::Canonicity::NotCanonical;
     use crate::DecodeError;
@@ -442,10 +442,10 @@ mod utcoffset {
         {
             let mut buf = Vec::new();
             let out_of_range: (i32, i32, i32) = (10, 0, -10);
-            ValueEncoder::<GeneralInMessage>::encode_value(&out_of_range, &mut buf);
+            ValueEncoder::<General>::encode_value(&out_of_range, &mut buf);
             let mut utc_off = UtcOffset::for_overwrite();
             assert_eq!(
-                ValueDecoder::<GeneralInMessage>::decode_value(
+                ValueDecoder::<General>::decode_value(
                     &mut utc_off,
                     Capped::new(&mut buf.as_slice()),
                     DecodeContext::default(),
@@ -453,7 +453,7 @@ mod utcoffset {
                 Err(DecodeError::new(InvalidValue))
             );
             assert_eq!(
-                DistinguishedValueDecoder::<GeneralInMessage>::decode_value_distinguished::<true>(
+                DistinguishedValueDecoder::<General>::decode_value_distinguished::<true>(
                     &mut utc_off,
                     Capped::new(&mut buf.as_slice()),
                     RestrictedDecodeContext::new(NotCanonical),
@@ -519,7 +519,7 @@ impl DistinguishedProxiable<SealedBilrostTag> for OffsetDateTime {
 }
 
 delegate_proxied_encoding!(
-    use encoding (GeneralInMessage) to encode proxied type (OffsetDateTime)
+    use encoding (General) to encode proxied type (OffsetDateTime)
     using proxy tag (SealedBilrostTag)
     with general encodings including distinguished
 );
@@ -588,7 +588,7 @@ impl DistinguishedProxiable<SealedBilrostTag> for Duration {
 }
 
 delegate_proxied_encoding!(
-    use encoding (GeneralInMessage) to encode proxied type (Duration)
+    use encoding (General) to encode proxied type (Duration)
     using proxy tag (SealedBilrostTag)
     with general encodings including distinguished
 );

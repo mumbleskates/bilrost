@@ -192,16 +192,16 @@ mod test {
     mod btree {
         mod general {
             use crate::encoding::test::check_type_test;
-            use crate::encoding::{GeneralInMessage, Map};
+            use crate::encoding::{General, Map};
             use alloc::collections::BTreeMap;
             check_type_test!(
-                Map<GeneralInMessage, GeneralInMessage>,
+                Map<General, General>,
                 relaxed,
                 BTreeMap<u64, f32>,
                 WireType::LengthDelimited
             );
             check_type_test!(
-                Map<GeneralInMessage, GeneralInMessage>,
+                Map<General, General>,
                 distinguished,
                 BTreeMap<u32, i32>,
                 WireType::LengthDelimited
@@ -228,16 +228,16 @@ mod test {
 
         mod delegated_from_general {
             use crate::encoding::test::check_type_test;
-            use crate::encoding::GeneralInMessage;
+            use crate::encoding::General;
             use alloc::collections::BTreeMap;
             check_type_test!(
-                GeneralInMessage,
+                General,
                 relaxed,
                 BTreeMap<bool, f32>,
                 WireType::LengthDelimited
             );
             check_type_test!(
-                GeneralInMessage,
+                General,
                 distinguished,
                 BTreeMap<bool, u32>,
                 WireType::LengthDelimited

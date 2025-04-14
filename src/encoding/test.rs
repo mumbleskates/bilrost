@@ -1,7 +1,7 @@
 use crate::encoding::{
     const_varint, decode_varint, decode_varint_slow, encode_varint, encoded_len_varint, Capped,
     DecodeContext, Decoder, DistinguishedDecoder, DistinguishedProxiable,
-    DistinguishedValueDecoder, EmptyState, Encoder, Fixed, ForOverwrite, GeneralInMessage, Map,
+    DistinguishedValueDecoder, EmptyState, Encoder, Fixed, ForOverwrite, General, Map,
     Packed, PlainBytes, Proxiable, RestrictedDecodeContext, RuntimeTagMeasurer, TagReader,
     TagRevWriter, TagWriter, ValueDecoder, ValueEncoder, Varint, WireType,
 };
@@ -183,7 +183,7 @@ macro_rules! check_type {
         pub mod $kind {
             use super::*;
             use crate::buf::ReverseBuffer;
-            use crate::encoding::{GeneralInMessage, GeneralInOneof};
+            use crate::encoding::{General, GeneralPacked};
 
             pub fn check_type<T, E>(value: T, tag: u32, wire_type: WireType) -> TestCaseResult
             where
@@ -275,12 +275,12 @@ macro_rules! check_type {
                     + Clone
                     + ForOverwrite
                     + PartialEq
-                    + $decoder_trait<GeneralInMessage>
-                    + $decoder_trait<GeneralInOneof>,
+                    + $decoder_trait<General>
+                    + $decoder_trait<GeneralPacked>,
             {
-                check_type::<T, GeneralInMessage>(value.clone(), tag, wire_type).or(check_type::<
+                check_type::<T, General>(value.clone(), tag, wire_type).or(check_type::<
                     T,
-                    GeneralInOneof,
+                    GeneralPacked,
                 >(
                     value, tag, wire_type,
                 ))
@@ -501,75 +501,75 @@ where
 fn test_present_and_empty() {
     // Any value that's present not in an `Option` that is not omitted must err when decoded in
     // distinguished mode
-    present_empty_not_canon::<u32, GeneralInMessage>();
-    present_empty_not_canon::<u64, GeneralInMessage>();
-    present_empty_not_canon::<i32, GeneralInMessage>();
-    present_empty_not_canon::<i64, GeneralInMessage>();
+    present_empty_not_canon::<u32, General>();
+    present_empty_not_canon::<u64, General>();
+    present_empty_not_canon::<i32, General>();
+    present_empty_not_canon::<i64, General>();
     present_empty_not_canon::<u32, Fixed>();
     present_empty_not_canon::<u64, Fixed>();
     present_empty_not_canon::<i32, Fixed>();
     present_empty_not_canon::<i64, Fixed>();
-    present_empty_not_canon::<bool, GeneralInMessage>();
-    present_empty_not_canon::<String, GeneralInMessage>();
-    present_empty_not_canon::<Blob, GeneralInMessage>();
+    present_empty_not_canon::<bool, General>();
+    present_empty_not_canon::<String, General>();
+    present_empty_not_canon::<Blob, General>();
     present_empty_not_canon::<Vec<u8>, PlainBytes>();
 
-    present_empty_not_canon::<Vec<u32>, Packed<GeneralInMessage>>();
-    present_empty_not_canon::<Vec<u64>, Packed<GeneralInMessage>>();
-    present_empty_not_canon::<Vec<i32>, Packed<GeneralInMessage>>();
-    present_empty_not_canon::<Vec<i64>, Packed<GeneralInMessage>>();
+    present_empty_not_canon::<Vec<u32>, Packed<General>>();
+    present_empty_not_canon::<Vec<u64>, Packed<General>>();
+    present_empty_not_canon::<Vec<i32>, Packed<General>>();
+    present_empty_not_canon::<Vec<i64>, Packed<General>>();
     present_empty_not_canon::<Vec<u32>, Packed<Fixed>>();
     present_empty_not_canon::<Vec<u64>, Packed<Fixed>>();
     present_empty_not_canon::<Vec<i32>, Packed<Fixed>>();
     present_empty_not_canon::<Vec<i64>, Packed<Fixed>>();
-    present_empty_not_canon::<Vec<bool>, Packed<GeneralInMessage>>();
-    present_empty_not_canon::<Vec<String>, Packed<GeneralInMessage>>();
-    present_empty_not_canon::<Vec<Blob>, Packed<GeneralInMessage>>();
+    present_empty_not_canon::<Vec<bool>, Packed<General>>();
+    present_empty_not_canon::<Vec<String>, Packed<General>>();
+    present_empty_not_canon::<Vec<Blob>, Packed<General>>();
     present_empty_not_canon::<Vec<Vec<u8>>, Packed<PlainBytes>>();
-    present_empty_not_canon::<[u32; 5], Packed<GeneralInMessage>>();
-    present_empty_not_canon::<[(u32, String); 5], Packed<GeneralInMessage>>();
+    present_empty_not_canon::<[u32; 5], Packed<General>>();
+    present_empty_not_canon::<[(u32, String); 5], Packed<General>>();
 
-    present_empty_not_canon::<BTreeSet<u32>, Packed<GeneralInMessage>>();
-    present_empty_not_canon::<BTreeSet<u64>, Packed<GeneralInMessage>>();
-    present_empty_not_canon::<BTreeSet<i32>, Packed<GeneralInMessage>>();
-    present_empty_not_canon::<BTreeSet<i64>, Packed<GeneralInMessage>>();
+    present_empty_not_canon::<BTreeSet<u32>, Packed<General>>();
+    present_empty_not_canon::<BTreeSet<u64>, Packed<General>>();
+    present_empty_not_canon::<BTreeSet<i32>, Packed<General>>();
+    present_empty_not_canon::<BTreeSet<i64>, Packed<General>>();
     present_empty_not_canon::<BTreeSet<u32>, Packed<Fixed>>();
     present_empty_not_canon::<BTreeSet<u64>, Packed<Fixed>>();
     present_empty_not_canon::<BTreeSet<i32>, Packed<Fixed>>();
     present_empty_not_canon::<BTreeSet<i64>, Packed<Fixed>>();
-    present_empty_not_canon::<BTreeSet<bool>, Packed<GeneralInMessage>>();
-    present_empty_not_canon::<BTreeSet<String>, Packed<GeneralInMessage>>();
-    present_empty_not_canon::<BTreeSet<Blob>, Packed<GeneralInMessage>>();
+    present_empty_not_canon::<BTreeSet<bool>, Packed<General>>();
+    present_empty_not_canon::<BTreeSet<String>, Packed<General>>();
+    present_empty_not_canon::<BTreeSet<Blob>, Packed<General>>();
     present_empty_not_canon::<BTreeSet<Vec<u8>>, Packed<PlainBytes>>();
 
-    present_empty_not_canon::<BTreeMap<u32, u32>, Map<GeneralInMessage, GeneralInMessage>>();
-    present_empty_not_canon::<BTreeMap<u64, u64>, Map<GeneralInMessage, GeneralInMessage>>();
-    present_empty_not_canon::<BTreeMap<i32, i32>, Map<GeneralInMessage, GeneralInMessage>>();
-    present_empty_not_canon::<BTreeMap<i64, i64>, Map<GeneralInMessage, GeneralInMessage>>();
+    present_empty_not_canon::<BTreeMap<u32, u32>, Map<General, General>>();
+    present_empty_not_canon::<BTreeMap<u64, u64>, Map<General, General>>();
+    present_empty_not_canon::<BTreeMap<i32, i32>, Map<General, General>>();
+    present_empty_not_canon::<BTreeMap<i64, i64>, Map<General, General>>();
     present_empty_not_canon::<BTreeMap<u32, u32>, Map<Fixed, Fixed>>();
     present_empty_not_canon::<BTreeMap<u64, u64>, Map<Fixed, Fixed>>();
     present_empty_not_canon::<BTreeMap<i32, i32>, Map<Fixed, Fixed>>();
     present_empty_not_canon::<BTreeMap<i64, i64>, Map<Fixed, Fixed>>();
-    present_empty_not_canon::<BTreeMap<bool, bool>, Map<GeneralInMessage, GeneralInMessage>>();
-    present_empty_not_canon::<BTreeMap<String, String>, Map<GeneralInMessage, GeneralInMessage>>();
-    present_empty_not_canon::<BTreeMap<Blob, Blob>, Map<GeneralInMessage, GeneralInMessage>>();
+    present_empty_not_canon::<BTreeMap<bool, bool>, Map<General, General>>();
+    present_empty_not_canon::<BTreeMap<String, String>, Map<General, General>>();
+    present_empty_not_canon::<BTreeMap<Blob, Blob>, Map<General, General>>();
     present_empty_not_canon::<BTreeMap<Vec<u8>, Vec<u8>>, Map<PlainBytes, PlainBytes>>();
 
     present_empty_not_canon::<
         Vec<BTreeMap<u32, u32>>,
-        Packed<Map<GeneralInMessage, GeneralInMessage>>,
+        Packed<Map<General, General>>,
     >();
     present_empty_not_canon::<
         Vec<BTreeMap<u64, u64>>,
-        Packed<Map<GeneralInMessage, GeneralInMessage>>,
+        Packed<Map<General, General>>,
     >();
     present_empty_not_canon::<
         Vec<BTreeMap<i32, i32>>,
-        Packed<Map<GeneralInMessage, GeneralInMessage>>,
+        Packed<Map<General, General>>,
     >();
     present_empty_not_canon::<
         Vec<BTreeMap<i64, i64>>,
-        Packed<Map<GeneralInMessage, GeneralInMessage>>,
+        Packed<Map<General, General>>,
     >();
     present_empty_not_canon::<Vec<BTreeMap<u32, u32>>, Packed<Map<Fixed, Fixed>>>();
     present_empty_not_canon::<Vec<BTreeMap<u64, u64>>, Packed<Map<Fixed, Fixed>>>();
@@ -577,61 +577,61 @@ fn test_present_and_empty() {
     present_empty_not_canon::<Vec<BTreeMap<i64, i64>>, Packed<Map<Fixed, Fixed>>>();
     present_empty_not_canon::<
         Vec<BTreeMap<bool, bool>>,
-        Packed<Map<GeneralInMessage, GeneralInMessage>>,
+        Packed<Map<General, General>>,
     >();
     present_empty_not_canon::<
         Vec<BTreeMap<String, String>>,
-        Packed<Map<GeneralInMessage, GeneralInMessage>>,
+        Packed<Map<General, General>>,
     >();
     present_empty_not_canon::<
         Vec<BTreeMap<Blob, Blob>>,
-        Packed<Map<GeneralInMessage, GeneralInMessage>>,
+        Packed<Map<General, General>>,
     >();
     present_empty_not_canon::<Vec<BTreeMap<Vec<u8>, Vec<u8>>>, Packed<Map<PlainBytes, PlainBytes>>>(
     );
 
-    present_empty_not_canon::<(bool,), GeneralInMessage>();
-    present_empty_not_canon::<(bool, bool), GeneralInMessage>();
-    present_empty_not_canon::<(bool, bool, bool), GeneralInMessage>();
-    present_empty_not_canon::<(bool, bool, bool, bool), GeneralInMessage>();
-    present_empty_not_canon::<(bool, bool, bool, bool, bool), GeneralInMessage>();
-    present_empty_not_canon::<(bool, bool, bool, bool, bool, bool), GeneralInMessage>();
-    present_empty_not_canon::<(bool, bool, bool, bool, bool, bool, bool), GeneralInMessage>();
-    present_empty_not_canon::<(bool, bool, bool, bool, bool, bool, bool, bool), GeneralInMessage>();
+    present_empty_not_canon::<(bool,), General>();
+    present_empty_not_canon::<(bool, bool), General>();
+    present_empty_not_canon::<(bool, bool, bool), General>();
+    present_empty_not_canon::<(bool, bool, bool, bool), General>();
+    present_empty_not_canon::<(bool, bool, bool, bool, bool), General>();
+    present_empty_not_canon::<(bool, bool, bool, bool, bool, bool), General>();
+    present_empty_not_canon::<(bool, bool, bool, bool, bool, bool, bool), General>();
+    present_empty_not_canon::<(bool, bool, bool, bool, bool, bool, bool, bool), General>();
     present_empty_not_canon::<
         (bool, bool, bool, bool, bool, bool, bool, bool, bool),
-        GeneralInMessage,
+        General,
     >();
-    present_empty_not_canon::<(u16, u16, u16, u16, u16, u16, u16, u16, u16, u16), GeneralInMessage>(
+    present_empty_not_canon::<(u16, u16, u16, u16, u16, u16, u16, u16, u16, u16), General>(
     );
     present_empty_not_canon::<
         (u16, u16, u16, u16, u16, u16, u16, u16, u16, u16, u16),
-        GeneralInMessage,
+        General,
     >();
     present_empty_not_canon::<
         (u16, u16, u16, u16, u16, u16, u16, u16, u16, u16, u16, u16),
-        GeneralInMessage,
+        General,
     >();
-    present_empty_not_canon::<(bool,), GeneralInMessage>();
-    present_empty_not_canon::<(bool, u32), GeneralInMessage>();
-    present_empty_not_canon::<(bool, bool, String), GeneralInMessage>();
-    present_empty_not_canon::<(bool, i64, Blob, bool), GeneralInMessage>();
-    present_empty_not_canon::<(bool, bool, bool, bool, bool), GeneralInMessage>();
-    present_empty_not_canon::<(bool, bool, (), bool, bool, bool), GeneralInMessage>();
-    present_empty_not_canon::<(bool, bool, bytes::Bytes, bool, bool, bool, bool), GeneralInMessage>(
+    present_empty_not_canon::<(bool,), General>();
+    present_empty_not_canon::<(bool, u32), General>();
+    present_empty_not_canon::<(bool, bool, String), General>();
+    present_empty_not_canon::<(bool, i64, Blob, bool), General>();
+    present_empty_not_canon::<(bool, bool, bool, bool, bool), General>();
+    present_empty_not_canon::<(bool, bool, (), bool, bool, bool), General>();
+    present_empty_not_canon::<(bool, bool, bytes::Bytes, bool, bool, bool, bool), General>(
     );
-    present_empty_not_canon::<(bool, bool, u16, bool, i16, bool, bool, bool), GeneralInMessage>();
+    present_empty_not_canon::<(bool, bool, u16, bool, i16, bool, bool, bool), General>();
     present_empty_not_canon::<
         (bool, String, bool, bool, bool, bool, bool, bool, bool),
-        GeneralInMessage,
+        General,
     >();
     present_empty_not_canon::<
         (String, u16, u16, u16, u16, u16, i64, u16, u16, u16),
-        GeneralInMessage,
+        General,
     >();
     present_empty_not_canon::<
         (u16, u16, u16, bool, u16, u16, u16, u16, bool, u16, u16),
-        GeneralInMessage,
+        General,
     >();
     present_empty_not_canon::<
         (
@@ -648,7 +648,7 @@ fn test_present_and_empty() {
             u16,
             u16,
         ),
-        GeneralInMessage,
+        General,
     >();
 }
 
@@ -750,7 +750,7 @@ fn string_merge_invalid_utf8() {
     let mut s = String::new();
     let buf = b"\x02\x80\x80";
 
-    let r = ValueDecoder::<GeneralInMessage>::decode_value(
+    let r = ValueDecoder::<General>::decode_value(
         &mut s,
         Capped::new(&mut buf.as_slice()),
         DecodeContext::default(),
@@ -1026,11 +1026,11 @@ fn varints_reject_wrong_wire_type() {
         WireType::ThirtyTwoBit,
         WireType::SixtyFourBit,
     ] {
-        check_rejects_wrong_wire_type_distinguished::<u32, GeneralInMessage>(wire_type);
-        check_rejects_wrong_wire_type_distinguished::<u64, GeneralInMessage>(wire_type);
-        check_rejects_wrong_wire_type_distinguished::<i32, GeneralInMessage>(wire_type);
-        check_rejects_wrong_wire_type_distinguished::<i64, GeneralInMessage>(wire_type);
-        check_rejects_wrong_wire_type_distinguished::<bool, GeneralInMessage>(wire_type);
+        check_rejects_wrong_wire_type_distinguished::<u32, General>(wire_type);
+        check_rejects_wrong_wire_type_distinguished::<u64, General>(wire_type);
+        check_rejects_wrong_wire_type_distinguished::<i32, General>(wire_type);
+        check_rejects_wrong_wire_type_distinguished::<i64, General>(wire_type);
+        check_rejects_wrong_wire_type_distinguished::<bool, General>(wire_type);
     }
 }
 
@@ -1041,7 +1041,7 @@ fn floats_reject_wrong_wire_type() {
         WireType::LengthDelimited,
         WireType::SixtyFourBit,
     ] {
-        check_rejects_wrong_wire_type::<f32, GeneralInMessage>(wire_type);
+        check_rejects_wrong_wire_type::<f32, General>(wire_type);
         check_rejects_wrong_wire_type::<f32, Fixed>(wire_type);
     }
     for wire_type in [
@@ -1049,7 +1049,7 @@ fn floats_reject_wrong_wire_type() {
         WireType::LengthDelimited,
         WireType::ThirtyTwoBit,
     ] {
-        check_rejects_wrong_wire_type::<f64, GeneralInMessage>(wire_type);
+        check_rejects_wrong_wire_type::<f64, General>(wire_type);
         check_rejects_wrong_wire_type::<f64, Fixed>(wire_type);
     }
 }
@@ -1061,8 +1061,8 @@ fn variable_length_values_reject_wrong_wire_type() {
         WireType::ThirtyTwoBit,
         WireType::SixtyFourBit,
     ] {
-        check_rejects_wrong_wire_type_distinguished::<String, GeneralInMessage>(wire_type);
-        check_rejects_wrong_wire_type_distinguished::<Blob, GeneralInMessage>(wire_type);
+        check_rejects_wrong_wire_type_distinguished::<String, General>(wire_type);
+        check_rejects_wrong_wire_type_distinguished::<Blob, General>(wire_type);
         check_rejects_wrong_wire_type_distinguished::<Vec<u8>, PlainBytes>(wire_type);
     }
 }
@@ -1071,9 +1071,9 @@ proptest! {
     #[test]
     fn u32_in_u64(value: u32) {
         let mut buf = Vec::<u8>::new();
-        ValueEncoder::<GeneralInMessage>::encode_value(&value, &mut buf);
+        ValueEncoder::<General>::encode_value(&value, &mut buf);
         let mut out = 0u64;
-        ValueDecoder::<GeneralInMessage>::decode_value(
+        ValueDecoder::<General>::decode_value(
             &mut out,
             Capped::new(&mut &*buf),
             DecodeContext::default(),
@@ -1084,9 +1084,9 @@ proptest! {
     #[test]
     fn i32_in_i64(value: i32) {
         let mut buf = Vec::<u8>::new();
-        ValueEncoder::<GeneralInMessage>::encode_value(&value, &mut buf);
+        ValueEncoder::<General>::encode_value(&value, &mut buf);
         let mut out = 0i64;
-        ValueDecoder::<GeneralInMessage>::decode_value(
+        ValueDecoder::<General>::decode_value(
             &mut out,
             Capped::new(&mut &*buf),
             DecodeContext::default(),
@@ -1098,9 +1098,9 @@ proptest! {
     fn u64_in_u32(value: u32) {
         let value = value as u64;
         let mut buf = Vec::<u8>::new();
-        ValueEncoder::<GeneralInMessage>::encode_value(&value, &mut buf);
+        ValueEncoder::<General>::encode_value(&value, &mut buf);
         let mut out = 0u32;
-        ValueDecoder::<GeneralInMessage>::decode_value(
+        ValueDecoder::<General>::decode_value(
             &mut out,
             Capped::new(&mut &*buf),
             DecodeContext::default(),
@@ -1112,9 +1112,9 @@ proptest! {
     fn i64_in_i32(value: i32) {
         let value = value as i64;
         let mut buf = Vec::<u8>::new();
-        ValueEncoder::<GeneralInMessage>::encode_value(&value, &mut buf);
+        ValueEncoder::<General>::encode_value(&value, &mut buf);
         let mut out = 0i32;
-        ValueDecoder::<GeneralInMessage>::decode_value(
+        ValueDecoder::<General>::decode_value(
             &mut out,
             Capped::new(&mut &*buf),
             DecodeContext::default(),
@@ -1125,10 +1125,10 @@ proptest! {
     #[test]
     fn u32_out_of_range(value in u32::MAX as u64 + 1..) {
         let mut buf = Vec::<u8>::new();
-        ValueEncoder::<GeneralInMessage>::encode_value(&value, &mut buf);
+        ValueEncoder::<General>::encode_value(&value, &mut buf);
         let mut out = 0u32;
         prop_assert_eq!(
-            ValueDecoder::<GeneralInMessage>::decode_value(
+            ValueDecoder::<General>::decode_value(
                 &mut out,
                 Capped::new(&mut &*buf),
                 DecodeContext::default(),
@@ -1144,10 +1144,10 @@ proptest! {
     ) {
         for value in [low_value, high_value] {
             let mut buf = Vec::<u8>::new();
-            ValueEncoder::<GeneralInMessage>::encode_value(&value, &mut buf);
+            ValueEncoder::<General>::encode_value(&value, &mut buf);
             let mut out = 0i32;
             prop_assert_eq!(
-                ValueDecoder::<GeneralInMessage>::decode_value(
+                ValueDecoder::<General>::decode_value(
                     &mut out,
                     Capped::new(&mut &*buf),
                     DecodeContext::default(),
@@ -1160,10 +1160,10 @@ proptest! {
     #[test]
     fn u16_out_of_range(value in u16::MAX as u64 + 1..) {
         let mut buf = Vec::<u8>::new();
-        ValueEncoder::<GeneralInMessage>::encode_value(&value, &mut buf);
+        ValueEncoder::<General>::encode_value(&value, &mut buf);
         let mut out = 0u16;
         prop_assert_eq!(
-            ValueDecoder::<GeneralInMessage>::decode_value(
+            ValueDecoder::<General>::decode_value(
                 &mut out,
                 Capped::new(&mut &*buf),
                 DecodeContext::default(),
@@ -1179,10 +1179,10 @@ proptest! {
     ) {
         for value in [low_value, high_value] {
             let mut buf = Vec::<u8>::new();
-            ValueEncoder::<GeneralInMessage>::encode_value(&value, &mut buf);
+            ValueEncoder::<General>::encode_value(&value, &mut buf);
             let mut out = 0i16;
             prop_assert_eq!(
-                ValueDecoder::<GeneralInMessage>::decode_value(
+                ValueDecoder::<General>::decode_value(
                     &mut out,
                     Capped::new(&mut &*buf),
                     DecodeContext::default(),
@@ -1233,7 +1233,7 @@ proptest! {
         encode_varint(varint, &mut buf);
         let mut out = false;
         prop_assert_eq!(
-            ValueDecoder::<GeneralInMessage>::decode_value(
+            ValueDecoder::<General>::decode_value(
                 &mut out,
                 Capped::new(&mut &*buf),
                 DecodeContext::default(),

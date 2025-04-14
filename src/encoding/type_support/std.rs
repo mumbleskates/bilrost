@@ -2,7 +2,7 @@ use crate::encoding::proxy::SealedBilrostTag;
 use crate::encoding::value_traits::for_overwrite_via_default;
 use crate::encoding::{
     delegate_encoding, delegate_proxied_encoding, delegate_value_encoding, Collection, EmptyState,
-    ForOverwrite, GeneralGeneric, GeneralInMessage, GeneralInOneof, GeneralInsidePacked, Map,
+    ForOverwrite, GeneralGeneric, General, GeneralPacked, Map,
     Mapping, Packed, Proxiable, Unpacked, Varint,
 };
 use crate::DecodeErrorKind::{self, InvalidValue, OutOfDomainValue, UnexpectedlyRepeated};
@@ -215,7 +215,7 @@ mod systemtime {
 
     check_type_empty!(SystemTime, via proxy with tag SealedBilrostTag);
     check_type_test!(
-        GeneralInMessage,
+        General,
         relaxed,
         SystemTime,
         WireType::LengthDelimited
@@ -223,23 +223,23 @@ mod systemtime {
 }
 
 delegate_encoding!(
-    delegate from (GeneralInMessage) to (Unpacked<GeneralInMessage>)
+    delegate from (General) to (Unpacked<General>)
     for type (HashSet<T, S>)
     with where clause (S: Default + core::hash::BuildHasher)
     with generics (T, S)
 );
 delegate_value_encoding!(
-    delegate from (GeneralInOneof) to (Packed<GeneralInsidePacked>)
+    delegate from (GeneralPacked) to (Packed<GeneralPacked>)
     for type (HashSet<T, S>)
     with where clause (S: Default + core::hash::BuildHasher)
     with generics (T, S)
 );
 
 delegate_value_encoding!(
-    delegate from (GeneralGeneric<G>) to (Map<GeneralInsidePacked, GeneralInsidePacked>)
+    delegate from (GeneralGeneric<P>) to (Map<GeneralPacked, GeneralPacked>)
     for type (HashMap<K, V, S>)
     with where clause (K: Eq + core::hash::Hash, S: Default + core::hash::BuildHasher)
-    with generics (const G: u8, K, V, S)
+    with generics (const P: u8, K, V, S)
 );
 
 #[cfg(test)]
@@ -247,10 +247,10 @@ mod test {
     mod hash_map {
         mod general {
             use crate::encoding::test::check_type_test;
-            use crate::encoding::{GeneralInMessage, Map};
+            use crate::encoding::{General, Map};
             use std::collections::HashMap;
             check_type_test!(
-                Map<GeneralInMessage, GeneralInMessage>,
+                Map<General, General>,
                 relaxed,
                 HashMap<u64, f32>,
                 WireType::LengthDelimited
@@ -271,10 +271,10 @@ mod test {
 
         mod delegated_from_general {
             use crate::encoding::test::check_type_test;
-            use crate::encoding::GeneralInMessage;
+            use crate::encoding::General;
             use std::collections::HashMap;
             check_type_test!(
-                GeneralInMessage,
+                General,
                 relaxed,
                 HashMap<bool, u32>,
                 WireType::LengthDelimited
@@ -283,10 +283,10 @@ mod test {
 
         mod delegated_from_general_in_oneof {
             use crate::encoding::test::check_type_test;
-            use crate::encoding::GeneralInOneof;
+            use crate::encoding::GeneralPacked;
             use std::collections::HashMap;
             check_type_test!(
-                GeneralInOneof,
+                GeneralPacked,
                 relaxed,
                 HashMap<bool, u32>,
                 WireType::LengthDelimited

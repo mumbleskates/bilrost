@@ -1,8 +1,8 @@
 use crate::encoding::plain_bytes::plain_bytes_vec_impl;
 use crate::encoding::value_traits::{for_overwrite_via_default, TriviallyDistinguishedCollection};
 use crate::encoding::{
-    delegate_encoding, delegate_value_encoding, Collection, EmptyState, GeneralInMessage,
-    GeneralInOneof, GeneralInsidePacked, Packed, Unpacked,
+    delegate_encoding, delegate_value_encoding, Collection, EmptyState, General,
+    GeneralPacked, Packed, Unpacked,
 };
 use crate::DecodeErrorKind::InvalidValue;
 use crate::{DecodeError, DecodeErrorKind};
@@ -117,25 +117,25 @@ impl<T, A: tinyvec::Array<Item = T>> Collection for tinyvec::TinyVec<A> {
 impl<A: tinyvec::Array> TriviallyDistinguishedCollection for tinyvec::TinyVec<A> {}
 
 delegate_encoding!(
-    delegate from (GeneralInMessage) to (Unpacked<GeneralInMessage>)
+    delegate from (General) to (Unpacked<General>)
     for type (tinyvec::ArrayVec<A>) including distinguished
     with where clause (A: tinyvec::Array<Item = T>)
     with generics (T, A)
 );
 delegate_encoding!(
-    delegate from (GeneralInMessage) to (Unpacked<GeneralInMessage>)
+    delegate from (General) to (Unpacked<General>)
     for type (tinyvec::TinyVec<A>) including distinguished
     with where clause (A: tinyvec::Array<Item = T>)
     with generics (T, A)
 );
 delegate_value_encoding!(
-    delegate from (GeneralInOneof) to (Packed<GeneralInsidePacked>)
+    delegate from (GeneralPacked) to (Packed<GeneralPacked>)
     for type (tinyvec::ArrayVec<A>) including distinguished
     with where clause for relaxed (A: tinyvec::Array<Item = T>)
     with generics (T, A)
 );
 delegate_value_encoding!(
-    delegate from (GeneralInOneof) to (Packed<GeneralInsidePacked>)
+    delegate from (GeneralPacked) to (Packed<GeneralPacked>)
     for type (tinyvec::TinyVec<A>) including distinguished
     with where clause for relaxed (A: tinyvec::Array<Item = T>)
     with generics (T, A)

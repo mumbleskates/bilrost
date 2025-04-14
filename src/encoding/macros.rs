@@ -373,7 +373,7 @@ pub use delegate_value_encoding;
 macro_rules! delegate_proxied_encoding {
     (
         use encoding ($to:ty)
-        to encode proxied type ($ty:ty)
+        to encode proxied type ($value_ty:ty)
         $(using proxy tag ($proxy_tag:ty))?
         with encoding ($from:ty)
         $(with where clause ($($where_clause:tt)+))?
@@ -382,14 +382,14 @@ macro_rules! delegate_proxied_encoding {
         $crate::delegate_value_encoding!(
             delegate from ($from)
             to ($crate::encoding::Proxied<$to $(, $proxy_tag)?>)
-            for type ($ty)
+            for type ($value_ty)
             $(with where clause ($($where_clause)*))?
             $(with generics ($($impl_generics)*))?
         );
     };
     (
         use encoding ($to:ty)
-        to encode proxied type ($ty:ty)
+        to encode proxied type ($value_ty:ty)
         $(using proxy tag ($proxy_tag:ty))?
         with encoding ($from:ty)
         including distinguished
@@ -400,7 +400,7 @@ macro_rules! delegate_proxied_encoding {
         $crate::delegate_value_encoding!(
             delegate from ($from)
             to ($crate::encoding::Proxied<$to $(, $proxy_tag)?>)
-            for type ($ty)
+            for type ($value_ty)
             including distinguished
             $(with where clause for relaxed ($($relaxed_where)*))?
             $(with where clause for distinguished ($($distinguished_where)*))?
@@ -410,7 +410,7 @@ macro_rules! delegate_proxied_encoding {
 
     (
         use encoding ($to:ty)
-        to encode proxied type ($ty:ty)
+        to encode proxied type ($value_ty:ty)
         $(using proxy tag ($proxy_tag:ty))?
         with general encodings
         $(with where clause ($($where_clause:tt)+))?
@@ -419,14 +419,14 @@ macro_rules! delegate_proxied_encoding {
         $crate::delegate_value_encoding!(
             delegate from ($crate::encoding::GeneralGeneric<__G>)
             to ($crate::encoding::Proxied<$to $(, $proxy_tag)?>)
-            for type ($ty)
+            for type ($value_ty)
             $(with where clause ($($where_clause)*))?
             with generics (const __G: u8, $($($impl_generics)*)?)
         );
     };
     (
         use encoding ($to:ty)
-        to encode proxied type ($ty:ty)
+        to encode proxied type ($value_ty:ty)
         $(using proxy tag ($proxy_tag:ty))?
         with general encodings
         including distinguished
@@ -437,7 +437,7 @@ macro_rules! delegate_proxied_encoding {
         $crate::delegate_value_encoding!(
             delegate from ($crate::encoding::GeneralGeneric<__G>)
             to ($crate::encoding::Proxied<$to $(, $proxy_tag)?>)
-            for type ($ty)
+            for type ($value_ty)
             including distinguished
             $(with where clause for relaxed ($($relaxed_where)*))?
             $(with where clause for distinguished ($($distinguished_where)*))?

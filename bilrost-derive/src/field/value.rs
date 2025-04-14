@@ -118,7 +118,7 @@ impl Field {
         };
 
         let encoding = encoding.unwrap_or(parse_str::<Type>(if in_oneof {
-            "general_in_oneof"
+            "general_packed"
         } else {
             "general"
         })?);

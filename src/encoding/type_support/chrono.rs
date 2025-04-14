@@ -3,7 +3,7 @@ use crate::encoding::proxy::SealedBilrostTag;
 use crate::encoding::type_support::common::time_proxies::TimeDeltaProxy;
 use crate::encoding::{
     delegate_proxied_encoding, delegate_value_encoding, empty_state_via_default, Canonicity,
-    DecodeErrorKind, DistinguishedProxiable, EmptyState, ForOverwrite, GeneralInMessage, Packed,
+    DecodeErrorKind, DistinguishedProxiable, EmptyState, ForOverwrite, General, Packed,
     Proxiable, Varint,
 };
 use crate::Canonicity::Canonical;
@@ -85,7 +85,7 @@ delegate_proxied_encoding!(
 mod naivedate {
     use super::SealedBilrostTag;
     use crate::encoding::test::{check_type_empty, check_type_test, distinguished, relaxed};
-    use crate::encoding::{EmptyState, GeneralInMessage, WireType};
+    use crate::encoding::{EmptyState, General, WireType};
     use alloc::vec::Vec;
     use chrono::NaiveDate;
 
@@ -114,7 +114,7 @@ mod naivedate {
     mod proptests {
         use super::*;
         check_type_test!(
-            GeneralInMessage,
+            General,
             relaxed,
             from Vec<u8>,
             into NaiveDate,
@@ -125,7 +125,7 @@ mod naivedate {
             WireType::LengthDelimited
         );
         check_type_test!(
-            GeneralInMessage,
+            General,
             distinguished,
             from Vec<u8>,
             into NaiveDate,
@@ -200,7 +200,7 @@ delegate_proxied_encoding!(
 mod naivetime {
     use super::SealedBilrostTag;
     use crate::encoding::test::{check_type_empty, check_type_test, distinguished, relaxed};
-    use crate::encoding::{EmptyState, GeneralInMessage, WireType};
+    use crate::encoding::{EmptyState, General, WireType};
     use alloc::vec::Vec;
     use chrono::NaiveTime;
 
@@ -229,7 +229,7 @@ mod naivetime {
     mod proptests {
         use super::*;
         check_type_test!(
-            GeneralInMessage,
+            General,
             relaxed,
             from Vec<u8>,
             into NaiveTime,
@@ -240,7 +240,7 @@ mod naivetime {
             WireType::LengthDelimited
         );
         check_type_test!(
-            GeneralInMessage,
+            General,
             distinguished,
             from Vec<u8>,
             into NaiveTime,
@@ -342,7 +342,7 @@ mod naivedatetime {
     use super::naivetime::test_times;
     use super::SealedBilrostTag;
     use crate::encoding::test::{check_type_empty, check_type_test, distinguished, relaxed};
-    use crate::encoding::{EmptyState, GeneralInMessage, WireType};
+    use crate::encoding::{EmptyState, General, WireType};
     use alloc::vec::Vec;
     use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
     use itertools::iproduct;
@@ -383,7 +383,7 @@ mod naivedatetime {
     mod proptests {
         use super::*;
         check_type_test!(
-            GeneralInMessage,
+            General,
             relaxed,
             from Vec<u8>,
             into NaiveDateTime,
@@ -394,7 +394,7 @@ mod naivedatetime {
             WireType::LengthDelimited
         );
         check_type_test!(
-            GeneralInMessage,
+            General,
             distinguished,
             from Vec<u8>,
             into NaiveDateTime,
@@ -463,7 +463,7 @@ delegate_proxied_encoding!(
 #[cfg(test)]
 mod utc {
     use crate::encoding::{
-        Capped, DecodeContext, DistinguishedValueDecoder, ForOverwrite, GeneralInMessage,
+        Capped, DecodeContext, DistinguishedValueDecoder, ForOverwrite, General,
         RestrictedDecodeContext, ValueDecoder, ValueEncoder,
     };
     use crate::Canonicity::{Canonical, NotCanonical};
@@ -477,10 +477,10 @@ mod utc {
         {
             let mut buf = Vec::new();
             let zero_offset = FixedOffset::east_opt(0).unwrap();
-            ValueEncoder::<GeneralInMessage>::encode_value(&zero_offset, &mut buf);
+            ValueEncoder::<General>::encode_value(&zero_offset, &mut buf);
             let mut utc = Utc::for_overwrite();
             assert_eq!(
-                ValueDecoder::<GeneralInMessage>::decode_value(
+                ValueDecoder::<General>::decode_value(
                     &mut utc,
                     Capped::new(&mut buf.as_slice()),
                     DecodeContext::default(),
@@ -488,7 +488,7 @@ mod utc {
                 Ok(())
             );
             assert_eq!(
-                DistinguishedValueDecoder::<GeneralInMessage>::decode_value_distinguished::<true>(
+                DistinguishedValueDecoder::<General>::decode_value_distinguished::<true>(
                     &mut utc,
                     Capped::new(&mut buf.as_slice()),
                     RestrictedDecodeContext::new(NotCanonical),
@@ -500,10 +500,10 @@ mod utc {
         {
             let mut buf = Vec::new();
             let nonzero_offset = FixedOffset::east_opt(1000).unwrap();
-            ValueEncoder::<GeneralInMessage>::encode_value(&nonzero_offset, &mut buf);
+            ValueEncoder::<General>::encode_value(&nonzero_offset, &mut buf);
             let mut utc = Utc::for_overwrite();
             assert_eq!(
-                ValueDecoder::<GeneralInMessage>::decode_value(
+                ValueDecoder::<General>::decode_value(
                     &mut utc,
                     Capped::new(&mut buf.as_slice()),
                     DecodeContext::default(),
@@ -511,7 +511,7 @@ mod utc {
                 Err(DecodeError::new(OutOfDomainValue))
             );
             assert_eq!(
-                DistinguishedValueDecoder::<GeneralInMessage>::decode_value_distinguished::<true>(
+                DistinguishedValueDecoder::<General>::decode_value_distinguished::<true>(
                     &mut utc,
                     Capped::new(&mut buf.as_slice()),
                     RestrictedDecodeContext::new(NotCanonical),
@@ -605,7 +605,7 @@ mod fixedoffset {
     use crate::encoding::test::{check_type_empty, check_type_test, distinguished, relaxed};
     use crate::encoding::value_traits::ForOverwrite;
     use crate::encoding::{
-        Capped, DecodeContext, DistinguishedValueDecoder, EmptyState, GeneralInMessage,
+        Capped, DecodeContext, DistinguishedValueDecoder, EmptyState, General,
         RestrictedDecodeContext, ValueDecoder, ValueEncoder, WireType,
     };
     use crate::Canonicity::NotCanonical;
@@ -638,7 +638,7 @@ mod fixedoffset {
     mod proptests {
         use super::*;
         check_type_test!(
-            GeneralInMessage,
+            General,
             relaxed,
             from Vec<u8>,
             into FixedOffset,
@@ -649,7 +649,7 @@ mod fixedoffset {
             WireType::LengthDelimited
         );
         check_type_test!(
-            GeneralInMessage,
+            General,
             distinguished,
             from Vec<u8>,
             into FixedOffset,
@@ -666,10 +666,10 @@ mod fixedoffset {
         {
             let mut buf = Vec::new();
             let out_of_range: (i32, i32, i32) = (23, 45, 67);
-            ValueEncoder::<GeneralInMessage>::encode_value(&out_of_range, &mut buf);
+            ValueEncoder::<General>::encode_value(&out_of_range, &mut buf);
             let mut fixed = FixedOffset::for_overwrite();
             assert_eq!(
-                ValueDecoder::<GeneralInMessage>::decode_value(
+                ValueDecoder::<General>::decode_value(
                     &mut fixed,
                     Capped::new(&mut buf.as_slice()),
                     DecodeContext::default(),
@@ -677,7 +677,7 @@ mod fixedoffset {
                 Err(DecodeError::new(OutOfDomainValue))
             );
             assert_eq!(
-                DistinguishedValueDecoder::<GeneralInMessage>::decode_value_distinguished::<true>(
+                DistinguishedValueDecoder::<General>::decode_value_distinguished::<true>(
                     &mut fixed,
                     Capped::new(&mut buf.as_slice()),
                     RestrictedDecodeContext::new(NotCanonical),
@@ -692,10 +692,10 @@ mod fixedoffset {
         {
             let mut buf = Vec::new();
             let out_of_range: (i32, i32, i32) = (10, 0, -10);
-            ValueEncoder::<GeneralInMessage>::encode_value(&out_of_range, &mut buf);
+            ValueEncoder::<General>::encode_value(&out_of_range, &mut buf);
             let mut fixed = FixedOffset::for_overwrite();
             assert_eq!(
-                ValueDecoder::<GeneralInMessage>::decode_value(
+                ValueDecoder::<General>::decode_value(
                     &mut fixed,
                     Capped::new(&mut buf.as_slice()),
                     DecodeContext::default(),
@@ -703,7 +703,7 @@ mod fixedoffset {
                 Err(DecodeError::new(InvalidValue))
             );
             assert_eq!(
-                DistinguishedValueDecoder::<GeneralInMessage>::decode_value_distinguished::<true>(
+                DistinguishedValueDecoder::<General>::decode_value_distinguished::<true>(
                     &mut fixed,
                     Capped::new(&mut buf.as_slice()),
                     RestrictedDecodeContext::new(NotCanonical),
@@ -777,7 +777,7 @@ where
 // The encoding for DateTime<Tz> is the same as the (NaiveDateTime, Tz::Offset) that it is composed
 // of.
 delegate_proxied_encoding!(
-    use encoding (GeneralInMessage) to encode proxied type (DateTime<Z>)
+    use encoding (General) to encode proxied type (DateTime<Z>)
     using proxy tag (SealedBilrostTag)
     with general encodings including distinguished
     with where clause for relaxed (Z::Offset: EmptyState)
@@ -790,7 +790,7 @@ mod datetime {
     use super::naivedatetime::test_datetimes;
     use super::SealedBilrostTag;
     use crate::encoding::test::{check_type_empty, check_type_test, distinguished, relaxed};
-    use crate::encoding::{GeneralInMessage, WireType};
+    use crate::encoding::{General, WireType};
     use alloc::vec::Vec;
     use chrono::{DateTime, FixedOffset, Utc};
     use itertools::iproduct;
@@ -810,7 +810,7 @@ mod datetime {
     mod proptests {
         use super::*;
         check_type_test!(
-            GeneralInMessage,
+            General,
             relaxed,
             from Vec<u8>,
             into DateTime<Utc>,
@@ -821,7 +821,7 @@ mod datetime {
             WireType::LengthDelimited
         );
         check_type_test!(
-            GeneralInMessage,
+            General,
             distinguished,
             from Vec<u8>,
             into DateTime<Utc>,
@@ -881,7 +881,7 @@ impl DistinguishedProxiable<SealedBilrostTag> for TimeDelta {
 
 // The encoding for TimeDelta matches that of bilrost_types::Duration.
 delegate_proxied_encoding!(
-    use encoding (GeneralInMessage) to encode proxied type (TimeDelta)
+    use encoding (General) to encode proxied type (TimeDelta)
     using proxy tag (SealedBilrostTag)
     with general encodings including distinguished
 );
