@@ -516,7 +516,7 @@ We can now import and use its traits and derive macros. The main three are:
   except when they are included in a `Message` struct (or [have `Message`
   derived themselves](#deriving-message-for-enums)).
 
-And then there are the five traits for the different [message encoding and 
+And then there are the five traits for the different [message encoding and
 decoding](#encoding-and-decoding-messages) capabilities:
 * `Message`
 * `OwnedMessage`
@@ -1773,7 +1773,7 @@ encoding can be nested as well.
 
 Tuples encode and decode exactly as if they were nested messages with the same
 field types and encodings, and the tags assigned to those fields are the same as
-the index of the member of the tuple. So, he assigned tags start at zero; this
+the index of the member of the tuple. So, the assigned tags start at zero; this
 is in contrast to derived message implementations which *by default* will assign
 tags starting at 1.
 
@@ -2590,5 +2590,5 @@ See [LICENSE](./LICENSE) & [NOTICE](./NOTICE) in the source for details, or the
 
 [ghnotice]: https://github.com/mumbleskates/bilrost/blob/bilrost/NOTICE
 
-Copyright 2023-2025 Kent Ross  
+Copyright 2023-2025 Kent Ross
 Copyright 2022 Dan Burkert & Tokio Contributors
