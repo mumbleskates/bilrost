@@ -2590,5 +2590,5 @@ See [LICENSE](./LICENSE) & [NOTICE](./NOTICE) in the source for details, or the
 
 [ghnotice]: https://github.com/mumbleskates/bilrost/blob/bilrost/NOTICE
 
-Copyright 2023-2025 Kent Ross
+Copyright 2023-2025 Kent Ross  
 Copyright 2022 Dan Burkert & Tokio Contributors
