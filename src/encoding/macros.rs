@@ -160,7 +160,7 @@ pub use delegate_encoding;
 ///
 /// Delegation is implemented by macro type-by-type rather than as a blanket impl (such as borrowed
 /// encoding whenever owned decoding exists) right now because we want `impl RawMessage` to provide
-/// value encoding and decoding in the `General` encoding. This continues to preclude any other
+/// value encoding and decoding in the `General` encodings. This continues to preclude any other
 /// blanket trait delegation.
 #[macro_export]
 macro_rules! delegate_value_encoding {
