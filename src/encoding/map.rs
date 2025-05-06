@@ -56,8 +56,8 @@ where
 impl<M, K, V, KE, VE> ValueEncoder<Map<KE, VE>> for M
 where
     M: Mapping<Key = K, Value = V>,
-    K: ForOverwrite + ValueEncoder<KE>,
-    V: ForOverwrite + ValueEncoder<VE>,
+    K: ForOverwrite<KE> + ValueEncoder<KE>,
+    V: ForOverwrite<VE> + ValueEncoder<VE>,
 {
     fn encode_value<B: BufMut + ?Sized>(value: &M, buf: &mut B) {
         encode_varint(map_encoded_length::<M, KE, VE>(value) as u64, buf);
@@ -99,8 +99,8 @@ macro_rules! impl_decoders {
         impl<$($lifetime,)? M, K, V, KE, VE> $relaxed_value <$($lifetime,)? Map<KE, VE>> for M
         where
             M: Mapping<Key = K, Value = V>,
-            K: ForOverwrite + $relaxed_value <$($lifetime,)? KE>,
-            V: ForOverwrite + $relaxed_value <$($lifetime,)? VE>,
+            K: ForOverwrite<KE> + $relaxed_value <$($lifetime,)? KE>,
+            V: ForOverwrite<VE> + $relaxed_value <$($lifetime,)? VE>,
         {
             fn $relaxed_value_method $($($buf_generic)*)? (
                 value: &mut M,
@@ -136,8 +136,8 @@ macro_rules! impl_decoders {
         $distinguished_value <$($lifetime,)? Map<KE, VE>> for M
         where
             M: DistinguishedMapping<Key = K, Value = V> + Eq,
-            K: ForOverwrite + Eq + $distinguished_value <$($lifetime,)? KE>,
-            V: ForOverwrite + Eq + $distinguished_value <$($lifetime,)? VE>,
+            K: ForOverwrite<KE> + Eq + $distinguished_value <$($lifetime,)? KE>,
+            V: ForOverwrite<VE> + Eq + $distinguished_value <$($lifetime,)? VE>,
         {
             const CHECKS_EMPTY: bool = false;
 

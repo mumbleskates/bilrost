@@ -242,7 +242,7 @@ pub(crate) mod borrowed {
 impl<C, T, E> Encoder<Unpacked<E>> for C
 where
     C: Collection<Item = T>,
-    T: ForOverwrite + ValueEncoder<E>,
+    T: ForOverwrite<E> + ValueEncoder<E>,
 {
     #[inline]
     fn encode<B: BufMut + ?Sized>(tag: u32, value: &C, buf: &mut B, tw: &mut TagWriter) {
@@ -279,7 +279,7 @@ where
 /// decoding mode will accept both packed and un-packed encodings.
 impl<T, const N: usize, E> Encoder<Unpacked<E>> for [T; N]
 where
-    T: EmptyState + ValueEncoder<E>,
+    T: EmptyState<E> + ValueEncoder<E>,
 {
     #[inline]
     fn encode<B: BufMut + ?Sized>(tag: u32, value: &[T; N], buf: &mut B, tw: &mut TagWriter) {
@@ -318,7 +318,7 @@ where
 /// Unpacked encodes arrays as repeated fields if any of the values are non-empty.
 impl<T, const N: usize, E> Encoder<Unpacked<E>> for Option<[T; N]>
 where
-    T: ForOverwrite + ValueEncoder<E>,
+    T: ForOverwrite<E> + ValueEncoder<E>,
 {
     #[inline]
     fn encode<B: BufMut + ?Sized>(
@@ -376,7 +376,7 @@ macro_rules! impl_decoders {
         impl<$($lifetime,)? C, T, E> $relaxed <$($lifetime,)? Unpacked<E>> for C
         where
             C: Collection<Item = T>,
-            T: ForOverwrite + $relaxed_value <$($lifetime,)? E>,
+            T: ForOverwrite<E> + $relaxed_value <$($lifetime,)? E>,
         {
             #[inline]
             fn $relaxed_method $($($buf_generic)*)? (
@@ -404,7 +404,7 @@ macro_rules! impl_decoders {
             Self: DistinguishedCollection<Item = T>
                 + $relaxed_value <$($lifetime,)? Packed<E>>
                 + $relaxed <$($lifetime,)? Unpacked<E>>,
-            T: ForOverwrite + Eq + $distinguished_value <$($lifetime,)? E>,
+            T: ForOverwrite<E> + Eq + $distinguished_value <$($lifetime,)? E>,
         {
             #[inline]
             fn $distinguished_method $($($buf_generic)*)? (
@@ -435,7 +435,7 @@ macro_rules! impl_decoders {
 
         impl<$($lifetime,)? T, const N: usize, E> $relaxed <$($lifetime,)? Unpacked<E>> for [T; N]
         where
-            T: EmptyState + $relaxed_value <$($lifetime,)? E>,
+            T: EmptyState<E> + $relaxed_value <$($lifetime,)? E>,
         {
             #[inline]
             fn $relaxed_method $($($buf_generic)*)? (
@@ -453,7 +453,7 @@ macro_rules! impl_decoders {
         $distinguished <$($lifetime,)? Unpacked<E>> for [T; N]
         where
             T: Eq
-                + EmptyState
+                + EmptyState<E>
                 + $distinguished_value <$($lifetime,)? E>
                 + $relaxed_value <$($lifetime,)? E>,
         {
@@ -481,7 +481,7 @@ macro_rules! impl_decoders {
         impl<$($lifetime,)? T, const N: usize, E>
         $relaxed <$($lifetime,)? Unpacked<E>> for Option<[T; N]>
         where
-            T: ForOverwrite + $relaxed_value <$($lifetime,)? E>,
+            T: ForOverwrite<E> + $relaxed_value <$($lifetime,)? E>,
         {
             #[inline]
             fn $relaxed_method $($($buf_generic)*)? (
@@ -505,7 +505,7 @@ macro_rules! impl_decoders {
         $distinguished <$($lifetime,)? Unpacked<E>> for Option<[T; N]>
         where
             T: Eq
-                + ForOverwrite
+                + ForOverwrite<E>
                 + $distinguished_value<$($lifetime,)? E>
                 + $relaxed_value<$($lifetime,)? E>,
         {

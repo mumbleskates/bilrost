@@ -33,6 +33,8 @@ pub trait Proxiable<Tag = ()> {
 
     /// Return a fresh proxy value. This should just be a cheap default, its value needn't be
     /// significant.
+    // TODO(widders): eliminate new_proxy, use ForOverwrite<E> and EmptyState<E> for the proxy type
+    //  instead
     fn new_proxy() -> Self::Proxy;
 
     /// Convert this value into a value of the proxy's type.

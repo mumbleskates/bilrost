@@ -1,8 +1,8 @@
 use crate::buf::ReverseBuf;
 use crate::encoding::{
     encode_varint, encoded_len_varint, encoding_implemented_via_value_encoding, prepend_varint,
-    Buf, BufMut, Canonicity, Capped, DecodeContext, DistinguishedValueDecoder,
-    RestrictedDecodeContext, ValueDecoder, ValueEncoder, WireType, Wiretyped,
+    Buf, BufMut, Canonicity, Capped, DecodeContext, DistinguishedValueDecoder, EmptyState,
+    ForOverwrite, RestrictedDecodeContext, ValueDecoder, ValueEncoder, WireType, Wiretyped,
 };
 use crate::DecodeError;
 use crate::DecodeErrorKind::OutOfDomainValue;
@@ -61,6 +61,25 @@ macro_rules! varint {
         to_uint64($to_uint64_value:ident) $to_uint64:expr,
         from_uint64($from_uint64_value:ident) $from_uint64:expr
     ) => {
+        impl ForOverwrite<Varint> for $ty {
+            #[inline(always)]
+            fn for_overwrite() -> Self where Self: Sized {
+                <Self as ForOverwrite>::for_overwrite()
+            }
+        }
+
+        impl EmptyState<Varint> for $ty {
+            #[inline(always)]
+            fn is_empty(&self) -> bool {
+                <Self as EmptyState>::is_empty(self)
+            }
+
+            #[inline(always)]
+            fn clear(&mut self) {
+                <Self as EmptyState>::clear(self)
+            }
+        }
+
         impl Wiretyped<Varint> for $ty {
             const WIRE_TYPE: WireType = WireType::Varint;
         }

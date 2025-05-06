@@ -22,7 +22,7 @@ impl<T, E> Wiretyped<Packed<E>> for T {
 impl<C, T, E> ValueEncoder<Packed<E>> for C
 where
     C: Collection<Item = T>,
-    T: ForOverwrite + ValueEncoder<E>,
+    T: ForOverwrite<E> + ValueEncoder<E>,
 {
     #[inline]
     fn encode_value<B: BufMut + ?Sized>(value: &C, buf: &mut B) {
@@ -57,7 +57,7 @@ where
 impl<C, T, E> Encoder<Packed<E>> for C
 where
     C: Collection<Item = T> + ValueEncoder<Packed<E>>,
-    T: ForOverwrite + ValueEncoder<E>,
+    T: ForOverwrite<E> + ValueEncoder<E>,
 {
     #[inline]
     fn encode<B: BufMut + ?Sized>(tag: u32, value: &C, buf: &mut B, tw: &mut TagWriter) {
@@ -123,7 +123,7 @@ where
 
 impl<T, const N: usize, E> Encoder<Packed<E>> for [T; N]
 where
-    T: EmptyState + ValueEncoder<E>,
+    T: EmptyState<E> + ValueEncoder<E>,
 {
     #[inline]
     fn encode<B: BufMut + ?Sized>(tag: u32, value: &[T; N], buf: &mut B, tw: &mut TagWriter) {
@@ -171,7 +171,7 @@ macro_rules! impl_decoders {
         impl<$($lifetime,)? C, T, E> $relaxed_value <$($lifetime,)? Packed<E>> for C
         where
             C: Collection<Item = T>,
-            T: ForOverwrite + $relaxed_value<$($lifetime,)? E>,
+            T: ForOverwrite<E> + $relaxed_value<$($lifetime,)? E>,
         {
             #[inline]
             fn $relaxed_value_method $($($buf_generic)*)? (
@@ -204,7 +204,7 @@ macro_rules! impl_decoders {
         impl<$($lifetime,)? C, T, E> $distinguished_value<$($lifetime,)? Packed<E>> for C
         where
             C: DistinguishedCollection<Item = T> + Eq,
-            T: ForOverwrite + Eq + $distinguished_value<$($lifetime,)? E>,
+            T: ForOverwrite<E> + Eq + $distinguished_value<$($lifetime,)? E>,
         {
             const CHECKS_EMPTY: bool = false;
 
@@ -242,7 +242,7 @@ macro_rules! impl_decoders {
         impl<$($lifetime,)? C, T, E> $relaxed <$($lifetime,)? Packed<E>> for C
         where
             C: Collection<Item = T> + $relaxed_value <$($lifetime,)? Packed<E>>,
-            T: ForOverwrite + $relaxed_value <$($lifetime,)? E>,
+            T: ForOverwrite<E> + $relaxed_value <$($lifetime,)? E>,
         {
             #[inline]
             fn $relaxed_method $($($buf_generic)*)? (

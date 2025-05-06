@@ -4,8 +4,8 @@ use crate::encoding::message::{
 };
 use crate::encoding::{
     encode_varint, encoded_len_varint, prepend_varint, Capped, DecodeContext, EmptyState,
-    RawDistinguishedMessageBorrowDecoder, RawDistinguishedMessageDecoder, RawMessage,
-    RawMessageBorrowDecoder, RawMessageDecoder, RestrictedDecodeContext,
+    MessageEncoding, RawDistinguishedMessageBorrowDecoder, RawDistinguishedMessageDecoder,
+    RawMessage, RawMessageBorrowDecoder, RawMessageDecoder, RestrictedDecodeContext,
 };
 use crate::Canonicity::{Canonical, NotCanonical};
 use crate::{length_delimiter_len, Canonicity, DecodeError, EncodeError};
@@ -13,7 +13,7 @@ use alloc::vec::Vec;
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 
 /// A Bilrost message. Provides basic encoding functionality for message types.
-pub trait Message: EmptyState {
+pub trait Message: EmptyState<MessageEncoding> {
     /// Encodes the message to a buffer.
     ///
     /// An error will be returned if the buffer does not have sufficient capacity.
