@@ -4,14 +4,16 @@ use crate::{Canonicity, DecodeErrorKind};
 ///
 /// This type must be implemented for every type encodable as a directly included field in a bilrost
 /// message.
-pub trait EmptyState: ForOverwrite {
+///
+// TODO(widders): revisit the default here
+pub trait EmptyState<E = ()>: ForOverwrite<E> {
     #[inline(always)]
     /// Produces the empty state for this type.
     fn empty() -> Self
     where
         Self: Sized,
     {
-        ForOverwrite::for_overwrite()
+        ForOverwrite::<E>::for_overwrite()
     }
 
     /// Returns true iff this instance is in the empty state.
@@ -24,7 +26,9 @@ pub trait EmptyState: ForOverwrite {
 /// than a value that is definitely empty. This is implemented for types that can be present
 /// optionally (in `Option` or `Vec`, for instance) but don't have an "empty" value, such as
 /// enumerations without a zero value.
-pub trait ForOverwrite {
+///
+// TODO(widders): revisit the default here
+pub trait ForOverwrite<E = ()> {
     /// Produces a new `Self` value to be overwritten.
     fn for_overwrite() -> Self
     where
