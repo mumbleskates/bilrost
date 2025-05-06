@@ -680,6 +680,19 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         .map(|(field_ident, _)| field_ident)
         .collect();
 
+    let for_overwrites: Vec<_> = unsorted_fields
+        .iter()
+        .map(|(_, field)| field.for_overwrite())
+        .collect();
+    let is_empties: Vec<_> = unsorted_fields
+        .iter()
+        .map(|(field_ident, field)| field.is_empty(quote!(&self.#field_ident)))
+        .collect();
+    let clears: Vec<_> = unsorted_fields
+        .iter()
+        .map(|(field_ident, field)| field.clear(quote!(&mut self.#field_ident)))
+        .collect();
+
     let initialize_ignored = if has_ignored_fields {
         quote!(..::core::default::Default::default())
     } else {
@@ -778,24 +791,24 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
             }
         }
 
-        impl #impl_generics #crate_::encoding::ForOverwrite
+        impl #impl_generics #crate_::encoding::ForOverwrite<#crate_::encoding::MessageEncoding>
         for #ident #ty_generics #encoder_where_clause {
             fn for_overwrite() -> Self {
                 Self {
-                    #(#field_idents: #crate_::encoding::ForOverwrite::for_overwrite(),)*
+                    #(#field_idents: #for_overwrites,)*
                     #initialize_ignored
                 }
             }
         }
 
-        impl #impl_generics #crate_::encoding::EmptyState
+        impl #impl_generics #crate_::encoding::EmptyState<#crate_::encoding::MessageEncoding>
         for #ident #ty_generics #encoder_where_clause {
             fn is_empty(&self) -> bool {
-                true #(&& #crate_::encoding::EmptyState::is_empty(&self.#field_idents))*
+                true #(&& #is_empties)*
             }
 
             fn clear(&mut self) {
-                #(#crate_::encoding::EmptyState::clear(&mut self.#field_idents);)*
+                #(#clears)*
             }
         }
     };
@@ -1663,7 +1676,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         encoded_len.push(quote!(#ident::#empty_ident => 0));
 
         empty_state_impl = Some(quote! {
-            impl #impl_generics #crate_::encoding::ForOverwrite
+            impl #impl_generics #crate_::encoding::ForOverwrite<#crate_::encoding::MessageEncoding>
             for #ident #ty_generics #encoder_where_clause {
                 #[inline]
                 fn for_overwrite() -> Self {
@@ -1671,7 +1684,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
                 }
             }
 
-            impl #impl_generics #crate_::encoding::EmptyState
+            impl #impl_generics #crate_::encoding::EmptyState<#crate_::encoding::MessageEncoding>
             for #ident #ty_generics #encoder_where_clause {
                 #[inline]
                 fn is_empty(&self) -> bool {
@@ -1680,7 +1693,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
 
                 #[inline]
                 fn clear(&mut self) {
-                    *self = Self::empty();
+                    *self = #ident::#empty_ident;
                 }
             }
         });

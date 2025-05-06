@@ -281,6 +281,29 @@ impl Field {
         }
     }
 
+    /// Returns an expression which initializes the field's type with the encoding.
+    pub fn for_overwrite(&self) -> TokenStream {
+        let crate_ = crate_name();
+        let encoding = &self.encoding;
+        quote!(#crate_::encoding::ForOverwrite::<#encoding>::for_overwrite())
+    }
+
+    /// Returns an expression which returns whether the field is considered empty in the encoding.
+    pub fn is_empty(&self, ident: TokenStream) -> TokenStream {
+        let crate_ = crate_name();
+        let encoding = &self.encoding;
+        quote!(#crate_::encoding::EmptyState::<#encoding>::is_empty(#ident))
+    }
+
+    /// Returns an expression which resets the field's value to empty with its encoding.
+    pub fn clear(&self, ident: TokenStream) -> TokenStream {
+        let crate_ = crate_name();
+        let encoding = &self.encoding;
+        quote! {
+            #crate_::encoding::EmptyState::<#encoding>::clear(#ident);
+        }
+    }
+
     /// Returns the where clause constraint terms for the field's encoder.
     pub fn where_terms(&self, purpose: WhereFor) -> Vec<TokenStream> {
         let crate_ = crate_name();
@@ -312,7 +335,7 @@ impl Field {
                 // Encoding or decoding a oneof field always has trivially externally determined
                 // presence, and we never need to know whether or not the value is empty; it never
                 // needs to implement the empty state.
-                quote!(#ty: #crate_::encoding::ForOverwrite),
+                quote!(#ty: #crate_::encoding::ForOverwrite<#encoding>),
             ]
         } else {
             vec![
@@ -336,7 +359,7 @@ impl Field {
                 // Message field encoding always requires EmptyState instead of just ForOverwrite
                 // because we need to know whether a field is empty to know whether we should write
                 // anything; and all the decoding traits imply the encoding trait.
-                quote!(#ty: #crate_::encoding::EmptyState),
+                quote!(#ty: #crate_::encoding::EmptyState<#encoding>),
             ]
         }
     }

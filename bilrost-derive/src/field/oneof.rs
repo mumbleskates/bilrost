@@ -97,6 +97,30 @@ impl Field {
         quote!(#crate_::encoding::Oneof::oneof_encoded_len(&#ident, tm))
     }
 
+    /// Returns an expression which initializes the field's type with the encoding.
+    pub fn for_overwrite(&self) -> TokenStream {
+        let crate_ = crate_name();
+        quote!(
+            #crate_::encoding::ForOverwrite::<#crate_::encoding::MessageEncoding>::for_overwrite()
+        )
+    }
+
+    /// Returns an expression which returns whether the field is considered empty in the encoding.
+    pub fn is_empty(&self, ident: TokenStream) -> TokenStream {
+        let crate_ = crate_name();
+        quote!(
+            #crate_::encoding::EmptyState::<#crate_::encoding::MessageEncoding>::is_empty(#ident)
+        )
+    }
+
+    /// Returns an expression which resets the field's value to empty with its encoding.
+    pub fn clear(&self, ident: TokenStream) -> TokenStream {
+        let crate_ = crate_name();
+        quote! {
+            #crate_::encoding::EmptyState::<#crate_::encoding::MessageEncoding>::clear(#ident);
+        }
+    }
+
     /// Returns an expression which evaluates to an Option<u32> of the tag of the (maybe) present
     /// field in the oneof.
     pub fn current_tag(&self, ident: TokenStream) -> TokenStream {

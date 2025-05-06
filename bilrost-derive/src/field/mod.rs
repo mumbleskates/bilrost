@@ -170,6 +170,30 @@ impl Field {
         }
     }
 
+    /// Returns an expression which initializes the field's type with the encoding.
+    pub fn for_overwrite(&self) -> TokenStream {
+        match self {
+            Field::Value(scalar) => scalar.for_overwrite(),
+            Field::Oneof(oneof) => oneof.for_overwrite(),
+        }
+    }
+
+    /// Returns an expression which returns whether the field is considered empty in the encoding.
+    pub fn is_empty(&self, ident: TokenStream) -> TokenStream {
+        match self {
+            Field::Value(scalar) => scalar.is_empty(ident),
+            Field::Oneof(oneof) => oneof.is_empty(ident),
+        }
+    }
+
+    /// Returns an expression which resets the field's value to empty with its encoding.
+    pub fn clear(&self, ident: TokenStream) -> TokenStream {
+        match self {
+            Field::Value(scalar) => scalar.clear(ident),
+            Field::Oneof(oneof) => oneof.clear(ident),
+        }
+    }
+
     /// If the field is a oneof, returns an expression which evaluates to an Option<u32> of the tag
     /// of the (maybe) present field in the oneof. Panics if the field is not a oneof.
     pub fn current_tag(&self, ident: TokenStream) -> TokenStream {
