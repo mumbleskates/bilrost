@@ -368,7 +368,8 @@ macro_rules! delegate_value_encoding {
 }
 pub use delegate_value_encoding;
 
-// TODO(widders): docs
+/// Shorthand call for delegating encoding using the `Proxiable` traits and the `Proxied` encoding
+/// that uses it.
 #[macro_export]
 macro_rules! delegate_proxied_encoding {
     (
