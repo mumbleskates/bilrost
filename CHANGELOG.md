@@ -17,6 +17,8 @@
   `into_owned`, and `OpaqueValue::convert_to_owned` to `into_owned` to better
   match [common naming conventions](
   https://rust-lang.github.io/api-guidelines/naming.html#ad-hoc-conversions-follow-as_-to_-into_-conventions-c-conv)
+* The "fixed" encoding no longer automatically covers `Vec<T>` by delegating to
+  "unpacked<fixed>" when `T` is supported by the "fixed" encoding.
 
 ### New features
 

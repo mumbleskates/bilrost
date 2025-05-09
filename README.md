@@ -879,7 +879,7 @@ to collide with other type names that are in scope. These standard aliases are:
   instead of `unpacked`.
 * `varint`: primitive numeric types and bool, encodes as varint.
 * `fixed`: fixed-width four- and eight-byte values for integers, floats, and
-  byte arrays. Delegates encoding of collections to `unpacked<fixed>`
+  byte arrays.
 * `plainbytes`: encodes byte arrays, `Vec<u8>`, and `Cow<[u8]>` as
   length-delimited values. Delegates encoding of `Vec<Vec<u8>>`
   and `Vec<Cow<[u8]>>` to `unpacked<plainbytes>`

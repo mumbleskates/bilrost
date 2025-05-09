@@ -1,10 +1,8 @@
-use alloc::vec::Vec;
-
 use bytes::{Buf, BufMut};
 
 use crate::buf::ReverseBuf;
 use crate::encoding::{
-    delegate_encoding, delegate_value_encoding, encoding_implemented_via_value_encoding,
+    delegate_value_encoding, encoding_implemented_via_value_encoding,
     Canonicity, Capped, DecodeContext, DistinguishedValueDecoder, RestrictedDecodeContext,
     ValueDecoder, ValueEncoder, WireType, Wiretyped,
 };
@@ -14,9 +12,6 @@ use crate::DecodeErrorKind::Truncated;
 pub struct Fixed;
 
 encoding_implemented_via_value_encoding!(Fixed);
-
-delegate_encoding!(delegate from (Fixed) to (crate::encoding::Unpacked<Fixed>) for type (Vec<T>)
-    including distinguished with generics (T));
 
 /// Macros which emit implementations for fixed width numeric encoding.
 macro_rules! fixed_width_common {
