@@ -791,7 +791,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
             }
         }
 
-        impl #impl_generics #crate_::encoding::ForOverwrite<#crate_::encoding::MessageEncoding>
+        impl #impl_generics #crate_::encoding::ForOverwrite
         for #ident #ty_generics #encoder_where_clause {
             fn for_overwrite() -> Self {
                 Self {
@@ -801,7 +801,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
             }
         }
 
-        impl #impl_generics #crate_::encoding::EmptyState<#crate_::encoding::MessageEncoding>
+        impl #impl_generics #crate_::encoding::EmptyState
         for #ident #ty_generics #encoder_where_clause {
             fn is_empty(&self) -> bool {
                 true #(&& #is_empties)*
@@ -1676,7 +1676,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         encoded_len.push(quote!(#ident::#empty_ident => 0));
 
         empty_state_impl = Some(quote! {
-            impl #impl_generics #crate_::encoding::ForOverwrite<#crate_::encoding::MessageEncoding>
+            impl #impl_generics #crate_::encoding::ForOverwrite
             for #ident #ty_generics #encoder_where_clause {
                 #[inline]
                 fn for_overwrite() -> Self {
@@ -1684,7 +1684,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
                 }
             }
 
-            impl #impl_generics #crate_::encoding::EmptyState<#crate_::encoding::MessageEncoding>
+            impl #impl_generics #crate_::encoding::EmptyState
             for #ident #ty_generics #encoder_where_clause {
                 #[inline]
                 fn is_empty(&self) -> bool {
