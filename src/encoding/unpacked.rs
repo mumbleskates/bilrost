@@ -40,7 +40,7 @@ macro_rules! define_decoders {
         ) -> Result<(), DecodeError>
         where
             T: Collection,
-            T::Item: ForOverwrite + $relaxed_value <$($lifetime,)? E>,
+            T::Item: ForOverwrite<E> + $relaxed_value <$($lifetime,)? E>,
         {
             check_wire_type(<T::Item as Wiretyped<E>>::WIRE_TYPE, wire_type)?;
             loop {
@@ -128,7 +128,7 @@ macro_rules! define_decoders {
         ) -> Result<Canonicity, DecodeError>
         where
             T: DistinguishedCollection,
-            T::Item: ForOverwrite + Eq + $distinguished_value <$($lifetime,)? E>,
+            T::Item: ForOverwrite<E> + Eq + $distinguished_value <$($lifetime,)? E>,
         {
             check_wire_type(<T::Item as Wiretyped<E>>::WIRE_TYPE, wire_type)?;
             let mut canon = Canonicity::Canonical;
