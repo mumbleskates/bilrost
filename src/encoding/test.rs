@@ -187,7 +187,7 @@ macro_rules! check_type {
 
             pub fn check_type<T, E>(value: T, tag: u32, wire_type: WireType) -> TestCaseResult
             where
-                T: Debug + ForOverwrite + PartialEq + $decoder_trait<E>,
+                T: Debug + ForOverwrite<E> + PartialEq + $decoder_trait<E>,
             {
                 let expected_len =
                     <T as Encoder<E>>::encoded_len(tag, &value, &mut RuntimeTagMeasurer::new());
@@ -273,7 +273,8 @@ macro_rules! check_type {
             where
                 T: Debug
                     + Clone
-                    + ForOverwrite
+                    + ForOverwrite<General>
+                    + ForOverwrite<GeneralPacked>
                     + PartialEq
                     + $decoder_trait<General>
                     + $decoder_trait<GeneralPacked>,
@@ -292,7 +293,7 @@ macro_rules! check_type {
                 wire_type: WireType,
             ) -> TestCaseResult
             where
-                T: Debug + ForOverwrite + PartialEq + $decoder_trait<E>,
+                T: Debug + ForOverwrite<E> + PartialEq + $decoder_trait<E>,
             {
                 let expected_len =
                     <T as Encoder<E>>::encoded_len(tag, &value, &mut RuntimeTagMeasurer::new());
@@ -425,9 +426,9 @@ macro_rules! check_type_empty {
 }
 pub(crate) use check_type_empty;
 
-pub(crate) fn check_type_empty_impl<T>()
+pub(crate) fn check_type_empty_impl<T, E>()
 where
-    T: Debug + EmptyState + PartialEq,
+    T: Debug + EmptyState<E> + PartialEq,
 {
     let mut empty = T::empty();
     assert!(empty.is_empty());
@@ -438,17 +439,17 @@ where
 
 pub(crate) fn check_type_empty_proxied_impl<T, Tag>()
 where
-    T: Debug + EmptyState + PartialEq + Proxiable<Tag>,
-    T::Proxy: Debug + EmptyState + PartialEq,
+    T: Debug + EmptyState<crate::encoding::Proxied<General, Tag>> + PartialEq + Proxiable<Tag>,
+    T::Proxy: Debug + EmptyState<General> + PartialEq,
 {
-    check_type_empty_impl::<T>();
-    check_type_empty_impl::<T::Proxy>();
+    check_type_empty_impl::<T, crate::encoding::Proxied<General, Tag>>();
+    check_type_empty_impl::<T::Proxy, General>();
 }
 
 pub(crate) fn check_proxy_round_trip<T, Tag>()
 where
-    T: Debug + EmptyState + PartialEq + Proxiable<Tag>,
-    T::Proxy: Debug + EmptyState + PartialEq,
+    T: Debug + EmptyState<crate::encoding::Proxied<General, Tag>> + PartialEq + Proxiable<Tag>,
+    T::Proxy: Debug + EmptyState<General> + PartialEq,
 {
     let start = T::empty();
     let proxy = start.encode_proxy();
@@ -461,8 +462,8 @@ where
 
 pub(crate) fn check_proxy_round_trip_distinguished<T, Tag>()
 where
-    T: Debug + EmptyState + Eq + DistinguishedProxiable<Tag>,
-    T::Proxy: Debug + EmptyState + Eq,
+    T: Debug + EmptyState<crate::encoding::Proxied<General, Tag>> + Eq + DistinguishedProxiable<Tag>,
+    T::Proxy: Debug + EmptyState<General> + Eq,
 {
     let start = T::empty();
     let proxy = start.encode_proxy();
@@ -476,7 +477,7 @@ where
 
 fn present_empty_not_canon<T, E>()
 where
-    T: EmptyState + Eq + DistinguishedDecoder<E> + ValueEncoder<E>,
+    T: EmptyState<E> + Eq + DistinguishedDecoder<E> + ValueEncoder<E>,
 {
     let mut encoded = <Vec<u8>>::new();
     Encoder::<E>::encode(123, &Some(T::empty()), &mut encoded, &mut TagWriter::new());
