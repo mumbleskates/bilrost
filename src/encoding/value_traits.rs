@@ -75,12 +75,12 @@ macro_rules! empty_state_via_for_overwrite {
         {
             #[inline]
             fn is_empty(&self) -> bool {
-                *self == <Self as EmptyState>::empty()
+                *self == <Self as $crate::encoding::EmptyState>::empty()
             }
 
             #[inline]
             fn clear(&mut self) {
-                *self = <Self as EmptyState>::empty();
+                *self = <Self as $crate::encoding::EmptyState>::empty();
             }
         }
     };
