@@ -119,7 +119,7 @@ pub(crate) fn borrow_merge_distinguished<'a, T: RawDistinguishedMessageBorrowDec
 
 /// Encoding trait to be implemented by messages. The methods of this trait are meant to only be
 /// used by the `Message` implementation.
-pub trait RawMessage: EmptyState<MessageEncoding> {
+pub trait RawMessage: EmptyState {
     const __ASSERTIONS: ();
 
     /// Encodes the message to a buffer.
