@@ -499,10 +499,45 @@ macro_rules! encoding_uses_base_empty_state {
 }
 pub(crate) use encoding_uses_base_empty_state;
 
-// TODO(widders): macro for populating an encoding with standard empty state trait definitions:
-//  * Option<T>
-//  * [T; N]
-//  * (is there anything else? doesn't seem like it)
+// TODO(widders): document and incorporate [T; N]
+#[macro_export]
+macro_rules! implement_core_empty_state_rules {
+    (
+        $encoding:ty
+        $(, with generics ($($impl_generics:tt)*))?
+        $(, with where clause ($($where_clause:tt)*))?
+    ) => {
+        impl<$($($impl_generics)*,)? __T> $crate::encoding::ForOverwrite<$encoding>
+        for ::core::option::Option<__T>
+        where
+            __T: $crate::encoding::ForOverwrite<$encoding>,
+            $($($where_clause)*)?
+        {
+            #[inline(always)]
+            fn for_overwrite() -> Self {
+                ::core::option::Option::None
+            }
+        }
+
+        impl<$($($impl_generics)*,)? __T> $crate::encoding::EmptyState<$encoding>
+        for ::core::option::Option<__T>
+        where
+            __T: $crate::encoding::EmptyState<$encoding>,
+            $($($where_clause)*)?
+        {
+            #[inline(always)]
+            fn is_empty(&self) -> bool {
+                ::core::option::Option::is_none(self)
+            }
+
+            #[inline(always)]
+            fn clear(&mut self) {
+                *self = ::core::option::Option::None;
+            }
+        }
+    }
+}
+pub(crate) use implement_core_empty_state_rules;
 
 /// Most kinds of encodings want to act as field decoders for bare values in any situation where
 /// they also implement value decoding. Only a couple encodings want to do anything fancy, like

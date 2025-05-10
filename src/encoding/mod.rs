@@ -142,7 +142,7 @@ pub use encoding_traits::{
 };
 pub(crate) use macros::{
     __impl_decoder_where_value_decoder, encoding_implemented_via_value_encoding,
-    encoding_uses_base_empty_state, impl_cow_value_encoding,
+    encoding_uses_base_empty_state, impl_cow_value_encoding, implement_core_empty_state_rules,
 };
 pub use macros::{delegate_encoding, delegate_proxied_encoding, delegate_value_encoding};
 pub use message::{

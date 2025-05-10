@@ -65,25 +65,6 @@ where
     }
 }
 
-impl<T> ForOverwrite for Option<T> {
-    #[inline]
-    fn for_overwrite() -> Self {
-        None
-    }
-}
-
-impl<T> EmptyState for Option<T> {
-    #[inline]
-    fn is_empty(&self) -> bool {
-        self.is_none()
-    }
-
-    #[inline]
-    fn clear(&mut self) {
-        *self = None;
-    }
-}
-
 impl<T> ForOverwrite for Box<T>
 where
     T: ForOverwrite,

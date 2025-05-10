@@ -20,11 +20,12 @@ use bytes::{Buf, BufMut};
 use crate::buf::ReverseBuf;
 use crate::encoding::{
     delegate_value_encoding, encode_varint, encoded_len_varint,
-    encoding_implemented_via_value_encoding, prepend_varint, skip_field, BorrowDecoder, Canonicity,
-    Capped, DecodeContext, Decoder, DistinguishedBorrowDecoder, DistinguishedDecoder,
-    DistinguishedValueBorrowDecoder, DistinguishedValueDecoder, EmptyState, Encoder, General,
-    GeneralGeneric, RestrictedDecodeContext, TagReader, TagRevWriter, TagWriter,
-    TrivialTagMeasurer, ValueBorrowDecoder, ValueDecoder, ValueEncoder, WireType, Wiretyped,
+    encoding_implemented_via_value_encoding, implement_core_empty_state_rules, prepend_varint,
+    skip_field, BorrowDecoder, Canonicity, Capped, DecodeContext, Decoder,
+    DistinguishedBorrowDecoder, DistinguishedDecoder, DistinguishedValueBorrowDecoder,
+    DistinguishedValueDecoder, EmptyState, Encoder, ForOverwrite, General, GeneralGeneric,
+    RestrictedDecodeContext, TagReader, TagRevWriter, TagWriter, TrivialTagMeasurer,
+    ValueBorrowDecoder, ValueDecoder, ValueEncoder, WireType, Wiretyped,
 };
 use crate::DecodeError;
 use crate::DecodeErrorKind::UnexpectedlyRepeated;
@@ -41,6 +42,8 @@ macro_rules! impl_tuple {
         ($($encodings:ident),*),
         ($($tees:ident),*),
     ) => {
+        implement_core_empty_state_rules!(($($encodings,)*), with generics ($($encodings),*));
+
         // All tuple types encode as nested messages, so all of them implement ValueEncoder and
         // should therefore implement Encoder in terms of that.
         encoding_implemented_via_value_encoding!(
@@ -48,7 +51,7 @@ macro_rules! impl_tuple {
             with generics ($($encodings),*)
         );
 
-        impl<$($letters,)* $($encodings,)*> ForOverwrite<$($encodings,)*> for ($($letters,)*)
+        impl<$($letters,)* $($encodings,)*> ForOverwrite<($($encodings,)*)> for ($($letters,)*)
         where
             $($letters: ForOverwrite<$encodings>,)*
         {
@@ -58,7 +61,7 @@ macro_rules! impl_tuple {
             }
         }
 
-        impl<$($letters,)* $($encodings,)*> EmptyState<$($encodings,)*> for ($($letters,)*)
+        impl<$($letters,)* $($encodings,)*> EmptyState<($($encodings,)*)> for ($($letters,)*)
         where
             $($letters: EmptyState<$encodings>,)*
         {
@@ -84,7 +87,7 @@ macro_rules! impl_tuple {
 
         impl<$($letters,)* $($encodings,)*> ValueEncoder<($($encodings,)*)> for ($($letters,)*)
         where
-            $($letters: EmptyState + Encoder<$encodings>,)*
+            $($letters: EmptyState<$encodings> + Encoder<$encodings>,)*
         {
             #[inline]
             fn encode_value<__B: BufMut + ?Sized>(value: &Self, buf: &mut __B) {
@@ -121,7 +124,7 @@ macro_rules! impl_tuple {
 
         impl<$($letters,)* $($encodings,)*> ValueDecoder<($($encodings,)*)> for ($($letters,)*)
         where
-            $($letters: EmptyState + Decoder<$encodings>,)*
+            $($letters: EmptyState<$encodings> + Decoder<$encodings>,)*
         {
             #[inline]
             fn decode_value<__B: Buf + ?Sized>(
@@ -167,7 +170,7 @@ macro_rules! impl_tuple {
         for ($($letters,)*)
         where
             Self: Eq,
-            $($letters: Eq + EmptyState + DistinguishedDecoder<$encodings>,)*
+            $($letters: Eq + EmptyState<$encodings> + DistinguishedDecoder<$encodings>,)*
         {
             const CHECKS_EMPTY: bool = true; // Message types are always zero-length when empty
 
@@ -233,7 +236,7 @@ macro_rules! impl_tuple {
         impl<'a, $($letters,)* $($encodings,)*>
         ValueBorrowDecoder<'a, ($($encodings,)*)> for ($($letters,)*)
         where
-            $($letters: EmptyState + BorrowDecoder<'a, $encodings>,)*
+            $($letters: EmptyState<$encodings> + BorrowDecoder<'a, $encodings>,)*
         {
             #[inline]
             fn borrow_decode_value(
@@ -279,7 +282,7 @@ macro_rules! impl_tuple {
         DistinguishedValueBorrowDecoder<'a, ($($encodings,)*)> for ($($letters,)*)
         where
             Self: Eq,
-            $($letters: Eq + EmptyState + DistinguishedBorrowDecoder<'a, $encodings>,)*
+            $($letters: Eq + EmptyState<$encodings> + DistinguishedBorrowDecoder<'a, $encodings>,)*
         {
             const CHECKS_EMPTY: bool = true; // Message types are always zero-length when empty
 

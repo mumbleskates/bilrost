@@ -1,3 +1,4 @@
+use crate::encoding::implement_core_empty_state_rules;
 use crate::{Canonicity, DecodeErrorKind};
 
 /// Trait for types that have a state that is considered "empty".
@@ -34,6 +35,8 @@ pub trait ForOverwrite<E = ()> {
     where
         Self: Sized;
 }
+
+implement_core_empty_state_rules!(());
 
 /// Implements `ForOverwrite` in terms of `Default`.
 #[macro_export]
