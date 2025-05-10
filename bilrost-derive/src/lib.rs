@@ -2034,13 +2034,13 @@ struct DecoderForOneof<'a> {
 
 impl ToTokens for DecoderForOneof<'_> {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        let crate_ = crate_name();
         let ident = self.ident;
         let variant_ident = self.variant_ident;
         let field = self.field;
         let tag = field.first_tag();
         let with_new_value = field.with_value(quote!(new_value));
         let decode = field.decode(quote!(&mut new_value), self.lifetime, self.mode);
+        let for_overwrite = field.for_overwrite();
 
         // It's important that we spell the whole expression for the decoder matching for oneofs as
         // a single Result expression that never early-returns with `?`; that way when we add guards
@@ -2051,7 +2051,7 @@ impl ToTokens for DecoderForOneof<'_> {
         tokens.append_all(match self.mode {
             Relaxed => quote! {
                 #tag => {
-                    let mut new_value = #crate_::encoding::ForOverwrite::for_overwrite();
+                    let mut new_value = #for_overwrite;
                     match #decode {
                         ::core::result::Result::Ok(()) => {
                             ::core::result::Result::Ok(#ident::#variant_ident #with_new_value)
@@ -2062,7 +2062,7 @@ impl ToTokens for DecoderForOneof<'_> {
             },
             Distinguished => quote! {
                 #tag => {
-                    let mut new_value = #crate_::encoding::ForOverwrite::for_overwrite();
+                    let mut new_value = #for_overwrite;
                     match #decode {
                         ::core::result::Result::Ok(canon) => ::core::result::Result::Ok((
                             #ident::#variant_ident #with_new_value,
