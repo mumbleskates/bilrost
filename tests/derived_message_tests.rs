@@ -3719,7 +3719,7 @@ fn enumeration_helpers() {
         .unwrap()
         .expect_err("bad enumeration value parsed successfully");
 
-    let val = HelpedStruct::empty();
+    let val = <HelpedStruct as EmptyState>::empty();
     assert_eq!(val.optional(), None);
 
     // Demonstrate that the same errors happen when we decode to a struct with strict
@@ -3823,7 +3823,7 @@ fn directly_included_message() {
         owned distinguished,
         [(2, OV::string("abc"))],
         OuterDirect {
-            inner: EmptyState::empty(),
+            inner: <_ as EmptyState>::empty(),
             also: "abc".into(),
         },
     );
@@ -3841,7 +3841,7 @@ fn directly_included_message() {
     assert::decodes!(
         owned non-canonically,
         [(1, OV::message(&[].into_opaque_message()))],
-        OuterDirect::empty(),
+        <OuterDirect as EmptyState>::empty(),
         NotCanonical,
         "OuterDirect.inner",
     );
@@ -3849,7 +3849,7 @@ fn directly_included_message() {
         owned distinguished,
         [(1, OV::message(&[].into_opaque_message()))],
         OuterOptional {
-            inner: Some(EmptyState::empty()),
+            inner: Some(<_ as EmptyState>::empty()),
             also: None,
         },
     );
