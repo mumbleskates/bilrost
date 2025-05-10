@@ -5,7 +5,7 @@ use crate::{Canonicity, DecodeErrorKind};
 /// This type must be implemented for every type encodable as a directly included field in a bilrost
 /// message.
 ///
-// TODO(widders): revisit the default here
+// TODO(widders): document () delegation and tagged implementations
 pub trait EmptyState<E = ()>: ForOverwrite<E> {
     #[inline(always)]
     /// Produces the empty state for this type.
@@ -27,7 +27,7 @@ pub trait EmptyState<E = ()>: ForOverwrite<E> {
 /// optionally (in `Option` or `Vec`, for instance) but don't have an "empty" value, such as
 /// enumerations without a zero value.
 ///
-// TODO(widders): revisit the default here
+// TODO(widders): document () delegation and tagged implementations
 pub trait ForOverwrite<E = ()> {
     /// Produces a new `Self` value to be overwritten.
     fn for_overwrite() -> Self
