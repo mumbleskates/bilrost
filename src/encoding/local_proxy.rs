@@ -28,7 +28,7 @@ impl<T: EmptyState, const N: usize> Deref for LocalProxy<T, N> {
 impl<T: EmptyState, const N: usize> LocalProxy<T, N> {
     /// Creates a new, empty array-list proxy.
     pub fn new_empty() -> Self {
-        Self::empty()
+        <_ as EmptyState>::empty()
     }
 
     /// Creates a new value that only contains the values in the given backing array that are not
@@ -82,7 +82,7 @@ impl<T: EmptyState + Eq, const N: usize> Eq for LocalProxy<T, N> {}
 impl<T: EmptyState, const N: usize> ForOverwrite for LocalProxy<T, N> {
     fn for_overwrite() -> Self {
         Self {
-            arr: EmptyState::empty(),
+            arr: <_ as EmptyState>::empty(),
             size: 0,
         }
     }

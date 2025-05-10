@@ -31,7 +31,7 @@ macro_rules! empty_state_for_float {
 
             #[inline]
             fn clear(&mut self) {
-                *self = Self::empty();
+                *self = 0.0;
             }
         }
     };

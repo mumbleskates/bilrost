@@ -20,11 +20,11 @@ for_overwrite_via_default!(bytes::Bytes);
 impl EmptyState for bytes::Bytes {
     #[inline]
     fn is_empty(&self) -> bool {
-        Self::is_empty(self)
+        bytes::Bytes::is_empty(self)
     }
 
     #[inline]
     fn clear(&mut self) {
-        *self = Self::empty();
+        *self = <Self as EmptyState>::empty();
     }
 }

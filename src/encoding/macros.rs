@@ -785,7 +785,7 @@ macro_rules! impl_cow_value_encoding {
                     buf: Capped<&'a [u8]>,
                     ctx: DecodeContext,
                 ) -> Result<(), DecodeError> {
-                    let mut s = <&$T>::for_overwrite();
+                    let mut s = <&$T as ForOverwrite>::for_overwrite();
                     ValueBorrowDecoder::<$E>::borrow_decode_value(&mut s, buf, ctx)?;
                     *value = Cow::Borrowed(s);
                     Ok(())
@@ -802,7 +802,7 @@ macro_rules! impl_cow_value_encoding {
                     buf: Capped<&'a [u8]>,
                     ctx: RestrictedDecodeContext,
                 ) -> Result<Canonicity, DecodeError> {
-                    let mut s = <&$T>::for_overwrite();
+                    let mut s = <&$T as ForOverwrite>::for_overwrite();
                     let canon =
                         DistinguishedValueBorrowDecoder::<$E>::borrow_decode_value_distinguished::<
                             ALLOW_EMPTY,
