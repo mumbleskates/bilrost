@@ -61,11 +61,11 @@ impl<const N: usize> ForOverwrite for &[u8; N] {
 
 impl<const N: usize> EmptyState for &[u8; N] {
     fn is_empty(&self) -> bool {
-        *self == Self::empty()
+        *self == <Self as EmptyState>::empty()
     }
 
     fn clear(&mut self) {
-        *self = Self::empty();
+        *self = <Self as EmptyState>::empty();
     }
 }
 
