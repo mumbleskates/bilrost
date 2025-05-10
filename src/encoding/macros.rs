@@ -509,9 +509,7 @@ macro_rules! implement_core_empty_state_rules {
     ) => {
         impl<$($($impl_generics)*,)? __T> $crate::encoding::ForOverwrite<$encoding>
         for ::core::option::Option<__T>
-        where
-            __T: $crate::encoding::ForOverwrite<$encoding>,
-            $($($where_clause)*)?
+        $(where $($where_clause)*)?
         {
             #[inline(always)]
             fn for_overwrite() -> Self {
@@ -521,9 +519,7 @@ macro_rules! implement_core_empty_state_rules {
 
         impl<$($($impl_generics)*,)? __T> $crate::encoding::EmptyState<$encoding>
         for ::core::option::Option<__T>
-        where
-            __T: $crate::encoding::EmptyState<$encoding>,
-            $($($where_clause)*)?
+        $(where $($where_clause)*)?
         {
             #[inline(always)]
             fn is_empty(&self) -> bool {
