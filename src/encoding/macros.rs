@@ -448,6 +448,57 @@ macro_rules! delegate_proxied_encoding {
 }
 pub use delegate_proxied_encoding;
 
+/// Generates implementations of `ForOverwrite` and `EmptyState` for the given encoding that always
+/// defer to the base implementation of the trait.
+/// 
+/// This is suitable for any encoding that won't need to implement those traits for any un-owned
+/// types. To implement encodings for types that are not owned for your crate (such as types in
+/// `std` or a third-party crate that `bilrost` doesn't already cover) your implementation will be
+/// required to "own" the trait that is being implemented. This means that for your custom encoding
+/// type `MyEncoding`, the traits `ForOverwrite<MyEncoding>` and `EmptyState<MyEncoding>` can still
+/// be implemented inside your crate as long as you don't also use this macro.
+#[macro_export]
+macro_rules! encoding_uses_base_empty_state {
+    (
+        $encoding:ty
+        $(, with generics ($($impl_generics:tt)*))?
+        $(, with where clause ($($where_clause:tt)*))?
+    ) => {
+        impl<$($($impl_generics)*,)? __T> $crate::encoding::ForOverwrite<$encoding> for __T
+        where
+            Self: $crate::encoding::ForOverwrite<()>,
+            $($($where_clause)*)?
+        {
+            #[inline(always)]
+            fn for_overwrite() -> Self {
+                $crate::encoding::ForOverwrite::<()>::for_overwrite()
+            }
+        }
+
+        impl<$($($impl_generics)*,)? __T> $crate::encoding::EmptyState<$encoding> for __T
+        where
+            Self: $crate::encoding::EmptyState<()>,
+            $($($where_clause)*)?
+        {
+            #[inline(always)]
+            fn empty() -> Self {
+                $crate::encoding::EmptyState::<()>::empty()
+            }
+
+            #[inline(always)]
+            fn is_empty(&self) -> bool {
+                $crate::encoding::EmptyState::<()>::is_empty(self)
+            }
+
+            #[inline(always)]
+            fn clear(&mut self) {
+                $crate::encoding::EmptyState::<()>::clear(self);
+            }
+        }
+    }
+}
+pub(crate) use encoding_uses_base_empty_state;
+
 /// Most kinds of encodings want to act as field decoders for bare values in any situation where
 /// they also implement value decoding. Only a couple encodings want to do anything fancy, like
 /// accepting alternate wire-types in relaxed mode; the rest want to use this to blanket those
