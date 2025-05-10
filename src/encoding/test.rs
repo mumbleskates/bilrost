@@ -483,7 +483,12 @@ where
     T: EmptyState<E> + Eq + DistinguishedDecoder<E> + ValueEncoder<E>,
 {
     let mut encoded = <Vec<u8>>::new();
-    Encoder::<E>::encode(123, &Some(T::empty()), &mut encoded, &mut TagWriter::new());
+    crate::encoding::FieldEncoder::<E>::encode_field(
+        123,
+        &<T as EmptyState<E>>::empty(),
+        &mut encoded,
+        &mut TagWriter::new(),
+    );
     let mut buf = &*encoded;
     let mut capped = Capped::new(&mut buf);
     let (tag, wire_type) = TagReader::new().decode_key(capped.lend()).unwrap();
