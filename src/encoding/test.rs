@@ -140,7 +140,7 @@ macro_rules! check_borrowable {
                     );
 
                     // distinguished borrowed decoding
-                    let mut borrowed = <&$ty>::empty();
+                    let mut borrowed = <&$ty as EmptyState>::empty();
                     prop_assert_eq!(
                         DistinguishedValueBorrowDecoder::<$encoding>::
                             borrow_decode_value_distinguished::<true>

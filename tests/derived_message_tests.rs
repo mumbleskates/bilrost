@@ -1151,7 +1151,7 @@ fn field_clearing() {
     assert!(!<_ as EmptyState>::is_empty(&clearable));
     <_ as EmptyState>::clear(&mut clearable);
     assert_eq!(clearable, <Clearable as EmptyState>::empty());
-    assert!(clearable.is_empty());
+    assert!(<_ as EmptyState>::is_empty(&clearable));
     assert!(clearable.string.capacity() >= 64);
     assert!(clearable.blob.capacity() >= 64);
     assert!(clearable.vec.capacity() >= 64);
@@ -1669,7 +1669,7 @@ fn parsing_strings() {
 #[test]
 fn owned_empty_cow_str_is_still_empty() {
     let owned_empty = Cow::<str>::Owned(String::with_capacity(32));
-    assert!(owned_empty.is_empty());
+    assert!(<_ as EmptyState>::is_empty(&owned_empty));
 
     #[derive(Message)]
     struct Foo<'a>(Cow<'a, str>);
@@ -4112,7 +4112,7 @@ fn unknown_fields_distinguished() {
             zero: "hello".into(),
             four: Some(Nested(555)),
             oneof: Three(Nested(301)),
-            ..EmptyState::empty()
+            ..EmptyState::<()>::empty()
         },
     );
     assert::decodes!(
@@ -4127,7 +4127,7 @@ fn unknown_fields_distinguished() {
             zero: "hello".into(),
             four: Some(Nested(555)),
             oneof: Three(Nested(301)),
-            ..EmptyState::empty()
+            ..EmptyState::<()>::empty()
         },
         HasExtensions,
         "",
@@ -4152,7 +4152,7 @@ fn unknown_fields_distinguished() {
             zero: "hello".into(),
             four: Some(Nested(555)),
             oneof: Three(Nested(301)),
-            ..EmptyState::empty()
+            ..EmptyState::<()>::empty()
         },
         HasExtensions,
         "Foo.four",
@@ -4177,7 +4177,7 @@ fn unknown_fields_distinguished() {
             zero: "hello".into(),
             four: Some(Nested(555)),
             oneof: Three(Nested(301)),
-            ..EmptyState::empty()
+            ..EmptyState::<()>::empty()
         },
         HasExtensions,
         "Foo.oneof/InnerOneof.Three",
@@ -4193,7 +4193,7 @@ fn unknown_fields_distinguished() {
         Foo {
             one: 1,
             oneof: Three(Nested(1)),
-            ..EmptyState::empty()
+            ..EmptyState::<()>::empty()
         },
     );
     // We can see when there are extensions in both the inner and outer message...
@@ -4209,7 +4209,7 @@ fn unknown_fields_distinguished() {
         Foo {
             one: 1,
             oneof: Three(Nested(1)),
-            ..EmptyState::empty()
+            ..EmptyState::<()>::empty()
         },
         HasExtensions,
         "Foo.oneof/InnerOneof.Three",
@@ -4224,7 +4224,7 @@ fn unknown_fields_distinguished() {
         Foo {
             one: 1,
             oneof: Three(Nested(1)),
-            ..EmptyState::empty()
+            ..EmptyState::<()>::empty()
         },
         HasExtensions,
         "",
@@ -4241,7 +4241,7 @@ fn unknown_fields_distinguished() {
         Foo {
             one: 1,
             oneof: Three(Nested(0)),
-            ..EmptyState::empty()
+            ..EmptyState::<()>::empty()
         },
         NotCanonical,
         // depending on how constrained a mode we parse in we can get different errors back from

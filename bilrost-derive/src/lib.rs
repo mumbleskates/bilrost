@@ -1238,7 +1238,7 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
 
                 #[inline]
                 fn clear(&mut self) {
-                    *self = Self::empty();
+                    *self = Self::#zero;
                 }
             }
         }
