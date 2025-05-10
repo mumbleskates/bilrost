@@ -126,7 +126,8 @@ where
 
 impl<T, const N: usize, E> Encoder<Packed<E>> for [T; N]
 where
-    T: EmptyState<E> + ValueEncoder<E>,
+    T: ValueEncoder<E>,
+    [T; N]: EmptyState<E>,
 {
     #[inline]
     fn encode<B: BufMut + ?Sized>(tag: u32, value: &[T; N], buf: &mut B, tw: &mut TagWriter) {
@@ -408,7 +409,8 @@ macro_rules! impl_decoders {
         impl<$($lifetime,)? T, const N: usize, E>
         $relaxed <$($lifetime,)? Packed<E>> for [T; N]
         where
-            T: EmptyState + $relaxed_value <$($lifetime,)? E>,
+            T: $relaxed_value <$($lifetime,)? E>,
+            [T; N]: EmptyState<E>,
         {
             #[inline]
             fn $relaxed_method $($($buf_generic)*)? (
@@ -437,9 +439,9 @@ macro_rules! impl_decoders {
         $distinguished <$($lifetime,)? Packed<E>> for [T; N]
         where
             T: Eq
-                + EmptyState
                 + $distinguished_value <$($lifetime,)? E>
                 + $relaxed_value <$($lifetime,)? E>,
+            [T; N]: EmptyState<E>,
         {
             #[inline]
             fn $distinguished_method $($($buf_generic)*)? (

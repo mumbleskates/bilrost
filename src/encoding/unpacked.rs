@@ -281,11 +281,12 @@ where
 /// decoding mode will accept both packed and un-packed encodings.
 impl<T, const N: usize, E> Encoder<Unpacked<E>> for [T; N]
 where
-    T: EmptyState<E> + ValueEncoder<E>,
+    T: ValueEncoder<E>,
+    [T; N]: EmptyState<E>,
 {
     #[inline]
     fn encode<B: BufMut + ?Sized>(tag: u32, value: &[T; N], buf: &mut B, tw: &mut TagWriter) {
-        if !EmptyState::is_empty(value) {
+        if !EmptyState::<E>::is_empty(value) {
             for val in value.iter() {
                 FieldEncoder::<E>::encode_field(tag, val, buf, tw);
             }
@@ -299,7 +300,7 @@ where
         buf: &mut B,
         tw: &mut TagRevWriter,
     ) {
-        if !EmptyState::is_empty(value) {
+        if !EmptyState::<E>::is_empty(value) {
             for val in value.iter().rev() {
                 FieldEncoder::<E>::prepend_field(tag, val, buf, tw);
             }
@@ -308,7 +309,7 @@ where
 
     #[inline]
     fn encoded_len(tag: u32, value: &[T; N], tm: &mut impl TagMeasurer) -> usize {
-        if !EmptyState::is_empty(value) {
+        if !EmptyState::<E>::is_empty(value) {
             // Each *additional* field encoded after the first needs only 1 byte for the field key.
             tm.key_len(tag) + ValueEncoder::<E>::many_values_encoded_len(value.iter()) + N - 1
         } else {
@@ -320,7 +321,8 @@ where
 /// Unpacked encodes arrays as repeated fields if any of the values are non-empty.
 impl<T, const N: usize, E> Encoder<Unpacked<E>> for Option<[T; N]>
 where
-    T: ForOverwrite<E> + ValueEncoder<E>,
+    T: ValueEncoder<E>,
+    [T; N]: ForOverwrite<E>,
 {
     #[inline]
     fn encode<B: BufMut + ?Sized>(
@@ -437,7 +439,8 @@ macro_rules! impl_decoders {
 
         impl<$($lifetime,)? T, const N: usize, E> $relaxed <$($lifetime,)? Unpacked<E>> for [T; N]
         where
-            T: EmptyState<E> + $relaxed_value <$($lifetime,)? E>,
+            T: $relaxed_value <$($lifetime,)? E>,
+            [T; N]: EmptyState<E>,
         {
             #[inline]
             fn $relaxed_method $($($buf_generic)*)? (
@@ -455,9 +458,9 @@ macro_rules! impl_decoders {
         $distinguished <$($lifetime,)? Unpacked<E>> for [T; N]
         where
             T: Eq
-                + EmptyState<E>
                 + $distinguished_value <$($lifetime,)? E>
                 + $relaxed_value <$($lifetime,)? E>,
+            [T; N]: EmptyState<E>,
         {
             #[inline]
             fn $distinguished_method $($($buf_generic)*)? (
@@ -472,7 +475,7 @@ macro_rules! impl_decoders {
                     buf,
                     ctx.clone(),
                 )?;
-                if EmptyState::is_empty(value) {
+                if EmptyState::<E>::is_empty(value) {
                     ctx.check(Canonicity::NotCanonical)
                 } else {
                     Ok(canon)
@@ -483,7 +486,8 @@ macro_rules! impl_decoders {
         impl<$($lifetime,)? T, const N: usize, E>
         $relaxed <$($lifetime,)? Unpacked<E>> for Option<[T; N]>
         where
-            T: ForOverwrite<E> + $relaxed_value <$($lifetime,)? E>,
+            T: $relaxed_value <$($lifetime,)? E>,
+            [T; N]: ForOverwrite<E>,
         {
             #[inline]
             fn $relaxed_method $($($buf_generic)*)? (
@@ -494,7 +498,7 @@ macro_rules! impl_decoders {
             ) -> Result<(), DecodeError> {
                 $mode::decode_array_either_repr(
                     wire_type,
-                    value.get_or_insert_with(ForOverwrite::for_overwrite),
+                    value.get_or_insert_with(ForOverwrite::<E>::for_overwrite),
                     buf,
                     ctx,
                 )
@@ -507,9 +511,9 @@ macro_rules! impl_decoders {
         $distinguished <$($lifetime,)? Unpacked<E>> for Option<[T; N]>
         where
             T: Eq
-                + ForOverwrite<E>
                 + $distinguished_value<$($lifetime,)? E>
                 + $relaxed_value<$($lifetime,)? E>,
+            [T; N]: ForOverwrite<E>,
         {
             #[inline]
             fn $distinguished_method $($($buf_generic)*)? (
@@ -520,7 +524,7 @@ macro_rules! impl_decoders {
             ) -> Result<Canonicity, DecodeError> {
                 $mode::decode_distinguished_array_either_repr(
                     wire_type,
-                    value.get_or_insert_with(ForOverwrite::for_overwrite),
+                    value.get_or_insert_with(ForOverwrite::<E>::for_overwrite),
                     buf,
                     ctx,
                 )
