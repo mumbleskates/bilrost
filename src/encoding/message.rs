@@ -1,6 +1,6 @@
 use crate::buf::ReverseBuf;
 use crate::encoding::{
-    encode_varint, encoded_len_varint, prepend_varint, Canonicity, Capped, DecodeContext,
+    encoding_uses_base_empty_state, encode_varint, encoded_len_varint, prepend_varint, Canonicity, Capped, DecodeContext,
     DistinguishedValueBorrowDecoder, DistinguishedValueDecoder, EmptyState,
     RestrictedDecodeContext, TagReader, ValueBorrowDecoder, ValueDecoder, ValueEncoder, WireType,
     Wiretyped,
@@ -14,6 +14,8 @@ use bytes::{Buf, BufMut};
 /// traits into length-delineated values on the wire. By default this is directly delegated to by
 /// the general encodings.
 pub struct MessageEncoding;
+
+encoding_uses_base_empty_state!(MessageEncoding);
 
 /// Merges fields from the given buffer, to its cap, into the given owned message value.
 /// Implemented as a private standalone method to discourage "merging" as a usage pattern.

@@ -48,6 +48,36 @@ macro_rules! impl_tuple {
             with generics ($($encodings),*)
         );
 
+        impl<$($letters,)* $($encodings,)*> ForOverwrite<$($encodings,)*> for ($($letters,)*)
+        where
+            $($letters: ForOverwrite<$encodings>,)*
+        {
+            #[inline]
+            fn for_overwrite() -> Self {
+                ($($letters::for_overwrite(),)*)
+            }
+        }
+
+        impl<$($letters,)* $($encodings,)*> EmptyState<$($encodings,)*> for ($($letters,)*)
+        where
+            $($letters: EmptyState<$encodings>,)*
+        {
+            #[inline]
+            fn empty() -> Self {
+                ($($letters::empty(),)*)
+            }
+
+            #[inline]
+            fn is_empty(&self) -> bool {
+                true $(&& self.$numbers.is_empty())*
+            }
+
+            #[inline]
+            fn clear(&mut self) {
+                $(self.$numbers.clear();)*
+            }
+        }
+
         impl<$($letters,)* $($encodings,)*> Wiretyped<($($encodings,)*)> for ($($letters,)*) {
             const WIRE_TYPE: WireType = WireType::LengthDelimited;
         }

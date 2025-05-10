@@ -7,12 +7,14 @@ use crate::encoding::{
     Canonicity, Capped, DecodeContext, DecodeError, Decoder, DistinguishedBorrowDecoder,
     DistinguishedDecoder, DistinguishedValueBorrowDecoder, DistinguishedValueDecoder, Encoder,
     FieldEncoder, GeneralPacked, RestrictedDecodeContext, TagMeasurer, TagRevWriter, TagWriter,
-    ValueBorrowDecoder, ValueDecoder, ValueEncoder, WireType, Wiretyped,
+    ValueBorrowDecoder, ValueDecoder, ValueEncoder, WireType, Wiretyped,encoding_uses_base_empty_state
 };
 use crate::DecodeErrorKind::{InvalidValue, Truncated};
 use bytes::{Buf, BufMut};
 
 pub struct Packed<E = GeneralPacked>(E);
+
+encoding_uses_base_empty_state!(Packed<E>, with generics (E));
 
 /// Packed encodings always prefer to encode length delimited.
 impl<T, E> Wiretyped<Packed<E>> for T {

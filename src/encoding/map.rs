@@ -4,13 +4,14 @@ use crate::encoding::{
     decoding_modes, encode_varint, encoded_len_varint, encoding_implemented_via_value_encoding,
     prepend_varint, Canonicity, Capped, DecodeContext, DecodeError,
     DistinguishedValueBorrowDecoder, DistinguishedValueDecoder, ForOverwrite, GeneralPacked,
-    RestrictedDecodeContext, ValueBorrowDecoder, ValueDecoder, ValueEncoder, WireType, Wiretyped,
+    RestrictedDecodeContext, ValueBorrowDecoder, ValueDecoder, ValueEncoder, WireType, Wiretyped,encoding_uses_base_empty_state
 };
 use crate::DecodeErrorKind::Truncated;
 use bytes::{Buf, BufMut};
 
 pub struct Map<KE = GeneralPacked, VE = GeneralPacked>(KE, VE);
 
+encoding_uses_base_empty_state!(Map<KE, VE>, with generics (KE, VE));
 encoding_implemented_via_value_encoding!(
     Map<KE, VE>,
     with where clause (T: Mapping),

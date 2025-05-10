@@ -8,7 +8,12 @@ use core::ops::Index;
 use bytes::{Buf, BufMut};
 
 use crate::buf::ReverseBuf;
-use crate::encoding::{encode_varint, encoded_len_varint, prepend_varint, Capped, DecodeContext, EmptyState, ForOverwrite, MessageEncoding, RawDistinguishedMessageBorrowDecoder, RawDistinguishedMessageDecoder, RawMessage, RawMessageBorrowDecoder, RawMessageDecoder, RestrictedDecodeContext, RuntimeTagMeasurer, TagMeasurer, TagRevWriter, TagWriter, WireType};
+use crate::encoding::{
+    encode_varint, encoded_len_varint, prepend_varint, Capped, DecodeContext, EmptyState,
+    ForOverwrite, RawDistinguishedMessageBorrowDecoder, RawDistinguishedMessageDecoder, RawMessage,
+    RawMessageBorrowDecoder, RawMessageDecoder, RestrictedDecodeContext, RuntimeTagMeasurer,
+    TagMeasurer, TagRevWriter, TagWriter, WireType,
+};
 use crate::iter::FlatAdapter;
 use crate::DecodeErrorKind::Truncated;
 use crate::{Canonicity, DecodeError, Message};
@@ -352,13 +357,13 @@ impl<'a> FromIterator<(u32, OpaqueValue<'a>)> for OpaqueMessage<'a> {
     }
 }
 
-impl ForOverwrite<MessageEncoding> for OpaqueMessage<'_> {
+impl ForOverwrite for OpaqueMessage<'_> {
     fn for_overwrite() -> Self {
         Self::new()
     }
 }
 
-impl EmptyState<MessageEncoding> for OpaqueMessage<'_> {
+impl EmptyState for OpaqueMessage<'_> {
     #[inline]
     fn is_empty(&self) -> bool {
         self.0.is_empty()

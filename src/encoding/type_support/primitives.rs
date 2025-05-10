@@ -1,5 +1,5 @@
 use crate::encoding::value_traits::{empty_state_via_default, for_overwrite_via_default};
-use crate::encoding::{EmptyState, ForOverwrite, MessageEncoding};
+use crate::encoding::{EmptyState, ForOverwrite};
 
 empty_state_via_default!(bool);
 empty_state_via_default!(u8);
@@ -69,7 +69,6 @@ impl<const N: usize> EmptyState for &[u8; N] {
     }
 }
 
-// TODO(widders): expand this to dispatch encodings, move to tuple.rs
 macro_rules! impls_for_tuple {
     (($($letters:ident),*), ($($numbers:tt),*)$(,)?) => {
         impl<$($letters,)*> ForOverwrite for ($($letters,)*)
@@ -125,9 +124,9 @@ impls_for_tuple!(
     (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)
 );
 
-impl<T, const N: usize, E> ForOverwrite<E> for [T; N]
+impl<T, const N: usize> ForOverwrite for [T; N]
 where
-    T: ForOverwrite<E>,
+    T: ForOverwrite,
 {
     #[inline]
     fn for_overwrite() -> Self {
@@ -135,9 +134,9 @@ where
     }
 }
 
-impl<T, const N: usize, E> EmptyState<E> for [T; N]
+impl<T, const N: usize> EmptyState for [T; N]
 where
-    T: EmptyState<E>,
+    T: EmptyState,
 {
     #[inline]
     fn empty() -> Self
@@ -160,11 +159,11 @@ where
     }
 }
 
-impl ForOverwrite<MessageEncoding> for () {
+impl ForOverwrite for () {
     fn for_overwrite() -> Self {}
 }
 
-impl EmptyState<MessageEncoding> for () {
+impl EmptyState for () {
     fn is_empty(&self) -> bool {
         true
     }

@@ -65,14 +65,14 @@ where
     }
 }
 
-impl<T, E> ForOverwrite<E> for Option<T> {
+impl<T> ForOverwrite for Option<T> {
     #[inline]
     fn for_overwrite() -> Self {
         None
     }
 }
 
-impl<T, E> EmptyState<E> for Option<T> {
+impl<T> EmptyState for Option<T> {
     #[inline]
     fn is_empty(&self) -> bool {
         self.is_none()
@@ -84,9 +84,9 @@ impl<T, E> EmptyState<E> for Option<T> {
     }
 }
 
-impl<T, E> ForOverwrite<E> for Box<T>
+impl<T> ForOverwrite for Box<T>
 where
-    T: ForOverwrite<E>,
+    T: ForOverwrite,
 {
     #[inline(always)]
     fn for_overwrite() -> Self {
@@ -94,9 +94,9 @@ where
     }
 }
 
-impl<T, E> EmptyState<E> for Box<T>
+impl<T> EmptyState for Box<T>
 where
-    T: EmptyState<E>,
+    T: EmptyState,
 {
     #[inline]
     fn empty() -> Self {

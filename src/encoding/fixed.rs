@@ -2,7 +2,7 @@ use bytes::{Buf, BufMut};
 
 use crate::buf::ReverseBuf;
 use crate::encoding::{
-    delegate_value_encoding, encoding_implemented_via_value_encoding,
+    delegate_value_encoding, encoding_implemented_via_value_encoding,encoding_uses_base_empty_state, 
     Canonicity, Capped, DecodeContext, DistinguishedValueDecoder, RestrictedDecodeContext,
     ValueDecoder, ValueEncoder, WireType, Wiretyped,
 };
@@ -11,6 +11,7 @@ use crate::DecodeErrorKind::Truncated;
 
 pub struct Fixed;
 
+encoding_uses_base_empty_state!(Fixed);
 encoding_implemented_via_value_encoding!(Fixed);
 
 /// Macros which emit implementations for fixed width numeric encoding.

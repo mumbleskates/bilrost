@@ -1,8 +1,5 @@
 use crate::buf::ReverseBuf;
-use crate::encoding::{
-    Capped, DecodeContext, DistinguishedValueBorrowDecoder, DistinguishedValueDecoder,
-    RestrictedDecodeContext, ValueBorrowDecoder, ValueDecoder, ValueEncoder, WireType, Wiretyped,
-};
+use crate::encoding::{Capped, DecodeContext, DistinguishedValueBorrowDecoder, DistinguishedValueDecoder, ForOverwrite, RestrictedDecodeContext, ValueBorrowDecoder, ValueDecoder, ValueEncoder, WireType, Wiretyped};
 use crate::{Canonicity, DecodeError, DecodeErrorKind};
 use bytes::{Buf, BufMut};
 use core::ops::Deref;
@@ -58,6 +55,9 @@ pub trait DistinguishedProxiable<Tag = ()>: Proxiable<Tag> {
         proxy: Self::Proxy,
     ) -> Result<Canonicity, DecodeErrorKind>;
 }
+
+// TODO(widders): consider implementing proxied empty states in terms of the proxy's empty state
+//  instead, from here
 
 impl<T, E, Tag> Wiretyped<Proxied<E, Tag>> for T
 where

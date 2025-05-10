@@ -2,7 +2,7 @@ use crate::buf::ReverseBuf;
 use crate::encoding::message::{RawDistinguishedMessageDecoder, RawMessage};
 use crate::encoding::proxy::SealedBilrostTag;
 use crate::encoding::{
-    delegate_encoding, delegate_value_encoding, encoding_implemented_via_value_encoding,
+    delegate_encoding, delegate_value_encoding, encoding_implemented_via_value_encoding,delegate_proxied_encoding, encoding_uses_base_empty_state,
     impl_cow_value_encoding, Canonicity, Capped, DecodeContext, DecodeError,
     DistinguishedProxiable, DistinguishedValueBorrowDecoder, DistinguishedValueDecoder, Fixed, Map,
     MessageEncoding, Packed, PlainBytes, Proxiable, RawDistinguishedMessageBorrowDecoder,
@@ -10,7 +10,7 @@ use crate::encoding::{
     ValueBorrowDecoder, ValueDecoder, ValueEncoder, Varint, WireType, Wiretyped,
 };
 use crate::DecodeErrorKind::InvalidValue;
-use crate::{delegate_proxied_encoding, Blob, DecodeErrorKind};
+use crate::{ Blob, DecodeErrorKind};
 use alloc::borrow::Cow;
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::string::String;
@@ -37,6 +37,7 @@ pub struct GeneralGeneric<const P: u8>;
 pub type General = GeneralGeneric<PREFER_UNPACKED>;
 pub type GeneralPacked = GeneralGeneric<PREFER_PACKED>;
 
+encoding_uses_base_empty_state!(GeneralGeneric<P>, with generics (const P: u8));
 encoding_implemented_via_value_encoding!(GeneralGeneric<P>, with generics (const P: u8));
 
 // `general` and `general_in_oneof` delegate to the `unpacked` and `packed` encodings respectively

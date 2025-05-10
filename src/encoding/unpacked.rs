@@ -7,13 +7,15 @@ use crate::encoding::{
     Decoder, DistinguishedBorrowDecoder, DistinguishedDecoder, DistinguishedValueBorrowDecoder,
     DistinguishedValueDecoder, Encoder, FieldEncoder, GeneralPacked, Packed,
     RestrictedDecodeContext, TagMeasurer, TagRevWriter, TagWriter, ValueBorrowDecoder,
-    ValueDecoder, ValueEncoder, WireType, Wiretyped,
+    ValueDecoder, ValueEncoder, WireType, Wiretyped, encoding_uses_base_empty_state
 };
 use crate::DecodeErrorKind::InvalidValue;
 use crate::{Canonicity, DecodeError};
 use bytes::BufMut;
 
 pub struct Unpacked<E = GeneralPacked>(E);
+
+encoding_uses_base_empty_state!(Unpacked<E>, with generics (E));
 
 macro_rules! define_decoders {
     (
