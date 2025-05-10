@@ -501,6 +501,7 @@ pub(crate) use encoding_uses_base_empty_state;
 
 // TODO(widders): macro for populating an encoding with standard empty state trait definitions:
 //  * Option<T>
+//  * [T; N]
 //  * (is there anything else? doesn't seem like it)
 
 /// Most kinds of encodings want to act as field decoders for bare values in any situation where
