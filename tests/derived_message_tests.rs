@@ -954,7 +954,7 @@ fn ignored_fields_with_defaults() {
     // The empty value for the message will still have the empty value for all non-ignored
     // fields; the rest will be taken from the `Default` implementation.
     assert_eq!(
-        FooPlus::empty(),
+        <FooPlus as EmptyState>::empty(),
         FooPlus {
             x: 0,
             y: 0,
@@ -1148,9 +1148,9 @@ fn field_clearing() {
     }
 
     let mut clearable = Clearable::default();
-    assert!(!clearable.is_empty());
-    clearable.clear();
-    assert_eq!(clearable, Clearable::empty());
+    assert!(!<_ as EmptyState>::is_empty(&clearable));
+    <_ as EmptyState>::clear(&mut clearable);
+    assert_eq!(clearable, <Clearable as EmptyState>::empty());
     assert!(clearable.is_empty());
     assert!(clearable.string.capacity() >= 64);
     assert!(clearable.blob.capacity() >= 64);
@@ -1179,7 +1179,7 @@ fn field_clearing() {
     assert!(clearable.hbset.capacity() >= 64);
 
     assert::decodes!(owned relaxed, Clearable::default().encode_to_vec(), Clearable::default());
-    assert::decodes!(owned relaxed, [], Clearable::empty());
+    assert::decodes!(owned relaxed, [], <Clearable as EmptyState>::empty());
 }
 
 #[test]
@@ -1224,7 +1224,7 @@ fn parsing_varints() {
         isize,
     );
 
-    assert::decodes!(owned distinguished, [], Foo::empty());
+    assert::decodes!(owned distinguished, [], <Foo as EmptyState>::empty());
     assert::decodes!(
         owned distinguished,
         (0..11).map(|tag| (tag, OV::Varint(1))),
@@ -1374,7 +1374,7 @@ fn parsing_fixed_width_ints() {
         #[bilrost(encoding(fixed))] i64,
     );
 
-    assert::decodes!(owned distinguished, [], Foo::empty());
+    assert::decodes!(owned distinguished, [], <Foo as EmptyState>::empty());
     assert::decodes!(
         owned distinguished,
         [
@@ -1500,8 +1500,8 @@ fn floating_point_zero_is_present_nested() {
     #[derive(Debug, Message)]
     struct Outer(#[bilrost(1)] Inner);
 
-    assert!(!Inner(-0.0).is_empty());
-    assert!(!Outer(Inner(-0.0)).is_empty());
+    assert!(!<_ as EmptyState>::is_empty(&Inner(-0.0)));
+    assert!(!<_ as EmptyState>::is_empty(&Outer(Inner(-0.0))));
     assert::encodes(
         Outer(Inner(-0.0)),
         [(1, OV::message(&[(1, OV::f32(-0.0))].into_opaque_message()))],
@@ -4287,7 +4287,7 @@ fn length_delimited_borrowed_decoding_shortens_input_slices() {
             .ok_or(bilrost::DecodeError::new(DecodeErrorKind::Other))
     };
 
-    let mut replaceable = Foo::empty();
+    let mut replaceable = <Foo as EmptyState>::empty();
 
     assert_eq!(
         Foo::decode_borrowed_length_delimited(&mut slice),

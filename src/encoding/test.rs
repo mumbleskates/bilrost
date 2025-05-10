@@ -110,8 +110,8 @@ macro_rules! check_borrowable {
             #[allow(unused_imports)]
             use super::*;
             use crate::encoding::{
-                Capped, ValueBorrowDecoder, DistinguishedValueBorrowDecoder, EmptyState, RestrictedDecodeContext,
-                ValueEncoder, DecodeContext
+                Capped, ValueBorrowDecoder, DistinguishedValueBorrowDecoder, EmptyState,
+                RestrictedDecodeContext, ValueEncoder, DecodeContext,
             };
             use crate::Canonicity::Canonical;
             use alloc::format;
@@ -127,7 +127,7 @@ macro_rules! check_borrowable {
                     ValueEncoder::<$encoding>::encode_value(&val, &mut buf);
 
                     // relaxed borrowed decoding
-                    let mut borrowed = <&$ty>::empty();
+                    let mut borrowed = <&$ty as EmptyState>::empty();
                     ValueBorrowDecoder::<$encoding>::borrow_decode_value
                     (
                         &mut borrowed,
