@@ -270,7 +270,7 @@ macro_rules! impl_decoders {
         where
             C: DistinguishedCollection<Item = T>
                 + $distinguished_value <$($lifetime,)? Packed<E>>,
-            T: ForOverwrite + Eq + $relaxed_value <$($lifetime,)? E>,
+            T: ForOverwrite<E> + Eq + $relaxed_value <$($lifetime,)? E>,
         {
             #[inline]
             fn $distinguished_method $($($buf_generic)*)? (
