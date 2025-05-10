@@ -2,9 +2,9 @@ use bytes::{Buf, BufMut};
 
 use crate::buf::ReverseBuf;
 use crate::encoding::{
-    delegate_value_encoding, encoding_implemented_via_value_encoding,encoding_uses_base_empty_state, 
-    Canonicity, Capped, DecodeContext, DistinguishedValueDecoder, RestrictedDecodeContext,
-    ValueDecoder, ValueEncoder, WireType, Wiretyped,
+    delegate_value_encoding, encoding_implemented_via_value_encoding,
+    encoding_uses_base_empty_state, Canonicity, Capped, DecodeContext, DistinguishedValueDecoder,
+    RestrictedDecodeContext, ValueDecoder, ValueEncoder, WireType, Wiretyped,
 };
 use crate::DecodeError;
 use crate::DecodeErrorKind::Truncated;

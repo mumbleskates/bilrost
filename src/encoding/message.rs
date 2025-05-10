@@ -1,7 +1,7 @@
 use crate::buf::ReverseBuf;
 use crate::encoding::{
-    encoding_uses_base_empty_state, encode_varint, encoded_len_varint, prepend_varint, Canonicity, Capped, DecodeContext,
-    DistinguishedValueBorrowDecoder, DistinguishedValueDecoder, EmptyState,
+    encode_varint, encoded_len_varint, encoding_uses_base_empty_state, prepend_varint, Canonicity,
+    Capped, DecodeContext, DistinguishedValueBorrowDecoder, DistinguishedValueDecoder, EmptyState,
     RestrictedDecodeContext, TagReader, ValueBorrowDecoder, ValueDecoder, ValueEncoder, WireType,
     Wiretyped,
 };

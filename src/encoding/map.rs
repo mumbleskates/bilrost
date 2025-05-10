@@ -2,9 +2,9 @@ use crate::buf::ReverseBuf;
 use crate::encoding::value_traits::{DistinguishedMapping, Mapping};
 use crate::encoding::{
     decoding_modes, encode_varint, encoded_len_varint, encoding_implemented_via_value_encoding,
-    prepend_varint, Canonicity, Capped, DecodeContext, DecodeError,
+    encoding_uses_base_empty_state, prepend_varint, Canonicity, Capped, DecodeContext, DecodeError,
     DistinguishedValueBorrowDecoder, DistinguishedValueDecoder, ForOverwrite, GeneralPacked,
-    RestrictedDecodeContext, ValueBorrowDecoder, ValueDecoder, ValueEncoder, WireType, Wiretyped,encoding_uses_base_empty_state
+    RestrictedDecodeContext, ValueBorrowDecoder, ValueDecoder, ValueEncoder, WireType, Wiretyped,
 };
 use crate::DecodeErrorKind::Truncated;
 use bytes::{Buf, BufMut};

@@ -1,5 +1,9 @@
 use crate::buf::ReverseBuf;
-use crate::encoding::{Capped, DecodeContext, DistinguishedValueBorrowDecoder, DistinguishedValueDecoder, ForOverwrite, RestrictedDecodeContext, ValueBorrowDecoder, ValueDecoder, ValueEncoder, WireType, Wiretyped};
+use crate::encoding::{
+    Capped, DecodeContext, DistinguishedValueBorrowDecoder, DistinguishedValueDecoder,
+    ForOverwrite, RestrictedDecodeContext, ValueBorrowDecoder, ValueDecoder, ValueEncoder,
+    WireType, Wiretyped,
+};
 use crate::{Canonicity, DecodeError, DecodeErrorKind};
 use bytes::{Buf, BufMut};
 use core::ops::Deref;

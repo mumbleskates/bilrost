@@ -1,9 +1,10 @@
 use crate::buf::ReverseBuf;
 use crate::encoding::{
     const_varint, delegate_encoding, delegate_value_encoding, encode_varint, encoded_len_varint,
-    encoding_implemented_via_value_encoding, impl_cow_value_encoding, prepend_varint, Canonicity,
-    Capped, DecodeContext, DecodeError, DistinguishedValueBorrowDecoder, DistinguishedValueDecoder,
-    RestrictedDecodeContext, ValueBorrowDecoder, ValueDecoder, ValueEncoder, WireType, Wiretyped,encoding_uses_base_empty_state,
+    encoding_implemented_via_value_encoding, encoding_uses_base_empty_state,
+    impl_cow_value_encoding, prepend_varint, Canonicity, Capped, DecodeContext, DecodeError,
+    DistinguishedValueBorrowDecoder, DistinguishedValueDecoder, RestrictedDecodeContext,
+    ValueBorrowDecoder, ValueDecoder, ValueEncoder, WireType, Wiretyped,
 };
 use crate::DecodeErrorKind::InvalidValue;
 use alloc::borrow::Cow;

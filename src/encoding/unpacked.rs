@@ -3,11 +3,11 @@ use crate::encoding::value_traits::{
     Collection, DistinguishedCollection, EmptyState, ForOverwrite,
 };
 use crate::encoding::{
-    check_wire_type, decoding_modes, peek_repeated_field, BorrowDecoder, Capped, DecodeContext,
-    Decoder, DistinguishedBorrowDecoder, DistinguishedDecoder, DistinguishedValueBorrowDecoder,
-    DistinguishedValueDecoder, Encoder, FieldEncoder, GeneralPacked, Packed,
-    RestrictedDecodeContext, TagMeasurer, TagRevWriter, TagWriter, ValueBorrowDecoder,
-    ValueDecoder, ValueEncoder, WireType, Wiretyped, encoding_uses_base_empty_state
+    check_wire_type, decoding_modes, encoding_uses_base_empty_state, peek_repeated_field,
+    BorrowDecoder, Capped, DecodeContext, Decoder, DistinguishedBorrowDecoder,
+    DistinguishedDecoder, DistinguishedValueBorrowDecoder, DistinguishedValueDecoder, Encoder,
+    FieldEncoder, GeneralPacked, Packed, RestrictedDecodeContext, TagMeasurer, TagRevWriter,
+    TagWriter, ValueBorrowDecoder, ValueDecoder, ValueEncoder, WireType, Wiretyped,
 };
 use crate::DecodeErrorKind::InvalidValue;
 use crate::{Canonicity, DecodeError};

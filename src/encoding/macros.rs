@@ -450,7 +450,7 @@ pub use delegate_proxied_encoding;
 
 /// Generates implementations of `ForOverwrite` and `EmptyState` for the given encoding that always
 /// defer to the base implementation of the trait.
-/// 
+///
 /// This is suitable for any encoding that won't need to implement those traits for any un-owned
 /// types. To implement encodings for types that are not owned for your crate (such as types in
 /// `std` or a third-party crate that `bilrost` doesn't already cover) your implementation will be
@@ -498,6 +498,13 @@ macro_rules! encoding_uses_base_empty_state {
     }
 }
 pub(crate) use encoding_uses_base_empty_state;
+
+// TODO(widders): macro for populating an encoding with standard empty state trait definitions:
+//  * Option<T>
+//  * &[T]
+//  * [T; N]
+//  * &[T; N]
+//  * vec? cow?
 
 /// Most kinds of encodings want to act as field decoders for bare values in any situation where
 /// they also implement value decoding. Only a couple encodings want to do anything fancy, like

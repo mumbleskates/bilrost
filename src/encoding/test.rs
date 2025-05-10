@@ -462,7 +462,10 @@ where
 
 pub(crate) fn check_proxy_round_trip_distinguished<T, Tag>()
 where
-    T: Debug + EmptyState<crate::encoding::Proxied<General, Tag>> + Eq + DistinguishedProxiable<Tag>,
+    T: Debug
+        + EmptyState<crate::encoding::Proxied<General, Tag>>
+        + Eq
+        + DistinguishedProxiable<Tag>,
     T::Proxy: Debug + EmptyState<General> + Eq,
 {
     let start = T::empty();
