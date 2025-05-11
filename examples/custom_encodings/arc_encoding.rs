@@ -11,7 +11,10 @@ use std::sync::Arc;
 
 pub(crate) struct ArcEncoding<E>(E);
 
+// This enables `Option<Arc<T>>` and [Arc<T>; N]
 bilrost::implement_core_empty_state_rules!(ArcEncoding<E>, with generics (E));
+
+// The rest of the file is trait implementations that perform direct method pass-through.
 
 impl<T, E> ForOverwrite<ArcEncoding<E>> for Arc<T>
 where

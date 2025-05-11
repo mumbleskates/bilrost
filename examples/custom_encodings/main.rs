@@ -1,6 +1,15 @@
 use bilrost::{Message, OwnedMessage};
 use std::sync::Arc;
 
+/// `arc_encoding::ArcEncoding` implements a custom encoding from outside the `bilrost` crate, for
+/// the type `Arc<T>` which is also not owned by us. All this encoding does is directly pass through
+/// all encoding traits directly from the `T` inside the arc; if it is to be modified, we first call
+/// `Arc::make_mut` to ensure that we have a unique copy.
+///
+/// The `bilrost` crate itself will likely never provide this *specific* amenity for `Arc<T>` or
+/// `Rc<T>` in particular because there are risks and pitfalls around reference cycles that may
+/// cause `bilrost` to crash the program when encoding. It's still very useful for the careful user
+/// though, and serves as an excellent example of how something like this can be implemented.
 mod arc_encoding;
 use arc_encoding::ArcEncoding as arced;
 
@@ -17,7 +26,7 @@ fn main() {
 
     #[derive(Clone, Debug, Message)]
     struct DemoCustom {
-        #[bilrost(tag(1), encoding(arced<varint>))]
+        #[bilrost(tag(1), encoding(arced<varint>))] // Any field can be wrapped in Arc
         scalar: Option<Arc<u64>>,
         #[bilrost(tag(2))]
         name: String,
