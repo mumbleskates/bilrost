@@ -138,13 +138,13 @@ pub struct TestAllTypes {
     pub unpacked_uint32: Vec<u32>,
     #[bilrost(59)]
     pub unpacked_uint64: Vec<u64>,
-    #[bilrost(tag(60), encoding(fixed))]
+    #[bilrost(tag(60), encoding(unpacked<fixed>))]
     pub unpacked_ufixed32: Vec<u32>,
-    #[bilrost(tag(61), encoding(fixed))]
+    #[bilrost(tag(61), encoding(unpacked<fixed>))]
     pub unpacked_ufixed64: Vec<u64>,
-    #[bilrost(tag(62), encoding(fixed))]
+    #[bilrost(tag(62), encoding(unpacked<fixed>))]
     pub unpacked_sfixed32: Vec<i32>,
-    #[bilrost(tag(63), encoding(fixed))]
+    #[bilrost(tag(63), encoding(unpacked<fixed>))]
     pub unpacked_sfixed64: Vec<i64>,
     #[bilrost(64)]
     pub unpacked_float32: Vec<f32>,
@@ -433,7 +433,7 @@ pub struct TestDistinguished {
     /// Unpacked
     #[bilrost(28)]
     pub unpacked_varint: Vec<u16>,
-    #[bilrost(tag(29), encoding(fixed))]
+    #[bilrost(tag(29), encoding(unpacked<fixed>))]
     pub unpacked_fixed: Vec<u32>,
     #[bilrost(30)]
     pub unpacked_bool: Vec<bool>,
