@@ -231,12 +231,12 @@ macro_rules! define_decoders {
 
 pub(crate) mod owned {
     use super::*;
-    decoding_modes::invoke!(define_decoders, owned);
+    decoding_modes::__invoke!(define_decoders, owned);
 }
 
 pub(crate) mod borrowed {
     use super::*;
-    decoding_modes::invoke!(define_decoders, borrowed);
+    decoding_modes::__invoke!(define_decoders, borrowed);
 }
 
 /// Unpacked encodes vecs as repeated fields and in relaxed decoding mode will accept both packed
@@ -533,8 +533,8 @@ macro_rules! impl_decoders {
     };
 }
 
-decoding_modes::invoke!(impl_decoders, owned);
-decoding_modes::invoke!(impl_decoders, borrowed);
+decoding_modes::__invoke!(impl_decoders, owned);
+decoding_modes::__invoke!(impl_decoders, borrowed);
 
 #[cfg(test)]
 mod test {

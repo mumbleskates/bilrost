@@ -185,8 +185,8 @@ macro_rules! impl_decoders {
     }
 }
 
-decoding_modes::invoke!(impl_decoders, owned);
-decoding_modes::invoke!(impl_decoders, borrowed);
+decoding_modes::__invoke!(impl_decoders, owned);
+decoding_modes::__invoke!(impl_decoders, borrowed);
 
 #[cfg(test)]
 mod test {

@@ -582,6 +582,7 @@ pub(crate) use implement_core_empty_state_rules;
 /// they also implement value decoding. Only a couple encodings want to do anything fancy, like
 /// accepting alternate wire-types in relaxed mode; the rest want to use this to blanket those
 /// definitions.
+#[macro_export]
 macro_rules! __impl_decoder_where_value_decoder {
     (
         mode: $mode:ident,
@@ -655,6 +656,7 @@ macro_rules! __impl_decoder_where_value_decoder {
 }
 pub(crate) use __impl_decoder_where_value_decoder;
 
+#[macro_export]
 macro_rules! encoding_implemented_via_value_encoding {
     (
         $encoding:ty
@@ -708,15 +710,15 @@ macro_rules! encoding_implemented_via_value_encoding {
             }
         }
 
-        $crate::encoding::decoding_modes::invoke!(
-            $crate::encoding::__impl_decoder_where_value_decoder,
+        $crate::__invoke!(
+            $crate::__impl_decoder_where_value_decoder,
             owned,
             encoding: $encoding,
             $(with where clause ($($where_clause)*),)?
             $(with generics ($($generics)*),)?
         );
-        $crate::encoding::decoding_modes::invoke!(
-            $crate::encoding::__impl_decoder_where_value_decoder,
+        $crate::__invoke!(
+            $crate::__impl_decoder_where_value_decoder,
             borrowed,
             encoding: $encoding,
             $(with where clause ($($where_clause)*),)?

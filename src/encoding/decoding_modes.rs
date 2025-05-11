@@ -32,7 +32,8 @@ macro_rules! other_macro {
 //! * `lifetime`: lifetime required for the impl and for all listed decoding traits in addition to
 //!   the encoder
 
-macro_rules! invoke {
+#[macro_export]
+macro_rules! __invoke {
     ($($other_macro:ident)::+, owned $(, $($more_args:tt)*)?) => {
         $($other_macro)::*!(
             mode: owned,
@@ -64,4 +65,4 @@ macro_rules! invoke {
         );
     };
 }
-pub(crate) use invoke;
+pub(crate) use __invoke;
