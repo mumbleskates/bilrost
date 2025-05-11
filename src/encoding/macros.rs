@@ -499,7 +499,11 @@ macro_rules! encoding_uses_base_empty_state {
 }
 pub(crate) use encoding_uses_base_empty_state;
 
-// TODO(widders): document and incorporate [T; N]
+/// Adds basic empty trait implementations that are typically universal. Currently this includes
+/// `Option<T>` (which is always empty when `None`, regardless of the type of `T`), and arrays
+/// `[T; N]` which are implemented whenever `T` is implemented, and use the implementation for `T`
+/// for each value in the array. For example, an array of values of type `T` is only empty when each
+/// value in the array is empty, and clearing the array value will clear each of the values inside.
 #[macro_export]
 macro_rules! implement_core_empty_state_rules {
     (
@@ -529,6 +533,43 @@ macro_rules! implement_core_empty_state_rules {
             #[inline(always)]
             fn clear(&mut self) {
                 *self = ::core::option::Option::None;
+            }
+        }
+
+        impl<$($($impl_generics)*,)? __T, const __N: usize>
+        $crate::encoding::ForOverwrite<$encoding> for [__T; __N]
+        where
+            __T: $crate::encoding::ForOverwrite<$encoding>,
+        {
+            #[inline]
+            fn for_overwrite() -> Self {
+                ::core::array::from_fn(|_| __T::for_overwrite())
+            }
+        }
+
+        impl<$($($impl_generics)*,)? __T, const __N: usize>
+        $crate::encoding::EmptyState<$encoding> for [__T; __N]
+        where
+            __T: $crate::encoding::EmptyState<$encoding>,
+        {
+            #[inline]
+            fn empty() -> Self
+            where
+                Self: Sized,
+            {
+                ::core::array::from_fn(|_| __T::empty())
+            }
+
+            #[inline]
+            fn is_empty(&self) -> bool {
+                self.iter().all($crate::encoding::EmptyState::is_empty)
+            }
+
+            #[inline]
+            fn clear(&mut self) {
+                for v in self {
+                    v.clear();
+                }
             }
         }
     }

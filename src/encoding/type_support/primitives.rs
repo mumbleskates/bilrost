@@ -124,41 +124,6 @@ impls_for_tuple!(
     (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)
 );
 
-impl<T, const N: usize> ForOverwrite for [T; N]
-where
-    T: ForOverwrite,
-{
-    #[inline]
-    fn for_overwrite() -> Self {
-        core::array::from_fn(|_| T::for_overwrite())
-    }
-}
-
-impl<T, const N: usize> EmptyState for [T; N]
-where
-    T: EmptyState,
-{
-    #[inline]
-    fn empty() -> Self
-    where
-        Self: Sized,
-    {
-        core::array::from_fn(|_| T::empty())
-    }
-
-    #[inline]
-    fn is_empty(&self) -> bool {
-        self.iter().all(EmptyState::is_empty)
-    }
-
-    #[inline]
-    fn clear(&mut self) {
-        for v in self {
-            v.clear();
-        }
-    }
-}
-
 impl ForOverwrite for () {
     fn for_overwrite() -> Self {}
 }
