@@ -428,7 +428,7 @@ pub(crate) use check_type_empty;
 
 pub(crate) fn check_type_empty_impl<T, E>()
 where
-    T: Debug + EmptyState<E> + PartialEq,
+    T: Debug + EmptyState + PartialEq,
 {
     let mut empty = T::empty();
     assert!(empty.is_empty());
@@ -439,8 +439,8 @@ where
 
 pub(crate) fn check_type_empty_proxied_impl<T, Tag>()
 where
-    T: Debug + EmptyState<crate::encoding::Proxied<General, Tag>> + PartialEq + Proxiable<Tag>,
-    T::Proxy: Debug + EmptyState<General> + PartialEq,
+    T: Debug + EmptyState + PartialEq + Proxiable<Tag>,
+    T::Proxy: Debug + EmptyState + PartialEq,
 {
     check_type_empty_impl::<T, crate::encoding::Proxied<General, Tag>>();
     check_type_empty_impl::<T::Proxy, General>();
@@ -448,8 +448,8 @@ where
 
 pub(crate) fn check_proxy_round_trip<T, Tag>()
 where
-    T: Debug + EmptyState<crate::encoding::Proxied<General, Tag>> + PartialEq + Proxiable<Tag>,
-    T::Proxy: Debug + EmptyState<General> + PartialEq,
+    T: Debug + EmptyState + PartialEq + Proxiable<Tag>,
+    T::Proxy: Debug + EmptyState + PartialEq,
 {
     let start = T::empty();
     let proxy = start.encode_proxy();
@@ -463,10 +463,10 @@ where
 pub(crate) fn check_proxy_round_trip_distinguished<T, Tag>()
 where
     T: Debug
-        + EmptyState<crate::encoding::Proxied<General, Tag>>
+        + EmptyState
         + Eq
         + DistinguishedProxiable<Tag>,
-    T::Proxy: Debug + EmptyState<General> + Eq,
+    T::Proxy: Debug + EmptyState + Eq,
 {
     let start = T::empty();
     let proxy = start.encode_proxy();
