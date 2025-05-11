@@ -540,6 +540,7 @@ macro_rules! implement_core_empty_state_rules {
         $crate::encoding::ForOverwrite<$encoding> for [__T; __N]
         where
             __T: $crate::encoding::ForOverwrite<$encoding>,
+            $($($where_clause)*)?
         {
             #[inline]
             fn for_overwrite() -> Self {
@@ -551,6 +552,7 @@ macro_rules! implement_core_empty_state_rules {
         $crate::encoding::EmptyState<$encoding> for [__T; __N]
         where
             __T: $crate::encoding::EmptyState<$encoding>,
+            $($($where_clause)*)?
         {
             #[inline]
             fn empty() -> Self
