@@ -2,7 +2,6 @@ use bilrost::{Message, OwnedMessage};
 use std::sync::Arc;
 
 mod arc_encoding;
-
 use arc_encoding::ArcEncoding as arced;
 
 fn main() {
@@ -59,6 +58,8 @@ fn main() {
         ],
     };
     println!("input: {:#?}", input);
-    let output = DemoCustom::decode(input.encode_to_vec().as_slice()).expect("should decode");
+    let encoded = input.encode_to_vec();
+    let output = DemoCustom::decode(encoded.as_slice()).expect("should decode");
     println!("output: {:#?}", output);
+    assert_eq!(encoded, output.encode_to_vec());
 }
