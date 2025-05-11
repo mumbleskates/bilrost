@@ -34,7 +34,7 @@ impl EmptyState for NaiveDate {
     }
 
     fn clear(&mut self) {
-        *self = Self::empty();
+        *self = <_ as EmptyState>::empty();
     }
 }
 
@@ -93,7 +93,7 @@ mod naivedate {
         [
             NaiveDate::MIN,
             NaiveDate::MAX,
-            NaiveDate::empty(),
+            <NaiveDate as EmptyState>::empty(),
             NaiveDate::from_ymd_opt(1970, 1, 1).unwrap(),
             NaiveDate::from_ymd_opt(1988, 6, 28).unwrap(),
         ]
@@ -150,7 +150,7 @@ impl EmptyState for NaiveTime {
     }
 
     fn clear(&mut self) {
-        *self = Self::empty();
+        *self = <_ as EmptyState>::empty();
     }
 }
 
@@ -208,7 +208,7 @@ mod naivetime {
         [
             NaiveTime::MIN,
             NaiveTime::from_hms_nano_opt(23, 59, 59, 999_999_999).unwrap(),
-            NaiveTime::empty(),
+            <NaiveTime as EmptyState>::empty(),
             NaiveTime::from_hms_opt(17, 0, 0).unwrap(),
             NaiveTime::from_hms_nano_opt(11, 11, 11, 111_111_111).unwrap(),
         ]
@@ -255,7 +255,7 @@ mod naivetime {
 
 impl ForOverwrite for NaiveDateTime {
     fn for_overwrite() -> Self {
-        Self::new(EmptyState::empty(), EmptyState::empty())
+        Self::new(<_ as EmptyState>::empty(), <_ as EmptyState>::empty())
     }
 }
 
@@ -270,7 +270,7 @@ impl EmptyState for NaiveDateTime {
     }
 
     fn clear(&mut self) {
-        *self = Self::empty();
+        *self = <_ as EmptyState>::empty();
     }
 }
 
@@ -352,7 +352,7 @@ mod naivedatetime {
             NaiveDateTime::MIN,
             NaiveDateTime::MAX,
             NaiveDateTime::default(),
-            NaiveDateTime::empty(),
+            <NaiveDateTime as EmptyState>::empty(),
             NaiveDateTime::new(
                 NaiveDate::from_ymd_opt(-44, 3, 15).unwrap(),
                 NaiveTime::from_hms_opt(12, 36, 27).unwrap(),
@@ -478,7 +478,7 @@ mod utc {
             let mut buf = Vec::new();
             let zero_offset = FixedOffset::east_opt(0).unwrap();
             ValueEncoder::<General>::encode_value(&zero_offset, &mut buf);
-            let mut utc = Utc::for_overwrite();
+            let mut utc = <Utc as ForOverwrite>::for_overwrite();
             assert_eq!(
                 ValueDecoder::<General>::decode_value(
                     &mut utc,
@@ -501,7 +501,7 @@ mod utc {
             let mut buf = Vec::new();
             let nonzero_offset = FixedOffset::east_opt(1000).unwrap();
             ValueEncoder::<General>::encode_value(&nonzero_offset, &mut buf);
-            let mut utc = Utc::for_overwrite();
+            let mut utc = <Utc as ForOverwrite>::for_overwrite();
             assert_eq!(
                 ValueDecoder::<General>::decode_value(
                     &mut utc,
@@ -534,7 +534,7 @@ impl EmptyState for FixedOffset {
     }
 
     fn clear(&mut self) {
-        *self = Self::empty();
+        *self = <_ as EmptyState>::empty();
     }
 }
 
@@ -617,7 +617,7 @@ mod fixedoffset {
     pub(in super::super) fn test_zones() -> impl Iterator<Item = FixedOffset> + Clone {
         [
             FixedOffset::east_opt(0).unwrap(),
-            FixedOffset::empty(),
+            <FixedOffset as EmptyState>::empty(),
             FixedOffset::west_opt(-7 * 3600 - 15 * 60).unwrap(),
             FixedOffset::east_opt(14 * 3600).unwrap(),
         ]
@@ -667,7 +667,7 @@ mod fixedoffset {
             let mut buf = Vec::new();
             let out_of_range: (i32, i32, i32) = (23, 45, 67);
             ValueEncoder::<General>::encode_value(&out_of_range, &mut buf);
-            let mut fixed = FixedOffset::for_overwrite();
+            let mut fixed = <FixedOffset as ForOverwrite>::for_overwrite();
             assert_eq!(
                 ValueDecoder::<General>::decode_value(
                     &mut fixed,
@@ -693,7 +693,7 @@ mod fixedoffset {
             let mut buf = Vec::new();
             let out_of_range: (i32, i32, i32) = (10, 0, -10);
             ValueEncoder::<General>::encode_value(&out_of_range, &mut buf);
-            let mut fixed = FixedOffset::for_overwrite();
+            let mut fixed = <FixedOffset as ForOverwrite>::for_overwrite();
             assert_eq!(
                 ValueDecoder::<General>::decode_value(
                     &mut fixed,
@@ -720,7 +720,7 @@ where
     Z::Offset: EmptyState,
 {
     fn for_overwrite() -> Self {
-        Self::from_naive_utc_and_offset(EmptyState::empty(), EmptyState::empty())
+        Self::from_naive_utc_and_offset(<_ as EmptyState>::empty(), <_ as EmptyState>::empty())
     }
 }
 
@@ -730,11 +730,11 @@ where
     Z::Offset: EmptyState,
 {
     fn is_empty(&self) -> bool {
-        self.naive_utc().is_empty() && self.offset().is_empty()
+        <_ as EmptyState>::is_empty(&self.naive_utc()) && <_ as EmptyState>::is_empty(self.offset())
     }
 
     fn clear(&mut self) {
-        *self = Self::empty();
+        *self = <_ as EmptyState>::empty();
     }
 }
 
@@ -746,7 +746,7 @@ where
     type Proxy = (NaiveDateTime, Z::Offset);
 
     fn new_proxy() -> Self::Proxy {
-        Self::Proxy::empty()
+        <_ as EmptyState>::empty()
     }
 
     fn encode_proxy(&self) -> Self::Proxy {
@@ -902,7 +902,7 @@ mod timedelta {
             TimeDelta::default(),
             TimeDelta::milliseconds(-i64::MAX), // apparently the minimum
             TimeDelta::milliseconds(i64::MAX),  // apparently the maximum
-            TimeDelta::empty(),
+            <TimeDelta as EmptyState>::empty(),
             TimeDelta::new(900, 10).unwrap(),
             TimeDelta::seconds(-60),
         ]

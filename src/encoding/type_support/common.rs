@@ -229,7 +229,7 @@ mod chrono_time_value_compat {
     fn aware_compose_chrono(
         pair: (chrono::NaiveDateTime, FixedOffset),
     ) -> Option<chrono::DateTime<FixedOffset>> {
-        let mut result = chrono::DateTime::<FixedOffset>::empty();
+        let mut result = <chrono::DateTime<FixedOffset> as EmptyState>::empty();
         result.decode_proxy(pair).ok()?;
         Some(result)
     }
@@ -237,7 +237,7 @@ mod chrono_time_value_compat {
     fn aware_compose_time(
         pair: (time::PrimitiveDateTime, time::UtcOffset),
     ) -> Option<time::OffsetDateTime> {
-        let mut result = time::OffsetDateTime::empty();
+        let mut result = <time::OffsetDateTime as EmptyState>::empty();
         result.decode_proxy(pair).ok()?;
         Some(result)
     }

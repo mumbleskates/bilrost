@@ -19,7 +19,7 @@ impl EmptyState for bytestring::ByteString {
 
     #[inline]
     fn clear(&mut self) {
-        *self = Self::empty();
+        *self = <_ as EmptyState>::empty();
     }
 }
 

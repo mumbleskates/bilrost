@@ -46,11 +46,11 @@ impl ForOverwrite for Date {
 
 impl EmptyState for Date {
     fn is_empty(&self) -> bool {
-        *self == Self::empty()
+        *self == <_ as EmptyState>::empty()
     }
 
     fn clear(&mut self) {
-        *self = Self::empty();
+        *self = <_ as EmptyState>::empty();
     }
 }
 
@@ -110,7 +110,7 @@ mod date {
         [
             Date::MIN,
             Date::MAX,
-            Date::empty(),
+            <Date as EmptyState>::empty(),
             Date::from_calendar_date(1970, January, 1).unwrap(),
             Date::from_calendar_date(1998, June, 28).unwrap(),
         ]
@@ -211,7 +211,7 @@ mod time_ty {
         [
             Time::MIDNIGHT,
             Time::from_hms_nano(23, 59, 59, 999_999_999).unwrap(),
-            Time::empty(),
+            <Time as EmptyState>::empty(),
             Time::from_hms(17, 0, 0).unwrap(),
             Time::from_hms_nano(11, 11, 11, 111_111_111).unwrap(),
         ]
@@ -232,17 +232,17 @@ mod time_ty {
 
 impl ForOverwrite for PrimitiveDateTime {
     fn for_overwrite() -> Self {
-        Self::new(EmptyState::empty(), EmptyState::empty())
+        Self::new(<_ as EmptyState>::empty(), <_ as EmptyState>::empty())
     }
 }
 
 impl EmptyState for PrimitiveDateTime {
     fn is_empty(&self) -> bool {
-        self.date().is_empty() && self.time().is_empty()
+        <_ as EmptyState>::is_empty(&self.date()) && <_ as EmptyState>::is_empty(&self.time())
     }
 
     fn clear(&mut self) {
-        *self = Self::empty();
+        *self = <_ as EmptyState>::empty();
     }
 }
 
@@ -308,7 +308,7 @@ mod primitivedatetime {
 
     pub(in super::super) fn test_datetimes() -> impl IntoIterator<Item = PrimitiveDateTime> {
         [
-            PrimitiveDateTime::empty(),
+            <PrimitiveDateTime as EmptyState>::empty(),
             PrimitiveDateTime::new(
                 Date::from_calendar_date(-44, March, 15).unwrap(),
                 Time::from_hms(12, 36, 27).unwrap(),
@@ -419,7 +419,7 @@ mod utcoffset {
     pub(in super::super) fn test_zones() -> impl Iterator<Item = UtcOffset> + Clone {
         [
             UtcOffset::UTC,
-            UtcOffset::empty(),
+            <UtcOffset as EmptyState>::empty(),
             UtcOffset::from_hms(-7, -15, 0).unwrap(),
             UtcOffset::from_hms(14, 0, 0).unwrap(),
         ]
@@ -443,7 +443,7 @@ mod utcoffset {
             let mut buf = Vec::new();
             let out_of_range: (i32, i32, i32) = (10, 0, -10);
             ValueEncoder::<General>::encode_value(&out_of_range, &mut buf);
-            let mut utc_off = UtcOffset::for_overwrite();
+            let mut utc_off = <UtcOffset as ForOverwrite>::for_overwrite();
             assert_eq!(
                 ValueDecoder::<General>::decode_value(
                     &mut utc_off,
@@ -476,17 +476,17 @@ const fn odt_decompose(odt: OffsetDateTime) -> (PrimitiveDateTime, UtcOffset) {
 
 impl ForOverwrite for OffsetDateTime {
     fn for_overwrite() -> Self {
-        odt_compose(EmptyState::empty(), EmptyState::empty())
+        odt_compose(<_ as EmptyState>::empty(), <_ as EmptyState>::empty())
     }
 }
 
 impl EmptyState for OffsetDateTime {
     fn is_empty(&self) -> bool {
-        self.date().is_empty() && self.time().is_empty() && self.offset().is_empty()
+        <_ as EmptyState>::is_empty(&self.date()) && <_ as EmptyState>::is_empty(&self.time()) && <_ as EmptyState>::is_empty(&self.offset())
     }
 
     fn clear(&mut self) {
-        *self = Self::empty();
+        *self = <_ as EmptyState>::empty();
     }
 }
 
@@ -494,7 +494,7 @@ impl Proxiable<SealedBilrostTag> for OffsetDateTime {
     type Proxy = (PrimitiveDateTime, UtcOffset);
 
     fn new_proxy() -> Self::Proxy {
-        EmptyState::empty()
+        <_ as EmptyState>::empty()
     }
 
     fn encode_proxy(&self) -> Self::Proxy {
@@ -606,7 +606,7 @@ mod duration {
             Duration::ZERO,
             Duration::MIN,
             Duration::MAX,
-            Duration::empty(),
+            <Duration as EmptyState>::empty(),
             Duration::seconds_f64(900.00000001),
             Duration::seconds(-60),
         ]
