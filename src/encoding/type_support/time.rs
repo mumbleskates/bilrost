@@ -482,7 +482,9 @@ impl ForOverwrite for OffsetDateTime {
 
 impl EmptyState for OffsetDateTime {
     fn is_empty(&self) -> bool {
-        <_ as EmptyState>::is_empty(&self.date()) && <_ as EmptyState>::is_empty(&self.time()) && <_ as EmptyState>::is_empty(&self.offset())
+        <_ as EmptyState>::is_empty(&self.date())
+            && <_ as EmptyState>::is_empty(&self.time())
+            && <_ as EmptyState>::is_empty(&self.offset())
     }
 
     fn clear(&mut self) {

@@ -462,10 +462,7 @@ where
 
 pub(crate) fn check_proxy_round_trip_distinguished<T, Tag>()
 where
-    T: Debug
-        + EmptyState
-        + Eq
-        + DistinguishedProxiable<Tag>,
+    T: Debug + EmptyState + Eq + DistinguishedProxiable<Tag>,
     T::Proxy: Debug + EmptyState + Eq,
 {
     let start = T::empty();
