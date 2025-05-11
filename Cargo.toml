@@ -45,6 +45,16 @@ name = "custom_encodings"
 test = true
 harness = false # just run the binary
 
+[[example]]
+name = "proxy_own_type"
+test = true
+harness = false # just run the binary
+
+[[example]]
+name = "proxy_third_party_type"
+test = true
+harness = false # just run the binary
+
 [dependencies]
 arrayvec = { version = ">=0.6.0,<0.8", default-features = false, optional = true }
 bilrost-derive = { version = "=0.1013.0-dev", path = "bilrost-derive", optional = true }
