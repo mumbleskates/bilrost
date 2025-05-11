@@ -337,7 +337,7 @@ mod generic_optional {
 
     impl<T, E> Encoder<E> for Option<T>
     where
-        T: ValueEncoder<E> + ForOverwrite,
+        T: ValueEncoder<E> + ForOverwrite<E>,
     {
         #[inline]
         fn encode<B: BufMut + ?Sized>(tag: u32, value: &Self, buf: &mut B, tw: &mut TagWriter) {
@@ -370,7 +370,7 @@ mod generic_optional {
 
     impl<T, E> Decoder<E> for Option<T>
     where
-        T: ValueDecoder<E> + ForOverwrite,
+        T: ValueDecoder<E> + ForOverwrite<E>,
     {
         #[inline]
         fn decode<B: Buf + ?Sized>(
@@ -390,7 +390,7 @@ mod generic_optional {
 
     impl<T, E> DistinguishedDecoder<E> for Option<T>
     where
-        T: DistinguishedValueDecoder<E> + ForOverwrite + Eq,
+        T: DistinguishedValueDecoder<E> + ForOverwrite<E> + Eq,
     {
         #[inline]
         fn decode_distinguished<B: Buf + ?Sized>(
@@ -410,7 +410,7 @@ mod generic_optional {
 
     impl<'a, T, E> BorrowDecoder<'a, E> for Option<T>
     where
-        T: ValueBorrowDecoder<'a, E> + ForOverwrite,
+        T: ValueBorrowDecoder<'a, E> + ForOverwrite<E>,
     {
         #[inline]
         fn borrow_decode(
@@ -430,7 +430,7 @@ mod generic_optional {
 
     impl<'a, T, E> DistinguishedBorrowDecoder<'a, E> for Option<T>
     where
-        T: DistinguishedValueBorrowDecoder<'a, E> + ForOverwrite + Eq,
+        T: DistinguishedValueBorrowDecoder<'a, E> + ForOverwrite<E> + Eq,
     {
         #[inline]
         fn borrow_decode_distinguished(
