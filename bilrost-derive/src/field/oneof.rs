@@ -101,7 +101,7 @@ impl Field {
     pub fn for_overwrite(&self) -> TokenStream {
         let crate_ = crate_name();
         quote!(
-            #crate_::encoding::ForOverwrite::<#crate_::encoding::MessageEncoding>::for_overwrite()
+            #crate_::encoding::ForOverwrite::<()>::for_overwrite()
         )
     }
 
@@ -109,7 +109,7 @@ impl Field {
     pub fn is_empty(&self, ident: TokenStream) -> TokenStream {
         let crate_ = crate_name();
         quote!(
-            #crate_::encoding::EmptyState::<#crate_::encoding::MessageEncoding>::is_empty(#ident)
+            #crate_::encoding::EmptyState::<()>::is_empty(#ident)
         )
     }
 
@@ -117,7 +117,7 @@ impl Field {
     pub fn clear(&self, ident: TokenStream) -> TokenStream {
         let crate_ = crate_name();
         quote! {
-            #crate_::encoding::EmptyState::<#crate_::encoding::MessageEncoding>::clear(#ident);
+            #crate_::encoding::EmptyState::<()>::clear(#ident);
         }
     }
 
