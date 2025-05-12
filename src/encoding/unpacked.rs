@@ -42,17 +42,17 @@ macro_rules! define_decoders {
         ) -> Result<(), DecodeError>
         where
             T: Collection,
-            T::Item: ForOverwrite<E> + $relaxed_value <$($lifetime,)? E>,
+            (): ForOverwrite<E, T::Item> + $relaxed_value <$($lifetime,)? E, T::Item>,
         {
-            check_wire_type(<T::Item as Wiretyped<E>>::WIRE_TYPE, wire_type)?;
+            check_wire_type(<() as Wiretyped<E, T::Item>>::WIRE_TYPE, wire_type)?;
             loop {
                 // Decode one item
-                let mut new_item = T::Item::for_overwrite();
-                $relaxed_value::<E>::$relaxed_value_method(&mut new_item, buf.lend(), ctx.clone())?;
+                let mut new_item = <() as ForOverwrite<E, T::Item>>::for_overwrite();
+                $relaxed_value::<E, _>::$relaxed_value_method(&mut new_item, buf.lend(), ctx.clone())?;
                 collection.insert(new_item)?;
 
                 if let Some(next_wire_type) = peek_repeated_field(&mut buf) {
-                    check_wire_type(<T::Item as Wiretyped<E>>::WIRE_TYPE, next_wire_type)?;
+                    check_wire_type(<() as Wiretyped<E, T::Item>>::WIRE_TYPE, next_wire_type)?;
                 } else {
                     break;
                 }
@@ -70,14 +70,14 @@ macro_rules! define_decoders {
             ctx: DecodeContext,
         ) -> Result<(), DecodeError>
         where
-            T: $relaxed_value <$($lifetime,)? E>,
+            (): $relaxed_value <$($lifetime,)? E, T>,
         {
             if wire_type == WireType::LengthDelimited
-                && <T as Wiretyped<E>>::WIRE_TYPE != WireType::LengthDelimited
+                && <() as Wiretyped<E, T>>::WIRE_TYPE != WireType::LengthDelimited
             {
                 // We've encountered a length-delimited field when we aren't expecting one; try
                 // decoding it in packed format instead.
-                $relaxed_value::<Packed<E>>::$relaxed_value_method(arr, buf, ctx)
+                $relaxed_value::<Packed<E>, _>::$relaxed_value_method(arr, buf, ctx)
             } else {
                 // Otherwise, decode in unpacked mode.
                 decode_array_unpacked_only(wire_type, arr, buf, ctx)
@@ -94,22 +94,22 @@ macro_rules! define_decoders {
             ctx: DecodeContext,
         ) -> Result<(), DecodeError>
         where
-            T: $relaxed_value <$($lifetime,)? E>,
+            (): $relaxed_value <$($lifetime,)? E, T>,
         {
-            check_wire_type(<T as Wiretyped<E>>::WIRE_TYPE, wire_type)?;
+            check_wire_type(<() as Wiretyped<E, T>>::WIRE_TYPE, wire_type)?;
             for (i, dest) in arr.iter_mut().enumerate() {
                 // The initial field key is consumed, but we must read the repeated field key for
                 // each one after that.
                 if i > 0 {
                     if let Some(next_wire_type) = peek_repeated_field(&mut buf) {
-                        check_wire_type(<T as Wiretyped<E>>::WIRE_TYPE, next_wire_type)?;
+                        check_wire_type(<() as Wiretyped<E, T>>::WIRE_TYPE, next_wire_type)?;
                     } else {
                         // Not enough value fields
                         return Err(DecodeError::new(InvalidValue));
                     }
                 }
                 // Decode one item
-                $relaxed_value::<E>::$relaxed_value_method(dest, buf.lend(), ctx.clone())?;
+                $relaxed_value::<E, _>::$relaxed_value_method(dest, buf.lend(), ctx.clone())?;
             }
             if peek_repeated_field(&mut buf).is_some() {
                 // Too many value fields
@@ -130,16 +130,17 @@ macro_rules! define_decoders {
         ) -> Result<Canonicity, DecodeError>
         where
             T: DistinguishedCollection,
-            T::Item: ForOverwrite<E> + Eq + $distinguished_value <$($lifetime,)? E>,
+            T::Item: Eq,
+            (): ForOverwrite<E, T::Item> + $distinguished_value <$($lifetime,)? E, T::Item>,
         {
-            check_wire_type(<T::Item as Wiretyped<E>>::WIRE_TYPE, wire_type)?;
+            check_wire_type(<() as Wiretyped<E, T::Item>>::WIRE_TYPE, wire_type)?;
             let mut canon = Canonicity::Canonical;
             loop {
                 // Decode one item
-                let mut new_item = T::Item::for_overwrite();
+                let mut new_item = <() as ForOverwrite<E, T::Item>>::for_overwrite();
                 // Decoded field values are nested within the collection; empty values are OK
                 canon.update(
-                    $distinguished_value::<E>::$distinguished_value_method::<true>(
+                    $distinguished_value::<E, _>::$distinguished_value_method::<true>(
                         &mut new_item,
                         buf.lend(),
                         ctx.clone(),
@@ -148,7 +149,7 @@ macro_rules! define_decoders {
                 canon.update(ctx.check(collection.insert_distinguished(new_item)?)?);
 
                 if let Some(next_wire_type) = peek_repeated_field(&mut buf) {
-                    check_wire_type(<T::Item as Wiretyped<E>>::WIRE_TYPE, next_wire_type)?;
+                    check_wire_type(<() as Wiretyped<E, T::Item>>::WIRE_TYPE, next_wire_type)?;
                 } else {
                     break;
                 }
@@ -166,18 +167,18 @@ macro_rules! define_decoders {
             ctx: RestrictedDecodeContext,
         ) -> Result<Canonicity, DecodeError>
         where
-            T: Eq
-                + $relaxed_value <$($lifetime,)? E>
-                + $distinguished_value <$($lifetime,)? E>,
+            T: Eq,
+            (): $relaxed_value <$($lifetime,)? E, T>
+                + $distinguished_value <$($lifetime,)? E, T>,
         {
             if wire_type == WireType::LengthDelimited
-                && <T as Wiretyped<E>>::WIRE_TYPE != WireType::LengthDelimited
+                && <() as Wiretyped<E, T>>::WIRE_TYPE != WireType::LengthDelimited
             {
                 // We've encountered a length-delimited field when we aren't expecting one; try
                 // decoding it in packed format instead.
                 // The data is already known to be non-canonical; use relaxed decoding
                 _ = ctx.check(Canonicity::NotCanonical)?;
-                $relaxed_value::<Packed<E>>::$relaxed_value_method(arr, buf, ctx.into_inner())?;
+                $relaxed_value::<Packed<E>, _>::$relaxed_value_method(arr, buf, ctx.into_inner())?;
                 Ok(Canonicity::NotCanonical)
             } else {
                 // Otherwise, decode in unpacked mode.
@@ -195,16 +196,17 @@ macro_rules! define_decoders {
             ctx: RestrictedDecodeContext,
         ) -> Result<Canonicity, DecodeError>
         where
-            T: Eq + $distinguished_value <$($lifetime,)? E>,
+            T: Eq,
+            (): $distinguished_value <$($lifetime,)? E, T>,
         {
-            check_wire_type(<T as Wiretyped<E>>::WIRE_TYPE, wire_type)?;
+            check_wire_type(<() as Wiretyped<E, T>>::WIRE_TYPE, wire_type)?;
             let mut canon = Canonicity::Canonical;
             for (i, dest) in arr.iter_mut().enumerate() {
                 // The initial field key is consumed, but we must read the repeated field key for
                 // each one after that.
                 if i > 0 {
                     if let Some(next_wire_type) = peek_repeated_field(&mut buf) {
-                        check_wire_type(<T as Wiretyped<E>>::WIRE_TYPE, next_wire_type)?;
+                        check_wire_type(<() as Wiretyped<E, T>>::WIRE_TYPE, next_wire_type)?;
                     } else {
                         // Not enough value fields
                         return Err(DecodeError::new(InvalidValue));
@@ -212,7 +214,7 @@ macro_rules! define_decoders {
                 }
                 // Decode one item. Empty values are allowed
                 canon.update(
-                    $distinguished_value::<E>::$distinguished_value_method::<true>(
+                    $distinguished_value::<E, _>::$distinguished_value_method::<true>(
                         dest,
                         buf.lend(),
                         ctx.clone(),
@@ -241,35 +243,37 @@ pub(crate) mod borrowed {
 
 /// Unpacked encodes vecs as repeated fields and in relaxed decoding mode will accept both packed
 /// and un-packed encodings.
-impl<C, T, E> Encoder<Unpacked<E>> for C
+impl<C, T, E> Encoder<Unpacked<E>, C> for ()
 where
     C: Collection<Item = T>,
-    T: ForOverwrite<E> + ValueEncoder<E>,
+    (): ForOverwrite<E, T> + ValueEncoder<E, T>,
 {
     #[inline]
     fn encode<B: BufMut + ?Sized>(tag: u32, value: &C, buf: &mut B, tw: &mut TagWriter) {
         for val in value.iter() {
-            FieldEncoder::<E>::encode_field(tag, val, buf, tw);
+            <() as FieldEncoder<E, T>>::encode_field(tag, val, buf, tw);
         }
     }
 
     #[inline]
     fn prepend_encode<B: ReverseBuf + ?Sized>(
         tag: u32,
-        value: &Self,
+        value: &C,
         buf: &mut B,
         tw: &mut TagRevWriter,
     ) {
         for val in value.reversed() {
-            FieldEncoder::<E>::prepend_field(tag, val, buf, tw);
+            <() as FieldEncoder<E, T>>::prepend_field(tag, val, buf, tw);
         }
     }
 
     #[inline]
     fn encoded_len(tag: u32, value: &C, tm: &mut impl TagMeasurer) -> usize {
-        if !value.is_empty() {
+        if value.len() > 0 {
             // Each *additional* field encoded after the first needs only 1 byte for the field key.
-            tm.key_len(tag) + ValueEncoder::<E>::many_values_encoded_len(value.iter()) + value.len()
+            tm.key_len(tag)
+                + ValueEncoder::<E, _>::many_values_encoded_len(value.iter())
+                + value.len()
                 - 1
         } else {
             0
@@ -279,16 +283,15 @@ where
 
 /// Unpacked encodes arrays as repeated fields if any of the values are non-empty, and in relaxed
 /// decoding mode will accept both packed and un-packed encodings.
-impl<T, const N: usize, E> Encoder<Unpacked<E>> for [T; N]
+impl<T, const N: usize, E> Encoder<Unpacked<E>, [T; N]> for ()
 where
-    T: ValueEncoder<E>,
-    [T; N]: EmptyState<E>,
+    (): ValueEncoder<E, T> + EmptyState<E, [T; N]>,
 {
     #[inline]
     fn encode<B: BufMut + ?Sized>(tag: u32, value: &[T; N], buf: &mut B, tw: &mut TagWriter) {
-        if !EmptyState::<E>::is_empty(value) {
+        if !value.is_empty() {
             for val in value.iter() {
-                FieldEncoder::<E>::encode_field(tag, val, buf, tw);
+                <() as FieldEncoder<E, T>>::encode_field(tag, val, buf, tw);
             }
         }
     }
@@ -296,22 +299,22 @@ where
     #[inline]
     fn prepend_encode<B: ReverseBuf + ?Sized>(
         tag: u32,
-        value: &Self,
+        value: &[T; N],
         buf: &mut B,
         tw: &mut TagRevWriter,
     ) {
-        if !EmptyState::<E>::is_empty(value) {
+        if !value.is_empty() {
             for val in value.iter().rev() {
-                FieldEncoder::<E>::prepend_field(tag, val, buf, tw);
+                <() as FieldEncoder<E, T>>::prepend_field(tag, val, buf, tw);
             }
         }
     }
 
     #[inline]
     fn encoded_len(tag: u32, value: &[T; N], tm: &mut impl TagMeasurer) -> usize {
-        if !EmptyState::<E>::is_empty(value) {
+        if !value.is_empty() {
             // Each *additional* field encoded after the first needs only 1 byte for the field key.
-            tm.key_len(tag) + ValueEncoder::<E>::many_values_encoded_len(value.iter()) + N - 1
+            tm.key_len(tag) + ValueEncoder::<E, T>::many_values_encoded_len(value.iter()) + N - 1
         } else {
             0
         }
@@ -319,10 +322,9 @@ where
 }
 
 /// Unpacked encodes arrays as repeated fields if any of the values are non-empty.
-impl<T, const N: usize, E> Encoder<Unpacked<E>> for Option<[T; N]>
+impl<T, const N: usize, E> Encoder<Unpacked<E>, Option<[T; N]>> for ()
 where
-    T: ValueEncoder<E>,
-    [T; N]: ForOverwrite<E>,
+    (): ValueEncoder<E, T> + ForOverwrite<E, [T; N]>,
 {
     #[inline]
     fn encode<B: BufMut + ?Sized>(
@@ -333,7 +335,7 @@ where
     ) {
         if let Some(values) = value.as_ref() {
             for val in values {
-                FieldEncoder::<E>::encode_field(tag, val, buf, tw);
+                <() as FieldEncoder<E, T>>::encode_field(tag, val, buf, tw);
             }
         }
     }
@@ -341,13 +343,13 @@ where
     #[inline]
     fn prepend_encode<B: ReverseBuf + ?Sized>(
         tag: u32,
-        value: &Self,
+        value: &Option<[T; N]>,
         buf: &mut B,
         tw: &mut TagRevWriter,
     ) {
         if let Some(values) = value.as_ref() {
             for val in values.iter().rev() {
-                FieldEncoder::<E>::prepend_field(tag, val, buf, tw);
+                <() as FieldEncoder<E, T>>::prepend_field(tag, val, buf, tw);
             }
         }
     }
@@ -356,7 +358,7 @@ where
     fn encoded_len(tag: u32, value: &Option<[T; N]>, tm: &mut impl TagMeasurer) -> usize {
         if let Some(values) = value.as_ref() {
             // Each *additional* field encoded after the first needs only 1 byte for the field key.
-            tm.key_len(tag) + ValueEncoder::<E>::many_values_encoded_len(values.iter()) + N - 1
+            tm.key_len(tag) + ValueEncoder::<E, T>::many_values_encoded_len(values.iter()) + N - 1
         } else {
             0
         }
@@ -377,10 +379,10 @@ macro_rules! impl_decoders {
         $(buf_generic: ($($buf_generic:tt)*),)?
         $(lifetime: $lifetime:lifetime,)?
     ) => {
-        impl<$($lifetime,)? C, T, E> $relaxed <$($lifetime,)? Unpacked<E>> for C
+        impl<$($lifetime,)? C, T, E> $relaxed <$($lifetime,)? Unpacked<E>, C> for ()
         where
             C: Collection<Item = T>,
-            T: ForOverwrite<E> + $relaxed_value <$($lifetime,)? E>,
+            (): ForOverwrite<E, T> + $relaxed_value <$($lifetime,)? E, T>,
         {
             #[inline]
             fn $relaxed_method $($($buf_generic)*)? (
@@ -390,11 +392,11 @@ macro_rules! impl_decoders {
                 ctx: DecodeContext,
             ) -> Result<(), DecodeError> {
                 if wire_type == WireType::LengthDelimited
-                    && <C::Item as Wiretyped<E>>::WIRE_TYPE != WireType::LengthDelimited
+                    && <() as Wiretyped<E, C::Item>>::WIRE_TYPE != WireType::LengthDelimited
                 {
                     // We've encountered a length-delimited field when we aren't expecting one; try decoding
                     // it in packed format instead.
-                    $relaxed_value::<Packed<E>>::$relaxed_value_method(value, buf, ctx)
+                    $relaxed_value::<Packed<E>, _>::$relaxed_value_method(value, buf, ctx)
                 } else {
                     // Otherwise, decode in unpacked mode.
                     $mode::decode::<C, E>(wire_type, value, buf, ctx)
@@ -403,12 +405,15 @@ macro_rules! impl_decoders {
         }
 
         /// Distinguished encoding enforces only the repeated field representation is allowed.
-        impl<$($lifetime,)? C, T, E> $distinguished <$($lifetime,)? Unpacked<E>> for C
+        impl<$($lifetime,)? C, T, E> $distinguished <$($lifetime,)? Unpacked<E>, C> for ()
         where
-            Self: DistinguishedCollection<Item = T>
-                + $relaxed_value <$($lifetime,)? Packed<E>>
-                + $relaxed <$($lifetime,)? Unpacked<E>>,
-            T: ForOverwrite<E> + Eq + $distinguished_value <$($lifetime,)? E>,
+            C: DistinguishedCollection<Item = T>,
+            T: Eq,
+            ():
+                ForOverwrite<E, T>
+                + $distinguished_value <$($lifetime,)? E, T>
+                + $relaxed_value <$($lifetime,)? Packed<E>, C>
+                + $relaxed <$($lifetime,)? Unpacked<E>, C>,
         {
             #[inline]
             fn $distinguished_method $($($buf_generic)*)? (
@@ -418,13 +423,13 @@ macro_rules! impl_decoders {
                 ctx: RestrictedDecodeContext,
             ) -> Result<Canonicity, DecodeError> {
                 if wire_type == WireType::LengthDelimited
-                    && <T as Wiretyped<E>>::WIRE_TYPE != WireType::LengthDelimited
+                    && <() as Wiretyped<E, T>>::WIRE_TYPE != WireType::LengthDelimited
                 {
                     // We've encountered a length-delimited field when we aren't expecting one; try decoding
                     // it in packed format instead.
                     // The data is already known to be non-canonical; use relaxed decoding
                     _ = ctx.check(Canonicity::NotCanonical)?;
-                    $relaxed_value::<Packed<E>>::$relaxed_value_method(
+                    $relaxed_value::<Packed<E>, _>::$relaxed_value_method(
                         value,
                         buf,
                         ctx.into_inner(),
@@ -437,10 +442,10 @@ macro_rules! impl_decoders {
             }
         }
 
-        impl<$($lifetime,)? T, const N: usize, E> $relaxed <$($lifetime,)? Unpacked<E>> for [T; N]
+        impl<$($lifetime,)? T, const N: usize, E>
+        $relaxed <$($lifetime,)? Unpacked<E>, [T; N]> for ()
         where
-            T: $relaxed_value <$($lifetime,)? E>,
-            [T; N]: EmptyState<E>,
+            (): $relaxed_value <$($lifetime,)? E, T> + EmptyState<E, [T; N]>,
         {
             #[inline]
             fn $relaxed_method $($($buf_generic)*)? (
@@ -455,12 +460,12 @@ macro_rules! impl_decoders {
 
         /// Distinguished encoding considers only the repeated field representation to be canonical.
         impl<$($lifetime,)? T, const N: usize, E>
-        $distinguished <$($lifetime,)? Unpacked<E>> for [T; N]
+        $distinguished <$($lifetime,)? Unpacked<E>, [T; N]> for ()
         where
-            T: Eq
-                + $distinguished_value <$($lifetime,)? E>
-                + $relaxed_value <$($lifetime,)? E>,
-            [T; N]: EmptyState<E>,
+            T: Eq,
+            (): EmptyState<E, [T; N]>
+                + $distinguished_value <$($lifetime,)? E, T>
+                + $relaxed_value <$($lifetime,)? E, T>,
         {
             #[inline]
             fn $distinguished_method $($($buf_generic)*)? (
@@ -475,7 +480,7 @@ macro_rules! impl_decoders {
                     buf,
                     ctx.clone(),
                 )?;
-                if EmptyState::<E>::is_empty(value) {
+                if <() as EmptyState::<E, _>>::is_empty(value) {
                     ctx.check(Canonicity::NotCanonical)
                 } else {
                     Ok(canon)
@@ -484,10 +489,9 @@ macro_rules! impl_decoders {
         }
 
         impl<$($lifetime,)? T, const N: usize, E>
-        $relaxed <$($lifetime,)? Unpacked<E>> for Option<[T; N]>
+        $relaxed <$($lifetime,)? Unpacked<E>, Option<[T; N]>> for ()
         where
-            T: $relaxed_value <$($lifetime,)? E>,
-            [T; N]: ForOverwrite<E>,
+            (): $relaxed_value <$($lifetime,)? E, T> + ForOverwrite<E, [T; N]>,
         {
             #[inline]
             fn $relaxed_method $($($buf_generic)*)? (
@@ -498,7 +502,7 @@ macro_rules! impl_decoders {
             ) -> Result<(), DecodeError> {
                 $mode::decode_array_either_repr(
                     wire_type,
-                    value.get_or_insert_with(ForOverwrite::<E>::for_overwrite),
+                    value.get_or_insert_with(ForOverwrite::<E, _>::for_overwrite),
                     buf,
                     ctx,
                 )
@@ -508,12 +512,12 @@ macro_rules! impl_decoders {
         /// Distinguished encoding enforces only the repeated field representation is considered to be
         /// canonical.
         impl<$($lifetime,)? T, const N: usize, E>
-        $distinguished <$($lifetime,)? Unpacked<E>> for Option<[T; N]>
+        $distinguished <$($lifetime,)? Unpacked<E>, Option<[T; N]>> for ()
         where
-            T: Eq
-                + $distinguished_value<$($lifetime,)? E>
-                + $relaxed_value<$($lifetime,)? E>,
-            [T; N]: ForOverwrite<E>,
+            T: Eq,
+            (): ForOverwrite<E, [T; N]>
+                + $distinguished_value<$($lifetime,)? E, T>
+                + $relaxed_value<$($lifetime,)? E, T>,
         {
             #[inline]
             fn $distinguished_method $($($buf_generic)*)? (
@@ -524,7 +528,7 @@ macro_rules! impl_decoders {
             ) -> Result<Canonicity, DecodeError> {
                 $mode::decode_distinguished_array_either_repr(
                     wire_type,
-                    value.get_or_insert_with(ForOverwrite::<E>::for_overwrite),
+                    value.get_or_insert_with(ForOverwrite::<E, _>::for_overwrite),
                     buf,
                     ctx,
                 )

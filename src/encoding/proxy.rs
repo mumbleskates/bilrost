@@ -62,39 +62,39 @@ pub trait DistinguishedProxiable<Tag = ()>: Proxiable<Tag> {
 // TODO(widders): consider implementing proxied empty states in terms of the proxy's empty state
 //  instead, from here
 
-impl<T, E, Tag> Wiretyped<Proxied<E, Tag>> for T
+impl<T, E, Tag> Wiretyped<Proxied<E, Tag>, T> for ()
 where
     T: Proxiable<Tag>,
-    T::Proxy: Wiretyped<E>,
+    (): Wiretyped<E, T::Proxy>,
 {
-    const WIRE_TYPE: WireType = T::Proxy::WIRE_TYPE;
+    const WIRE_TYPE: WireType = <() as Wiretyped<E, T::Proxy>>::WIRE_TYPE;
 }
 
-impl<T, E, Tag> ValueEncoder<Proxied<E, Tag>> for T
+impl<T, E, Tag> ValueEncoder<Proxied<E, Tag>, T> for ()
 where
     T: Proxiable<Tag>,
-    T::Proxy: ValueEncoder<E>,
+    (): ValueEncoder<E, T::Proxy>,
 {
     #[inline]
-    fn encode_value<B: BufMut + ?Sized>(value: &Self, buf: &mut B) {
-        ValueEncoder::<E>::encode_value(&value.encode_proxy(), buf);
+    fn encode_value<B: BufMut + ?Sized>(value: &T, buf: &mut B) {
+        ValueEncoder::<E, _>::encode_value(&value.encode_proxy(), buf);
     }
 
     #[inline]
-    fn prepend_value<B: ReverseBuf + ?Sized>(value: &Self, buf: &mut B) {
-        ValueEncoder::<E>::prepend_value(&value.encode_proxy(), buf);
+    fn prepend_value<B: ReverseBuf + ?Sized>(value: &T, buf: &mut B) {
+        ValueEncoder::<E, _>::prepend_value(&value.encode_proxy(), buf);
     }
 
     #[inline]
-    fn value_encoded_len(value: &Self) -> usize {
-        ValueEncoder::<E>::value_encoded_len(&value.encode_proxy())
+    fn value_encoded_len(value: &T) -> usize {
+        ValueEncoder::<E, _>::value_encoded_len(&value.encode_proxy())
     }
 
     #[inline]
     fn many_values_encoded_len<I>(values: I) -> usize
     where
         I: ExactSizeIterator,
-        I::Item: Deref<Target = Self>,
+        I::Item: Deref<Target = T>,
     {
         /// Do-nothing wrapper allowing us to return items by-value and still have them Deref to T. Maybe
         /// it would be "more correct" to use Borrow or something like that but this is pretty easy too.
@@ -109,43 +109,43 @@ where
             }
         }
 
-        ValueEncoder::<E>::many_values_encoded_len(
+        ValueEncoder::<E, _>::many_values_encoded_len(
             values.map(|item| WrapDeref(item.encode_proxy())),
         )
     }
 }
 
-impl<T, E, Tag> ValueDecoder<Proxied<E, Tag>> for T
+impl<T, E, Tag> ValueDecoder<Proxied<E, Tag>, T> for ()
 where
     T: Proxiable<Tag>,
-    T::Proxy: ValueDecoder<E>,
+    (): ValueDecoder<E, T::Proxy>,
 {
     #[inline]
     fn decode_value<B: Buf + ?Sized>(
-        value: &mut Self,
+        value: &mut T,
         buf: Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         let mut proxy = T::new_proxy();
-        ValueDecoder::<E>::decode_value(&mut proxy, buf, ctx)?;
+        ValueDecoder::<E, _>::decode_value(&mut proxy, buf, ctx)?;
         Ok(value.decode_proxy(proxy)?)
     }
 }
 
-impl<T, E, Tag> DistinguishedValueDecoder<Proxied<E, Tag>> for T
+impl<T, E, Tag> DistinguishedValueDecoder<Proxied<E, Tag>, T> for ()
 where
     T: DistinguishedProxiable<Tag> + Eq,
-    T::Proxy: DistinguishedValueDecoder<E>,
+    (): DistinguishedValueDecoder<E, T::Proxy>,
 {
-    const CHECKS_EMPTY: bool = T::Proxy::CHECKS_EMPTY;
+    const CHECKS_EMPTY: bool = <() as DistinguishedValueDecoder<E, T::Proxy>>::CHECKS_EMPTY;
 
     fn decode_value_distinguished<const ALLOW_EMPTY: bool>(
-        value: &mut Self,
+        value: &mut T,
         buf: Capped<impl Buf + ?Sized>,
         ctx: RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
         let mut proxy = T::new_proxy();
-        let mut canon = DistinguishedValueDecoder::<E>::decode_value_distinguished::<ALLOW_EMPTY>(
+        let mut canon = DistinguishedValueDecoder::<E, _>::decode_value_distinguished::<ALLOW_EMPTY>(
             &mut proxy,
             buf,
             ctx.clone(),
@@ -155,37 +155,37 @@ where
     }
 }
 
-impl<'a, T, E, Tag> ValueBorrowDecoder<'a, Proxied<E, Tag>> for T
+impl<'a, T, E, Tag> ValueBorrowDecoder<'a, Proxied<E, Tag>, T> for ()
 where
     T: Proxiable<Tag>,
-    T::Proxy: ValueBorrowDecoder<'a, E>,
+    (): ValueBorrowDecoder<'a, E, T::Proxy>,
 {
     #[inline]
     fn borrow_decode_value(
-        value: &mut Self,
+        value: &mut T,
         buf: Capped<&'a [u8]>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         let mut proxy = T::new_proxy();
-        ValueBorrowDecoder::<E>::borrow_decode_value(&mut proxy, buf, ctx)?;
+        ValueBorrowDecoder::<E, _>::borrow_decode_value(&mut proxy, buf, ctx)?;
         Ok(value.decode_proxy(proxy)?)
     }
 }
 
-impl<'a, T, E, Tag> DistinguishedValueBorrowDecoder<'a, Proxied<E, Tag>> for T
+impl<'a, T, E, Tag> DistinguishedValueBorrowDecoder<'a, Proxied<E, Tag>, T> for ()
 where
     T: DistinguishedProxiable<Tag> + Eq,
-    T::Proxy: DistinguishedValueBorrowDecoder<'a, E>,
+    (): DistinguishedValueBorrowDecoder<'a, E, T::Proxy>,
 {
-    const CHECKS_EMPTY: bool = T::Proxy::CHECKS_EMPTY;
+    const CHECKS_EMPTY: bool = <() as DistinguishedValueBorrowDecoder<E, T::Proxy>>::CHECKS_EMPTY;
 
     fn borrow_decode_value_distinguished<const ALLOW_EMPTY: bool>(
-        value: &mut Self,
+        value: &mut T,
         buf: Capped<&'a [u8]>,
         ctx: RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
         let mut proxy = T::new_proxy();
-        let mut canon = DistinguishedValueBorrowDecoder::<E>::borrow_decode_value_distinguished::<
+        let mut canon = DistinguishedValueBorrowDecoder::<E, _>::borrow_decode_value_distinguished::<
             ALLOW_EMPTY,
         >(&mut proxy, buf, ctx.clone())?;
         canon.update(ctx.check(value.decode_proxy_distinguished(proxy)?)?);

@@ -22,11 +22,11 @@ pub struct PlainBytes;
 encoding_uses_base_empty_state!(PlainBytes);
 encoding_implemented_via_value_encoding!(PlainBytes);
 
-impl Wiretyped<PlainBytes> for &[u8] {
+impl Wiretyped<PlainBytes, &[u8]> for () {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
 }
 
-impl ValueEncoder<PlainBytes> for &[u8] {
+impl ValueEncoder<PlainBytes, &[u8]> for () {
     #[inline]
     fn encode_value<B: BufMut + ?Sized>(value: &&[u8], buf: &mut B) {
         encode_varint(value.len() as u64, buf);
@@ -45,10 +45,10 @@ impl ValueEncoder<PlainBytes> for &[u8] {
     }
 }
 
-impl<'a> ValueBorrowDecoder<'a, PlainBytes> for &'a [u8] {
+impl<'a> ValueBorrowDecoder<'a, PlainBytes, &'a [u8]> for () {
     #[inline]
     fn borrow_decode_value(
-        value: &mut Self,
+        value: &mut &'a [u8],
         mut buf: Capped<&'a [u8]>,
         _ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
@@ -57,12 +57,12 @@ impl<'a> ValueBorrowDecoder<'a, PlainBytes> for &'a [u8] {
     }
 }
 
-impl<'a> DistinguishedValueBorrowDecoder<'a, PlainBytes> for &'a [u8] {
+impl<'a> DistinguishedValueBorrowDecoder<'a, PlainBytes, &'a [u8]> for () {
     const CHECKS_EMPTY: bool = false;
 
     #[inline]
     fn borrow_decode_value_distinguished<const ALLOW_EMPTY: bool>(
-        value: &mut Self,
+        value: &mut &'a [u8],
         mut buf: Capped<&'a [u8]>,
         _ctx: RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
@@ -76,28 +76,28 @@ mod ref_bytes {
     crate::encoding::test::check_borrowable!(borrowed: [u8], encoding: crate::encoding::PlainBytes);
 }
 
-impl Wiretyped<PlainBytes> for Vec<u8> {
+impl Wiretyped<PlainBytes, Vec<u8>> for () {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
 }
 
-impl ValueEncoder<PlainBytes> for Vec<u8> {
+impl ValueEncoder<PlainBytes, Vec<u8>> for () {
     #[inline]
     fn encode_value<B: BufMut + ?Sized>(value: &Vec<u8>, buf: &mut B) {
-        ValueEncoder::<PlainBytes>::encode_value(&value.as_slice(), buf)
+        ValueEncoder::<PlainBytes, _>::encode_value(&value.as_slice(), buf)
     }
 
     #[inline]
     fn prepend_value<B: ReverseBuf + ?Sized>(value: &Vec<u8>, buf: &mut B) {
-        ValueEncoder::<PlainBytes>::prepend_value(&value.as_slice(), buf)
+        ValueEncoder::<PlainBytes, _>::prepend_value(&value.as_slice(), buf)
     }
 
     #[inline]
     fn value_encoded_len(value: &Vec<u8>) -> usize {
-        ValueEncoder::<PlainBytes>::value_encoded_len(&value.as_slice())
+        ValueEncoder::<PlainBytes, _>::value_encoded_len(&value.as_slice())
     }
 }
 
-impl ValueDecoder<PlainBytes> for Vec<u8> {
+impl ValueDecoder<PlainBytes, Vec<u8>> for () {
     fn decode_value<B: Buf + ?Sized>(
         value: &mut Vec<u8>,
         mut buf: Capped<B>,
@@ -111,7 +111,7 @@ impl ValueDecoder<PlainBytes> for Vec<u8> {
     }
 }
 
-impl DistinguishedValueDecoder<PlainBytes> for Vec<u8> {
+impl DistinguishedValueDecoder<PlainBytes, Vec<u8>> for () {
     const CHECKS_EMPTY: bool = false;
 
     fn decode_value_distinguished<const ALLOW_EMPTY: bool>(
@@ -119,7 +119,7 @@ impl DistinguishedValueDecoder<PlainBytes> for Vec<u8> {
         buf: Capped<impl Buf + ?Sized>,
         ctx: RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
-        ValueDecoder::<PlainBytes>::decode_value(value, buf, ctx.into_inner())?;
+        ValueDecoder::<PlainBytes, _>::decode_value(value, buf, ctx.into_inner())?;
         Ok(Canonicity::Canonical)
     }
 }
@@ -165,11 +165,11 @@ mod cow_bytes {
     );
 }
 
-impl<const N: usize> Wiretyped<PlainBytes> for [u8; N] {
+impl<const N: usize> Wiretyped<PlainBytes, [u8; N]> for () {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
 }
 
-impl<const N: usize> ValueEncoder<PlainBytes> for [u8; N] {
+impl<const N: usize> ValueEncoder<PlainBytes, [u8; N]> for () {
     #[inline]
     fn encode_value<B: BufMut + ?Sized>(value: &[u8; N], mut buf: &mut B) {
         buf.put_slice(&const_varint(N as u64));
@@ -197,7 +197,7 @@ impl<const N: usize> ValueEncoder<PlainBytes> for [u8; N] {
     }
 }
 
-impl<const N: usize> ValueDecoder<PlainBytes> for [u8; N] {
+impl<const N: usize> ValueDecoder<PlainBytes, [u8; N]> for () {
     fn decode_value<B: Buf + ?Sized>(
         value: &mut [u8; N],
         mut buf: Capped<B>,
@@ -212,7 +212,7 @@ impl<const N: usize> ValueDecoder<PlainBytes> for [u8; N] {
     }
 }
 
-impl<const N: usize> DistinguishedValueDecoder<PlainBytes> for [u8; N] {
+impl<const N: usize> DistinguishedValueDecoder<PlainBytes, [u8; N]> for () {
     const CHECKS_EMPTY: bool = false;
 
     fn decode_value_distinguished<const ALLOW_EMPTY: bool>(
@@ -220,7 +220,7 @@ impl<const N: usize> DistinguishedValueDecoder<PlainBytes> for [u8; N] {
         buf: Capped<impl Buf + ?Sized>,
         ctx: RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
-        ValueDecoder::<PlainBytes>::decode_value(value, buf, ctx.into_inner())?;
+        ValueDecoder::<PlainBytes, _>::decode_value(value, buf, ctx.into_inner())?;
         Ok(Canonicity::Canonical)
     }
 }
@@ -230,37 +230,37 @@ delegate_value_encoding!(
     with generics (const N: usize)
 );
 
-impl<const N: usize> Wiretyped<PlainBytes> for &[u8; N] {
+impl<const N: usize> Wiretyped<PlainBytes, &[u8; N]> for () {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
 }
 
-impl<const N: usize> ValueEncoder<PlainBytes> for &[u8; N] {
+impl<const N: usize> ValueEncoder<PlainBytes, &[u8; N]> for () {
     #[inline]
     fn encode_value<B: BufMut + ?Sized>(value: &&[u8; N], buf: &mut B) {
-        ValueEncoder::<PlainBytes>::encode_value(&value.as_slice(), buf)
+        ValueEncoder::<PlainBytes, _>::encode_value(&value.as_slice(), buf)
     }
 
     #[inline]
     fn prepend_value<B: ReverseBuf + ?Sized>(value: &&[u8; N], buf: &mut B) {
-        ValueEncoder::<PlainBytes>::prepend_value(&value.as_slice(), buf)
+        ValueEncoder::<PlainBytes, _>::prepend_value(&value.as_slice(), buf)
     }
 
     #[inline]
     fn value_encoded_len(value: &&[u8; N]) -> usize {
-        ValueEncoder::<PlainBytes>::value_encoded_len(&value.as_slice())
+        ValueEncoder::<PlainBytes, _>::value_encoded_len(&value.as_slice())
     }
 
     #[inline]
     fn many_values_encoded_len<I>(values: I) -> usize
     where
         I: ExactSizeIterator,
-        I::Item: Deref<Target = Self>,
+        I::Item: Deref<Target = &[u8; N]>,
     {
         values.len() * (const_varint(N as u64).len() + N)
     }
 }
 
-impl<'a, const N: usize> ValueBorrowDecoder<'a, PlainBytes> for &'a [u8; N] {
+impl<'a, const N: usize> ValueBorrowDecoder<'a, PlainBytes, &'a [u8; N]> for () {
     #[inline]
     fn borrow_decode_value(
         value: &mut &'a [u8; N],
@@ -275,7 +275,7 @@ impl<'a, const N: usize> ValueBorrowDecoder<'a, PlainBytes> for &'a [u8; N] {
     }
 }
 
-impl<'a, const N: usize> DistinguishedValueBorrowDecoder<'a, PlainBytes> for &'a [u8; N] {
+impl<'a, const N: usize> DistinguishedValueBorrowDecoder<'a, PlainBytes, &'a [u8; N]> for () {
     const CHECKS_EMPTY: bool = false;
 
     #[inline]
@@ -284,7 +284,7 @@ impl<'a, const N: usize> DistinguishedValueBorrowDecoder<'a, PlainBytes> for &'a
         buf: Capped<&'a [u8]>,
         ctx: RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
-        ValueBorrowDecoder::<PlainBytes>::borrow_decode_value(value, buf, ctx.into_inner())?;
+        ValueBorrowDecoder::<PlainBytes, _>::borrow_decode_value(value, buf, ctx.into_inner())?;
         Ok(Canonicity::Canonical)
     }
 }
@@ -373,31 +373,32 @@ macro_rules! plain_bytes_vec_impl {
             $(with generics ($($generics)*))?
         );
 
-        impl$(<$($generics)*>)? $crate::encoding::Wiretyped<$crate::encoding::PlainBytes> for $ty {
+        impl$(<$($generics)*>)?
+        $crate::encoding::Wiretyped<$crate::encoding::PlainBytes, $ty> for () {
             const WIRE_TYPE: $crate::encoding::WireType =
                 $crate::encoding::WireType::LengthDelimited;
         }
 
-        impl$(<$($generics)*>)? $crate::encoding::ValueEncoder<$crate::encoding::PlainBytes>
-        for $ty {
+        impl$(<$($generics)*>)?
+        $crate::encoding::ValueEncoder<$crate::encoding::PlainBytes, $ty> for () {
             fn encode_value<B: $crate::bytes::BufMut + ?Sized>(value: &$ty, buf: &mut B) {
-                $crate::encoding::ValueEncoder::<$crate::encoding::PlainBytes>::encode_value
+                $crate::encoding::ValueEncoder::<$crate::encoding::PlainBytes, _>::encode_value
                     (&&**value, buf)
             }
 
             fn prepend_value<B: $crate::buf::ReverseBuf + ?Sized>(value: &$ty, buf: &mut B) {
-                $crate::encoding::ValueEncoder::<$crate::encoding::PlainBytes>::prepend_value
+                $crate::encoding::ValueEncoder::<$crate::encoding::PlainBytes, _>::prepend_value
                     (&&**value, buf)
             }
 
             fn value_encoded_len(value: &$ty) -> usize {
-                $crate::encoding::ValueEncoder::<$crate::encoding::PlainBytes>::value_encoded_len
+                $crate::encoding::ValueEncoder::<$crate::encoding::PlainBytes, _>::value_encoded_len
                     (&&**value)
             }
         }
 
-        impl$(<$($generics)*>)? $crate::encoding::ValueDecoder<$crate::encoding::PlainBytes>
-        for $ty {
+        impl$(<$($generics)*>)?
+        $crate::encoding::ValueDecoder<$crate::encoding::PlainBytes, $ty> for () {
             fn decode_value<B: $crate::bytes::Buf + ?Sized>(
                 $value: &mut $ty,
                 mut buf: $crate::encoding::Capped<B>,
@@ -416,7 +417,7 @@ macro_rules! plain_bytes_vec_impl {
         }
 
         impl$(<$($generics)*>)?
-        $crate::encoding::DistinguishedValueDecoder<$crate::encoding::PlainBytes> for $ty {
+        $crate::encoding::DistinguishedValueDecoder<$crate::encoding::PlainBytes, $ty> for () {
             const CHECKS_EMPTY: bool = false;
 
             fn decode_value_distinguished<const ALLOW_EMPTY: bool>(
@@ -424,7 +425,7 @@ macro_rules! plain_bytes_vec_impl {
                 buf: $crate::encoding::Capped<impl $crate::bytes::Buf + ?Sized>,
                 ctx: $crate::encoding::RestrictedDecodeContext,
             ) -> Result<$crate::Canonicity, $crate::DecodeError> {
-                $crate::encoding::ValueDecoder::<$crate::encoding::PlainBytes>::decode_value(
+                $crate::encoding::ValueDecoder::<$crate::encoding::PlainBytes, _>::decode_value(
                     value, buf, ctx.into_inner())?;
                 Ok($crate::Canonicity::Canonical)
             }

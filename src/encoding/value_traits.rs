@@ -7,20 +7,20 @@ use crate::{Canonicity, DecodeErrorKind};
 /// message.
 ///
 // TODO(widders): document () delegation and tagged implementations
-pub trait EmptyState<E = ()>: ForOverwrite<E> {
+pub trait EmptyState<E, T: ?Sized>: ForOverwrite<E, T> {
     #[inline(always)]
     /// Produces the empty state for this type.
-    fn empty() -> Self
+    fn empty() -> T
     where
-        Self: Sized,
+        T: Sized,
     {
-        ForOverwrite::<E>::for_overwrite()
+        ForOverwrite::<E, T>::for_overwrite()
     }
 
     /// Returns true iff this instance is in the empty state.
-    fn is_empty(&self) -> bool;
+    fn is_empty(val: &T) -> bool;
 
-    fn clear(&mut self);
+    fn clear(val: &mut T);
 }
 
 /// Trait for cheaply producing a new value that will always be overwritten or decoded into, rather
@@ -29,9 +29,9 @@ pub trait EmptyState<E = ()>: ForOverwrite<E> {
 /// enumerations without a zero value.
 ///
 // TODO(widders): document () delegation and tagged implementations
-pub trait ForOverwrite<E = ()> {
+pub trait ForOverwrite<E, T: ?Sized> {
     /// Produces a new `Self` value to be overwritten.
-    fn for_overwrite() -> Self
+    fn for_overwrite() -> T
     where
         Self: Sized;
 }
@@ -46,13 +46,13 @@ macro_rules! for_overwrite_via_default {
         $(, with generics ($($generics:tt)*))?
         $(, with where clause ($($where_clause:tt)*))?
     ) => {
-        impl<$($($generics)*)?> $crate::encoding::ForOverwrite for $ty
+        impl<$($($generics)*)?> $crate::encoding::ForOverwrite<(), $ty> for ()
         where
             Self: ::core::default::Default,
             $($($where_clause)*)?
         {
             #[inline]
-            fn for_overwrite() -> Self {
+            fn for_overwrite() -> $ty {
                 ::core::default::Default::default()
             }
         }
@@ -68,19 +68,20 @@ macro_rules! empty_state_via_for_overwrite {
         $(, with generics ($($generics:tt)*))?
         $(, with where clause ($($where_clause:tt)*))?
     ) => {
-        impl<$($($generics)*)?> $crate::encoding::EmptyState for $ty
+        impl<$($($generics)*)?> $crate::encoding::EmptyState<(), $ty> for ()
         where
-            Self: $crate::encoding::ForOverwrite + ::core::cmp::PartialEq,
+            $ty: ::core::cmp::PartialEq,
+            (): $crate::encoding::ForOverwrite<(), $ty>,
             $($($where_clause)*)?
         {
             #[inline]
-            fn is_empty(&self) -> bool {
-                *self == <Self as $crate::encoding::EmptyState>::empty()
+            fn is_empty(val: &$ty) -> bool {
+                *val == <() as $crate::encoding::EmptyState<(), $ty>>::empty()
             }
 
             #[inline]
-            fn clear(&mut self) {
-                *self = <Self as $crate::encoding::EmptyState>::empty();
+            fn clear(val: &mut $ty) {
+                *val = <() as $crate::encoding::EmptyState<(), $ty>>::empty();
             }
         }
     };
@@ -122,7 +123,7 @@ pub trait Enumeration: Eq + Sized {
 }
 
 /// Trait for containers that store multiple items such as `Vec`, `BTreeSet`, and `HashSet`
-pub trait Collection: EmptyState {
+pub trait Collection: EmptyState<(), Self> {
     type Item;
     type RefIter<'a>: ExactSizeIterator<Item = &'a Self::Item>
     where
@@ -158,7 +159,7 @@ where
 }
 
 /// Trait for associative containers, such as `BTreeMap` and `HashMap`.
-pub trait Mapping: EmptyState {
+pub trait Mapping: EmptyState<(), Self> {
     type Key;
     type Value;
     type RefIter<'a>: ExactSizeIterator<Item = (&'a Self::Key, &'a Self::Value)>

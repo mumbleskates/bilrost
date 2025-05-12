@@ -5,26 +5,26 @@ use alloc::vec::Vec;
 
 for_overwrite_via_default!(Blob);
 
-impl EmptyState for Blob {
-    fn is_empty(&self) -> bool {
-        Vec::is_empty(self)
+impl EmptyState<(), Blob> for () {
+    fn is_empty(val: &Blob) -> bool {
+        Vec::is_empty(val)
     }
 
-    fn clear(&mut self) {
-        Vec::clear(self)
+    fn clear(val: &mut Blob) {
+        Vec::clear(val)
     }
 }
 
 for_overwrite_via_default!(bytes::Bytes);
 
-impl EmptyState for bytes::Bytes {
+impl EmptyState<(), bytes::Bytes> for () {
     #[inline]
-    fn is_empty(&self) -> bool {
-        bytes::Bytes::is_empty(self)
+    fn is_empty(val: &bytes::Bytes) -> bool {
+        bytes::Bytes::is_empty(val)
     }
 
     #[inline]
-    fn clear(&mut self) {
-        *self = <Self as EmptyState>::empty();
+    fn clear(val: &mut bytes::Bytes) {
+        *val = <() as EmptyState<(), _>>::empty();
     }
 }

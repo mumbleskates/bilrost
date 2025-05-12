@@ -8,9 +8,9 @@ macro_rules! delegate_encoding {
         $(with where clause ($($where_clause:tt)*))?
         $(with generics ($($value_generics:tt)*))?
     ) => {
-        impl$(<$($value_generics)*>)? $crate::encoding::Encoder<$from_ty> for $value_ty
+        impl$(<$($value_generics)*>)? $crate::encoding::Encoder<$from_ty, $value_ty> for ()
         where
-            Self: $crate::encoding::Encoder<$to_ty>,
+            (): $crate::encoding::Encoder<$to_ty, $value_ty>,
             $($($where_clause)*)?
         {
             #[inline(always)]
@@ -20,7 +20,7 @@ macro_rules! delegate_encoding {
                 buf: &mut B,
                 tw: &mut $crate::encoding::TagWriter,
             ) {
-                $crate::encoding::Encoder::<$to_ty>::encode(tag, value, buf, tw)
+                $crate::encoding::Encoder::<$to_ty, _>::encode(tag, value, buf, tw)
             }
 
             #[inline(always)]
@@ -30,7 +30,7 @@ macro_rules! delegate_encoding {
                 buf: &mut B,
                 tw: &mut $crate::encoding::TagRevWriter,
             ) {
-                $crate::encoding::Encoder::<$to_ty>::prepend_encode(tag, value, buf, tw)
+                $crate::encoding::Encoder::<$to_ty, _>::prepend_encode(tag, value, buf, tw)
             }
 
             #[inline(always)]
@@ -39,13 +39,13 @@ macro_rules! delegate_encoding {
                 value: &$value_ty,
                 tm: &mut impl $crate::encoding::TagMeasurer,
             ) -> usize {
-                $crate::encoding::Encoder::<$to_ty>::encoded_len(tag, value, tm)
+                $crate::encoding::Encoder::<$to_ty, _>::encoded_len(tag, value, tm)
             }
         }
 
-        impl$(<$($value_generics)*>)? $crate::encoding::Decoder<$from_ty> for $value_ty
+        impl$(<$($value_generics)*>)? $crate::encoding::Decoder<$from_ty, $value_ty> for ()
         where
-            Self: $crate::encoding::Decoder<$to_ty>,
+            (): $crate::encoding::Decoder<$to_ty, $value_ty>,
             $($($where_clause)*)?
         {
             #[inline(always)]
@@ -55,7 +55,7 @@ macro_rules! delegate_encoding {
                 buf: $crate::encoding::Capped<B>,
                 ctx: $crate::encoding::DecodeContext,
             ) -> Result<(), $crate::DecodeError> {
-                $crate::encoding::Decoder::<$to_ty>::decode(
+                $crate::encoding::Decoder::<$to_ty, _>::decode(
                     wire_type,
                     value,
                     buf,
@@ -65,9 +65,9 @@ macro_rules! delegate_encoding {
         }
 
         impl<'__a$(, $($value_generics)*)?>
-        $crate::encoding::BorrowDecoder<'__a, $from_ty> for $value_ty
+        $crate::encoding::BorrowDecoder<'__a, $from_ty, $value_ty> for ()
         where
-            Self: $crate::encoding::BorrowDecoder<'__a, $to_ty>,
+            (): $crate::encoding::BorrowDecoder<'__a, $to_ty, $value_ty>,
             $($($where_clause)*)?
         {
             #[inline(always)]
@@ -77,7 +77,7 @@ macro_rules! delegate_encoding {
                 buf: $crate::encoding::Capped<&'__a [u8]>,
                 ctx: $crate::encoding::DecodeContext,
             ) -> Result<(), $crate::DecodeError> {
-                $crate::encoding::BorrowDecoder::<$to_ty>::borrow_decode(
+                $crate::encoding::BorrowDecoder::<$to_ty, _>::borrow_decode(
                     wire_type,
                     value,
                     buf,
@@ -98,11 +98,11 @@ macro_rules! delegate_encoding {
             $(with generics ($($value_generics)*))?
         );
 
-        impl$(<$($value_generics)*>)? $crate::encoding::DistinguishedDecoder<$from_ty>
-        for $value_ty
+        impl$(<$($value_generics)*>)?
+        $crate::encoding::DistinguishedDecoder<$from_ty, $value_ty> for ()
         where
-            Self: $crate::encoding::DistinguishedDecoder<$to_ty>
-                + $crate::encoding::Encoder<$to_ty>,
+            (): $crate::encoding::DistinguishedDecoder<$to_ty, $value_ty>
+                + $crate::encoding::Encoder<$to_ty, $value_ty>,
             $($($where_clause)*)?
         {
             #[inline(always)]
@@ -112,7 +112,7 @@ macro_rules! delegate_encoding {
                 buf: $crate::encoding::Capped<B>,
                 ctx: $crate::encoding::RestrictedDecodeContext,
             ) -> Result<$crate::Canonicity, $crate::DecodeError> {
-                $crate::encoding::DistinguishedDecoder::<$to_ty>::decode_distinguished(
+                $crate::encoding::DistinguishedDecoder::<$to_ty, _>::decode_distinguished(
                     wire_type,
                     value,
                     buf,
@@ -122,11 +122,10 @@ macro_rules! delegate_encoding {
         }
 
         impl<'__a$(, $($value_generics)*)?>
-        $crate::encoding::DistinguishedBorrowDecoder<'__a, $from_ty>
-        for $value_ty
+        $crate::encoding::DistinguishedBorrowDecoder<'__a, $from_ty, $value_ty> for ()
         where
-            Self: $crate::encoding::DistinguishedBorrowDecoder<'__a, $to_ty>
-                + $crate::encoding::Encoder<$to_ty>,
+            (): $crate::encoding::DistinguishedBorrowDecoder<'__a, $to_ty, $value_ty>
+                + $crate::encoding::Encoder<$to_ty, $value_ty>,
             $($($where_clause)*)?
         {
             #[inline(always)]
@@ -136,7 +135,9 @@ macro_rules! delegate_encoding {
                 buf: $crate::encoding::Capped<&'__a [u8]>,
                 ctx: $crate::encoding::RestrictedDecodeContext,
             ) -> Result<$crate::Canonicity, $crate::DecodeError> {
-                $crate::encoding::DistinguishedBorrowDecoder::<$to_ty>::borrow_decode_distinguished(
+                $crate::encoding::DistinguishedBorrowDecoder::<$to_ty, _>::
+                    borrow_decode_distinguished
+                (
                     wire_type,
                     value,
                     buf,
@@ -169,23 +170,23 @@ macro_rules! delegate_value_encoding {
         $(with where clause ($($where_clause:tt)+))?
         $(with generics ($($value_generics:tt)*))?
     ) => {
-        impl$(<$($value_generics)*>)? $crate::encoding::Wiretyped<$from_ty> for $value_ty
+        impl$(<$($value_generics)*>)? $crate::encoding::Wiretyped<$from_ty, $value_ty> for ()
         where
-            Self: $crate::encoding::Wiretyped<$to_ty>,
+            (): $crate::encoding::Wiretyped<$to_ty, $value_ty>,
             $($($where_clause)+ ,)?
         {
             const WIRE_TYPE: $crate::encoding::WireType =
-                <Self as $crate::encoding::Wiretyped<$to_ty>>::WIRE_TYPE;
+                <() as $crate::encoding::Wiretyped<$to_ty, $value_ty>>::WIRE_TYPE;
         }
 
-        impl$(<$($value_generics)*>)? $crate::encoding::ValueEncoder<$from_ty> for $value_ty
+        impl$(<$($value_generics)*>)? $crate::encoding::ValueEncoder<$from_ty, $value_ty> for ()
         where
-            Self: $crate::encoding::ValueEncoder<$to_ty>,
+            (): $crate::encoding::ValueEncoder<$to_ty, $value_ty>,
             $($($where_clause)+ ,)?
         {
             #[inline(always)]
             fn encode_value<__B: $crate::bytes::BufMut + ?Sized>(value: &$value_ty, buf: &mut __B) {
-                $crate::encoding::ValueEncoder::<$to_ty>::encode_value(value, buf)
+                $crate::encoding::ValueEncoder::<$to_ty, _>::encode_value(value, buf)
             }
 
             #[inline(always)]
@@ -193,12 +194,12 @@ macro_rules! delegate_value_encoding {
                 value: &$value_ty,
                 buf: &mut __B,
             ) {
-                $crate::encoding::ValueEncoder::<$to_ty>::prepend_value(value, buf)
+                $crate::encoding::ValueEncoder::<$to_ty, _>::prepend_value(value, buf)
             }
 
             #[inline(always)]
             fn value_encoded_len(value: &$value_ty) -> usize {
-                $crate::encoding::ValueEncoder::<$to_ty>::value_encoded_len(value)
+                $crate::encoding::ValueEncoder::<$to_ty, _>::value_encoded_len(value)
             }
 
             #[inline(always)]
@@ -207,13 +208,13 @@ macro_rules! delegate_value_encoding {
                 __I: ExactSizeIterator,
                 __I::Item: core::ops::Deref<Target = $value_ty>,
             {
-                $crate::encoding::ValueEncoder::<$to_ty>::many_values_encoded_len(values)
+                $crate::encoding::ValueEncoder::<$to_ty, _>::many_values_encoded_len(values)
             }
         }
 
-        impl$(<$($value_generics)*>)? $crate::encoding::ValueDecoder<$from_ty> for $value_ty
+        impl$(<$($value_generics)*>)? $crate::encoding::ValueDecoder<$from_ty, $value_ty> for ()
         where
-            Self: $crate::encoding::ValueDecoder<$to_ty>,
+            (): $crate::encoding::ValueDecoder<$to_ty, $value_ty>,
             $($($where_clause)+ ,)?
         {
             #[inline(always)]
@@ -222,14 +223,14 @@ macro_rules! delegate_value_encoding {
                 buf: $crate::encoding::Capped<__B>,
                 ctx: $crate::encoding::DecodeContext,
             ) -> Result<(), $crate::DecodeError> {
-                $crate::encoding::ValueDecoder::<$to_ty>::decode_value(value, buf, ctx)
+                $crate::encoding::ValueDecoder::<$to_ty, _>::decode_value(value, buf, ctx)
             }
         }
 
         impl<'__a $(, $($value_generics)*)?>
-        $crate::encoding::ValueBorrowDecoder<'__a, $from_ty> for $value_ty
+        $crate::encoding::ValueBorrowDecoder<'__a, $from_ty, $value_ty> for ()
         where
-            Self: $crate::encoding::ValueBorrowDecoder<'__a, $to_ty>,
+            (): $crate::encoding::ValueBorrowDecoder<'__a, $to_ty, $value_ty>,
             $($($where_clause)+ ,)?
         {
             #[inline(always)]
@@ -238,7 +239,7 @@ macro_rules! delegate_value_encoding {
                 buf: $crate::encoding::Capped<&'__a [u8]>,
                 ctx: $crate::encoding::DecodeContext,
             ) -> Result<(), $crate::DecodeError> {
-                $crate::encoding::ValueBorrowDecoder::<$to_ty>::borrow_decode_value(value, buf, ctx)
+                $crate::encoding::ValueBorrowDecoder::<$to_ty, _>::borrow_decode_value(value, buf, ctx)
             }
         }
     };
@@ -255,15 +256,16 @@ macro_rules! delegate_value_encoding {
             $(with generics ($($value_generics)*))?
         );
 
-        impl$(<$($value_generics)*>)? $crate::encoding::DistinguishedValueDecoder<$from_ty>
-        for $value_ty
+        impl$(<$($value_generics)*>)?
+        $crate::encoding::DistinguishedValueDecoder<$from_ty, $value_ty> for ()
         where
-            Self: $crate::encoding::DistinguishedValueDecoder<$to_ty>,
+            (): $crate::encoding::DistinguishedValueDecoder<$to_ty, $value_ty>,
             $($($relaxed_where)+ ,)?
             $($($distinguished_where)+ ,)?
         {
-            const CHECKS_EMPTY: bool =
-                <$value_ty as $crate::encoding::DistinguishedValueDecoder<$to_ty>>::CHECKS_EMPTY;
+            const CHECKS_EMPTY: bool = <
+                () as $crate::encoding::DistinguishedValueDecoder<$to_ty, $value_ty>
+            >::CHECKS_EMPTY;
 
             #[inline(always)]
             fn decode_value_distinguished<const ALLOW_EMPTY: bool>(
@@ -271,7 +273,7 @@ macro_rules! delegate_value_encoding {
                 buf: $crate::encoding::Capped<impl $crate::bytes::Buf + ?Sized>,
                 ctx: $crate::encoding::RestrictedDecodeContext,
             ) -> Result<$crate::Canonicity, $crate::DecodeError> {
-                $crate::encoding::DistinguishedValueDecoder::<$to_ty>::
+                $crate::encoding::DistinguishedValueDecoder::<$to_ty, _>::
                     decode_value_distinguished::<ALLOW_EMPTY>
                 (
                     value,
@@ -282,14 +284,14 @@ macro_rules! delegate_value_encoding {
         }
 
         impl<'__a $(, $($value_generics)*)?>
-        $crate::encoding::DistinguishedValueBorrowDecoder<'__a, $from_ty> for $value_ty
+        $crate::encoding::DistinguishedValueBorrowDecoder<'__a, $from_ty, $value_ty> for ()
         where
-            Self: $crate::encoding::DistinguishedValueBorrowDecoder<'__a, $to_ty>,
+            (): $crate::encoding::DistinguishedValueBorrowDecoder<'__a, $to_ty, $value_ty>,
             $($($relaxed_where)+ ,)?
             $($($distinguished_where)+ ,)?
         {
             const CHECKS_EMPTY: bool = <
-                $value_ty as $crate::encoding::DistinguishedValueBorrowDecoder<'__a, $to_ty>
+                () as $crate::encoding::DistinguishedValueBorrowDecoder<'__a, $to_ty, $value_ty>
             >::CHECKS_EMPTY;
 
             #[inline(always)]
@@ -298,7 +300,7 @@ macro_rules! delegate_value_encoding {
                 buf: $crate::encoding::Capped<&'__a [u8]>,
                 ctx: $crate::encoding::RestrictedDecodeContext,
             ) -> Result<$crate::Canonicity, $crate::DecodeError> {
-                $crate::encoding::DistinguishedValueBorrowDecoder::<$to_ty>::
+                $crate::encoding::DistinguishedValueBorrowDecoder::<$to_ty, _>::
                     borrow_decode_value_distinguished::<ALLOW_EMPTY>
                 (
                     value,
@@ -315,9 +317,9 @@ macro_rules! delegate_value_encoding {
         $(with generics ($($impl_generics:tt)*))?
     ) => {
         impl<'__a, $($($impl_generics)*)?>
-        $crate::encoding::ValueBorrowDecoder<'__a, $encoding> for $ty
+        $crate::encoding::ValueBorrowDecoder<'__a, $encoding, $ty> for ()
         where
-            $ty: $crate::encoding::ValueDecoder<$encoding>,
+            (): $crate::encoding::ValueDecoder<$encoding, $ty>,
         {
             #[inline]
             fn borrow_decode_value(
@@ -325,7 +327,7 @@ macro_rules! delegate_value_encoding {
                 buf: $crate::encoding::Capped<&'__a [u8]>,
                 ctx: $crate::encoding::DecodeContext,
             ) -> Result<(), $crate::DecodeError> {
-                $crate::encoding::ValueDecoder::<$encoding>::decode_value(value, buf, ctx)
+                $crate::encoding::ValueDecoder::<$encoding, _>::decode_value(value, buf, ctx)
             }
         }
     };
@@ -342,12 +344,12 @@ macro_rules! delegate_value_encoding {
         );
 
         impl<'__a, $($($impl_generics)*)?>
-        $crate::encoding::DistinguishedValueBorrowDecoder<'__a, $encoding> for $ty
+        $crate::encoding::DistinguishedValueBorrowDecoder<'__a, $encoding, $ty> for ()
         where
-            $ty: $crate::encoding::DistinguishedValueDecoder<$encoding>,
+            (): $crate::encoding::DistinguishedValueDecoder<$encoding, $ty>,
         {
             const CHECKS_EMPTY: bool =
-                <$ty as $crate::encoding::DistinguishedValueDecoder<$encoding>>::CHECKS_EMPTY;
+                <() as $crate::encoding::DistinguishedValueDecoder<$encoding, $ty>>::CHECKS_EMPTY;
 
             #[inline]
             fn borrow_decode_value_distinguished<const ALLOW_EMPTY: bool>(
@@ -355,7 +357,7 @@ macro_rules! delegate_value_encoding {
                 buf: $crate::encoding::Capped<&'__a [u8]>,
                 ctx: $crate::encoding::RestrictedDecodeContext,
             ) -> Result<$crate::Canonicity, $crate::DecodeError> {
-                $crate::encoding::DistinguishedValueDecoder::<$encoding>::
+                $crate::encoding::DistinguishedValueDecoder::<$encoding, _>::
                     decode_value_distinguished::<ALLOW_EMPTY>
                 (
                     value,
@@ -464,35 +466,35 @@ macro_rules! encoding_uses_base_empty_state {
         $(, with generics ($($impl_generics:tt)*))?
         $(, with where clause ($($where_clause:tt)*))?
     ) => {
-        impl<$($($impl_generics)*,)? __T> $crate::encoding::ForOverwrite<$encoding> for __T
+        impl<$($($impl_generics)*,)? __T> $crate::encoding::ForOverwrite<$encoding, __T> for ()
         where
-            Self: $crate::encoding::ForOverwrite<()>,
+            (): $crate::encoding::ForOverwrite<(), __T>,
             $($($where_clause)*)?
         {
             #[inline(always)]
-            fn for_overwrite() -> Self {
-                $crate::encoding::ForOverwrite::<()>::for_overwrite()
+            fn for_overwrite() -> __T {
+                <() as $crate::encoding::ForOverwrite::<(), _>>::for_overwrite()
             }
         }
 
-        impl<$($($impl_generics)*,)? __T> $crate::encoding::EmptyState<$encoding> for __T
+        impl<$($($impl_generics)*,)? __T> $crate::encoding::EmptyState<$encoding, __T> for ()
         where
-            Self: $crate::encoding::EmptyState<()>,
+            (): $crate::encoding::EmptyState<(), __T>,
             $($($where_clause)*)?
         {
             #[inline(always)]
-            fn empty() -> Self {
-                $crate::encoding::EmptyState::<()>::empty()
+            fn empty() -> __T {
+                <() as $crate::encoding::EmptyState::<(), _>>::empty()
             }
 
             #[inline(always)]
-            fn is_empty(&self) -> bool {
-                $crate::encoding::EmptyState::<()>::is_empty(self)
+            fn is_empty(__val: &__T) -> bool {
+                <() as $crate::encoding::EmptyState::<(), _>>::is_empty(__val)
             }
 
             #[inline(always)]
-            fn clear(&mut self) {
-                $crate::encoding::EmptyState::<()>::clear(self);
+            fn clear(__val: &mut __T) {
+                <() as $crate::encoding::EmptyState::<(), _>>::clear(__val);
             }
         }
     }
@@ -511,69 +513,69 @@ macro_rules! implement_core_empty_state_rules {
         $(, with generics ($($impl_generics:tt)*))?
         $(, with where clause ($($where_clause:tt)*))?
     ) => {
-        impl<$($($impl_generics)*,)? __T> $crate::encoding::ForOverwrite<$encoding>
-        for ::core::option::Option<__T>
+        impl<$($($impl_generics)*,)? __T>
+        $crate::encoding::ForOverwrite<$encoding, ::core::option::Option<__T>> for ()
         $(where $($where_clause)*)?
         {
             #[inline(always)]
-            fn for_overwrite() -> Self {
+            fn for_overwrite() -> ::core::option::Option<__T> {
                 ::core::option::Option::None
             }
         }
 
-        impl<$($($impl_generics)*,)? __T> $crate::encoding::EmptyState<$encoding>
-        for ::core::option::Option<__T>
+        impl<$($($impl_generics)*,)? __T>
+        $crate::encoding::EmptyState<$encoding, ::core::option::Option<__T>> for ()
         $(where $($where_clause)*)?
         {
             #[inline(always)]
-            fn is_empty(&self) -> bool {
-                ::core::option::Option::is_none(self)
+            fn is_empty(__val: &::core::option::Option<__T>) -> bool {
+                ::core::option::Option::is_none(__val)
             }
 
             #[inline(always)]
-            fn clear(&mut self) {
-                *self = ::core::option::Option::None;
+            fn clear(__val: &mut ::core::option::Option<__T>) {
+                *__val = ::core::option::Option::None;
             }
         }
 
-        impl<$($($impl_generics)*,)? __T, const __N: usize>
-        $crate::encoding::ForOverwrite<$encoding> for [__T; __N]
-        where
-            __T: $crate::encoding::ForOverwrite<$encoding>,
-            $($($where_clause)*)?
-        {
-            #[inline]
-            fn for_overwrite() -> Self {
-                ::core::array::from_fn(|_| __T::for_overwrite())
-            }
-        }
-
-        impl<$($($impl_generics)*,)? __T, const __N: usize>
-        $crate::encoding::EmptyState<$encoding> for [__T; __N]
-        where
-            __T: $crate::encoding::EmptyState<$encoding>,
-            $($($where_clause)*)?
-        {
-            #[inline]
-            fn empty() -> Self
-            where
-                Self: Sized,
-            {
-                ::core::array::from_fn(|_| __T::empty())
-            }
-
-            #[inline]
-            fn is_empty(&self) -> bool {
-                self.iter().all($crate::encoding::EmptyState::is_empty)
-            }
-
-            #[inline]
-            fn clear(&mut self) {
-                for v in self {
-                    v.clear();
-                }
-            }
-        }
+        // impl<$($($impl_generics)*,)? __T, const __N: usize>
+        // $crate::encoding::ForOverwrite<$encoding> for [__T; __N]
+        // where
+        //     __T: $crate::encoding::ForOverwrite<$encoding>,
+        //     $($($where_clause)*)?
+        // {
+        //     #[inline]
+        //     fn for_overwrite() -> Self {
+        //         ::core::array::from_fn(|_| __T::for_overwrite())
+        //     }
+        // }
+        //
+        // impl<$($($impl_generics)*,)? __T, const __N: usize>
+        // $crate::encoding::EmptyState<$encoding> for [__T; __N]
+        // where
+        //     __T: $crate::encoding::EmptyState<$encoding>,
+        //     $($($where_clause)*)?
+        // {
+        //     #[inline]
+        //     fn empty() -> Self
+        //     where
+        //         Self: Sized,
+        //     {
+        //         ::core::array::from_fn(|_| __T::empty())
+        //     }
+        //
+        //     #[inline]
+        //     fn is_empty(&self) -> bool {
+        //         self.iter().all($crate::encoding::EmptyState::is_empty)
+        //     }
+        //
+        //     #[inline]
+        //     fn clear(&mut self) {
+        //         for v in self {
+        //             v.clear();
+        //         }
+        //     }
+        // }
     }
 }
 pub(crate) use implement_core_empty_state_rules;
@@ -602,10 +604,10 @@ macro_rules! __impl_decoder_where_value_decoder {
     ) => {
         /// Decodes plain values encoded as whole fields.
         impl<$($lifetime,)? T $(, $($generics)*)?>
-        $crate::encoding::$relaxed <$($lifetime,)? $encoding> for T
+        $crate::encoding::$relaxed <$($lifetime,)? $encoding, T> for ()
         where
-            T: $crate::encoding::EmptyState<$encoding>
-                + $crate::encoding::$relaxed_value <$($lifetime,)? $encoding>,
+            (): $crate::encoding::EmptyState<$encoding, T>
+                + $crate::encoding::$relaxed_value <$($lifetime,)? $encoding, T>,
             $($($where_clause)*)?
         {
             #[inline(always)]
@@ -615,7 +617,7 @@ macro_rules! __impl_decoder_where_value_decoder {
                 buf: $crate::encoding::Capped<$buf_ty>,
                 ctx: $crate::encoding::DecodeContext,
             ) -> ::core::result::Result<(), $crate::DecodeError> {
-                $crate::encoding::$relaxed_field::<$encoding>::$relaxed_field_method(
+                <() as $crate::encoding::$relaxed_field::<$encoding, _>>::$relaxed_field_method(
                     wire_type, value, buf, ctx)
             }
         }
@@ -624,11 +626,11 @@ macro_rules! __impl_decoder_where_value_decoder {
         /// directly-nested message types, which are not emitted when all their fields are default.
         /// If an empty value is decoded it is considered fully non-canonical.
         impl<$($lifetime,)? T $(, $($generics)*)?>
-        $crate::encoding::$distinguished <$($lifetime,)? $encoding> for T
+        $crate::encoding::$distinguished <$($lifetime,)? $encoding, T> for ()
         where
-            T: ::core::cmp::Eq
-                + $crate::encoding::EmptyState<$encoding>
-                + $crate::encoding::$distinguished_value <$($lifetime,)? $encoding>,
+            T: ::core::cmp::Eq,
+            (): $crate::encoding::EmptyState<$encoding, T>
+                + $crate::encoding::$distinguished_value <$($lifetime,)? $encoding, T>,
             $($($where_clause)*)?
         {
             #[inline(always)]
@@ -639,14 +641,17 @@ macro_rules! __impl_decoder_where_value_decoder {
                 ctx: $crate::encoding::RestrictedDecodeContext,
             ) -> ::core::result::Result<$crate::Canonicity, $crate::DecodeError> {
                 // decoding a value as a whole message field, empty values are unacceptable
-                let mut canon = $crate::encoding::$distinguished_field::<$encoding>
-                    ::$distinguished_field_method::<false>(
-                        wire_type,
-                        value,
-                        buf,
-                        ctx.clone(),
-                    )?;
-                if !T::CHECKS_EMPTY && $crate::encoding::EmptyState::<$encoding>::is_empty(value) {
+                let mut canon = <() as $crate::encoding::$distinguished_field::<$encoding, _>>::
+                    $distinguished_field_method::<false>
+                (
+                    wire_type,
+                    value,
+                    buf,
+                    ctx.clone(),
+                )?;
+                if !<() as $crate::encoding::$distinguished_value<$encoding, T>>::CHECKS_EMPTY
+                    && $crate::encoding::EmptyState::<$encoding, _>::is_empty(value)
+                {
                     canon.update(ctx.check($crate::Canonicity::NotCanonical)?);
                 }
                 Ok(canon)
@@ -664,9 +669,10 @@ macro_rules! encoding_implemented_via_value_encoding {
         $(, with generics ($($generics:tt)*) $(,)?)?
     ) => {
         /// Encodes plain values only when they are non-default.
-        impl<T $(, $($generics)*)?> $crate::encoding::Encoder<$encoding> for T
+        impl<T $(, $($generics)*)?> $crate::encoding::Encoder<$encoding, T> for ()
         where
-            T: $crate::encoding::EmptyState<$encoding> + $crate::encoding::ValueEncoder<$encoding>,
+            (): $crate::encoding::EmptyState<$encoding, T>
+                + $crate::encoding::ValueEncoder<$encoding, T>,
             $($($where_clause)*)?
         {
             #[inline(always)]
@@ -676,8 +682,8 @@ macro_rules! encoding_implemented_via_value_encoding {
                 buf: &mut B,
                 tw: &mut $crate::encoding::TagWriter,
             ) {
-                if !$crate::encoding::EmptyState::<$encoding>::is_empty(value) {
-                    $crate::encoding::FieldEncoder::<$encoding>::encode_field(
+                if !$crate::encoding::EmptyState::<$encoding, _>::is_empty(value) {
+                    <() as $crate::encoding::FieldEncoder::<$encoding, _>>::encode_field(
                         tag, value, buf, tw);
                 }
             }
@@ -689,8 +695,8 @@ macro_rules! encoding_implemented_via_value_encoding {
                 buf: &mut B,
                 tw: &mut $crate::encoding::TagRevWriter,
             ) {
-                if !$crate::encoding::EmptyState::<$encoding>::is_empty(value) {
-                    $crate::encoding::FieldEncoder::<$encoding>::prepend_field(
+                if !$crate::encoding::EmptyState::<$encoding, _>::is_empty(value) {
+                    <() as $crate::encoding::FieldEncoder::<$encoding, _>>::prepend_field(
                         tag, value, buf, tw);
                 }
             }
@@ -701,8 +707,8 @@ macro_rules! encoding_implemented_via_value_encoding {
                 value: &T,
                 tm: &mut impl $crate::encoding::TagMeasurer,
             ) -> usize {
-                if !$crate::encoding::EmptyState::<$encoding>::is_empty(value) {
-                    $crate::encoding::FieldEncoder::<$encoding>::field_encoded_len(
+                if !$crate::encoding::EmptyState::<$encoding, _>::is_empty(value) {
+                    <() as $crate::encoding::FieldEncoder::<$encoding, _>>::field_encoded_len(
                         tag, value, tm)
                 } else {
                     0
@@ -757,7 +763,7 @@ macro_rules! impl_cow_value_encoding {
             };
             use $crate::{Canonicity, DecodeError};
 
-            impl$(<$($generic)*>)? Wiretyped<$E> for Cow<'_, $T> {
+            impl$(<$($generic)*>)? Wiretyped<$E, Cow<'_, $T>> for () {
                 const WIRE_TYPE: WireType = {
                     let b = <&$T as Wiretyped<$E>>::WIRE_TYPE;
                     let o = <$Owned as Wiretyped<$E>>::WIRE_TYPE;
@@ -774,36 +780,37 @@ macro_rules! impl_cow_value_encoding {
                 };
             }
 
-            impl$(<$($generic)*>)? ValueEncoder<$E> for Cow<'_, $T> {
+            impl$(<$($generic)*>)? ValueEncoder<$E, Cow<'_, $T>> for () {
                 #[inline]
                 fn encode_value<B: BufMut + ?Sized>(value: &Cow<$T>, buf: &mut B) {
-                    ValueEncoder::<$E>::encode_value(&&**value, buf)
+                    ValueEncoder::<$E, _>::encode_value(&&**value, buf)
                 }
 
                 #[inline]
                 fn prepend_value<B: ReverseBuf + ?Sized>(value: &Cow<$T>, buf: &mut B) {
-                    ValueEncoder::<$E>::prepend_value(&&**value, buf)
+                    ValueEncoder::<$E, _>::prepend_value(&&**value, buf)
                 }
 
                 #[inline]
                 fn value_encoded_len(value: &Cow<$T>) -> usize {
-                    ValueEncoder::<$E>::value_encoded_len(&&**value)
+                    ValueEncoder::<$E, _>::value_encoded_len(&&**value)
                 }
             }
 
-            impl$(<$($generic)*>)? ValueDecoder<$E> for Cow<'_, $T> {
+            impl$(<$($generic)*>)? ValueDecoder<$E, Cow<'_, $T>> for () {
                 #[inline]
                 fn decode_value<B: Buf + ?Sized>(
                     value: &mut Cow<$T>,
                     buf: Capped<B>,
                     ctx: DecodeContext,
                 ) -> Result<(), DecodeError> {
-                    ValueDecoder::<$E>::decode_value(value.to_mut(), buf, ctx)
+                    ValueDecoder::<$E, _>::decode_value(value.to_mut(), buf, ctx)
                 }
             }
 
-            impl$(<$($generic)*>)? DistinguishedValueDecoder<$E> for Cow<'_, $T> {
-                const CHECKS_EMPTY: bool = <$Owned as DistinguishedValueDecoder<$E>>::CHECKS_EMPTY;
+            impl$(<$($generic)*>)? DistinguishedValueDecoder<$E, Cow<'_, $T>> for () {
+                const CHECKS_EMPTY: bool =
+                    <() as DistinguishedValueDecoder<$E, $Owned>>::CHECKS_EMPTY;
 
                 #[inline]
                 fn decode_value_distinguished<const ALLOW_EMPTY: bool>(
@@ -811,7 +818,7 @@ macro_rules! impl_cow_value_encoding {
                     buf: Capped<impl Buf + ?Sized>,
                     ctx: RestrictedDecodeContext,
                 ) -> Result<Canonicity, DecodeError> {
-                    DistinguishedValueDecoder::<$E>::decode_value_distinguished::<ALLOW_EMPTY>(
+                    DistinguishedValueDecoder::<$E, _>::decode_value_distinguished::<ALLOW_EMPTY>(
                         value.to_mut(),
                         buf,
                         ctx,
@@ -819,23 +826,24 @@ macro_rules! impl_cow_value_encoding {
                 }
             }
 
-            impl<'a $(, $($generic)*)?> ValueBorrowDecoder<'a, $E> for Cow<'a, $T> {
+            impl<'a $(, $($generic)*)?> ValueBorrowDecoder<'a, $E, Cow<'a, $T>> for () {
                 #[inline]
                 fn borrow_decode_value(
                     value: &mut Cow<'a, $T>,
                     buf: Capped<&'a [u8]>,
                     ctx: DecodeContext,
                 ) -> Result<(), DecodeError> {
-                    let mut s = <&$T as ForOverwrite>::for_overwrite();
-                    ValueBorrowDecoder::<$E>::borrow_decode_value(&mut s, buf, ctx)?;
+                    let mut s = <() as ForOverwrite<$E, &$T>>::for_overwrite();
+                    ValueBorrowDecoder::<$E, _>::borrow_decode_value(&mut s, buf, ctx)?;
                     *value = Cow::Borrowed(s);
                     Ok(())
                 }
             }
 
-            impl<'a $(, $($generic)*)?> DistinguishedValueBorrowDecoder<'a, $E> for Cow<'a, $T> {
+            impl<'a $(, $($generic)*)?>
+            DistinguishedValueBorrowDecoder<'a, $E, Cow<'a, $T>> for () {
                 const CHECKS_EMPTY: bool =
-                    <&$T as DistinguishedValueBorrowDecoder<'a, $E>>::CHECKS_EMPTY;
+                    <() as DistinguishedValueBorrowDecoder<'a, $E, &$T>>::CHECKS_EMPTY;
 
                 #[inline]
                 fn borrow_decode_value_distinguished<const ALLOW_EMPTY: bool>(
@@ -843,11 +851,14 @@ macro_rules! impl_cow_value_encoding {
                     buf: Capped<&'a [u8]>,
                     ctx: RestrictedDecodeContext,
                 ) -> Result<Canonicity, DecodeError> {
-                    let mut s = <&$T as ForOverwrite>::for_overwrite();
-                    let canon =
-                        DistinguishedValueBorrowDecoder::<$E>::borrow_decode_value_distinguished::<
-                            ALLOW_EMPTY,
-                        >(&mut s, buf, ctx)?;
+                    let mut s = <() as ForOverwrite<$E, &$T>>::for_overwrite();
+                    let canon = DistinguishedValueBorrowDecoder::<$E, _>::
+                        borrow_decode_value_distinguished::<ALLOW_EMPTY>
+                    (
+                        &mut s,
+                        buf,
+                        ctx,
+                    )?;
                     *value = Cow::Borrowed(s);
                     Ok(canon)
                 }

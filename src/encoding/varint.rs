@@ -63,11 +63,11 @@ macro_rules! varint {
         to_uint64($to_uint64_value:ident) $to_uint64:expr,
         from_uint64($from_uint64_value:ident) $from_uint64:expr
     ) => {
-        impl Wiretyped<Varint> for $ty {
+        impl Wiretyped<Varint, $ty> for () {
             const WIRE_TYPE: WireType = WireType::Varint;
         }
 
-        impl ValueEncoder<Varint> for $ty {
+        impl ValueEncoder<Varint, $ty> for () {
             #[inline(always)]
             fn encode_value<B: BufMut + ?Sized>($to_uint64_value: &$ty, buf: &mut B) {
                 encode_varint($to_uint64, buf);
@@ -84,7 +84,7 @@ macro_rules! varint {
             }
         }
 
-        impl ValueDecoder<Varint> for $ty {
+        impl ValueDecoder<Varint, $ty> for () {
             #[inline(always)]
             fn decode_value<B: Buf + ?Sized>(
                 __value: &mut $ty,
@@ -97,7 +97,7 @@ macro_rules! varint {
             }
         }
 
-        impl DistinguishedValueDecoder<Varint> for $ty {
+        impl DistinguishedValueDecoder<Varint, $ty> for () {
             const CHECKS_EMPTY: bool = false;
 
             #[inline]
@@ -106,7 +106,7 @@ macro_rules! varint {
                 buf: Capped<impl Buf + ?Sized>,
                 ctx: RestrictedDecodeContext,
             ) -> Result<Canonicity, DecodeError> {
-                ValueDecoder::<Varint>::decode_value(value, buf, ctx.into_inner())?;
+                ValueDecoder::<Varint, _>::decode_value(value, buf, ctx.into_inner())?;
                 Ok(Canonicity::Canonical)
             }
         }

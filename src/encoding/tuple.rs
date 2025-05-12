@@ -51,84 +51,97 @@ macro_rules! impl_tuple {
             with generics ($($encodings),*)
         );
 
-        impl<$($letters,)* $($encodings,)*> ForOverwrite<($($encodings,)*)> for ($($letters,)*)
+        impl<$($letters,)* $($encodings,)*> ForOverwrite<($($encodings,)*), ($($letters,)*)> for ()
         where
-            $($letters: ForOverwrite<$encodings>,)*
+            $((): ForOverwrite<$encodings, $letters>,)*
         {
             #[inline]
-            fn for_overwrite() -> Self {
-                ($($letters::for_overwrite(),)*)
+            fn for_overwrite() -> ($($letters,)*) {
+                ($(<() as ForOverwrite<$encodings, $letters>>::for_overwrite(),)*)
             }
         }
 
-        impl<$($letters,)* $($encodings,)*> EmptyState<($($encodings,)*)> for ($($letters,)*)
+        impl<$($letters,)* $($encodings,)*> EmptyState<($($encodings,)*), ($($letters,)*)> for ()
         where
-            $($letters: EmptyState<$encodings>,)*
+            $((): EmptyState<$encodings, $letters>,)*
         {
             #[inline]
-            fn empty() -> Self {
-                ($($letters::empty(),)*)
+            fn empty() -> ($($letters,)*) {
+                ($(<() as EmptyState<$encodings, $letters>>::empty(),)*)
             }
 
             #[inline]
-            fn is_empty(&self) -> bool {
-                true $(&& self.$numbers.is_empty())*
+            fn is_empty(val: &($($letters,)*)) -> bool {
+                true $(&& <() as EmptyState<$encodings, $letters>>::is_empty(&val.$numbers))*
             }
 
             #[inline]
-            fn clear(&mut self) {
-                $(self.$numbers.clear();)*
+            fn clear(val: &mut ($($letters,)*)) {
+                $(<() as EmptyState<$encodings, $letters>>::clear(&mut val.$numbers);)*
             }
         }
 
-        impl<$($letters,)* $($encodings,)*> Wiretyped<($($encodings,)*)> for ($($letters,)*) {
+        impl<$($letters,)* $($encodings,)*> Wiretyped<($($encodings,)*), ($($letters,)*)> for () {
             const WIRE_TYPE: WireType = WireType::LengthDelimited;
         }
 
-        impl<$($letters,)* $($encodings,)*> ValueEncoder<($($encodings,)*)> for ($($letters,)*)
+        impl<$($letters,)* $($encodings,)*> ValueEncoder<($($encodings,)*), ($($letters,)*)> for ()
         where
-            $($letters: EmptyState<$encodings> + Encoder<$encodings>,)*
+            $((): EmptyState<$encodings, $letters> + Encoder<$encodings, $letters>,)*
         {
             #[inline]
-            fn encode_value<__B: BufMut + ?Sized>(value: &Self, buf: &mut __B) {
+            fn encode_value<__B: BufMut + ?Sized>(value: &($($letters,)*), buf: &mut __B) {
                 // Because we do not implement tuples with more than arity 32, we can always use
                 // the trivial tag measurer implementation.
                 let tm = &mut TrivialTagMeasurer::new();
-                let message_len = 0usize $(+ $letters::encoded_len($numbers, &value.$numbers, tm))*;
+                let message_len = 0usize $(+ <() as Encoder<$encodings, _>>::encoded_len(
+                    $numbers,
+                    &value.$numbers,
+                    tm,
+                ))*;
                 encode_varint(message_len as u64, buf);
                 let tw = &mut TagWriter::new();
-                $($letters::encode($numbers, &value.$numbers, buf, tw);)*
+                $(<() as Encoder<$encodings, _>>::encode($numbers, &value.$numbers, buf, tw);)*
             }
 
             #[inline]
             fn prepend_value<__B: ReverseBuf + ?Sized>(
-                value: &Self,
+                value: &($($letters,)*),
                 buf: &mut __B,
             ) {
                 let end = buf.remaining();
                 let tw = &mut TagRevWriter::new();
-                $($letters_desc::prepend_encode($numbers_desc, &value.$numbers_desc, buf, tw);)*
+                $(<() as Encoder<$letters_desc, _>>::prepend_encode(
+                    $numbers_desc,
+                    &value.$numbers_desc,
+                    buf,
+                    tw,
+                );)*
                 tw.finalize(buf);
                 prepend_varint((buf.remaining() - end) as u64, buf);
             }
 
             #[inline]
-            fn value_encoded_len(value: &Self) -> usize {
+            fn value_encoded_len(value: &($($letters,)*)) -> usize {
                 // Because we do not implement tuples with more than arity 32, we can always use
                 // the trivial tag measurer implementation.
                 let tm = &mut TrivialTagMeasurer::new();
-                let message_len = 0usize $(+ $letters::encoded_len($numbers, &value.$numbers, tm))*;
+                let message_len = 0usize $(+ <() as Encoder<$encodings, _>>::encoded_len(
+                    $numbers,
+                    &value.$numbers,
+                    tm,
+                ))*;
                 encoded_len_varint(message_len as u64) + message_len
             }
         }
 
-        impl<$($letters,)* $($encodings,)*> ValueDecoder<($($encodings,)*)> for ($($letters,)*)
+        impl<$($letters,)* $($encodings,)*> ValueDecoder<($($encodings,)*), ($($letters,)*)> for ()
         where
-            $($letters: EmptyState<$encodings> + Decoder<$encodings>,)*
+            $((): EmptyState<$encodings, $letters> + Decoder<$encodings, $letters>,)*
         {
             #[inline]
             fn decode_value<__B: Buf + ?Sized>(
-                value: &mut Self,
+                value: &mut ($($letters,)*),
                 mut buf: Capped<__B>,
                 ctx: DecodeContext,
             ) -> Result<(), DecodeError> {
@@ -147,7 +160,7 @@ macro_rules! impl_tuple {
                             if duplicated {
                                 Err(DecodeError::new(UnexpectedlyRepeated))
                             } else {
-                                $letters::decode(
+                                <() as Decoder<$encodings, _>>::decode(
                                     wire_type,
                                     &mut value.$numbers,
                                     buf.lend(),
@@ -166,22 +179,26 @@ macro_rules! impl_tuple {
             }
         }
 
-        impl<$($letters,)* $($encodings,)*> DistinguishedValueDecoder<($($encodings,)*)>
-        for ($($letters,)*)
+        impl<$($letters,)* $($encodings,)*>
+        DistinguishedValueDecoder<($($encodings,)*), ($($letters,)*)> for ()
         where
-            Self: Eq,
-            $($letters: Eq + EmptyState<$encodings> + DistinguishedDecoder<$encodings>,)*
+            ($($letters,)*): Eq,
+            $(
+                $letters: Eq,
+                (): EmptyState<$encodings, $letters>
+                    + DistinguishedDecoder<$encodings, $letters>,
+            )*
         {
             const CHECKS_EMPTY: bool = true; // Message types are always zero-length when empty
 
             #[inline]
             fn decode_value_distinguished<const ALLOW_EMPTY: bool>(
-                value: &mut Self,
+                value: &mut ($($letters,)*),
                 mut buf: Capped<impl Buf + ?Sized>,
                 ctx: RestrictedDecodeContext,
             ) -> Result<Canonicity, DecodeError>
             where
-                Self: Sized,
+                ($($letters,)*): Sized,
             {
                 let mut buf = buf.take_length_delimited()?;
                 // Since tuples emulate messages, empty values always encode and decode from zero
@@ -206,12 +223,13 @@ macro_rules! impl_tuple {
                                 if duplicated {
                                     Err(DecodeError::new(UnexpectedlyRepeated))
                                 } else {
-                                    $letters::decode_distinguished(
-                                        wire_type,
-                                        &mut value.$numbers,
-                                        buf.lend(),
-                                        ctx.clone(),
-                                    )
+                                    <() as DistinguishedDecoder<$encodings, _>>
+                                        ::decode_distinguished(
+                                            wire_type,
+                                            &mut value.$numbers,
+                                            buf.lend(),
+                                            ctx.clone(),
+                                        )
                                 }
                                 .map_err(|mut error| {
                                     error.push($name, stringify!($numbers));
@@ -229,18 +247,18 @@ macro_rules! impl_tuple {
             }
         }
 
-        // We'd like to implement the borrowed decoders here with decoding_modes::invoke!, but it
+        // We'd like to implement the borrowed decoders here with decoding_modes::__invoke!, but it
         // seems the optional lifetime and the repeating elements in the tuple won't nest in
         // macro_rules!.
 
         impl<'a, $($letters,)* $($encodings,)*>
-        ValueBorrowDecoder<'a, ($($encodings,)*)> for ($($letters,)*)
+        ValueBorrowDecoder<'a, ($($encodings,)*), ($($letters,)*)> for ()
         where
-            $($letters: EmptyState<$encodings> + BorrowDecoder<'a, $encodings>,)*
+            $((): EmptyState<$encodings, $letters> + BorrowDecoder<'a, $encodings, $letters>,)*
         {
             #[inline]
             fn borrow_decode_value(
-                value: &mut Self,
+                value: &mut ($($letters,)*),
                 mut buf: Capped<&'a [u8]>,
                 ctx: DecodeContext,
             ) -> Result<(), DecodeError> {
@@ -259,7 +277,7 @@ macro_rules! impl_tuple {
                             if duplicated {
                                 Err(DecodeError::new(UnexpectedlyRepeated))
                             } else {
-                                $letters::borrow_decode(
+                                <() as BorrowDecoder<$encodings, _>>::borrow_decode(
                                     wire_type,
                                     &mut value.$numbers,
                                     buf.lend(),
@@ -279,21 +297,25 @@ macro_rules! impl_tuple {
         }
 
         impl<'a, $($letters,)* $($encodings,)*>
-        DistinguishedValueBorrowDecoder<'a, ($($encodings,)*)> for ($($letters,)*)
+        DistinguishedValueBorrowDecoder<'a, ($($encodings,)*), ($($letters,)*)> for ()
         where
-            Self: Eq,
-            $($letters: Eq + EmptyState<$encodings> + DistinguishedBorrowDecoder<'a, $encodings>,)*
+            ($($letters,)*): Eq,
+            $(
+                $letters: Eq,
+                (): EmptyState<$encodings, $letters>
+                    + DistinguishedBorrowDecoder<'a, $encodings, $letters>,
+            )*
         {
             const CHECKS_EMPTY: bool = true; // Message types are always zero-length when empty
 
             #[inline]
             fn borrow_decode_value_distinguished<const ALLOW_EMPTY: bool>(
-                value: &mut Self,
+                value: &mut ($($letters,)*),
                 mut buf: Capped<&'a [u8]>,
                 ctx: RestrictedDecodeContext,
             ) -> Result<Canonicity, DecodeError>
             where
-                Self: Sized,
+                ($($letters,)*): Sized,
             {
                 let mut buf = buf.take_length_delimited()?;
                 // Since tuples emulate messages, empty values always encode and decode from zero
@@ -318,12 +340,13 @@ macro_rules! impl_tuple {
                                 if duplicated {
                                     Err(DecodeError::new(UnexpectedlyRepeated))
                                 } else {
-                                    $letters::borrow_decode_distinguished(
-                                        wire_type,
-                                        &mut value.$numbers,
-                                        buf.lend(),
-                                        ctx.clone(),
-                                    )
+                                    <() as DistinguishedBorrowDecoder<$encodings, _>>
+                                        ::borrow_decode_distinguished(
+                                            wire_type,
+                                            &mut value.$numbers,
+                                            buf.lend(),
+                                            ctx.clone(),
+                                        )
                                 }
                                 .map_err(|mut error| {
                                     error.push($name, stringify!($numbers));

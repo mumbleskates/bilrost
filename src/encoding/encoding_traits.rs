@@ -8,29 +8,29 @@ use bytes::{Buf, BufMut};
 use core::ops::Deref;
 
 /// The core trait for encoding bilrost data.
-pub trait Encoder<E> {
+pub trait Encoder<E, T> {
     /// Encodes the a field with the given tag and value.
-    fn encode<B: BufMut + ?Sized>(tag: u32, value: &Self, buf: &mut B, tw: &mut TagWriter);
+    fn encode<B: BufMut + ?Sized>(tag: u32, value: &T, buf: &mut B, tw: &mut TagWriter);
 
     /// Prepends the encoding of the field with the given tag and value.
     fn prepend_encode<B: ReverseBuf + ?Sized>(
         tag: u32,
-        value: &Self,
+        value: &T,
         buf: &mut B,
         tw: &mut TagRevWriter,
     );
 
     /// Returns the encoded length of the field, including the key.
-    fn encoded_len(tag: u32, value: &Self, tm: &mut impl TagMeasurer) -> usize;
+    fn encoded_len(tag: u32, value: &T, tm: &mut impl TagMeasurer) -> usize;
 }
 
 /// The core trait for decoding bilrost data. Data must always be copied from the buffer.
-pub trait Decoder<E>: Encoder<E> {
+pub trait Decoder<E, T>: Encoder<E, T> {
     /// Decodes a field's value with the given wire type; the field's key should have already been
     /// consumed from the buffer.
     fn decode<B: Buf + ?Sized>(
         wire_type: WireType,
-        value: &mut Self,
+        value: &mut T,
         buf: Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError>;
@@ -39,32 +39,32 @@ pub trait Decoder<E>: Encoder<E> {
 /// Decoding trait for canonical decoding. Distinguished decoding is available via
 /// this trait, and any type that implements this trait is guaranteed to always emit canonical data
 /// via `Encoder`.
-pub trait DistinguishedDecoder<E>: Encoder<E> {
+pub trait DistinguishedDecoder<E, T>: Encoder<E, T> {
     /// Decodes a field for the value, returning a value indicating how canonical the encoding was.
     fn decode_distinguished<B: Buf + ?Sized>(
         wire_type: WireType,
-        value: &mut Self,
+        value: &mut T,
         buf: Capped<B>,
         ctx: RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError>;
 }
 
 /// Decoding trait that allows decoding borrowed data.
-pub trait BorrowDecoder<'a, E>: Encoder<E> {
+pub trait BorrowDecoder<'a, E, T>: Encoder<E, T> {
     fn borrow_decode(
         wire_type: WireType,
-        value: &mut Self,
+        value: &mut T,
         buf: Capped<&'a [u8]>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError>;
 }
 
 /// Decoding trait that allows distinguished decoding of borrowed data.
-pub trait DistinguishedBorrowDecoder<'a, E>: Encoder<E> {
+pub trait DistinguishedBorrowDecoder<'a, E, T>: Encoder<E, T> {
     /// Decodes a field for the value, returning a value indicating how canonical the encoding was.
     fn borrow_decode_distinguished(
         wire_type: WireType,
-        value: &mut Self,
+        value: &mut T,
         buf: Capped<&'a [u8]>,
         ctx: RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError>;
@@ -76,28 +76,28 @@ pub trait DistinguishedBorrowDecoder<'a, E>: Encoder<E> {
 /// distinguished decoding without also implementing the corresponding relaxed decoding, but
 /// this means that it can become a typo to use the relaxed decoding functions by accident when
 /// implementing the distinguished decoders, which could cause serious mishaps.
-pub trait Wiretyped<E> {
+pub trait Wiretyped<E, T> {
     const WIRE_TYPE: WireType;
 }
 
 /// The core trait for encoding implementations for raw values that always encode to a single value.
 /// This is the basis for all the other plain, optional, and repeated encodings.
-pub trait ValueEncoder<E>: Wiretyped<E> {
+pub trait ValueEncoder<E, T>: Wiretyped<E, T> {
     /// Encodes the given value unconditionally. This is guaranteed to emit data to the buffer.
-    fn encode_value<B: BufMut + ?Sized>(value: &Self, buf: &mut B);
+    fn encode_value<B: BufMut + ?Sized>(value: &T, buf: &mut B);
 
     /// Prepends the given value unconditionally. This is guaranteed to emit data to the buffer.
-    fn prepend_value<B: ReverseBuf + ?Sized>(value: &Self, buf: &mut B);
+    fn prepend_value<B: ReverseBuf + ?Sized>(value: &T, buf: &mut B);
 
     /// Returns the number of bytes the given value would be encoded as.
-    fn value_encoded_len(value: &Self) -> usize;
+    fn value_encoded_len(value: &T) -> usize;
 
     /// Returns the number of total bytes to encode all the values in the given container.
     #[inline]
     fn many_values_encoded_len<I>(values: I) -> usize
     where
         I: ExactSizeIterator,
-        I::Item: Deref<Target = Self>,
+        I::Item: Deref<Target = T>,
     {
         let len = values.len();
         Self::WIRE_TYPE.fixed_size().map_or_else(
@@ -109,10 +109,10 @@ pub trait ValueEncoder<E>: Wiretyped<E> {
 
 /// The core trait for decoding single values in relaxed mode. Data is always copies when it is
 /// read from the buffer.
-pub trait ValueDecoder<E>: ValueEncoder<E> {
+pub trait ValueDecoder<E, T>: ValueEncoder<E, T> {
     /// Decodes a field assuming the encoder's wire type directly from the buffer.
     fn decode_value<B: Buf + ?Sized>(
-        value: &mut Self,
+        value: &mut T,
         buf: Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError>;
@@ -120,7 +120,7 @@ pub trait ValueDecoder<E>: ValueEncoder<E> {
 
 /// The core trait for decoding single values in distinguished mode. Data is always copies when it
 /// is read from the buffer.
-pub trait DistinguishedValueDecoder<E>: ValueEncoder<E> + Eq {
+pub trait DistinguishedValueDecoder<E, T>: ValueEncoder<E, T> + Eq {
     /// Indicates whether the `ALLOW_EMPTY` argument in `decode_value_distinguished` has any effect.
     /// Some decoder implementations can more cheaply determine whether they were empty during
     /// decoding, and will return `NotCanonical` if `ALLOW_EMPTY` was false; for these
@@ -132,24 +132,24 @@ pub trait DistinguishedValueDecoder<E>: ValueEncoder<E> + Eq {
     /// any additional validation required to guarantee that the value would be re-encoded into the
     /// exact same bytes.
     fn decode_value_distinguished<const ALLOW_EMPTY: bool>(
-        value: &mut Self,
+        value: &mut T,
         buf: Capped<impl Buf + ?Sized>,
         ctx: RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError>;
 }
 
 /// Value-decoding trait for decoding borrowed values.
-pub trait ValueBorrowDecoder<'a, E>: ValueEncoder<E> {
+pub trait ValueBorrowDecoder<'a, E, T>: ValueEncoder<E, T> {
     /// Decodes a field assuming the encoder's wire type directly from the buffer.
     fn borrow_decode_value(
-        value: &mut Self,
+        value: &mut T,
         buf: Capped<&'a [u8]>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError>;
 }
 
 /// Value-decoding trait for distinguished decoding of borrowed values.
-pub trait DistinguishedValueBorrowDecoder<'a, E>: ValueEncoder<E> + Eq {
+pub trait DistinguishedValueBorrowDecoder<'a, E, T>: ValueEncoder<E, T> + Eq {
     /// Indicates whether the `ALLOW_EMPTY` argument in `borrow_decode_value_distinguished` has any
     /// effect. Some decoder implementations can more cheaply determine whether they were empty
     /// during decoding, and will return `NotCanonical` if `ALLOW_EMPTY` was false; for these
@@ -161,7 +161,7 @@ pub trait DistinguishedValueBorrowDecoder<'a, E>: ValueEncoder<E> + Eq {
     /// any additional validation required to guarantee that the value would be re-encoded into the
     /// exact same bytes.
     fn borrow_decode_value_distinguished<const ALLOW_EMPTY: bool>(
-        value: &mut Self,
+        value: &mut T,
         buf: Capped<&'a [u8]>,
         ctx: RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError>;
@@ -169,29 +169,29 @@ pub trait DistinguishedValueBorrowDecoder<'a, E>: ValueEncoder<E> + Eq {
 
 /// Affiliated helper trait for ValueEncoder that provides obligate implementations for handling
 /// field keys and wire types.
-pub trait FieldEncoder<E>: ValueEncoder<E> {
+pub trait FieldEncoder<E, T>: ValueEncoder<E, T> {
     /// Encodes exactly one field with the given tag and value into the buffer.
-    fn encode_field<B: BufMut + ?Sized>(tag: u32, value: &Self, buf: &mut B, tw: &mut TagWriter);
+    fn encode_field<B: BufMut + ?Sized>(tag: u32, value: &T, buf: &mut B, tw: &mut TagWriter);
 
     /// Prepends exactly one field with the given tag and value into the buffer.
     fn prepend_field<B: ReverseBuf + ?Sized>(
         tag: u32,
-        value: &Self,
+        value: &T,
         buf: &mut B,
         tw: &mut TagRevWriter,
     );
 
     /// Returns the encoded length of the field including its key.
-    fn field_encoded_len(tag: u32, value: &Self, tm: &mut impl TagMeasurer) -> usize;
+    fn field_encoded_len(tag: u32, value: &T, tm: &mut impl TagMeasurer) -> usize;
 }
 
 /// Affiliated helper trait for ValueDecoder that provides obligate implementations for handling
 /// field keys and wire types.
-pub trait FieldDecoder<E>: ValueDecoder<E> {
+pub trait FieldDecoder<E, T>: ValueDecoder<E, T> {
     /// Decodes a field directly from the buffer, also checking the wire type.
     fn decode_field<B: Buf + ?Sized>(
         wire_type: WireType,
-        value: &mut Self,
+        value: &mut T,
         buf: Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError>;
@@ -199,11 +199,11 @@ pub trait FieldDecoder<E>: ValueDecoder<E> {
 
 /// Affiliated helper trait for DistinguishedValueDecoder that provides obligate implementations for
 /// handling field keys and wire types.
-pub trait DistinguishedFieldDecoder<E>: DistinguishedValueDecoder<E> {
+pub trait DistinguishedFieldDecoder<E, T>: DistinguishedValueDecoder<E, T> {
     /// Decodes a field directly from the buffer, also checking the wire type.
     fn decode_field_distinguished<const ALLOW_EMPTY: bool>(
         wire_type: WireType,
-        value: &mut Self,
+        value: &mut T,
         buf: Capped<impl Buf + ?Sized>,
         ctx: RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError>;
@@ -211,11 +211,11 @@ pub trait DistinguishedFieldDecoder<E>: DistinguishedValueDecoder<E> {
 
 /// Affiliated helper trait for BorrowDecoder that provides obligate implementations for handling
 /// field keys and wire types.
-pub trait FieldBorrowDecoder<'a, E>: ValueBorrowDecoder<'a, E> {
+pub trait FieldBorrowDecoder<'a, E, T>: ValueBorrowDecoder<'a, E, T> {
     /// Decodes a field directly from the buffer, also checking the wire type.
     fn borrow_decode_field(
         wire_type: WireType,
-        value: &mut Self,
+        value: &mut T,
         buf: Capped<&'a [u8]>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError>;
@@ -223,62 +223,64 @@ pub trait FieldBorrowDecoder<'a, E>: ValueBorrowDecoder<'a, E> {
 
 /// Affiliated helper trait for DistinguishedBorrowDecoder that provides obligate implementations
 /// for handling field keys and wire types.
-pub trait DistinguishedFieldBorrowDecoder<'a, E>: DistinguishedValueBorrowDecoder<'a, E> {
+pub trait DistinguishedFieldBorrowDecoder<'a, E, T>:
+    DistinguishedValueBorrowDecoder<'a, E, T>
+{
     /// Decodes a field directly from the buffer, also checking the wire type.
     fn borrow_decode_field_distinguished<const ALLOW_EMPTY: bool>(
         wire_type: WireType,
-        value: &mut Self,
+        value: &mut T,
         buf: Capped<&'a [u8]>,
         ctx: RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError>;
 }
 
-impl<T, E> FieldEncoder<E> for T
+impl<T, E> FieldEncoder<E, T> for ()
 where
-    T: ValueEncoder<E>,
+    (): ValueEncoder<E, T>,
 {
     #[inline]
-    fn encode_field<B: BufMut + ?Sized>(tag: u32, value: &Self, buf: &mut B, tw: &mut TagWriter) {
-        tw.encode_key(tag, Self::WIRE_TYPE, buf);
-        Self::encode_value(value, buf);
+    fn encode_field<B: BufMut + ?Sized>(tag: u32, value: &T, buf: &mut B, tw: &mut TagWriter) {
+        tw.encode_key(tag, <() as Wiretyped<E, T>>::WIRE_TYPE, buf);
+        ValueEncoder::encode_value(value, buf);
     }
 
     #[inline]
     fn prepend_field<B: ReverseBuf + ?Sized>(
         tag: u32,
-        value: &Self,
+        value: &T,
         buf: &mut B,
         tw: &mut TagRevWriter,
     ) {
-        tw.begin_field(tag, Self::WIRE_TYPE, buf);
-        Self::prepend_value(value, buf);
+        tw.begin_field(tag, <() as Wiretyped<E, T>>::WIRE_TYPE, buf);
+        ValueEncoder::prepend_value(value, buf);
     }
 
     #[inline]
-    fn field_encoded_len(tag: u32, value: &Self, tm: &mut impl TagMeasurer) -> usize {
-        tm.key_len(tag) + Self::value_encoded_len(value)
+    fn field_encoded_len(tag: u32, value: &T, tm: &mut impl TagMeasurer) -> usize {
+        tm.key_len(tag) + ValueEncoder::value_encoded_len(value)
     }
 }
 
-impl<T, E> FieldDecoder<E> for T
+impl<T, E> FieldDecoder<E, T> for ()
 where
-    T: ValueDecoder<E>,
+    (): ValueDecoder<E, T>,
 {
     #[inline]
     fn decode_field<B: Buf + ?Sized>(
         wire_type: WireType,
-        value: &mut Self,
+        value: &mut T,
         buf: Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
-        check_wire_type(Self::WIRE_TYPE, wire_type)?;
-        Self::decode_value(value, buf, ctx)
+        check_wire_type(<() as Wiretyped<E, T>>::WIRE_TYPE, wire_type)?;
+        ValueDecoder::decode_value(value, buf, ctx)
     }
 }
 
-impl<T, E> DistinguishedFieldDecoder<E> for T
+impl<T, E> DistinguishedFieldDecoder<E, T> for ()
 where
-    T: DistinguishedValueDecoder<E>,
+    (): DistinguishedValueDecoder<E, T>,
 {
     #[inline(always)]
     fn decode_field_distinguished<const ALLOW_EMPTY: bool>(
@@ -287,30 +289,30 @@ where
         buf: Capped<impl Buf + ?Sized>,
         ctx: RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
-        check_wire_type(Self::WIRE_TYPE, wire_type)?;
-        Self::decode_value_distinguished::<ALLOW_EMPTY>(value, buf, ctx)
+        check_wire_type(<() as Wiretyped<E, T>>::WIRE_TYPE, wire_type)?;
+        DistinguishedValueDecoder::decode_value_distinguished::<ALLOW_EMPTY>(value, buf, ctx)
     }
 }
 
-impl<'a, T, E> FieldBorrowDecoder<'a, E> for T
+impl<'a, T, E> FieldBorrowDecoder<'a, E, T> for ()
 where
-    T: ValueBorrowDecoder<'a, E>,
+    (): ValueBorrowDecoder<'a, E, T>,
 {
     #[inline]
     fn borrow_decode_field(
         wire_type: WireType,
-        value: &mut Self,
+        value: &mut T,
         buf: Capped<&'a [u8]>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
-        check_wire_type(Self::WIRE_TYPE, wire_type)?;
-        Self::borrow_decode_value(value, buf, ctx)
+        check_wire_type(<() as Wiretyped<E, T>>::WIRE_TYPE, wire_type)?;
+        ValueBorrowDecoder::borrow_decode_value(value, buf, ctx)
     }
 }
 
-impl<'a, T, E> DistinguishedFieldBorrowDecoder<'a, E> for T
+impl<'a, T, E> DistinguishedFieldBorrowDecoder<'a, E, T> for ()
 where
-    T: DistinguishedValueBorrowDecoder<'a, E>,
+    (): DistinguishedValueBorrowDecoder<'a, E, T>,
 {
     #[inline(always)]
     fn borrow_decode_field_distinguished<const ALLOW_EMPTY: bool>(
@@ -319,8 +321,10 @@ where
         buf: Capped<&'a [u8]>,
         ctx: RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
-        check_wire_type(Self::WIRE_TYPE, wire_type)?;
-        Self::borrow_decode_value_distinguished::<ALLOW_EMPTY>(value, buf, ctx)
+        check_wire_type(<() as Wiretyped<E, T>>::WIRE_TYPE, wire_type)?;
+        DistinguishedValueBorrowDecoder::borrow_decode_value_distinguished::<ALLOW_EMPTY>(
+            value, buf, ctx,
+        )
     }
 }
 
@@ -335,42 +339,42 @@ where
 mod generic_optional {
     use super::*;
 
-    impl<T, E> Encoder<E> for Option<T>
+    impl<T, E> Encoder<E, Option<T>> for ()
     where
-        T: ValueEncoder<E> + ForOverwrite<E>,
+        (): ValueEncoder<E, T> + ForOverwrite<E, T>,
     {
         #[inline]
-        fn encode<B: BufMut + ?Sized>(tag: u32, value: &Self, buf: &mut B, tw: &mut TagWriter) {
+        fn encode<B: BufMut + ?Sized>(tag: u32, value: &T, buf: &mut B, tw: &mut TagWriter) {
             if let Some(value) = value {
-                <T as FieldEncoder<E>>::encode_field(tag, value, buf, tw);
+                FieldEncoder::encode_field(tag, value, buf, tw);
             }
         }
 
         #[inline]
         fn prepend_encode<B: ReverseBuf + ?Sized>(
             tag: u32,
-            value: &Self,
+            value: &T,
             buf: &mut B,
             tw: &mut TagRevWriter,
         ) {
             if let Some(value) = value {
-                <T as FieldEncoder<E>>::prepend_field(tag, value, buf, tw)
+                FieldEncoder::prepend_field(tag, value, buf, tw)
             }
         }
 
         #[inline]
-        fn encoded_len(tag: u32, value: &Self, tm: &mut impl TagMeasurer) -> usize {
+        fn encoded_len(tag: u32, value: &T, tm: &mut impl TagMeasurer) -> usize {
             if let Some(value) = value {
-                <T as FieldEncoder<E>>::field_encoded_len(tag, value, tm)
+                FieldEncoder::field_encoded_len(tag, value, tm)
             } else {
                 0
             }
         }
     }
 
-    impl<T, E> Decoder<E> for Option<T>
+    impl<T, E> Decoder<E, Option<T>> for ()
     where
-        T: ValueDecoder<E> + ForOverwrite<E>,
+        (): ValueDecoder<E, T> + ForOverwrite<E, T>,
     {
         #[inline]
         fn decode<B: Buf + ?Sized>(
@@ -379,18 +383,19 @@ mod generic_optional {
             buf: Capped<B>,
             ctx: DecodeContext,
         ) -> Result<(), DecodeError> {
-            <T as FieldDecoder<E>>::decode_field(
+            FieldDecoder::decode_field(
                 wire_type,
-                value.get_or_insert_with(T::for_overwrite),
+                value.get_or_insert_with(ForOverwrite::for_overwrite),
                 buf,
                 ctx,
             )
         }
     }
 
-    impl<T, E> DistinguishedDecoder<E> for Option<T>
+    impl<T, E> DistinguishedDecoder<E, Option<T>> for ()
     where
-        T: DistinguishedValueDecoder<E> + ForOverwrite<E> + Eq,
+        Option<T>: Eq,
+        (): DistinguishedValueDecoder<E, T> + ForOverwrite<E, T>,
     {
         #[inline]
         fn decode_distinguished<B: Buf + ?Sized>(
@@ -399,38 +404,39 @@ mod generic_optional {
             buf: Capped<B>,
             ctx: RestrictedDecodeContext,
         ) -> Result<Canonicity, DecodeError> {
-            check_wire_type(T::WIRE_TYPE, wire_type)?;
-            T::decode_value_distinguished::<true>(
-                value.get_or_insert_with(T::for_overwrite),
+            check_wire_type(<() as Wiretyped<T, E>>::WIRE_TYPE, wire_type)?;
+            DistinguishedValueDecoder::decode_value_distinguished::<true>(
+                value.get_or_insert_with(ForOverwrite::for_overwrite),
                 buf,
                 ctx,
             )
         }
     }
 
-    impl<'a, T, E> BorrowDecoder<'a, E> for Option<T>
+    impl<'a, T, E> BorrowDecoder<'a, E, Option<T>> for ()
     where
-        T: ValueBorrowDecoder<'a, E> + ForOverwrite<E>,
+        (): ValueBorrowDecoder<'a, E, T> + ForOverwrite<E, T>,
     {
         #[inline]
         fn borrow_decode(
             wire_type: WireType,
-            value: &mut Self,
+            value: &mut Option<T>,
             buf: Capped<&'a [u8]>,
             ctx: DecodeContext,
         ) -> Result<(), DecodeError> {
-            <T as FieldBorrowDecoder<E>>::borrow_decode_field(
+            FieldBorrowDecoder::borrow_decode_field(
                 wire_type,
-                value.get_or_insert_with(T::for_overwrite),
+                value.get_or_insert_with(ForOverwrite::for_overwrite),
                 buf,
                 ctx,
             )
         }
     }
 
-    impl<'a, T, E> DistinguishedBorrowDecoder<'a, E> for Option<T>
+    impl<'a, T, E> DistinguishedBorrowDecoder<'a, E, Option<T>> for ()
     where
-        T: DistinguishedValueBorrowDecoder<'a, E> + ForOverwrite<E> + Eq,
+        Option<T>: Eq,
+        (): DistinguishedValueBorrowDecoder<'a, E, T> + ForOverwrite<E, T>,
     {
         #[inline]
         fn borrow_decode_distinguished(
@@ -439,9 +445,9 @@ mod generic_optional {
             buf: Capped<&'a [u8]>,
             ctx: RestrictedDecodeContext,
         ) -> Result<Canonicity, DecodeError> {
-            check_wire_type(T::WIRE_TYPE, wire_type)?;
-            T::borrow_decode_value_distinguished::<true>(
-                value.get_or_insert_with(T::for_overwrite),
+            check_wire_type(<() as Wiretyped<T, E>>::WIRE_TYPE, wire_type)?;
+            DistinguishedValueBorrowDecoder::borrow_decode_value_distinguished::<true>(
+                value.get_or_insert_with(ForOverwrite::for_overwrite),
                 buf,
                 ctx,
             )

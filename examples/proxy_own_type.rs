@@ -6,8 +6,8 @@ bilrost::implement_core_empty_state_rules!(CustomEncoding);
 //  `bilrost::Trait<crate::Something> for T` is disallowed: T is a type parameter, is uncovered, and
 //  appears before the first local type (the type implemented "for" is ordered first). the traits
 //  must be rejiggered to make this possible
-bilrost::encoding_implemented_via_value_encoding!(CustomEncoding);
-// bilrost::encoding_uses_base_empty_state!(CustomEncoding);
+// bilrost::encoding_implemented_via_value_encoding!(CustomEncoding);
+bilrost::encoding_uses_base_empty_state!(CustomEncoding);
 
 mod crate_defined_structs {
     #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
