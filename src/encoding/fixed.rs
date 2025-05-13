@@ -23,11 +23,11 @@ macro_rules! fixed_width_common {
         $prepend:ident,
         $get:ident
     ) => {
-        impl Wiretyped<Fixed> for $ty {
+        impl Wiretyped<Fixed, $ty> for () {
             const WIRE_TYPE: WireType = WireType::$wire_type;
         }
 
-        impl ValueEncoder<Fixed> for $ty {
+        impl ValueEncoder<Fixed, $ty> for () {
             #[inline(always)]
             fn encode_value<B: BufMut + ?Sized>(value: &$ty, buf: &mut B) {
                 buf.$put(*value);
@@ -44,7 +44,7 @@ macro_rules! fixed_width_common {
             }
         }
 
-        impl ValueDecoder<Fixed> for $ty {
+        impl ValueDecoder<Fixed, $ty> for () {
             #[inline(always)]
             fn decode_value<B: Buf + ?Sized>(
                 value: &mut $ty,
@@ -75,7 +75,7 @@ macro_rules! fixed_width_int {
             encoding (Fixed) borrows type ($ty) as owned including distinguished
         );
 
-        impl DistinguishedValueDecoder<Fixed> for $ty {
+        impl DistinguishedValueDecoder<Fixed, $ty> for () {
             const CHECKS_EMPTY: bool = false;
 
             #[inline(always)]
@@ -84,7 +84,7 @@ macro_rules! fixed_width_int {
                 buf: Capped<impl Buf + ?Sized>,
                 ctx: RestrictedDecodeContext,
             ) -> Result<Canonicity, DecodeError> {
-                ValueDecoder::<Fixed>::decode_value(value, buf, ctx.into_inner())?;
+                ValueDecoder::<Fixed, _>::decode_value(value, buf, ctx.into_inner())?;
                 Ok(Canonicity::Canonical)
             }
         }
@@ -140,11 +140,11 @@ macro_rules! fixed_width_array {
             encoding (Fixed) borrows type ([u8; $N]) as owned including distinguished
         );
 
-        impl Wiretyped<Fixed> for [u8; $N] {
+        impl Wiretyped<Fixed, [u8; $N]> for () {
             const WIRE_TYPE: WireType = WireType::$wire_type;
         }
 
-        impl ValueEncoder<Fixed> for [u8; $N] {
+        impl ValueEncoder<Fixed, [u8; $N]> for () {
             #[inline(always)]
             fn encode_value<B: BufMut + ?Sized>(value: &[u8; $N], mut buf: &mut B) {
                 (&mut buf).put(value.as_slice());
@@ -161,7 +161,7 @@ macro_rules! fixed_width_array {
             }
         }
 
-        impl ValueDecoder<Fixed> for [u8; $N] {
+        impl ValueDecoder<Fixed, [u8; $N]> for () {
             #[inline(always)]
             fn decode_value<B: Buf + ?Sized>(
                 value: &mut [u8; $N],
@@ -176,7 +176,7 @@ macro_rules! fixed_width_array {
             }
         }
 
-        impl DistinguishedValueDecoder<Fixed> for [u8; $N] {
+        impl DistinguishedValueDecoder<Fixed, [u8; $N]> for () {
             const CHECKS_EMPTY: bool = false;
 
             #[inline(always)]
@@ -185,7 +185,7 @@ macro_rules! fixed_width_array {
                 buf: Capped<impl Buf + ?Sized>,
                 ctx: RestrictedDecodeContext,
             ) -> Result<Canonicity, DecodeError> {
-                ValueDecoder::<Fixed>::decode_value(value, buf, ctx.into_inner())?;
+                ValueDecoder::<Fixed, _>::decode_value(value, buf, ctx.into_inner())?;
                 Ok(Canonicity::Canonical)
             }
         }
