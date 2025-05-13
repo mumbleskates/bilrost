@@ -20,7 +20,7 @@ macro_rules! delegate_encoding {
                 buf: &mut B,
                 tw: &mut $crate::encoding::TagWriter,
             ) {
-                $crate::encoding::Encoder::<$to_ty, _>::encode(tag, value, buf, tw)
+                <() as $crate::encoding::Encoder::<$to_ty, _>>::encode(tag, value, buf, tw)
             }
 
             #[inline(always)]
@@ -30,7 +30,7 @@ macro_rules! delegate_encoding {
                 buf: &mut B,
                 tw: &mut $crate::encoding::TagRevWriter,
             ) {
-                $crate::encoding::Encoder::<$to_ty, _>::prepend_encode(tag, value, buf, tw)
+                <() as $crate::encoding::Encoder::<$to_ty, _>>::prepend_encode(tag, value, buf, tw)
             }
 
             #[inline(always)]
@@ -39,7 +39,7 @@ macro_rules! delegate_encoding {
                 value: &$value_ty,
                 tm: &mut impl $crate::encoding::TagMeasurer,
             ) -> usize {
-                $crate::encoding::Encoder::<$to_ty, _>::encoded_len(tag, value, tm)
+                <() as $crate::encoding::Encoder::<$to_ty, _>>::encoded_len(tag, value, tm)
             }
         }
 
@@ -55,7 +55,7 @@ macro_rules! delegate_encoding {
                 buf: $crate::encoding::Capped<B>,
                 ctx: $crate::encoding::DecodeContext,
             ) -> Result<(), $crate::DecodeError> {
-                $crate::encoding::Decoder::<$to_ty, _>::decode(
+                <() as $crate::encoding::Decoder::<$to_ty, _>>::decode(
                     wire_type,
                     value,
                     buf,
@@ -77,7 +77,7 @@ macro_rules! delegate_encoding {
                 buf: $crate::encoding::Capped<&'__a [u8]>,
                 ctx: $crate::encoding::DecodeContext,
             ) -> Result<(), $crate::DecodeError> {
-                $crate::encoding::BorrowDecoder::<$to_ty, _>::borrow_decode(
+                <() as $crate::encoding::BorrowDecoder::<$to_ty, _>>::borrow_decode(
                     wire_type,
                     value,
                     buf,
@@ -112,7 +112,7 @@ macro_rules! delegate_encoding {
                 buf: $crate::encoding::Capped<B>,
                 ctx: $crate::encoding::RestrictedDecodeContext,
             ) -> Result<$crate::Canonicity, $crate::DecodeError> {
-                $crate::encoding::DistinguishedDecoder::<$to_ty, _>::decode_distinguished(
+                <() as $crate::encoding::DistinguishedDecoder::<$to_ty, _>>::decode_distinguished(
                     wire_type,
                     value,
                     buf,
@@ -135,7 +135,7 @@ macro_rules! delegate_encoding {
                 buf: $crate::encoding::Capped<&'__a [u8]>,
                 ctx: $crate::encoding::RestrictedDecodeContext,
             ) -> Result<$crate::Canonicity, $crate::DecodeError> {
-                $crate::encoding::DistinguishedBorrowDecoder::<$to_ty, _>::
+                <() as $crate::encoding::DistinguishedBorrowDecoder::<$to_ty, _>>::
                     borrow_decode_distinguished
                 (
                     wire_type,
@@ -186,7 +186,7 @@ macro_rules! delegate_value_encoding {
         {
             #[inline(always)]
             fn encode_value<__B: $crate::bytes::BufMut + ?Sized>(value: &$value_ty, buf: &mut __B) {
-                $crate::encoding::ValueEncoder::<$to_ty, _>::encode_value(value, buf)
+                <() as $crate::encoding::ValueEncoder::<$to_ty, _>>::encode_value(value, buf)
             }
 
             #[inline(always)]
@@ -194,12 +194,12 @@ macro_rules! delegate_value_encoding {
                 value: &$value_ty,
                 buf: &mut __B,
             ) {
-                $crate::encoding::ValueEncoder::<$to_ty, _>::prepend_value(value, buf)
+                <() as $crate::encoding::ValueEncoder::<$to_ty, _>>::prepend_value(value, buf)
             }
 
             #[inline(always)]
             fn value_encoded_len(value: &$value_ty) -> usize {
-                $crate::encoding::ValueEncoder::<$to_ty, _>::value_encoded_len(value)
+                <() as $crate::encoding::ValueEncoder::<$to_ty, _>>::value_encoded_len(value)
             }
 
             #[inline(always)]
@@ -208,7 +208,9 @@ macro_rules! delegate_value_encoding {
                 __I: ExactSizeIterator,
                 __I::Item: core::ops::Deref<Target = $value_ty>,
             {
-                $crate::encoding::ValueEncoder::<$to_ty, _>::many_values_encoded_len(values)
+                <() as $crate::encoding::ValueEncoder::<$to_ty, _>>::many_values_encoded_len(
+                    values,
+                )
             }
         }
 
@@ -223,7 +225,7 @@ macro_rules! delegate_value_encoding {
                 buf: $crate::encoding::Capped<__B>,
                 ctx: $crate::encoding::DecodeContext,
             ) -> Result<(), $crate::DecodeError> {
-                $crate::encoding::ValueDecoder::<$to_ty, _>::decode_value(value, buf, ctx)
+                <() as $crate::encoding::ValueDecoder::<$to_ty, _>>::decode_value(value, buf, ctx)
             }
         }
 
@@ -239,7 +241,11 @@ macro_rules! delegate_value_encoding {
                 buf: $crate::encoding::Capped<&'__a [u8]>,
                 ctx: $crate::encoding::DecodeContext,
             ) -> Result<(), $crate::DecodeError> {
-                $crate::encoding::ValueBorrowDecoder::<$to_ty, _>::borrow_decode_value(value, buf, ctx)
+                <() as $crate::encoding::ValueBorrowDecoder::<$to_ty, _>>::borrow_decode_value(
+                    value,
+                    buf,
+                    ctx,
+                )
             }
         }
     };
@@ -273,7 +279,7 @@ macro_rules! delegate_value_encoding {
                 buf: $crate::encoding::Capped<impl $crate::bytes::Buf + ?Sized>,
                 ctx: $crate::encoding::RestrictedDecodeContext,
             ) -> Result<$crate::Canonicity, $crate::DecodeError> {
-                $crate::encoding::DistinguishedValueDecoder::<$to_ty, _>::
+                <() as $crate::encoding::DistinguishedValueDecoder::<$to_ty, _>>::
                     decode_value_distinguished::<ALLOW_EMPTY>
                 (
                     value,
@@ -300,7 +306,7 @@ macro_rules! delegate_value_encoding {
                 buf: $crate::encoding::Capped<&'__a [u8]>,
                 ctx: $crate::encoding::RestrictedDecodeContext,
             ) -> Result<$crate::Canonicity, $crate::DecodeError> {
-                $crate::encoding::DistinguishedValueBorrowDecoder::<$to_ty, _>::
+                <() as $crate::encoding::DistinguishedValueBorrowDecoder::<$to_ty, _>>::
                     borrow_decode_value_distinguished::<ALLOW_EMPTY>
                 (
                     value,
@@ -327,7 +333,11 @@ macro_rules! delegate_value_encoding {
                 buf: $crate::encoding::Capped<&'__a [u8]>,
                 ctx: $crate::encoding::DecodeContext,
             ) -> Result<(), $crate::DecodeError> {
-                $crate::encoding::ValueDecoder::<$encoding, _>::decode_value(value, buf, ctx)
+                <() as $crate::encoding::ValueDecoder::<$encoding, _>>::decode_value(
+                    value,
+                    buf,
+                    ctx,
+                )
             }
         }
     };
@@ -357,7 +367,7 @@ macro_rules! delegate_value_encoding {
                 buf: $crate::encoding::Capped<&'__a [u8]>,
                 ctx: $crate::encoding::RestrictedDecodeContext,
             ) -> Result<$crate::Canonicity, $crate::DecodeError> {
-                $crate::encoding::DistinguishedValueDecoder::<$encoding, _>::
+                <() as $crate::encoding::DistinguishedValueDecoder::<$encoding, _>>::
                     decode_value_distinguished::<ALLOW_EMPTY>
                 (
                     value,
