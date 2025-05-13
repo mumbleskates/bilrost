@@ -234,19 +234,19 @@ impl<const N: usize> Wiretyped<PlainBytes, &[u8; N]> for () {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
 }
 
-impl<const N: usize> ValueEncoder<PlainBytes, &[u8; N]> for () {
+impl<'a, const N: usize> ValueEncoder<PlainBytes, &'a [u8; N]> for () {
     #[inline]
-    fn encode_value<B: BufMut + ?Sized>(value: &&[u8; N], buf: &mut B) {
+    fn encode_value<B: BufMut + ?Sized>(value: &&'a [u8; N], buf: &mut B) {
         ValueEncoder::<PlainBytes, _>::encode_value(&value.as_slice(), buf)
     }
 
     #[inline]
-    fn prepend_value<B: ReverseBuf + ?Sized>(value: &&[u8; N], buf: &mut B) {
+    fn prepend_value<B: ReverseBuf + ?Sized>(value: &&'a [u8; N], buf: &mut B) {
         ValueEncoder::<PlainBytes, _>::prepend_value(&value.as_slice(), buf)
     }
 
     #[inline]
-    fn value_encoded_len(value: &&[u8; N]) -> usize {
+    fn value_encoded_len(value: &&'a [u8; N]) -> usize {
         ValueEncoder::<PlainBytes, _>::value_encoded_len(&value.as_slice())
     }
 
@@ -254,7 +254,7 @@ impl<const N: usize> ValueEncoder<PlainBytes, &[u8; N]> for () {
     fn many_values_encoded_len<I>(values: I) -> usize
     where
         I: ExactSizeIterator,
-        I::Item: Deref<Target = &[u8; N]>,
+        I::Item: Deref<Target = &'a [u8; N]>,
     {
         values.len() * (const_varint(N as u64).len() + N)
     }
