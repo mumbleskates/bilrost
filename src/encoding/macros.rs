@@ -765,8 +765,8 @@ macro_rules! impl_cow_value_encoding {
 
             impl$(<$($generic)*>)? Wiretyped<$E, Cow<'_, $T>> for () {
                 const WIRE_TYPE: WireType = {
-                    let b = <&$T as Wiretyped<$E>>::WIRE_TYPE;
-                    let o = <$Owned as Wiretyped<$E>>::WIRE_TYPE;
+                    let b = <() as Wiretyped<$E, &$T>>::WIRE_TYPE;
+                    let o = <() as Wiretyped<$E, $Owned>>::WIRE_TYPE;
                     match (b, o) {
                         (WireType::Varint, WireType::Varint) => {}
                         (WireType::LengthDelimited, WireType::LengthDelimited) => {}
