@@ -357,21 +357,21 @@ impl<'a> FromIterator<(u32, OpaqueValue<'a>)> for OpaqueMessage<'a> {
     }
 }
 
-impl ForOverwrite for OpaqueMessage<'_> {
-    fn for_overwrite() -> Self {
-        Self::new()
+impl<'a> ForOverwrite<(), OpaqueMessage<'a>> for () {
+    fn for_overwrite() -> OpaqueMessage<'a> {
+        OpaqueMessage::new()
     }
 }
 
-impl EmptyState for OpaqueMessage<'_> {
+impl<'a> EmptyState<(), OpaqueMessage<'a>> for () {
     #[inline]
-    fn is_empty(&self) -> bool {
-        self.0.is_empty()
+    fn is_empty(val: &OpaqueMessage<'a>) -> bool {
+        val.0.is_empty()
     }
 
     #[inline]
-    fn clear(&mut self) {
-        self.0.clear()
+    fn clear(val: &mut OpaqueMessage<'a>) {
+        val.0.clear()
     }
 }
 
