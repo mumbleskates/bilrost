@@ -329,7 +329,7 @@ macro_rules! delegate_value_encoding {
         {
             #[inline]
             fn borrow_decode_value(
-                value: &mut Self,
+                value: &mut $ty,
                 buf: $crate::encoding::Capped<&'__a [u8]>,
                 ctx: $crate::encoding::DecodeContext,
             ) -> Result<(), $crate::DecodeError> {
@@ -363,7 +363,7 @@ macro_rules! delegate_value_encoding {
 
             #[inline]
             fn borrow_decode_value_distinguished<const ALLOW_EMPTY: bool>(
-                value: &mut Self,
+                value: &mut $ty,
                 buf: $crate::encoding::Capped<&'__a [u8]>,
                 ctx: $crate::encoding::RestrictedDecodeContext,
             ) -> Result<$crate::Canonicity, $crate::DecodeError> {
