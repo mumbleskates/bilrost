@@ -13,7 +13,10 @@ pub(crate) struct LocalProxy<T, const N: usize> {
     size: usize,
 }
 
-impl<T: EmptyState, const N: usize> Deref for LocalProxy<T, N> {
+impl<T, const N: usize> Deref for LocalProxy<T, N>
+where
+    (): EmptyState<(), T>,
+{
     type Target = [T];
 
     fn deref(&self) -> &Self::Target {
@@ -25,10 +28,13 @@ impl<T: EmptyState, const N: usize> Deref for LocalProxy<T, N> {
     }
 }
 
-impl<T: EmptyState, const N: usize> LocalProxy<T, N> {
+impl<T, const N: usize> LocalProxy<T, N>
+where
+    (): EmptyState<(), T>,
+{
     /// Creates a new, empty array-list proxy.
     pub fn new_empty() -> Self {
-        <_ as EmptyState>::empty()
+        <() as EmptyState<(), Self>>::empty()
     }
 
     /// Creates a new value that only contains the values in the given backing array that are not
@@ -38,7 +44,7 @@ impl<T: EmptyState, const N: usize> LocalProxy<T, N> {
     pub fn new_without_empty_suffix(arr: [T; N]) -> Self {
         let mut size = N;
         for item in arr.iter().rev() {
-            if item.is_empty() {
+            if <() as EmptyState<(), _>>::is_empty(item) {
                 size -= 1;
             } else {
                 break;
@@ -62,7 +68,10 @@ impl<T: EmptyState, const N: usize> LocalProxy<T, N> {
     /// been encoded if we were using new_without_empty_suffix, and thus isn't canonical.
     pub fn into_inner_distinguished(self) -> ([T; N], Canonicity) {
         // MSRV: this could be is_some_and(..)
-        let canon = if matches!(self.reversed().next(), Some(last_item) if last_item.is_empty()) {
+        let canon = if matches!(
+            self.reversed().next(),
+            Some(last_item) if <() as EmptyState<(), _>>::is_empty(last_item)
+        ) {
             NotCanonical
         } else {
             Canonical
@@ -71,34 +80,46 @@ impl<T: EmptyState, const N: usize> LocalProxy<T, N> {
     }
 }
 
-impl<T: EmptyState + PartialEq, const N: usize> PartialEq for LocalProxy<T, N> {
+impl<T: PartialEq, const N: usize> PartialEq for LocalProxy<T, N>
+where
+    (): EmptyState<(), T>,
+{
     fn eq(&self, other: &Self) -> bool {
         **self == **other
     }
 }
 
-impl<T: EmptyState + Eq, const N: usize> Eq for LocalProxy<T, N> {}
+impl<T: Eq, const N: usize> Eq for LocalProxy<T, N> where (): EmptyState<(), T> {}
 
-impl<T: EmptyState, const N: usize> ForOverwrite for LocalProxy<T, N> {
-    fn for_overwrite() -> Self {
-        Self {
-            arr: <_ as EmptyState>::empty(),
+impl<T, const N: usize> ForOverwrite<(), LocalProxy<T, N>> for ()
+where
+    (): EmptyState<(), T>,
+{
+    fn for_overwrite() -> LocalProxy<T, N> {
+        LocalProxy {
+            arr: <() as EmptyState<(), [T; N]>>::empty(),
             size: 0,
         }
     }
 }
 
-impl<T: EmptyState, const N: usize> EmptyState for LocalProxy<T, N> {
-    fn is_empty(&self) -> bool {
-        self.size == 0
+impl<T, const N: usize> EmptyState<(), LocalProxy<T, N>> for ()
+where
+    (): EmptyState<(), T>,
+{
+    fn is_empty(val: &LocalProxy<T, N>) -> bool {
+        val.size == 0
     }
 
-    fn clear(&mut self) {
-        self.size = 0;
+    fn clear(val: &mut LocalProxy<T, N>) {
+        val.size = 0;
     }
 }
 
-impl<T: EmptyState, const N: usize> Collection for LocalProxy<T, N> {
+impl<T, const N: usize> Collection for LocalProxy<T, N>
+where
+    (): EmptyState<(), T>,
+{
     type Item = T;
     type RefIter<'a>
         = core::slice::Iter<'a, T>
@@ -133,4 +154,7 @@ impl<T: EmptyState, const N: usize> Collection for LocalProxy<T, N> {
     }
 }
 
-impl<T: EmptyState, const N: usize> TriviallyDistinguishedCollection for LocalProxy<T, N> {}
+impl<T, const N: usize> TriviallyDistinguishedCollection for LocalProxy<T, N> where
+    (): EmptyState<(), T>
+{
+}
