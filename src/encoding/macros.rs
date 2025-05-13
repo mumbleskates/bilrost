@@ -538,44 +538,44 @@ macro_rules! implement_core_empty_state_rules {
             }
         }
 
-        // impl<$($($impl_generics)*,)? __T, const __N: usize>
-        // $crate::encoding::ForOverwrite<$encoding> for [__T; __N]
-        // where
-        //     __T: $crate::encoding::ForOverwrite<$encoding>,
-        //     $($($where_clause)*)?
-        // {
-        //     #[inline]
-        //     fn for_overwrite() -> Self {
-        //         ::core::array::from_fn(|_| __T::for_overwrite())
-        //     }
-        // }
-        //
-        // impl<$($($impl_generics)*,)? __T, const __N: usize>
-        // $crate::encoding::EmptyState<$encoding> for [__T; __N]
-        // where
-        //     __T: $crate::encoding::EmptyState<$encoding>,
-        //     $($($where_clause)*)?
-        // {
-        //     #[inline]
-        //     fn empty() -> Self
-        //     where
-        //         Self: Sized,
-        //     {
-        //         ::core::array::from_fn(|_| __T::empty())
-        //     }
-        //
-        //     #[inline]
-        //     fn is_empty(&self) -> bool {
-        //         self.iter().all($crate::encoding::EmptyState::is_empty)
-        //     }
-        //
-        //     #[inline]
-        //     fn clear(&mut self) {
-        //         for v in self {
-        //             v.clear();
-        //         }
-        //     }
-        // }
+        impl<$($($impl_generics)*,)? __T, const __N: usize>
+        $crate::encoding::ForOverwrite<$encoding, [__T; __N]> for ()
+        where
+            (): $crate::encoding::ForOverwrite<$encoding, __T>,
+            $($($where_clause)*)?
+        {
+            #[inline]
+            fn for_overwrite() -> [__T; __N] {
+                ::core::array::from_fn(|_| $crate::encoding::ForOverwrite::for_overwrite())
+            }
+        }
+
+        impl<$($($impl_generics)*,)? __T, const __N: usize>
+        $crate::encoding::EmptyState<$encoding, [__T; __N]> for ()
+        where
+            (): $crate::encoding::EmptyState<$encoding, __T>,
+            $($($where_clause)*)?
+        {
+            #[inline]
+            fn empty() -> [__T; __N]
+            where
+                [__T; __N]: Sized,
+            {
+                ::core::array::from_fn(|_| $crate::encoding::EmptyState::empty())
+            }
+
+            #[inline]
+            fn is_empty(val: &[__T; __N]) -> bool {
+                val.iter().all($crate::encoding::EmptyState::is_empty)
+            }
+
+            #[inline]
+            fn clear(val: &mut [__T; __N]) {
+                for v in val {
+                    <() as $crate::encoding::EmptyState<$encoding, __T>>::clear(v);
+                }
+            }
+        }
     }
 }
 pub(crate) use implement_core_empty_state_rules;
