@@ -344,28 +344,28 @@ mod generic_optional {
         (): ValueEncoder<E, T> + ForOverwrite<E, T>,
     {
         #[inline]
-        fn encode<B: BufMut + ?Sized>(tag: u32, value: &T, buf: &mut B, tw: &mut TagWriter) {
+        fn encode<B: BufMut + ?Sized>(tag: u32, value: &Option<T>, buf: &mut B, tw: &mut TagWriter) {
             if let Some(value) = value {
-                FieldEncoder::encode_field(tag, value, buf, tw);
+                <() as FieldEncoder<E, T>>::encode_field(tag, value, buf, tw);
             }
         }
 
         #[inline]
         fn prepend_encode<B: ReverseBuf + ?Sized>(
             tag: u32,
-            value: &T,
+            value: &Option<T>,
             buf: &mut B,
             tw: &mut TagRevWriter,
         ) {
             if let Some(value) = value {
-                FieldEncoder::prepend_field(tag, value, buf, tw)
+                <() as FieldEncoder<E, T>>::prepend_field(tag, value, buf, tw)
             }
         }
 
         #[inline]
-        fn encoded_len(tag: u32, value: &T, tm: &mut impl TagMeasurer) -> usize {
+        fn encoded_len(tag: u32, value: &Option<T>, tm: &mut impl TagMeasurer) -> usize {
             if let Some(value) = value {
-                FieldEncoder::field_encoded_len(tag, value, tm)
+                <() as FieldEncoder<E, T>>::field_encoded_len(tag, value, tm)
             } else {
                 0
             }
@@ -379,11 +379,11 @@ mod generic_optional {
         #[inline]
         fn decode<B: Buf + ?Sized>(
             wire_type: WireType,
-            value: &mut Self,
+            value: &mut Option<T>,
             buf: Capped<B>,
             ctx: DecodeContext,
         ) -> Result<(), DecodeError> {
-            FieldDecoder::decode_field(
+            <() as FieldDecoder<E, T>>::decode_field(
                 wire_type,
                 value.get_or_insert_with(ForOverwrite::for_overwrite),
                 buf,
@@ -404,7 +404,7 @@ mod generic_optional {
             buf: Capped<B>,
             ctx: RestrictedDecodeContext,
         ) -> Result<Canonicity, DecodeError> {
-            check_wire_type(<() as Wiretyped<T, E>>::WIRE_TYPE, wire_type)?;
+            check_wire_type(<() as Wiretyped<E, T>>::WIRE_TYPE, wire_type)?;
             DistinguishedValueDecoder::decode_value_distinguished::<true>(
                 value.get_or_insert_with(ForOverwrite::for_overwrite),
                 buf,
@@ -424,7 +424,7 @@ mod generic_optional {
             buf: Capped<&'a [u8]>,
             ctx: DecodeContext,
         ) -> Result<(), DecodeError> {
-            FieldBorrowDecoder::borrow_decode_field(
+            <() as FieldBorrowDecoder<E, T>>::borrow_decode_field(
                 wire_type,
                 value.get_or_insert_with(ForOverwrite::for_overwrite),
                 buf,
@@ -445,7 +445,7 @@ mod generic_optional {
             buf: Capped<&'a [u8]>,
             ctx: RestrictedDecodeContext,
         ) -> Result<Canonicity, DecodeError> {
-            check_wire_type(<() as Wiretyped<T, E>>::WIRE_TYPE, wire_type)?;
+            check_wire_type(<() as Wiretyped<E, T>>::WIRE_TYPE, wire_type)?;
             DistinguishedValueBorrowDecoder::borrow_decode_value_distinguished::<true>(
                 value.get_or_insert_with(ForOverwrite::for_overwrite),
                 buf,
