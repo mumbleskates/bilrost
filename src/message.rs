@@ -13,7 +13,10 @@ use alloc::vec::Vec;
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 
 /// A Bilrost message. Provides basic encoding functionality for message types.
-pub trait Message: EmptyState {
+pub trait Message
+where
+    (): EmptyState<(), Self>,
+{
     /// Encodes the message to a buffer.
     ///
     /// An error will be returned if the buffer does not have sufficient capacity.
@@ -768,7 +771,7 @@ where
 
     #[doc(hidden)]
     fn decode_capped<B: Buf + ?Sized>(buf: Capped<B>) -> Result<Self, DecodeError> {
-        let mut message = Self::empty();
+        let mut message = <() as EmptyState<(), Self>>::empty();
         merge(&mut message, buf, DecodeContext::default())?;
         Ok(message)
     }
@@ -913,7 +916,7 @@ where
     where
         Self: Sized,
     {
-        let mut message = Self::empty();
+        let mut message = <() as EmptyState<(), Self>>::empty();
         let ctx = RestrictedDecodeContext::new(restrict_to);
         let canon = merge_distinguished(&mut message, buf, ctx.clone())
             // Safety backstop to ensure we do not return a canonicity worse than restrict_to.
@@ -1079,7 +1082,7 @@ where
     T: RawMessageBorrowDecoder<'a> + Sized,
 {
     fn decode_borrowed(mut buf: &'a [u8]) -> Result<Self, DecodeError> {
-        let mut message = Self::empty();
+        let mut message = <() as EmptyState<(), Self>>::empty();
         borrow_merge(
             &mut message,
             Capped::new(&mut buf),
@@ -1143,7 +1146,7 @@ where
     where
         Self: Sized,
     {
-        let mut message = Self::empty();
+        let mut message = <() as EmptyState<(), Self>>::empty();
         let ctx = RestrictedDecodeContext::new(restrict_to);
         let canon = borrow_merge_distinguished(&mut message, Capped::new(&mut buf), ctx.clone())
             // Safety backstop to ensure we do not return a canonicity worse than restrict_to.

@@ -119,7 +119,10 @@ pub(crate) fn borrow_merge_distinguished<'a, T: RawDistinguishedMessageBorrowDec
 
 /// Encoding trait to be implemented by messages. The methods of this trait are meant to only be
 /// used by the `Message` implementation.
-pub trait RawMessage: EmptyState {
+pub trait RawMessage
+where
+    (): EmptyState<(), Self>,
+{
     const __ASSERTIONS: ();
 
     /// Encodes the message to a buffer.
@@ -291,14 +294,14 @@ where
     }
 }
 
-impl<T> Wiretyped<MessageEncoding> for T
+impl<T> Wiretyped<MessageEncoding, T> for ()
 where
     T: RawMessage,
 {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
 }
 
-impl<T> ValueEncoder<MessageEncoding> for T
+impl<T> ValueEncoder<MessageEncoding, T> for ()
 where
     T: RawMessage,
 {
@@ -322,7 +325,7 @@ where
     }
 }
 
-impl<T> ValueDecoder<MessageEncoding> for T
+impl<T> ValueDecoder<MessageEncoding, T> for ()
 where
     T: RawMessageDecoder,
 {
@@ -337,7 +340,7 @@ where
     }
 }
 
-impl<T> DistinguishedValueDecoder<MessageEncoding> for T
+impl<T> DistinguishedValueDecoder<MessageEncoding, T> for ()
 where
     T: RawDistinguishedMessageDecoder + Eq,
 {
@@ -361,7 +364,7 @@ where
     }
 }
 
-impl<'a, T> ValueBorrowDecoder<'a, MessageEncoding> for T
+impl<'a, T> ValueBorrowDecoder<'a, MessageEncoding, T> for ()
 where
     T: RawMessageBorrowDecoder<'a>,
 {
@@ -376,7 +379,7 @@ where
     }
 }
 
-impl<'a, T> DistinguishedValueBorrowDecoder<'a, MessageEncoding> for T
+impl<'a, T> DistinguishedValueBorrowDecoder<'a, MessageEncoding, T> for ()
 where
     T: RawDistinguishedMessageBorrowDecoder<'a> + Eq,
 {
