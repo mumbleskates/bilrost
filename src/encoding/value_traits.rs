@@ -123,7 +123,10 @@ pub trait Enumeration: Eq + Sized {
 }
 
 /// Trait for containers that store multiple items such as `Vec`, `BTreeSet`, and `HashSet`
-pub trait Collection: EmptyState<(), Self> {
+pub trait Collection
+where
+    (): EmptyState<(), Self>,
+{
     type Item;
     type RefIter<'a>: ExactSizeIterator<Item = &'a Self::Item>
     where
@@ -159,7 +162,10 @@ where
 }
 
 /// Trait for associative containers, such as `BTreeMap` and `HashMap`.
-pub trait Mapping: EmptyState<(), Self> {
+pub trait Mapping
+where
+    (): EmptyState<(), Self>,
+{
     type Key;
     type Value;
     type RefIter<'a>: ExactSizeIterator<Item = (&'a Self::Key, &'a Self::Value)>
