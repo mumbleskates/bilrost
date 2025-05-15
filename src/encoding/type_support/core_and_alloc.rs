@@ -15,15 +15,15 @@ use core::cmp::Ordering::{Equal, Greater, Less};
 
 for_overwrite_via_default!(String);
 
-impl EmptyState for String {
+impl EmptyState<(), String> for () {
     #[inline]
-    fn is_empty(&self) -> bool {
-        Self::is_empty(self)
+    fn is_empty(val: &String) -> bool {
+        Self::is_empty(val)
     }
 
     #[inline]
-    fn clear(&mut self) {
-        Self::clear(self)
+    fn clear(val: &mut String) {
+        Self::clear(val)
     }
 }
 
@@ -32,66 +32,64 @@ for_overwrite_via_default!(
     with generics ('a, T),
     with where clause (
         T: 'a + ?Sized + ToOwned,
-        &'a T: ForOverwrite,
-        T::Owned: ForOverwrite
+        T::Owned: Default,
+        (): ForOverwrite<(), &'a T> + ForOverwrite<(), T::Owned>
     )
 );
 
-impl<'a, T> EmptyState for Cow<'a, T>
+impl<'a, T> EmptyState<(), Cow<'a, T>> for ()
 where
-    Self: ForOverwrite,
     T: 'a + ?Sized + ToOwned,
-    &'a T: EmptyState,
-    T::Owned: EmptyState,
+    (): ForOverwrite<(), Cow<'a, T>> + EmptyState<(), &'a T> + EmptyState<(), T::Owned>,
 {
     #[inline]
-    fn is_empty(&self) -> bool {
-        match self {
-            Cow::Borrowed(b) => b.is_empty(),
-            Cow::Owned(o) => o.is_empty(),
+    fn is_empty(val: &Cow<'a, T>) -> bool {
+        match val {
+            Cow::Borrowed(b) => EmptyState::is_empty(&b),
+            Cow::Owned(o) => EmptyState::is_empty(&o),
         }
     }
 
     #[inline]
-    fn clear(&mut self) {
-        match self {
+    fn clear(val: &mut Cow<'a, T>) {
+        match val {
             Cow::Borrowed(_) => {
-                *self = Cow::Owned(T::Owned::empty());
+                *val = Cow::Owned(<() as EmptyState<(), T::Owned>>::empty());
             }
             Cow::Owned(owned) => {
-                owned.clear();
+                EmptyState::clear(owned);
             }
         }
     }
 }
 
-impl<T> ForOverwrite for Box<T>
+impl<T> ForOverwrite<(), Box<T>> for ()
 where
-    T: ForOverwrite,
+    (): ForOverwrite<(), T>,
 {
     #[inline(always)]
-    fn for_overwrite() -> Self {
-        Box::new(T::for_overwrite())
+    fn for_overwrite() -> Box<T> {
+        Box::new(<() as ForOverwrite<(), T>>::for_overwrite())
     }
 }
 
-impl<T> EmptyState for Box<T>
+impl<T> EmptyState<(), Box<T>> for ()
 where
-    T: EmptyState,
+    (): EmptyState<(), T>,
 {
     #[inline]
-    fn empty() -> Self {
-        Self::new(T::empty())
+    fn empty() -> Box<T> {
+        Box::new(<() as EmptyState<(), T>>::empty())
     }
 
     #[inline]
-    fn is_empty(&self) -> bool {
-        self.as_ref().is_empty()
+    fn is_empty(val: &Box<T>) -> bool {
+        <() as EmptyState<(), T>>::is_empty(val.as_ref())
     }
 
     #[inline]
-    fn clear(&mut self) {
-        self.as_mut().clear()
+    fn clear(val: &mut Box<T>) {
+        <() as EmptyState<(), T>>::clear(val.as_mut())
     }
 }
 
@@ -99,15 +97,15 @@ empty_state_via_default!(core::time::Duration);
 
 for_overwrite_via_default!(Vec<T>, with generics (T));
 
-impl<T> EmptyState for Vec<T> {
+impl<T> EmptyState<(), Vec<T>> for () {
     #[inline]
-    fn is_empty(&self) -> bool {
-        Self::is_empty(self)
+    fn is_empty(val: &Vec<T>) -> bool {
+        val.is_empty()
     }
 
     #[inline]
-    fn clear(&mut self) {
-        Self::clear(self)
+    fn clear(val: &mut Vec<T>) {
+        val.clear();
     }
 }
 
@@ -190,15 +188,15 @@ impl<T> TriviallyDistinguishedCollection for Cow<'_, [T]> where T: Clone {}
 
 for_overwrite_via_default!(BTreeSet<T>, with generics(T));
 
-impl<T> EmptyState for BTreeSet<T> {
+impl<T> EmptyState<(), BTreeSet<T>> for () {
     #[inline]
-    fn is_empty(&self) -> bool {
-        Self::is_empty(self)
+    fn is_empty(val: &BTreeSet<T>) -> bool {
+        val.is_empty()
     }
 
     #[inline]
-    fn clear(&mut self) {
-        Self::clear(self)
+    fn clear(val: &mut BTreeSet<T>) {
+        val.clear();
     }
 }
 
@@ -268,15 +266,15 @@ where
 
 for_overwrite_via_default!(BTreeMap<K, V>, with generics (K, V));
 
-impl<K, V> EmptyState for BTreeMap<K, V> {
+impl<K, V> EmptyState<(), BTreeMap<K, V>> for () {
     #[inline]
-    fn is_empty(&self) -> bool {
-        Self::is_empty(self)
+    fn is_empty(val: &BTreeMap<K, V>) -> bool {
+        val.is_empty()
     }
 
     #[inline]
-    fn clear(&mut self) {
-        Self::clear(self)
+    fn clear(val: &mut BTreeMap<K, V>) {
+        val.clear();
     }
 }
 
