@@ -19,7 +19,7 @@ encoding_implemented_via_value_encoding!(
 );
 
 /// Maps are always length delimited.
-impl<T, KE, VE> Wiretyped<Map<KE, VE>> for T {
+impl<T, KE, VE> Wiretyped<Map<KE, VE>, T> for () {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
 }
 
@@ -33,20 +33,19 @@ const fn combined_fixed_size(a: WireType, b: WireType) -> Option<usize> {
 fn map_encoded_length<M, KE, VE>(value: &M) -> usize
 where
     M: Mapping,
-    M::Key: ValueEncoder<KE>,
-    M::Value: ValueEncoder<VE>,
+    (): ValueEncoder<KE, M::Key> + ValueEncoder<VE, M::Value>,
 {
     combined_fixed_size(
-        <M::Key as Wiretyped<KE>>::WIRE_TYPE,
-        <M::Value as Wiretyped<VE>>::WIRE_TYPE,
+        <() as Wiretyped<KE, M::Key>>::WIRE_TYPE,
+        <() as Wiretyped<VE, M::Value>>::WIRE_TYPE,
     )
     .map_or_else(
         || {
             value
                 .iter()
                 .map(|(k, v)| {
-                    ValueEncoder::<KE>::value_encoded_len(k)
-                        + ValueEncoder::<VE>::value_encoded_len(v)
+                    ValueEncoder::<KE, _>::value_encoded_len(k)
+                        + ValueEncoder::<VE, _>::value_encoded_len(v)
                 })
                 .sum()
         },
@@ -54,25 +53,24 @@ where
     )
 }
 
-impl<M, K, V, KE, VE> ValueEncoder<Map<KE, VE>> for M
+impl<M, K, V, KE, VE> ValueEncoder<Map<KE, VE>, M> for ()
 where
     M: Mapping<Key = K, Value = V>,
-    K: ForOverwrite<KE> + ValueEncoder<KE>,
-    V: ForOverwrite<VE> + ValueEncoder<VE>,
+    (): ForOverwrite<KE, K> + ValueEncoder<KE, K> + ForOverwrite<VE, V> + ValueEncoder<VE, V>,
 {
     fn encode_value<B: BufMut + ?Sized>(value: &M, buf: &mut B) {
         encode_varint(map_encoded_length::<M, KE, VE>(value) as u64, buf);
         for (key, val) in value.iter() {
-            ValueEncoder::<KE>::encode_value(key, buf);
-            ValueEncoder::<VE>::encode_value(val, buf);
+            ValueEncoder::<KE, _>::encode_value(key, buf);
+            ValueEncoder::<VE, _>::encode_value(val, buf);
         }
     }
 
     fn prepend_value<B: ReverseBuf + ?Sized>(value: &M, buf: &mut B) {
         let end = buf.remaining();
         for (key, val) in value.reversed() {
-            ValueEncoder::<VE>::prepend_value(val, buf);
-            ValueEncoder::<KE>::prepend_value(key, buf);
+            ValueEncoder::<VE, _>::prepend_value(val, buf);
+            ValueEncoder::<KE, _>::prepend_value(key, buf);
         }
         prepend_varint((buf.remaining() - end) as u64, buf);
     }
@@ -97,11 +95,13 @@ macro_rules! impl_decoders {
         $(buf_generic: ($($buf_generic:tt)*),)?
         $(lifetime: $lifetime:lifetime,)?
     ) => {
-        impl<$($lifetime,)? M, K, V, KE, VE> $relaxed_value <$($lifetime,)? Map<KE, VE>> for M
+        impl<$($lifetime,)? M, K, V, KE, VE> $relaxed_value <$($lifetime,)? Map<KE, VE>, M> for ()
         where
             M: Mapping<Key = K, Value = V>,
-            K: ForOverwrite<KE> + $relaxed_value <$($lifetime,)? KE>,
-            V: ForOverwrite<VE> + $relaxed_value <$($lifetime,)? VE>,
+            (): ForOverwrite<KE, K>
+                + ForOverwrite<VE, V>
+                + $relaxed_value <$($lifetime,)? KE, K>
+                + $relaxed_value <$($lifetime,)? VE, V>,
         {
             fn $relaxed_value_method $($($buf_generic)*)? (
                 value: &mut M,
@@ -112,8 +112,8 @@ macro_rules! impl_decoders {
                 // MSRV: this could be .is_some_and(..)
                 if matches!(
                     combined_fixed_size(
-                        <M::Key as Wiretyped<KE>>::WIRE_TYPE,
-                        <M::Value as Wiretyped<VE>>::WIRE_TYPE,
+                        <() as Wiretyped<KE, M::Key>>::WIRE_TYPE,
+                        <() as Wiretyped<VE, M::Value>>::WIRE_TYPE,
                     ),
                     Some(fixed_size) if capped.remaining_before_cap() % fixed_size != 0
                 ) {
@@ -121,11 +121,11 @@ macro_rules! impl_decoders {
                     return Err(DecodeError::new(Truncated));
                 }
                 while capped.has_remaining()? {
-                    let mut new_key = K::for_overwrite();
-                    let mut new_val = V::for_overwrite();
-                    $relaxed_value::<KE>::$relaxed_value_method(
+                    let mut new_key = <() as ForOverwrite::<KE, K>>::for_overwrite();
+                    let mut new_val = <() as ForOverwrite::<VE, V>>::for_overwrite();
+                    $relaxed_value::<KE, _>::$relaxed_value_method(
                         &mut new_key, capped.lend(), ctx.clone())?;
-                    $relaxed_value::<VE>::$relaxed_value_method(
+                    $relaxed_value::<VE, _>::$relaxed_value_method(
                         &mut new_val, capped.lend(), ctx.clone())?;
                     value.insert(new_key, new_val)?;
                 }
@@ -134,11 +134,15 @@ macro_rules! impl_decoders {
         }
 
         impl<$($lifetime,)? M, K, V, KE, VE>
-        $distinguished_value <$($lifetime,)? Map<KE, VE>> for M
+        $distinguished_value <$($lifetime,)? Map<KE, VE>, M> for ()
         where
             M: DistinguishedMapping<Key = K, Value = V> + Eq,
-            K: ForOverwrite<KE> + Eq + $distinguished_value <$($lifetime,)? KE>,
-            V: ForOverwrite<VE> + Eq + $distinguished_value <$($lifetime,)? VE>,
+            K: Eq,
+            V: Eq,
+            (): ForOverwrite<KE, K>
+                + ForOverwrite<VE, V>
+                + $distinguished_value <$($lifetime,)? KE, K>
+                + $distinguished_value <$($lifetime,)? VE, V>,
         {
             const CHECKS_EMPTY: bool = false;
 
@@ -151,8 +155,8 @@ macro_rules! impl_decoders {
                 // MSRV: this could be .is_some_and(..)
                 if matches!(
                     combined_fixed_size(
-                        <M::Key as Wiretyped<KE>>::WIRE_TYPE,
-                        <M::Value as Wiretyped<VE>>::WIRE_TYPE,
+                        <() as Wiretyped<KE, M::Key>>::WIRE_TYPE,
+                        <() as Wiretyped<VE, M::Value>>::WIRE_TYPE,
                     ),
                     Some(fixed_size) if capped.remaining_before_cap() % fixed_size != 0
                 ) {
@@ -161,17 +165,17 @@ macro_rules! impl_decoders {
                 }
                 let mut canon = Canonicity::Canonical;
                 while capped.has_remaining()? {
-                    let mut new_key = K::for_overwrite();
-                    let mut new_val = V::for_overwrite();
+                    let mut new_key = <() as ForOverwrite<KE, K>>::for_overwrite();
+                    let mut new_val = <() as ForOverwrite<VE, V>>::for_overwrite();
                     canon.update(
-                        $distinguished_value::<KE>::$distinguished_value_method::<true>(
+                        $distinguished_value::<KE, _>::$distinguished_value_method::<true>(
                             &mut new_key,
                             capped.lend(),
                             ctx.clone(),
                         )?,
                     );
                     canon.update(
-                        $distinguished_value::<VE>::$distinguished_value_method::<true>(
+                        $distinguished_value::<VE, _>::$distinguished_value_method::<true>(
                             &mut new_val,
                             capped.lend(),
                             ctx.clone(),
