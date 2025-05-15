@@ -98,12 +98,12 @@ macro_rules! empty_state_via_default {
     ) => {
         $crate::for_overwrite_via_default!(
             $ty
-            $(, with generics ($($generics*)*))?
+            $(, with generics ($($generics)*))?
             $(, with where clause ($($where_clause)*))?
         );
         $crate::empty_state_via_for_overwrite!(
             $ty
-            $(, with generics ($($generics*)*))?
+            $(, with generics ($($generics)*))?
             $(, with where clause ($($where_clause)*))?
         );
     };
