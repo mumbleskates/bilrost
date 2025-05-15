@@ -34,7 +34,10 @@ use bytes::{Buf, BufMut};
 ///
 /// Other than that: Both empty and non-empty oneofs can be `Box`ed, as there are also wrapper impls
 /// to cover that.
-pub trait Oneof: EmptyState {
+pub trait Oneof
+where
+    (): EmptyState<(), Self>
+{
     const FIELD_TAGS: &'static [u32];
 
     /// Encodes the fields of the oneof into the given buffer.
