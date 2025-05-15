@@ -42,7 +42,9 @@ macro_rules! define_decoders {
         ) -> Result<(), DecodeError>
         where
             T: Collection,
-            (): ForOverwrite<E, T::Item> + $relaxed_value <$($lifetime,)? E, T::Item>,
+            (): EmptyState<(), T>
+                + ForOverwrite<E, T::Item>
+                + $relaxed_value <$($lifetime,)? E, T::Item>,
         {
             check_wire_type(<() as Wiretyped<E, T::Item>>::WIRE_TYPE, wire_type)?;
             loop {
@@ -131,7 +133,9 @@ macro_rules! define_decoders {
         where
             T: DistinguishedCollection,
             T::Item: Eq,
-            (): ForOverwrite<E, T::Item> + $distinguished_value <$($lifetime,)? E, T::Item>,
+            (): EmptyState<(), T>
+                + ForOverwrite<E, T::Item>
+                + $distinguished_value <$($lifetime,)? E, T::Item>,
         {
             check_wire_type(<() as Wiretyped<E, T::Item>>::WIRE_TYPE, wire_type)?;
             let mut canon = Canonicity::Canonical;
@@ -246,7 +250,7 @@ pub(crate) mod borrowed {
 impl<C, T, E> Encoder<Unpacked<E>, C> for ()
 where
     C: Collection<Item = T>,
-    (): ForOverwrite<E, T> + ValueEncoder<E, T>,
+    (): EmptyState<(), C> + ForOverwrite<E, T> + ValueEncoder<E, T>,
 {
     #[inline]
     fn encode<B: BufMut + ?Sized>(tag: u32, value: &C, buf: &mut B, tw: &mut TagWriter) {
@@ -272,7 +276,7 @@ where
         if value.len() > 0 {
             // Each *additional* field encoded after the first needs only 1 byte for the field key.
             tm.key_len(tag)
-                + ValueEncoder::<E, _>::many_values_encoded_len(value.iter())
+                + <() as ValueEncoder<E, _>>::many_values_encoded_len(value.iter())
                 + value.len()
                 - 1
         } else {
@@ -314,7 +318,8 @@ where
     fn encoded_len(tag: u32, value: &[T; N], tm: &mut impl TagMeasurer) -> usize {
         if !value.is_empty() {
             // Each *additional* field encoded after the first needs only 1 byte for the field key.
-            tm.key_len(tag) + ValueEncoder::<E, T>::many_values_encoded_len(value.iter()) + N - 1
+            tm.key_len(tag) + <() as ValueEncoder<E, T>>::many_values_encoded_len(value.iter()) + N
+                - 1
         } else {
             0
         }
@@ -382,7 +387,7 @@ macro_rules! impl_decoders {
         impl<$($lifetime,)? C, T, E> $relaxed <$($lifetime,)? Unpacked<E>, C> for ()
         where
             C: Collection<Item = T>,
-            (): ForOverwrite<E, T> + $relaxed_value <$($lifetime,)? E, T>,
+            (): EmptyState<(), C> + ForOverwrite<E, T> + $relaxed_value <$($lifetime,)? E, T>,
         {
             #[inline]
             fn $relaxed_method $($($buf_generic)*)? (
@@ -409,8 +414,8 @@ macro_rules! impl_decoders {
         where
             C: DistinguishedCollection<Item = T>,
             T: Eq,
-            ():
-                ForOverwrite<E, T>
+            (): EmptyState<(), C>
+                + ForOverwrite<E, T>
                 + $distinguished_value <$($lifetime,)? E, T>
                 + $relaxed_value <$($lifetime,)? Packed<E>, C>
                 + $relaxed <$($lifetime,)? Unpacked<E>, C>,
@@ -502,7 +507,7 @@ macro_rules! impl_decoders {
             ) -> Result<(), DecodeError> {
                 $mode::decode_array_either_repr(
                     wire_type,
-                    value.get_or_insert_with(ForOverwrite::<E, _>::for_overwrite),
+                    value.get_or_insert_with(<() as ForOverwrite::<E, _>>::for_overwrite),
                     buf,
                     ctx,
                 )
@@ -528,7 +533,7 @@ macro_rules! impl_decoders {
             ) -> Result<Canonicity, DecodeError> {
                 $mode::decode_distinguished_array_either_repr(
                     wire_type,
-                    value.get_or_insert_with(ForOverwrite::<E, _>::for_overwrite),
+                    value.get_or_insert_with(<() as ForOverwrite::<E, _>>::for_overwrite),
                     buf,
                     ctx,
                 )

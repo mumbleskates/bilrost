@@ -5,10 +5,11 @@ use crate::encoding::{
     delegate_encoding, delegate_proxied_encoding, delegate_value_encoding,
     encoding_implemented_via_value_encoding, encoding_uses_base_empty_state,
     impl_cow_value_encoding, Canonicity, Capped, DecodeContext, DecodeError,
-    DistinguishedProxiable, DistinguishedValueBorrowDecoder, DistinguishedValueDecoder, Fixed, Map,
-    MessageEncoding, Packed, PlainBytes, Proxiable, RawDistinguishedMessageBorrowDecoder,
-    RawMessageBorrowDecoder, RawMessageDecoder, RestrictedDecodeContext, Unpacked,
-    ValueBorrowDecoder, ValueDecoder, ValueEncoder, Varint, WireType, Wiretyped,
+    DistinguishedProxiable, DistinguishedValueBorrowDecoder, DistinguishedValueDecoder, EmptyState,
+    Fixed, Map, MessageEncoding, Packed, PlainBytes, Proxiable,
+    RawDistinguishedMessageBorrowDecoder, RawMessageBorrowDecoder, RawMessageDecoder,
+    RestrictedDecodeContext, Unpacked, ValueBorrowDecoder, ValueDecoder, ValueEncoder, Varint,
+    WireType, Wiretyped,
 };
 use crate::DecodeErrorKind::InvalidValue;
 use crate::{Blob, DecodeErrorKind};
@@ -475,6 +476,7 @@ mod delegate_to_message_encoding {
     impl<const P: u8, T> Wiretyped<GeneralGeneric<P>, T> for ()
     where
         T: RawMessage,
+        (): EmptyState<(), T>,
     {
         const WIRE_TYPE: WireType = <() as Wiretyped<MessageEncoding, T>>::WIRE_TYPE;
     }
@@ -482,6 +484,7 @@ mod delegate_to_message_encoding {
     impl<const P: u8, T> ValueEncoder<GeneralGeneric<P>, T> for ()
     where
         T: RawMessage,
+        (): EmptyState<(), T>,
     {
         #[inline(always)]
         fn encode_value<B: BufMut + ?Sized>(value: &T, buf: &mut B) {
@@ -502,6 +505,7 @@ mod delegate_to_message_encoding {
     impl<const P: u8, T> ValueDecoder<GeneralGeneric<P>, T> for ()
     where
         T: RawMessageDecoder,
+        (): EmptyState<(), T>,
     {
         #[inline(always)]
         fn decode_value<B: Buf + ?Sized>(
@@ -516,6 +520,7 @@ mod delegate_to_message_encoding {
     impl<const P: u8, T> DistinguishedValueDecoder<GeneralGeneric<P>, T> for ()
     where
         T: RawDistinguishedMessageDecoder + Eq,
+        (): EmptyState<(), T>,
     {
         const CHECKS_EMPTY: bool =
             <() as DistinguishedValueDecoder<MessageEncoding, T>>::CHECKS_EMPTY;
@@ -535,6 +540,7 @@ mod delegate_to_message_encoding {
     impl<'a, const P: u8, T> ValueBorrowDecoder<'a, GeneralGeneric<P>, T> for ()
     where
         T: RawMessageBorrowDecoder<'a>,
+        (): EmptyState<(), T>,
     {
         #[inline(always)]
         fn borrow_decode_value(
@@ -549,6 +555,7 @@ mod delegate_to_message_encoding {
     impl<'a, const P: u8, T> DistinguishedValueBorrowDecoder<'a, GeneralGeneric<P>, T> for ()
     where
         T: RawDistinguishedMessageBorrowDecoder<'a> + Eq,
+        (): EmptyState<(), T>,
     {
         const CHECKS_EMPTY: bool =
             <() as DistinguishedValueBorrowDecoder<MessageEncoding, T>>::CHECKS_EMPTY;

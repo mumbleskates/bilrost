@@ -68,7 +68,6 @@ mod implement_encoding_for_those_structs {
     use bilrost::Canonicity::Canonical;
     use bilrost::{Canonicity, DecodeErrorKind};
 
-
     impl Proxiable for AlwaysEven {
         type Proxy = u64;
 

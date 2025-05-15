@@ -166,7 +166,7 @@ where
 /// methods with a varying restriction level.
 pub trait DistinguishedOwnedMessage: OwnedMessage
 where
-(): EmptyState<(), Self>,
+    (): EmptyState<(), Self>,
 {
     // ------------ Distinguished mode ------------
 
@@ -668,7 +668,7 @@ where
 impl<T> Message for T
 where
     T: RawMessage + Sized,
-(): EmptyState<(), Self>,
+    (): EmptyState<(), Self>,
 {
     fn encode<B: BufMut + ?Sized>(&self, buf: &mut B) -> Result<(), EncodeError> {
         let required = self.encoded_len();
@@ -773,7 +773,7 @@ where
 impl<T> OwnedMessage for T
 where
     T: RawMessageDecoder + Sized,
-(): EmptyState<(), Self>,
+    (): EmptyState<(), Self>,
 {
     fn decode<B: Buf>(mut buf: B) -> Result<Self, DecodeError> {
         Self::decode_capped(Capped::new(&mut buf))
@@ -833,7 +833,7 @@ where
 impl<T> DistinguishedOwnedMessage for T
 where
     T: RawDistinguishedMessageDecoder + RawMessageDecoder,
-(): EmptyState<(), Self>,
+    (): EmptyState<(), Self>,
 {
     fn decode_distinguished<B: Buf>(buf: B) -> Result<(Self, Canonicity), DecodeError> {
         Self::decode_restricted(buf, NotCanonical)
@@ -1095,7 +1095,7 @@ where
 impl<'a, T> BorrowedMessage<'a> for T
 where
     T: RawMessageBorrowDecoder<'a> + Sized,
-(): EmptyState<(), Self>,
+    (): EmptyState<(), Self>,
 {
     fn decode_borrowed(mut buf: &'a [u8]) -> Result<Self, DecodeError> {
         let mut message = <() as EmptyState<(), Self>>::empty();
@@ -1130,7 +1130,7 @@ where
 impl<'a, T> DistinguishedBorrowedMessage<'a> for T
 where
     T: RawDistinguishedMessageBorrowDecoder<'a> + RawMessageBorrowDecoder<'a>,
-(): EmptyState<(), Self>,
+    (): EmptyState<(), Self>,
 {
     fn decode_distinguished_borrowed(buf: &'a [u8]) -> Result<(Self, Canonicity), DecodeError> {
         Self::decode_restricted_borrowed(buf, NotCanonical)

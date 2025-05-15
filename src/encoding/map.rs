@@ -3,8 +3,9 @@ use crate::encoding::value_traits::{DistinguishedMapping, Mapping};
 use crate::encoding::{
     decoding_modes, encode_varint, encoded_len_varint, encoding_implemented_via_value_encoding,
     encoding_uses_base_empty_state, prepend_varint, Canonicity, Capped, DecodeContext, DecodeError,
-    DistinguishedValueBorrowDecoder, DistinguishedValueDecoder, ForOverwrite, GeneralPacked,
-    RestrictedDecodeContext, ValueBorrowDecoder, ValueDecoder, ValueEncoder, WireType, Wiretyped,
+    DistinguishedValueBorrowDecoder, DistinguishedValueDecoder, EmptyState, ForOverwrite,
+    GeneralPacked, RestrictedDecodeContext, ValueBorrowDecoder, ValueDecoder, ValueEncoder,
+    WireType, Wiretyped,
 };
 use crate::DecodeErrorKind::Truncated;
 use bytes::{Buf, BufMut};
@@ -14,7 +15,7 @@ pub struct Map<KE = GeneralPacked, VE = GeneralPacked>(KE, VE);
 encoding_uses_base_empty_state!(Map<KE, VE>, with generics (KE, VE));
 encoding_implemented_via_value_encoding!(
     Map<KE, VE>,
-    with where clause (T: Mapping),
+    with where clause (T: Mapping, (): EmptyState<(), T>),
     with generics (KE, VE),
 );
 
@@ -33,7 +34,7 @@ const fn combined_fixed_size(a: WireType, b: WireType) -> Option<usize> {
 fn map_encoded_length<M, KE, VE>(value: &M) -> usize
 where
     M: Mapping,
-    (): ValueEncoder<KE, M::Key> + ValueEncoder<VE, M::Value>,
+    (): EmptyState<(), M> + ValueEncoder<KE, M::Key> + ValueEncoder<VE, M::Value>,
 {
     combined_fixed_size(
         <() as Wiretyped<KE, M::Key>>::WIRE_TYPE,
@@ -56,7 +57,11 @@ where
 impl<M, K, V, KE, VE> ValueEncoder<Map<KE, VE>, M> for ()
 where
     M: Mapping<Key = K, Value = V>,
-    (): ForOverwrite<KE, K> + ValueEncoder<KE, K> + ForOverwrite<VE, V> + ValueEncoder<VE, V>,
+    (): EmptyState<(), M>
+        + ForOverwrite<KE, K>
+        + ValueEncoder<KE, K>
+        + ForOverwrite<VE, V>
+        + ValueEncoder<VE, V>,
 {
     fn encode_value<B: BufMut + ?Sized>(value: &M, buf: &mut B) {
         encode_varint(map_encoded_length::<M, KE, VE>(value) as u64, buf);
@@ -98,7 +103,8 @@ macro_rules! impl_decoders {
         impl<$($lifetime,)? M, K, V, KE, VE> $relaxed_value <$($lifetime,)? Map<KE, VE>, M> for ()
         where
             M: Mapping<Key = K, Value = V>,
-            (): ForOverwrite<KE, K>
+            (): EmptyState<(), M>
+                + ForOverwrite<KE, K>
                 + ForOverwrite<VE, V>
                 + $relaxed_value <$($lifetime,)? KE, K>
                 + $relaxed_value <$($lifetime,)? VE, V>,
@@ -139,7 +145,8 @@ macro_rules! impl_decoders {
             M: DistinguishedMapping<Key = K, Value = V> + Eq,
             K: Eq,
             V: Eq,
-            (): ForOverwrite<KE, K>
+            (): EmptyState<(), M>
+                + ForOverwrite<KE, K>
                 + ForOverwrite<VE, V>
                 + $distinguished_value <$($lifetime,)? KE, K>
                 + $distinguished_value <$($lifetime,)? VE, V>,

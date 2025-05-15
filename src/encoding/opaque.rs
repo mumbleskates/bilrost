@@ -106,7 +106,10 @@ impl OpaqueValue<'_> {
         LengthDelimited(Cow::Owned(value.into()))
     }
 
-    pub fn message<M: Message>(value: &M) -> OpaqueValue<'static> {
+    pub fn message<M: Message>(value: &M) -> OpaqueValue<'static>
+    where
+        (): EmptyState<(), M>,
+    {
         LengthDelimited(Cow::Owned(value.encode_to_vec()))
     }
 

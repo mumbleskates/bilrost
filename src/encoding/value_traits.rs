@@ -14,7 +14,7 @@ pub trait EmptyState<E, T: ?Sized>: ForOverwrite<E, T> {
     where
         T: Sized,
     {
-        ForOverwrite::<E, T>::for_overwrite()
+        <Self as ForOverwrite<E, T>>::for_overwrite()
     }
 
     /// Returns true iff this instance is in the empty state.
@@ -33,7 +33,7 @@ pub trait ForOverwrite<E, T: ?Sized> {
     /// Produces a new `Self` value to be overwritten.
     fn for_overwrite() -> T
     where
-        Self: Sized;
+        T: Sized;
 }
 
 implement_core_empty_state_rules!(());

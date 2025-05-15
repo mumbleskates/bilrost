@@ -344,7 +344,12 @@ mod generic_optional {
         (): ValueEncoder<E, T> + ForOverwrite<E, T>,
     {
         #[inline]
-        fn encode<B: BufMut + ?Sized>(tag: u32, value: &Option<T>, buf: &mut B, tw: &mut TagWriter) {
+        fn encode<B: BufMut + ?Sized>(
+            tag: u32,
+            value: &Option<T>,
+            buf: &mut B,
+            tw: &mut TagWriter,
+        ) {
             if let Some(value) = value {
                 <() as FieldEncoder<E, T>>::encode_field(tag, value, buf, tw);
             }

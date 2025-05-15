@@ -106,7 +106,7 @@ macro_rules! varint {
                 buf: Capped<impl Buf + ?Sized>,
                 ctx: RestrictedDecodeContext,
             ) -> Result<Canonicity, DecodeError> {
-                ValueDecoder::<Varint, _>::decode_value(value, buf, ctx.into_inner())?;
+                <() as ValueDecoder::<Varint, _>>::decode_value(value, buf, ctx.into_inner())?;
                 Ok(Canonicity::Canonical)
             }
         }

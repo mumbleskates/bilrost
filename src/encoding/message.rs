@@ -24,7 +24,10 @@ pub(crate) fn merge<T: RawMessageDecoder, B: Buf + ?Sized>(
     value: &mut T,
     mut buf: Capped<B>,
     ctx: DecodeContext,
-) -> Result<(), DecodeError> {
+) -> Result<(), DecodeError>
+where
+    (): EmptyState<(), T>,
+{
     let tr = &mut TagReader::new();
     let mut last_tag = None::<u32>;
     while buf.has_remaining()? {
@@ -43,7 +46,10 @@ pub(crate) fn merge_distinguished<T: RawDistinguishedMessageDecoder, B: Buf + ?S
     value: &mut T,
     mut buf: Capped<B>,
     ctx: RestrictedDecodeContext,
-) -> Result<Canonicity, DecodeError> {
+) -> Result<Canonicity, DecodeError>
+where
+    (): EmptyState<(), T>,
+{
     let tr = &mut TagReader::new();
     let mut last_tag = None::<u32>;
     let mut canon = Canonical;
@@ -74,7 +80,10 @@ pub(crate) fn borrow_merge<'a, T: RawMessageBorrowDecoder<'a>>(
     value: &mut T,
     mut buf: Capped<&'a [u8]>,
     ctx: DecodeContext,
-) -> Result<(), DecodeError> {
+) -> Result<(), DecodeError>
+where
+    (): EmptyState<(), T>,
+{
     let tr = &mut TagReader::new();
     let mut last_tag = None::<u32>;
     while buf.has_remaining()? {
@@ -93,7 +102,10 @@ pub(crate) fn borrow_merge_distinguished<'a, T: RawDistinguishedMessageBorrowDec
     value: &mut T,
     mut buf: Capped<&'a [u8]>,
     ctx: RestrictedDecodeContext,
-) -> Result<Canonicity, DecodeError> {
+) -> Result<Canonicity, DecodeError>
+where
+    (): EmptyState<(), T>,
+{
     let tr = &mut TagReader::new();
     let mut last_tag = None::<u32>;
     let mut canon = Canonical;
@@ -139,7 +151,10 @@ where
 
 /// Decoding trait to be implemented by messages. The methods of this trait are meant to only be
 /// used by the `OwnedMessage` implementation.
-pub trait RawMessageDecoder: RawMessage {
+pub trait RawMessageDecoder: RawMessage
+where
+    (): EmptyState<(), Self>,
+{
     /// Decodes a field from a buffer into `self`.
     fn raw_decode_field<B: Buf + ?Sized>(
         &mut self,
@@ -155,7 +170,10 @@ pub trait RawMessageDecoder: RawMessage {
 
 /// Distinguished decoding trait to be implemented by messages. The methods of this trait are meant
 /// to only be used by the `DistinguishedOwnedMessage` implementation.
-pub trait RawDistinguishedMessageDecoder: RawMessage + Eq {
+pub trait RawDistinguishedMessageDecoder: RawMessage + Eq
+where
+    (): EmptyState<(), Self>,
+{
     fn raw_decode_field_distinguished<B: Buf + ?Sized>(
         &mut self,
         tag: u32,
@@ -170,7 +188,10 @@ pub trait RawDistinguishedMessageDecoder: RawMessage + Eq {
 
 /// Borrowed decoding trait to be implemented by messages. The methods of this trait are meant to
 /// only be used by the `BorrowedMessage` implementation.
-pub trait RawMessageBorrowDecoder<'a>: RawMessage {
+pub trait RawMessageBorrowDecoder<'a>: RawMessage
+where
+    (): EmptyState<(), Self>,
+{
     /// Decodes a field from a buffer into `self` from a borrowed slice.
     fn raw_borrow_decode_field(
         &mut self,
@@ -186,7 +207,10 @@ pub trait RawMessageBorrowDecoder<'a>: RawMessage {
 
 /// Borrowed distinguished decoding trait to be implemented by messages. The methods of this trait
 /// are meant to only be used by the `DistinguishedBorrowedMessage` implementation.
-pub trait RawDistinguishedMessageBorrowDecoder<'a>: RawMessage + Eq {
+pub trait RawDistinguishedMessageBorrowDecoder<'a>: RawMessage + Eq
+where
+    (): EmptyState<(), Self>,
+{
     fn raw_borrow_decode_field_distinguished(
         &mut self,
         tag: u32,
@@ -202,6 +226,7 @@ pub trait RawDistinguishedMessageBorrowDecoder<'a>: RawMessage + Eq {
 impl<T> RawMessage for Box<T>
 where
     T: RawMessage,
+    (): EmptyState<(), T>,
 {
     const __ASSERTIONS: () = ();
 
@@ -221,6 +246,7 @@ where
 impl<T> RawMessageDecoder for Box<T>
 where
     T: RawMessageDecoder,
+    (): EmptyState<(), T>,
 {
     fn raw_decode_field<B: Buf + ?Sized>(
         &mut self,
@@ -240,6 +266,7 @@ where
 impl<'a, T> RawMessageBorrowDecoder<'a> for Box<T>
 where
     T: RawMessageBorrowDecoder<'a>,
+    (): EmptyState<(), T>,
 {
     fn raw_borrow_decode_field(
         &mut self,
@@ -259,6 +286,7 @@ where
 impl<T> RawDistinguishedMessageDecoder for Box<T>
 where
     T: RawDistinguishedMessageDecoder,
+    (): EmptyState<(), T>,
 {
     fn raw_decode_field_distinguished<B: Buf + ?Sized>(
         &mut self,
@@ -278,6 +306,7 @@ where
 impl<'a, T> RawDistinguishedMessageBorrowDecoder<'a> for Box<T>
 where
     T: RawDistinguishedMessageBorrowDecoder<'a>,
+    (): EmptyState<(), T>,
 {
     fn raw_borrow_decode_field_distinguished(
         &mut self,
@@ -304,6 +333,7 @@ where
 impl<T> ValueEncoder<MessageEncoding, T> for ()
 where
     T: RawMessage,
+    (): EmptyState<(), T>,
 {
     #[inline]
     fn encode_value<B: BufMut + ?Sized>(value: &T, buf: &mut B) {
@@ -328,6 +358,7 @@ where
 impl<T> ValueDecoder<MessageEncoding, T> for ()
 where
     T: RawMessageDecoder,
+    (): EmptyState<(), T>,
 {
     #[inline]
     fn decode_value<B: Buf + ?Sized>(
@@ -343,6 +374,7 @@ where
 impl<T> DistinguishedValueDecoder<MessageEncoding, T> for ()
 where
     T: RawDistinguishedMessageDecoder + Eq,
+    (): EmptyState<(), T>,
 {
     const CHECKS_EMPTY: bool = true; // Empty messages are always zero-length
 
@@ -367,6 +399,7 @@ where
 impl<'a, T> ValueBorrowDecoder<'a, MessageEncoding, T> for ()
 where
     T: RawMessageBorrowDecoder<'a>,
+    (): EmptyState<(), T>,
 {
     #[inline]
     fn borrow_decode_value(
@@ -382,6 +415,7 @@ where
 impl<'a, T> DistinguishedValueBorrowDecoder<'a, MessageEncoding, T> for ()
 where
     T: RawDistinguishedMessageBorrowDecoder<'a> + Eq,
+    (): EmptyState<(), T>,
 {
     const CHECKS_EMPTY: bool = true; // Empty messages are always zero-length
 
