@@ -145,7 +145,10 @@ where
 
 /// Trait for collections that store multiple items and have a distinguished representation, such as
 /// `Vec` and `BTreeSet`. Returns an error if the items are inserted in the wrong order.
-pub trait DistinguishedCollection: Collection + Eq {
+pub trait DistinguishedCollection: Collection + Eq
+where
+    (): EmptyState<(), Self>,
+{
     fn insert_distinguished(&mut self, item: Self::Item) -> Result<Canonicity, DecodeErrorKind>;
 }
 
@@ -154,6 +157,7 @@ pub(crate) trait TriviallyDistinguishedCollection {}
 impl<T> DistinguishedCollection for T
 where
     T: Eq + Collection + TriviallyDistinguishedCollection,
+    (): EmptyState<(), T>,
 {
     #[inline]
     fn insert_distinguished(&mut self, item: Self::Item) -> Result<Canonicity, DecodeErrorKind> {
@@ -187,7 +191,10 @@ where
 
 /// Trait for associative containers with a distinguished representation. Returns an error if the
 /// items are inserted in the wrong order.
-pub trait DistinguishedMapping: Mapping {
+pub trait DistinguishedMapping: Mapping
+where
+    (): EmptyState<(), Self>,
+{
     fn insert_distinguished(
         &mut self,
         key: Self::Key,
