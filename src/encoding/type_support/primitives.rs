@@ -15,23 +15,23 @@ empty_state_via_default!(isize);
 
 macro_rules! empty_state_for_float {
     ($ty:ty) => {
-        impl ForOverwrite for $ty {
+        impl ForOverwrite<(), $ty> for () {
             #[inline]
-            fn for_overwrite() -> Self {
+            fn for_overwrite() -> $ty {
                 0.0
             }
         }
 
-        impl EmptyState for $ty {
+        impl EmptyState<(), $ty> for () {
             #[inline]
-            fn is_empty(&self) -> bool {
+            fn is_empty(val: &$ty) -> bool {
                 // Preserve -0.0. This is actually the original motivation for `EmptyState`.
-                self.to_bits() == 0
+                val.to_bits() == 0
             }
 
             #[inline]
-            fn clear(&mut self) {
-                *self = 0.0;
+            fn clear(val: &mut $ty) {
+                *val = 0.0;
             }
         }
     };
@@ -39,65 +39,65 @@ macro_rules! empty_state_for_float {
 empty_state_for_float!(f32);
 empty_state_for_float!(f64);
 
-empty_state_via_default!(&str);
+empty_state_via_default!(&'a str, with generics ('a));
 
-for_overwrite_via_default!(&[T], with generics (T));
+for_overwrite_via_default!(&'a [T], with generics ('a, T));
 
-impl<T> EmptyState for &[T] {
-    fn is_empty(&self) -> bool {
-        <[T]>::is_empty(self)
+impl<T> EmptyState<(), &[T]> for () {
+    fn is_empty(val: &&[T]) -> bool {
+        <[T]>::is_empty(val)
     }
 
-    fn clear(&mut self) {
-        *self = &[];
+    fn clear(val: &mut &[T]) {
+        *val = &[];
     }
 }
 
-impl<const N: usize> ForOverwrite for &[u8; N] {
-    fn for_overwrite() -> Self {
+impl<'a, const N: usize> ForOverwrite<(), &'a [u8; N]> for () {
+    fn for_overwrite() -> &'a [u8; N] {
         &[0; N]
     }
 }
 
-impl<const N: usize> EmptyState for &[u8; N] {
-    fn is_empty(&self) -> bool {
-        *self == <Self as EmptyState>::empty()
+impl<const N: usize> EmptyState<(), &[u8; N]> for () {
+    fn is_empty(val: &&[u8; N]) -> bool {
+        *val == &[0; N]
     }
 
-    fn clear(&mut self) {
-        *self = <Self as EmptyState>::empty();
+    fn clear(val: &mut &[u8; N]) {
+        *val = &[0; N];
     }
 }
 
 macro_rules! impls_for_tuple {
     (($($letters:ident),*), ($($numbers:tt),*)$(,)?) => {
-        impl<$($letters,)*> ForOverwrite for ($($letters,)*)
+        impl<$($letters,)*> ForOverwrite<(), ($($letters,)*)> for ()
         where
-            $($letters: ForOverwrite,)*
+            $((): ForOverwrite<(), $letters>,)*
         {
             #[inline]
-            fn for_overwrite() -> Self {
-                ($($letters::for_overwrite(),)*)
+            fn for_overwrite() -> ($($letters,)*) {
+                ($(<() as ForOverwrite<(), $letters>>::for_overwrite(),)*)
             }
         }
 
-        impl<$($letters,)*> EmptyState for ($($letters,)*)
+        impl<$($letters,)*> EmptyState<(), ($($letters,)*)> for ()
         where
-            $($letters: EmptyState,)*
+            $((): EmptyState<(), $letters>,)*
         {
             #[inline]
-            fn empty() -> Self {
-                ($($letters::empty(),)*)
+            fn empty() -> ($($letters,)*) {
+                ($(<() as EmptyState<(), $letters>>::empty(),)*)
             }
 
             #[inline]
-            fn is_empty(&self) -> bool {
-                true $(&& self.$numbers.is_empty())*
+            fn is_empty(val: &($($letters,)*)) -> bool {
+                true $(&& <() as EmptyState<(), $letters>>::is_empty(&val.$numbers))*
             }
 
             #[inline]
-            fn clear(&mut self) {
-                $(self.$numbers.clear();)*
+            fn clear(val: &mut ($($letters,)*)) {
+                $(<() as EmptyState<(), $letters>>::clear(&mut val.$numbers);)*
             }
         }
     };
@@ -124,14 +124,14 @@ impls_for_tuple!(
     (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)
 );
 
-impl ForOverwrite for () {
+impl ForOverwrite<(), ()> for () {
     fn for_overwrite() -> Self {}
 }
 
-impl EmptyState for () {
-    fn is_empty(&self) -> bool {
+impl EmptyState<(), ()> for () {
+    fn is_empty(_: &()) -> bool {
         true
     }
 
-    fn clear(&mut self) {}
+    fn clear(_: &mut ()) {}
 }
