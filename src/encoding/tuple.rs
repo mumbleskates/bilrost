@@ -40,6 +40,7 @@ macro_rules! impl_tuple {
         ($($letters:ident),*),
         ($($letters_desc:ident),*),
         ($($encodings:ident),*),
+        ($($encodings_desc:ident),*),
         ($($tees:ident),*),
     ) => {
         implement_core_empty_state_rules!(($($encodings,)*), with generics ($($encodings),*));
@@ -111,7 +112,7 @@ macro_rules! impl_tuple {
             ) {
                 let end = buf.remaining();
                 let tw = &mut TagRevWriter::new();
-                $(<() as Encoder<$letters_desc, _>>::prepend_encode(
+                $(<() as Encoder<$encodings_desc, _>>::prepend_encode(
                     $numbers_desc,
                     &value.$numbers_desc,
                     buf,
@@ -464,6 +465,7 @@ impl_tuple!(
     (A),           //
     (A),           //
     (Ae),          //
+    (Ae),          //
     (T),           //
 );
 impl_tuple!(
@@ -475,6 +477,7 @@ impl_tuple!(
     (A, B),        //
     (B, A),        //
     (Ae, Be),      //
+    (Be, Ae),      //
     (T, T),        //
 );
 impl_tuple!(
@@ -486,6 +489,7 @@ impl_tuple!(
     (A, B, C),     //
     (C, B, A),     //
     (Ae, Be, Ce),  //
+    (Ce, Be, Ae),  //
     (T, T, T),     //
 );
 impl_tuple!(
@@ -497,6 +501,7 @@ impl_tuple!(
     (A, B, C, D),     //
     (D, C, B, A),     //
     (Ae, Be, Ce, De), //
+    (De, Ce, Be, Ae), //
     (T, T, T, T),     //
 );
 impl_tuple!(
@@ -508,6 +513,7 @@ impl_tuple!(
     (A, B, C, D, E),      //
     (E, D, C, B, A),      //
     (Ae, Be, Ce, De, Ee), //
+    (Ee, De, Ce, Be, Ae), //
     (T, T, T, T, T),      //
 );
 impl_tuple!(
@@ -519,6 +525,7 @@ impl_tuple!(
     (A, B, C, D, E, F),       //
     (F, E, D, C, B, A),       //
     (Ae, Be, Ce, De, Ee, Fe), //
+    (Fe, Ee, De, Ce, Be, Ae), //
     (T, T, T, T, T, T),       //
 );
 impl_tuple!(
@@ -530,6 +537,7 @@ impl_tuple!(
     (A, B, C, D, E, F, G),        //
     (G, F, E, D, C, B, A),        //
     (Ae, Be, Ce, De, Ee, Fe, Ge), //
+    (Ge, Fe, Ee, De, Ce, Be, Ae), //
     (T, T, T, T, T, T, T),        //
 );
 impl_tuple!(
@@ -541,6 +549,7 @@ impl_tuple!(
     (A, B, C, D, E, F, G, H),         //
     (H, G, F, E, D, C, B, A),         //
     (Ae, Be, Ce, De, Ee, Fe, Ge, He), //
+    (He, Ge, Fe, Ee, De, Ce, Be, Ae), //
     (T, T, T, T, T, T, T, T),         //
 );
 impl_tuple!(
@@ -552,6 +561,7 @@ impl_tuple!(
     (A, B, C, D, E, F, G, H, I),          //
     (I, H, G, F, E, D, C, B, A),          //
     (Ae, Be, Ce, De, Ee, Fe, Ge, He, Ie), //
+    (Ie, He, Ge, Fe, Ee, De, Ce, Be, Ae), //
     (T, T, T, T, T, T, T, T, T),          //
 );
 impl_tuple!(
@@ -563,6 +573,7 @@ impl_tuple!(
     (A, B, C, D, E, F, G, H, I, J),           //
     (J, I, H, G, F, E, D, C, B, A),           //
     (Ae, Be, Ce, De, Ee, Fe, Ge, He, Ie, Je), //
+    (Je, Ie, He, Ge, Fe, Ee, De, Ce, Be, Ae), //
     (T, T, T, T, T, T, T, T, T, T),           //
 );
 impl_tuple!(
@@ -574,6 +585,7 @@ impl_tuple!(
     (A, B, C, D, E, F, G, H, I, J, K),            //
     (K, J, I, H, G, F, E, D, C, B, A),            //
     (Ae, Be, Ce, De, Ee, Fe, Ge, He, Ie, Je, Ke), //
+    (Ke, Je, Ie, He, Ge, Fe, Ee, De, Ce, Be, Ae), //
     (T, T, T, T, T, T, T, T, T, T, T),            //
 );
 impl_tuple!(
@@ -585,6 +597,7 @@ impl_tuple!(
     (A, B, C, D, E, F, G, H, I, J, K, L),             //
     (L, K, J, I, H, G, F, E, D, C, B, A),             //
     (Ae, Be, Ce, De, Ee, Fe, Ge, He, Ie, Je, Ke, Le), //
+    (Le, Ke, Je, Ie, He, Ge, Fe, Ee, De, Ce, Be, Ae), //
     (T, T, T, T, T, T, T, T, T, T, T, T),             //
 );
 
