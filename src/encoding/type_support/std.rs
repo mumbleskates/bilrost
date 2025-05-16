@@ -14,18 +14,18 @@ for_overwrite_via_default!(HashSet<T, S>,
     with generics (T, S),
     with where clause (S: Default + core::hash::BuildHasher));
 
-impl<T, S> EmptyState for HashSet<T, S>
+impl<T, S> EmptyState<(), HashSet<T, S>> for ()
 where
     S: Default + core::hash::BuildHasher,
 {
     #[inline]
-    fn is_empty(&self) -> bool {
-        HashSet::is_empty(self)
+    fn is_empty(val: &HashSet<T, S>) -> bool {
+        val.is_empty()
     }
 
     #[inline]
-    fn clear(&mut self) {
-        HashSet::clear(self)
+    fn clear(val: &mut HashSet<T, S>) {
+        val.clear();
     }
 }
 
@@ -74,18 +74,18 @@ for_overwrite_via_default!(HashMap<K, V, S>,
     with generics (K, V, S),
     with where clause (S: Default + core::hash::BuildHasher));
 
-impl<K, V, S> EmptyState for HashMap<K, V, S>
+impl<K, V, S> EmptyState<(), HashMap<K, V, S>> for ()
 where
     S: Default + core::hash::BuildHasher,
 {
     #[inline]
-    fn is_empty(&self) -> bool {
-        HashMap::is_empty(self)
+    fn is_empty(val: &HashMap<K, V, S>) -> bool {
+        val.is_empty()
     }
 
     #[inline]
-    fn clear(&mut self) {
-        HashMap::clear(self)
+    fn clear(val: &mut HashMap<K, V, S>) {
+        val.clear();
     }
 }
 
@@ -135,19 +135,19 @@ where
     }
 }
 
-impl ForOverwrite for SystemTime {
-    fn for_overwrite() -> Self {
+impl ForOverwrite<(), SystemTime> for () {
+    fn for_overwrite() -> SystemTime {
         UNIX_EPOCH
     }
 }
 
-impl EmptyState for SystemTime {
-    fn is_empty(&self) -> bool {
-        *self == UNIX_EPOCH
+impl EmptyState<(), SystemTime> for () {
+    fn is_empty(val: &SystemTime) -> bool {
+        *val == UNIX_EPOCH
     }
 
-    fn clear(&mut self) {
-        *self = UNIX_EPOCH;
+    fn clear(val: &mut SystemTime) {
+        *val = UNIX_EPOCH;
     }
 }
 
