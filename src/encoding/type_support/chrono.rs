@@ -22,19 +22,19 @@ pub(super) use {
     timedelta::{random_timedelta, test_timedeltas},
 };
 
-impl ForOverwrite for NaiveDate {
-    fn for_overwrite() -> Self {
-        Self::from_yo_opt(0, 1).unwrap()
+impl ForOverwrite<(), NaiveDate> for () {
+    fn for_overwrite() -> NaiveDate {
+        NaiveDate::from_yo_opt(0, 1).unwrap()
     }
 }
 
-impl EmptyState for NaiveDate {
-    fn is_empty(&self) -> bool {
-        (self.year(), self.ordinal0()) == (0, 0)
+impl EmptyState<(), NaiveDate> for () {
+    fn is_empty(val: &NaiveDate) -> bool {
+        (val.year(), val.ordinal0()) == (0, 0)
     }
 
-    fn clear(&mut self) {
-        *self = <_ as EmptyState>::empty();
+    fn clear(val: &mut NaiveDate) {
+        *val = <() as ForOverwrite<(), NaiveDate>>::for_overwrite();
     }
 }
 
@@ -93,7 +93,7 @@ mod naivedate {
         [
             NaiveDate::MIN,
             NaiveDate::MAX,
-            <NaiveDate as EmptyState>::empty(),
+            <() as EmptyState<(), NaiveDate>>::empty(),
             NaiveDate::from_ymd_opt(1970, 1, 1).unwrap(),
             NaiveDate::from_ymd_opt(1988, 6, 28).unwrap(),
         ]
@@ -138,19 +138,19 @@ mod naivedate {
     }
 }
 
-impl ForOverwrite for NaiveTime {
-    fn for_overwrite() -> Self {
-        Self::from_num_seconds_from_midnight_opt(0, 0).unwrap()
+impl ForOverwrite<(), NaiveTime> for () {
+    fn for_overwrite() -> NaiveTime {
+        NaiveTime::from_num_seconds_from_midnight_opt(0, 0).unwrap()
     }
 }
 
-impl EmptyState for NaiveTime {
-    fn is_empty(&self) -> bool {
-        (self.num_seconds_from_midnight(), self.nanosecond()) == (0, 0)
+impl EmptyState<(), NaiveTime> for () {
+    fn is_empty(val: &NaiveTime) -> bool {
+        (val.num_seconds_from_midnight(), val.nanosecond()) == (0, 0)
     }
 
-    fn clear(&mut self) {
-        *self = <_ as EmptyState>::empty();
+    fn clear(val: &mut NaiveTime) {
+        *val = <() as ForOverwrite<(), NaiveTime>>::for_overwrite();
     }
 }
 
@@ -208,7 +208,7 @@ mod naivetime {
         [
             NaiveTime::MIN,
             NaiveTime::from_hms_nano_opt(23, 59, 59, 999_999_999).unwrap(),
-            <NaiveTime as EmptyState>::empty(),
+            <() as EmptyState<(), NaiveTime>>::empty(),
             NaiveTime::from_hms_opt(17, 0, 0).unwrap(),
             NaiveTime::from_hms_nano_opt(11, 11, 11, 111_111_111).unwrap(),
         ]
@@ -253,24 +253,27 @@ mod naivetime {
     }
 }
 
-impl ForOverwrite for NaiveDateTime {
-    fn for_overwrite() -> Self {
-        Self::new(<_ as EmptyState>::empty(), <_ as EmptyState>::empty())
+impl ForOverwrite<(), NaiveDateTime> for () {
+    fn for_overwrite() -> NaiveDateTime {
+        NaiveDateTime::new(
+            <() as EmptyState<(), _>>::empty(),
+            <() as EmptyState<(), _>>::empty(),
+        )
     }
 }
 
-impl EmptyState for NaiveDateTime {
-    fn is_empty(&self) -> bool {
+impl EmptyState<(), NaiveDateTime> for () {
+    fn is_empty(val: &NaiveDateTime) -> bool {
         (
-            self.year(),
-            self.ordinal0(),
-            self.num_seconds_from_midnight(),
-            self.nanosecond(),
+            val.year(),
+            val.ordinal0(),
+            val.num_seconds_from_midnight(),
+            val.nanosecond(),
         ) == (0, 0, 0, 0)
     }
 
-    fn clear(&mut self) {
-        *self = <_ as EmptyState>::empty();
+    fn clear(val: &mut NaiveDateTime) {
+        *val = <() as ForOverwrite<(), NaiveDateTime>>::for_overwrite();
     }
 }
 
@@ -352,7 +355,7 @@ mod naivedatetime {
             NaiveDateTime::MIN,
             NaiveDateTime::MAX,
             NaiveDateTime::default(),
-            <NaiveDateTime as EmptyState>::empty(),
+            <() as EmptyState<(), NaiveDateTime>>::empty(),
             NaiveDateTime::new(
                 NaiveDate::from_ymd_opt(-44, 3, 15).unwrap(),
                 NaiveTime::from_hms_opt(12, 36, 27).unwrap(),
@@ -407,18 +410,18 @@ mod naivedatetime {
     }
 }
 
-impl ForOverwrite for Utc {
-    fn for_overwrite() -> Self {
-        Self
+impl ForOverwrite<(), Utc> for () {
+    fn for_overwrite() -> Utc {
+        Utc
     }
 }
 
-impl EmptyState for Utc {
-    fn is_empty(&self) -> bool {
+impl EmptyState<(), Utc> for () {
+    fn is_empty(_: &Utc) -> bool {
         true
     }
 
-    fn clear(&mut self) {}
+    fn clear(_: &mut Utc) {}
 }
 
 impl Proxiable<SealedBilrostTag> for Utc {
@@ -477,10 +480,10 @@ mod utc {
         {
             let mut buf = Vec::new();
             let zero_offset = FixedOffset::east_opt(0).unwrap();
-            ValueEncoder::<General>::encode_value(&zero_offset, &mut buf);
-            let mut utc = <Utc as ForOverwrite>::for_overwrite();
+            <() as ValueEncoder<General, _>>::encode_value(&zero_offset, &mut buf);
+            let mut utc = <() as ForOverwrite<(), Utc>>::for_overwrite();
             assert_eq!(
-                ValueDecoder::<General>::decode_value(
+                <() as ValueDecoder<General, _>>::decode_value(
                     &mut utc,
                     Capped::new(&mut buf.as_slice()),
                     DecodeContext::default(),
@@ -488,7 +491,7 @@ mod utc {
                 Ok(())
             );
             assert_eq!(
-                DistinguishedValueDecoder::<General>::decode_value_distinguished::<true>(
+                <() as DistinguishedValueDecoder<General, _>>::decode_value_distinguished::<true>(
                     &mut utc,
                     Capped::new(&mut buf.as_slice()),
                     RestrictedDecodeContext::new(NotCanonical),
@@ -500,10 +503,10 @@ mod utc {
         {
             let mut buf = Vec::new();
             let nonzero_offset = FixedOffset::east_opt(1000).unwrap();
-            ValueEncoder::<General>::encode_value(&nonzero_offset, &mut buf);
-            let mut utc = <Utc as ForOverwrite>::for_overwrite();
+            <() as ValueEncoder<General, _>>::encode_value(&nonzero_offset, &mut buf);
+            let mut utc = <() as ForOverwrite<(), Utc>>::for_overwrite();
             assert_eq!(
-                ValueDecoder::<General>::decode_value(
+                <() as ValueDecoder<General, _>>::decode_value(
                     &mut utc,
                     Capped::new(&mut buf.as_slice()),
                     DecodeContext::default(),
@@ -511,7 +514,7 @@ mod utc {
                 Err(DecodeError::new(OutOfDomainValue))
             );
             assert_eq!(
-                DistinguishedValueDecoder::<General>::decode_value_distinguished::<true>(
+                <() as DistinguishedValueDecoder<General, _>>::decode_value_distinguished::<true>(
                     &mut utc,
                     Capped::new(&mut buf.as_slice()),
                     RestrictedDecodeContext::new(NotCanonical),
@@ -522,19 +525,19 @@ mod utc {
     }
 }
 
-impl ForOverwrite for FixedOffset {
-    fn for_overwrite() -> Self {
+impl ForOverwrite<(), FixedOffset> for () {
+    fn for_overwrite() -> FixedOffset {
         FixedOffset::east_opt(0).unwrap()
     }
 }
 
-impl EmptyState for FixedOffset {
-    fn is_empty(&self) -> bool {
-        self.local_minus_utc() == 0
+impl EmptyState<(), FixedOffset> for () {
+    fn is_empty(val: &FixedOffset) -> bool {
+        val.local_minus_utc() == 0
     }
 
-    fn clear(&mut self) {
-        *self = <_ as EmptyState>::empty();
+    fn clear(val: &mut FixedOffset) {
+        *val = <() as ForOverwrite<(), FixedOffset>>::for_overwrite();
     }
 }
 
@@ -617,7 +620,7 @@ mod fixedoffset {
     pub(in super::super) fn test_zones() -> impl Iterator<Item = FixedOffset> + Clone {
         [
             FixedOffset::east_opt(0).unwrap(),
-            <FixedOffset as EmptyState>::empty(),
+            <() as EmptyState<(), FixedOffset>>::empty(),
             FixedOffset::west_opt(-7 * 3600 - 15 * 60).unwrap(),
             FixedOffset::east_opt(14 * 3600).unwrap(),
         ]
@@ -666,10 +669,10 @@ mod fixedoffset {
         {
             let mut buf = Vec::new();
             let out_of_range: (i32, i32, i32) = (23, 45, 67);
-            ValueEncoder::<General>::encode_value(&out_of_range, &mut buf);
-            let mut fixed = <FixedOffset as ForOverwrite>::for_overwrite();
+            <() as ValueEncoder<General, _>>::encode_value(&out_of_range, &mut buf);
+            let mut fixed = <() as ForOverwrite<(), FixedOffset>>::for_overwrite();
             assert_eq!(
-                ValueDecoder::<General>::decode_value(
+                <() as ValueDecoder<General, _>>::decode_value(
                     &mut fixed,
                     Capped::new(&mut buf.as_slice()),
                     DecodeContext::default(),
@@ -677,7 +680,7 @@ mod fixedoffset {
                 Err(DecodeError::new(OutOfDomainValue))
             );
             assert_eq!(
-                DistinguishedValueDecoder::<General>::decode_value_distinguished::<true>(
+                <() as DistinguishedValueDecoder<General, _>>::decode_value_distinguished::<true>(
                     &mut fixed,
                     Capped::new(&mut buf.as_slice()),
                     RestrictedDecodeContext::new(NotCanonical),
@@ -692,10 +695,10 @@ mod fixedoffset {
         {
             let mut buf = Vec::new();
             let out_of_range: (i32, i32, i32) = (10, 0, -10);
-            ValueEncoder::<General>::encode_value(&out_of_range, &mut buf);
-            let mut fixed = <FixedOffset as ForOverwrite>::for_overwrite();
+            <() as ValueEncoder<General, _>>::encode_value(&out_of_range, &mut buf);
+            let mut fixed = <() as ForOverwrite<(), FixedOffset>>::for_overwrite();
             assert_eq!(
-                ValueDecoder::<General>::decode_value(
+                <() as ValueDecoder<General, _>>::decode_value(
                     &mut fixed,
                     Capped::new(&mut buf.as_slice()),
                     DecodeContext::default(),
@@ -703,7 +706,7 @@ mod fixedoffset {
                 Err(DecodeError::new(InvalidValue))
             );
             assert_eq!(
-                DistinguishedValueDecoder::<General>::decode_value_distinguished::<true>(
+                <() as DistinguishedValueDecoder<General, _>>::decode_value_distinguished::<true>(
                     &mut fixed,
                     Capped::new(&mut buf.as_slice()),
                     RestrictedDecodeContext::new(NotCanonical),
@@ -714,39 +717,43 @@ mod fixedoffset {
     }
 }
 
-impl<Z> ForOverwrite for DateTime<Z>
+impl<Z> ForOverwrite<(), DateTime<Z>> for ()
 where
     Z: TimeZone,
-    Z::Offset: EmptyState,
+    (): EmptyState<(), Z::Offset>,
 {
-    fn for_overwrite() -> Self {
-        Self::from_naive_utc_and_offset(<_ as EmptyState>::empty(), <_ as EmptyState>::empty())
+    fn for_overwrite() -> DateTime<Z> {
+        DateTime::from_naive_utc_and_offset(
+            <() as EmptyState<(), NaiveDateTime>>::empty(),
+            <() as EmptyState<(), Z::Offset>>::empty(),
+        )
     }
 }
 
-impl<Z> EmptyState for DateTime<Z>
+impl<Z> EmptyState<(), DateTime<Z>> for ()
 where
     Z: TimeZone,
-    Z::Offset: EmptyState,
+    (): EmptyState<(), Z::Offset>,
 {
-    fn is_empty(&self) -> bool {
-        <_ as EmptyState>::is_empty(&self.naive_utc()) && <_ as EmptyState>::is_empty(self.offset())
+    fn is_empty(val: &DateTime<Z>) -> bool {
+        <() as EmptyState<(), NaiveDateTime>>::is_empty(&val.naive_utc())
+            && <() as EmptyState<(), _>>::is_empty(val.offset())
     }
 
-    fn clear(&mut self) {
-        *self = <_ as EmptyState>::empty();
+    fn clear(val: &mut DateTime<Z>) {
+        *val = <() as ForOverwrite<(), DateTime<Z>>>::for_overwrite();
     }
 }
 
 impl<Z> Proxiable<SealedBilrostTag> for DateTime<Z>
 where
     Z: TimeZone,
-    Z::Offset: EmptyState,
+    (): EmptyState<(), Z::Offset>,
 {
     type Proxy = (NaiveDateTime, Z::Offset);
 
     fn new_proxy() -> Self::Proxy {
-        <_ as EmptyState>::empty()
+        <() as EmptyState<(), Self::Proxy>>::empty()
     }
 
     fn encode_proxy(&self) -> Self::Proxy {
@@ -763,7 +770,7 @@ where
 impl<Z> DistinguishedProxiable<SealedBilrostTag> for DateTime<Z>
 where
     Z: TimeZone,
-    Z::Offset: EmptyState,
+    (): EmptyState<(), Z::Offset>,
 {
     fn decode_proxy_distinguished(
         &mut self,
@@ -780,7 +787,7 @@ delegate_proxied_encoding!(
     use encoding (General) to encode proxied type (DateTime<Z>)
     using proxy tag (SealedBilrostTag)
     with general encodings including distinguished
-    with where clause for relaxed (Z::Offset: EmptyState)
+    with where clause for relaxed ((): EmptyState<(), Z::Offset>)
     with generics (Z: TimeZone)
 );
 
@@ -902,7 +909,7 @@ mod timedelta {
             TimeDelta::default(),
             TimeDelta::milliseconds(-i64::MAX), // apparently the minimum
             TimeDelta::milliseconds(i64::MAX),  // apparently the maximum
-            <TimeDelta as EmptyState>::empty(),
+            <() as EmptyState<(), TimeDelta>>::empty(),
             TimeDelta::new(900, 10).unwrap(),
             TimeDelta::seconds(-60),
         ]
