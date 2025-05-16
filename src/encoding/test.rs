@@ -1,10 +1,4 @@
-use crate::encoding::{
-    const_varint, decode_varint, decode_varint_slow, encode_varint, encoded_len_varint, Capped,
-    DecodeContext, Decoder, DistinguishedDecoder, DistinguishedProxiable,
-    DistinguishedValueDecoder, EmptyState, Encoder, Fixed, ForOverwrite, General, Map, Packed,
-    PlainBytes, Proxiable, RestrictedDecodeContext, RuntimeTagMeasurer, TagReader, TagRevWriter,
-    TagWriter, ValueDecoder, ValueEncoder, Varint, WireType,
-};
+use crate::encoding::{const_varint, decode_varint, decode_varint_slow, encode_varint, encoded_len_varint, Capped, DecodeContext, Decoder, DistinguishedDecoder, DistinguishedProxiable, DistinguishedValueDecoder, EmptyState, Encoder, FieldEncoder, Fixed, ForOverwrite, General, Map, Packed, PlainBytes, Proxiable, RestrictedDecodeContext, RuntimeTagMeasurer, TagReader, TagRevWriter, TagWriter, ValueDecoder, ValueEncoder, Varint, WireType};
 use crate::DecodeErrorKind::{
     InvalidVarint, OutOfDomainValue, TagOverflowed, Truncated, WrongWireType,
 };
@@ -187,13 +181,19 @@ macro_rules! check_type {
 
             pub fn check_type<T, E>(value: T, tag: u32, wire_type: WireType) -> TestCaseResult
             where
-                T: Debug + ForOverwrite<E> + PartialEq + $decoder_trait<E>,
+                T: Debug + PartialEq,
+                (): ForOverwrite<E, T> + $decoder_trait<E, T>,
             {
                 let expected_len =
-                    <T as Encoder<E>>::encoded_len(tag, &value, &mut RuntimeTagMeasurer::new());
+                    <() as Encoder<E, T>>::encoded_len(tag, &value, &mut RuntimeTagMeasurer::new());
 
                 let mut forward_encoded = Vec::with_capacity(expected_len);
-                <T as Encoder<E>>::encode(tag, &value, &mut forward_encoded, &mut TagWriter::new());
+                <() as Encoder<E, T>>::encode(
+                    tag,
+                    &value,
+                    &mut forward_encoded,
+                    &mut TagWriter::new(),
+                );
                 prop_assert_eq!(
                     expected_len,
                     forward_encoded.len(),
@@ -202,7 +202,7 @@ macro_rules! check_type {
 
                 let mut prepend_buf = ReverseBuffer::new();
                 let mut trw = TagRevWriter::new();
-                <T as Encoder<E>>::prepend_encode(tag, &value, &mut prepend_buf, &mut trw);
+                <() as Encoder<E, T>>::prepend_encode(tag, &value, &mut prepend_buf, &mut trw);
                 trw.finalize(&mut prepend_buf);
                 prop_assert_eq!(
                     expected_len,
@@ -246,8 +246,8 @@ macro_rules! check_type {
 
                     check_legal_remaining(tag, wire_type, buf.remaining())?;
 
-                    let mut roundtrip_value = T::for_overwrite();
-                    _ = <T as $decoder_trait<E>>::$decode(
+                    let mut roundtrip_value = <() as ForOverwrite<E, T>>::for_overwrite();
+                    _ = <() as $decoder_trait<E, T>>::$decode(
                         wire_type,
                         &mut roundtrip_value,
                         buf.lend(),
@@ -271,13 +271,11 @@ macro_rules! check_type {
             #[allow(dead_code)]
             pub fn check_type_general<T>(value: T, tag: u32, wire_type: WireType) -> TestCaseResult
             where
-                T: Debug
-                    + Clone
-                    + ForOverwrite<General>
-                    + ForOverwrite<GeneralPacked>
-                    + PartialEq
-                    + $decoder_trait<General>
-                    + $decoder_trait<GeneralPacked>,
+                T: Debug + Clone + PartialEq,
+                (): ForOverwrite<General, T>
+                    + $decoder_trait<General, T>
+                    + ForOverwrite<GeneralPacked, T>
+                    + $decoder_trait<GeneralPacked, T>,
             {
                 check_type::<T, General>(value.clone(), tag, wire_type).or(check_type::<
                     T,
@@ -293,13 +291,19 @@ macro_rules! check_type {
                 wire_type: WireType,
             ) -> TestCaseResult
             where
-                T: Debug + ForOverwrite<E> + PartialEq + $decoder_trait<E>,
+                T: Debug + PartialEq,
+                (): ForOverwrite<E, T> + $decoder_trait<E, T>
             {
                 let expected_len =
-                    <T as Encoder<E>>::encoded_len(tag, &value, &mut RuntimeTagMeasurer::new());
+                    <() as Encoder<E, T>>::encoded_len(tag, &value, &mut RuntimeTagMeasurer::new());
 
                 let mut forward_encoded = Vec::with_capacity(expected_len);
-                <T as Encoder<E>>::encode(tag, &value, &mut forward_encoded, &mut TagWriter::new());
+                <() as Encoder<E, T>>::encode(
+                    tag,
+                    &value,
+                    &mut forward_encoded,
+                    &mut TagWriter::new(),
+                );
 
                 prop_assert_eq!(
                     expected_len,
@@ -309,7 +313,7 @@ macro_rules! check_type {
 
                 let mut prepend_buf = ReverseBuffer::new();
                 let mut trw = TagRevWriter::new();
-                <T as Encoder<E>>::prepend_encode(tag, &value, &mut prepend_buf, &mut trw);
+                <() as Encoder<E, T>>::prepend_encode(tag, &value, &mut prepend_buf, &mut trw);
                 trw.finalize(&mut prepend_buf);
                 prop_assert_eq!(
                     expected_len,
@@ -334,7 +338,7 @@ macro_rules! check_type {
                     let mut buf = Capped::new(&mut slice);
                     let mut tr = TagReader::new();
 
-                    let mut roundtrip_value = T::for_overwrite();
+                    let mut roundtrip_value = <() as ForOverwrite<E, T>>::for_overwrite();
                     let (decoded_tag, decoded_wire_type) = tr.decode_key(buf.lend())?;
 
                     prop_assert_eq!(
@@ -353,7 +357,7 @@ macro_rules! check_type {
                         decoded_wire_type
                     );
 
-                    _ = <T as $decoder_trait<E>>::$decode(
+                    _ = <() as $decoder_trait<E, T>>::$decode(
                         wire_type,
                         &mut roundtrip_value,
                         buf.lend(),
@@ -428,19 +432,21 @@ pub(crate) use check_type_empty;
 
 pub(crate) fn check_type_empty_impl<T, E>()
 where
-    T: Debug + EmptyState + PartialEq,
+    T: Debug + PartialEq,
+    (): EmptyState<T, E>,
 {
-    let mut empty = T::empty();
+    let mut empty = <() as EmptyState<E, T>>::empty();
     assert!(empty.is_empty());
     empty.clear();
     assert!(empty.is_empty());
-    assert_eq!(empty, T::empty());
+    assert_eq!(empty, <() as EmptyState<E, T>>::empty());
 }
 
 pub(crate) fn check_type_empty_proxied_impl<T, Tag>()
 where
-    T: Debug + EmptyState + PartialEq + Proxiable<Tag>,
-    T::Proxy: Debug + EmptyState + PartialEq,
+    T: Debug + PartialEq + Proxiable<Tag>,
+    T::Proxy: Debug + PartialEq,
+    (): EmptyState<(), T> + EmptyState<(), T::Proxy>,
 {
     check_type_empty_impl::<T, crate::encoding::Proxied<General, Tag>>();
     check_type_empty_impl::<T::Proxy, General>();
@@ -448,8 +454,9 @@ where
 
 pub(crate) fn check_proxy_round_trip<T, Tag>()
 where
-    T: Debug + EmptyState + PartialEq + Proxiable<Tag>,
-    T::Proxy: Debug + EmptyState + PartialEq,
+    T: Debug + PartialEq + Proxiable<Tag>,
+    T::Proxy: Debug + PartialEq,
+    (): EmptyState<(), T> + EmptyState<(), T::Proxy>,
 {
     let start = T::empty();
     let proxy = start.encode_proxy();
@@ -462,8 +469,9 @@ where
 
 pub(crate) fn check_proxy_round_trip_distinguished<T, Tag>()
 where
-    T: Debug + EmptyState + Eq + DistinguishedProxiable<Tag>,
-    T::Proxy: Debug + EmptyState + Eq,
+    T: Debug + Eq + DistinguishedProxiable<Tag>,
+    T::Proxy: Debug + Eq,
+    (): EmptyState<(), T> + EmptyState<(), T::Proxy>,
 {
     let start = T::empty();
     let proxy = start.encode_proxy();
@@ -477,12 +485,13 @@ where
 
 fn present_empty_not_canon<T, E>()
 where
-    T: EmptyState<E> + Eq + DistinguishedDecoder<E> + ValueEncoder<E>,
+    T: Eq,
+    (): EmptyState<E, T> + DistinguishedDecoder<E, T> + ValueEncoder<E, T>,
 {
     let mut encoded = <Vec<u8>>::new();
-    crate::encoding::FieldEncoder::<E>::encode_field(
+    <() as FieldEncoder<E, T>>::encode_field(
         123,
-        &<T as EmptyState<E>>::empty(),
+        &<() as EmptyState<E, T>>::empty(),
         &mut encoded,
         &mut TagWriter::new(),
     );
@@ -492,7 +501,7 @@ where
     assert_eq!(tag, 123);
     let mut decoded = T::for_overwrite();
     assert_eq!(
-        DistinguishedDecoder::<E>::decode_distinguished(
+        <() as DistinguishedDecoder<E, T>>::decode_distinguished(
             wire_type,
             &mut decoded,
             capped,
@@ -626,7 +635,7 @@ fn unaligned_fixed64_packed() {
     buf.extend([1; 12]);
 
     let mut parsed = Vec::<u64>::new();
-    let res = ValueDecoder::<Packed<Fixed>>::decode_value(
+    let res = <() as ValueDecoder<Packed<Fixed>, _>>::decode_value(
         &mut parsed,
         Capped::new(&mut buf.as_slice()),
         DecodeContext::default(),
@@ -636,7 +645,9 @@ fn unaligned_fixed64_packed() {
             .kind(),
         Truncated
     );
-    let res = DistinguishedValueDecoder::<Packed<Fixed>>::decode_value_distinguished::<true>(
+    let res = <() as DistinguishedValueDecoder<Packed<Fixed>, _>>::
+        decode_value_distinguished::<true>
+    (
         &mut parsed,
         Capped::new(&mut buf.as_slice()),
         RestrictedDecodeContext::new(Canonicity::NotCanonical),
@@ -656,7 +667,7 @@ fn unaligned_fixed32_packed() {
     buf.extend([1; 17]);
 
     let mut parsed = Vec::<u32>::new();
-    let res = ValueDecoder::<Packed<Fixed>>::decode_value(
+    let res = <() as ValueDecoder<Packed<Fixed>, _>>::decode_value(
         &mut parsed,
         Capped::new(&mut buf.as_slice()),
         DecodeContext::default(),
@@ -666,7 +677,9 @@ fn unaligned_fixed32_packed() {
             .kind(),
         Truncated
     );
-    let res = DistinguishedValueDecoder::<Packed<Fixed>>::decode_value_distinguished::<true>(
+    let res = <() as DistinguishedValueDecoder<Packed<Fixed>, _>>::
+        decode_value_distinguished::<true>
+    (
         &mut parsed,
         Capped::new(&mut buf.as_slice()),
         RestrictedDecodeContext::new(Canonicity::NotCanonical),
@@ -689,7 +702,7 @@ fn unaligned_map_packed() {
 
     // The entries for this map always consume 12 bytes each.
     let mut parsed = BTreeMap::<u32, u64>::new();
-    let res = ValueDecoder::<Map<Fixed, Fixed>>::decode_value(
+    let res = <() as ValueDecoder<Map<Fixed, Fixed>, _>>::decode_value(
         &mut parsed,
         Capped::new(&mut buf.as_slice()),
         DecodeContext::default(),
@@ -699,7 +712,9 @@ fn unaligned_map_packed() {
             .kind(),
         Truncated
     );
-    let res = DistinguishedValueDecoder::<Map<Fixed, Fixed>>::decode_value_distinguished::<true>(
+    let res = <() as DistinguishedValueDecoder<Map<Fixed, Fixed>, _>>::
+        decode_value_distinguished::<true>
+    (
         &mut parsed,
         Capped::new(&mut buf.as_slice()),
         RestrictedDecodeContext::new(Canonicity::NotCanonical),
@@ -716,7 +731,7 @@ fn string_merge_invalid_utf8() {
     let mut s = String::new();
     let buf = b"\x02\x80\x80";
 
-    let r = ValueDecoder::<General>::decode_value(
+    let r = <() as ValueDecoder<General, _>>::decode_value(
         &mut s,
         Capped::new(&mut buf.as_slice()),
         DecodeContext::default(),
@@ -955,10 +970,13 @@ fn varint_truncated() {
     );
 }
 
-fn check_rejects_wrong_wire_type<T: ForOverwrite<E> + Decoder<E>, E>(wire_type: WireType) {
-    let mut out = T::for_overwrite();
+fn check_rejects_wrong_wire_type<T, E>(wire_type: WireType)
+where
+(): ForOverwrite<E, T> + Decoder<E, T>,
+{
+    let mut out = <() as ForOverwrite<E, T>>::for_overwrite();
     assert_eq!(
-        <T as Decoder<E>>::decode(
+        <() as Decoder<E, T>>::decode(
             wire_type,
             &mut out,
             Capped::new(&mut [0u8; 0].as_slice()),
@@ -970,11 +988,11 @@ fn check_rejects_wrong_wire_type<T: ForOverwrite<E> + Decoder<E>, E>(wire_type: 
 
 fn check_rejects_wrong_wire_type_distinguished<T, E>(wire_type: WireType)
 where
-    T: ForOverwrite<E> + Decoder<E> + DistinguishedDecoder<E>,
+    (): ForOverwrite<E, T> + Decoder<E, T> + DistinguishedDecoder<E, T>,
 {
-    let mut out = T::for_overwrite();
+    let mut out = <() as ForOverwrite<E, T>>::for_overwrite();
     assert_eq!(
-        <T as DistinguishedDecoder<E>>::decode_distinguished(
+        <() as DistinguishedDecoder<E, T>>::decode_distinguished(
             wire_type,
             &mut out,
             Capped::new(&mut [0u8; 0].as_slice()),
@@ -1037,9 +1055,9 @@ proptest! {
     #[test]
     fn u32_in_u64(value: u32) {
         let mut buf = Vec::<u8>::new();
-        ValueEncoder::<General>::encode_value(&value, &mut buf);
+        <() as ValueEncoder<General, _>>::encode_value(&value, &mut buf);
         let mut out = 0u64;
-        ValueDecoder::<General>::decode_value(
+        <() as ValueDecoder<General, _>>::decode_value(
             &mut out,
             Capped::new(&mut &*buf),
             DecodeContext::default(),
@@ -1050,9 +1068,9 @@ proptest! {
     #[test]
     fn i32_in_i64(value: i32) {
         let mut buf = Vec::<u8>::new();
-        ValueEncoder::<General>::encode_value(&value, &mut buf);
+        <() as ValueEncoder<General, _>>::encode_value(&value, &mut buf);
         let mut out = 0i64;
-        ValueDecoder::<General>::decode_value(
+        <() as ValueDecoder<General, _>>::decode_value(
             &mut out,
             Capped::new(&mut &*buf),
             DecodeContext::default(),
@@ -1064,9 +1082,9 @@ proptest! {
     fn u64_in_u32(value: u32) {
         let value = value as u64;
         let mut buf = Vec::<u8>::new();
-        ValueEncoder::<General>::encode_value(&value, &mut buf);
+        <() as ValueEncoder<General, _>>::encode_value(&value, &mut buf);
         let mut out = 0u32;
-        ValueDecoder::<General>::decode_value(
+        <() as ValueDecoder<General, _>>::decode_value(
             &mut out,
             Capped::new(&mut &*buf),
             DecodeContext::default(),
@@ -1078,9 +1096,9 @@ proptest! {
     fn i64_in_i32(value: i32) {
         let value = value as i64;
         let mut buf = Vec::<u8>::new();
-        ValueEncoder::<General>::encode_value(&value, &mut buf);
+        <() as ValueEncoder<General, _>>::encode_value(&value, &mut buf);
         let mut out = 0i32;
-        ValueDecoder::<General>::decode_value(
+        <() as ValueDecoder<General, _>>::decode_value(
             &mut out,
             Capped::new(&mut &*buf),
             DecodeContext::default(),
@@ -1091,10 +1109,10 @@ proptest! {
     #[test]
     fn u32_out_of_range(value in u32::MAX as u64 + 1..) {
         let mut buf = Vec::<u8>::new();
-        ValueEncoder::<General>::encode_value(&value, &mut buf);
+        <() as ValueEncoder<General, _>>::encode_value(&value, &mut buf);
         let mut out = 0u32;
         prop_assert_eq!(
-            ValueDecoder::<General>::decode_value(
+            <() as ValueDecoder<General, _>>::decode_value(
                 &mut out,
                 Capped::new(&mut &*buf),
                 DecodeContext::default(),
@@ -1110,10 +1128,10 @@ proptest! {
     ) {
         for value in [low_value, high_value] {
             let mut buf = Vec::<u8>::new();
-            ValueEncoder::<General>::encode_value(&value, &mut buf);
+            <() as ValueEncoder<General, _>>::encode_value(&value, &mut buf);
             let mut out = 0i32;
             prop_assert_eq!(
-                ValueDecoder::<General>::decode_value(
+                <() as ValueDecoder<General, _>>::decode_value(
                     &mut out,
                     Capped::new(&mut &*buf),
                     DecodeContext::default(),
@@ -1126,10 +1144,10 @@ proptest! {
     #[test]
     fn u16_out_of_range(value in u16::MAX as u64 + 1..) {
         let mut buf = Vec::<u8>::new();
-        ValueEncoder::<General>::encode_value(&value, &mut buf);
+        <() as ValueEncoder<General, _>>::encode_value(&value, &mut buf);
         let mut out = 0u16;
         prop_assert_eq!(
-            ValueDecoder::<General>::decode_value(
+            <() as ValueDecoder<General, _>>::decode_value(
                 &mut out,
                 Capped::new(&mut &*buf),
                 DecodeContext::default(),
@@ -1145,10 +1163,10 @@ proptest! {
     ) {
         for value in [low_value, high_value] {
             let mut buf = Vec::<u8>::new();
-            ValueEncoder::<General>::encode_value(&value, &mut buf);
+            <() as ValueEncoder<General, _>>::encode_value(&value, &mut buf);
             let mut out = 0i16;
             prop_assert_eq!(
-                ValueDecoder::<General>::decode_value(
+                <() as ValueDecoder<General, _>>::decode_value(
                     &mut out,
                     Capped::new(&mut &*buf),
                     DecodeContext::default(),
@@ -1161,10 +1179,10 @@ proptest! {
     #[test]
     fn u8_out_of_range(value in u8::MAX as u64 + 1..) {
         let mut buf = Vec::<u8>::new();
-        ValueEncoder::<Varint>::encode_value(&value, &mut buf);
+        <() as ValueEncoder<Varint, _>>::encode_value(&value, &mut buf);
         let mut out = 0u8;
         prop_assert_eq!(
-            ValueDecoder::<Varint>::decode_value(
+            <() as ValueDecoder<Varint, _>>::decode_value(
                 &mut out,
                 Capped::new(&mut &*buf),
                 DecodeContext::default(),
@@ -1180,10 +1198,10 @@ proptest! {
     ) {
         for value in [low_value, high_value] {
             let mut buf = Vec::<u8>::new();
-            ValueEncoder::<Varint>::encode_value(&value, &mut buf);
+            <() as ValueEncoder<Varint, _>>::encode_value(&value, &mut buf);
             let mut out = 0i8;
             prop_assert_eq!(
-                ValueDecoder::<Varint>::decode_value(
+                <() as ValueDecoder<Varint, _>>::decode_value(
                     &mut out,
                     Capped::new(&mut &*buf),
                     DecodeContext::default(),
@@ -1199,7 +1217,7 @@ proptest! {
         encode_varint(varint, &mut buf);
         let mut out = false;
         prop_assert_eq!(
-            ValueDecoder::<General>::decode_value(
+            <() as ValueDecoder<General, _>>::decode_value(
                 &mut out,
                 Capped::new(&mut &*buf),
                 DecodeContext::default(),

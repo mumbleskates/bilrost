@@ -18,12 +18,12 @@ for_overwrite_via_default!(String);
 impl EmptyState<(), String> for () {
     #[inline]
     fn is_empty(val: &String) -> bool {
-        Self::is_empty(val)
+        val.is_empty()
     }
 
     #[inline]
     fn clear(val: &mut String) {
-        Self::clear(val)
+        val.clear();
     }
 }
 
@@ -45,8 +45,8 @@ where
     #[inline]
     fn is_empty(val: &Cow<'a, T>) -> bool {
         match val {
-            Cow::Borrowed(b) => EmptyState::is_empty(&b),
-            Cow::Owned(o) => EmptyState::is_empty(&o),
+            Cow::Borrowed(b) => <() as EmptyState<(), _>>::is_empty(b),
+            Cow::Owned(o) => <() as EmptyState<(), _>>::is_empty(o),
         }
     }
 
@@ -57,7 +57,7 @@ where
                 *val = Cow::Owned(<() as EmptyState<(), T::Owned>>::empty());
             }
             Cow::Owned(owned) => {
-                EmptyState::clear(owned);
+                <() as EmptyState<(), _>>::clear(owned);
             }
         }
     }

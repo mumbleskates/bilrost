@@ -25,16 +25,16 @@ impl<T, E> Wiretyped<Packed<E>, T> for () {
 impl<C, T, E> ValueEncoder<Packed<E>, C> for ()
 where
     C: Collection<Item = T>,
-    (): ForOverwrite<E, T> + ValueEncoder<E, T>,
+    (): EmptyState<(), C> + ForOverwrite<E, T> + ValueEncoder<E, T>,
 {
     #[inline]
     fn encode_value<B: BufMut + ?Sized>(value: &C, buf: &mut B) {
         encode_varint(
-            ValueEncoder::<E, _>::many_values_encoded_len(value.iter()) as u64,
+            <() as ValueEncoder<E, _>>::many_values_encoded_len(value.iter()) as u64,
             buf,
         );
         for val in value.iter() {
-            ValueEncoder::<E, _>::encode_value(val, buf);
+            <() as ValueEncoder<E, _>>::encode_value(val, buf);
         }
     }
 
@@ -42,14 +42,14 @@ where
     fn prepend_value<B: ReverseBuf + ?Sized>(value: &C, buf: &mut B) {
         let end = buf.remaining();
         for val in value.reversed() {
-            ValueEncoder::<E, _>::prepend_value(val, buf);
+            <() as ValueEncoder<E, _>>::prepend_value(val, buf);
         }
         prepend_varint((buf.remaining() - end) as u64, buf);
     }
 
     #[inline]
     fn value_encoded_len(value: &C) -> usize {
-        let inner_len = ValueEncoder::<E, _>::many_values_encoded_len(value.iter());
+        let inner_len = <() as ValueEncoder<E, _>>::many_values_encoded_len(value.iter());
         encoded_len_varint(inner_len as u64)
             .checked_add(inner_len)
             .unwrap()
@@ -60,11 +60,11 @@ where
 impl<C, T, E> Encoder<Packed<E>, C> for ()
 where
     C: Collection<Item = T>,
-    (): ForOverwrite<E, T> + ValueEncoder<E, T> + ValueEncoder<Packed<E>, C>,
+    (): EmptyState<(), C> + ForOverwrite<E, T> + ValueEncoder<E, T> + ValueEncoder<Packed<E>, C>,
 {
     #[inline]
     fn encode<B: BufMut + ?Sized>(tag: u32, value: &C, buf: &mut B, tw: &mut TagWriter) {
-        if !EmptyState::is_empty(value) {
+        if !<() as EmptyState<(), _>>::is_empty(value) {
             Self::encode_field(tag, value, buf, tw);
         }
     }
@@ -76,14 +76,14 @@ where
         buf: &mut B,
         tw: &mut TagRevWriter,
     ) {
-        if !EmptyState::is_empty(value) {
+        if !<() as EmptyState<(), _>>::is_empty(value) {
             Self::prepend_field(tag, value, buf, tw);
         }
     }
 
     #[inline]
     fn encoded_len(tag: u32, value: &C, tm: &mut impl TagMeasurer) -> usize {
-        if !EmptyState::is_empty(value) {
+        if !<() as EmptyState<(), _>>::is_empty(value) {
             Self::field_encoded_len(tag, value, tm)
         } else {
             0
@@ -98,11 +98,11 @@ where
     #[inline]
     fn encode_value<B: BufMut + ?Sized>(value: &[T; N], buf: &mut B) {
         encode_varint(
-            ValueEncoder::<E, _>::many_values_encoded_len(value.iter()) as u64,
+            <() as ValueEncoder<E, _>>::many_values_encoded_len(value.iter()) as u64,
             buf,
         );
         for val in value.iter() {
-            ValueEncoder::<E, _>::encode_value(val, buf);
+            <() as ValueEncoder<E, _>>::encode_value(val, buf);
         }
     }
 
@@ -110,14 +110,14 @@ where
     fn prepend_value<B: ReverseBuf + ?Sized>(value: &[T; N], buf: &mut B) {
         let end = buf.remaining();
         for val in value.iter().rev() {
-            ValueEncoder::<E, _>::prepend_value(val, buf);
+            <() as ValueEncoder<E, _>>::prepend_value(val, buf);
         }
         prepend_varint((buf.remaining() - end) as u64, buf);
     }
 
     #[inline]
     fn value_encoded_len(value: &[T; N]) -> usize {
-        let inner_len = ValueEncoder::<E, _>::many_values_encoded_len(value.iter());
+        let inner_len = <() as ValueEncoder<E, _>>::many_values_encoded_len(value.iter());
         encoded_len_varint(inner_len as u64)
             .checked_add(inner_len)
             .unwrap()
@@ -130,8 +130,8 @@ where
 {
     #[inline]
     fn encode<B: BufMut + ?Sized>(tag: u32, value: &[T; N], buf: &mut B, tw: &mut TagWriter) {
-        if !EmptyState::is_empty(value) {
-            FieldEncoder::<E, [T; N]>::encode_field(tag, value, buf, tw);
+        if !<() as EmptyState<E, _>>::is_empty(value) {
+            <() as FieldEncoder<Packed<E>, [T; N]>>::encode_field(tag, value, buf, tw);
         }
     }
 
@@ -142,15 +142,15 @@ where
         buf: &mut B,
         tw: &mut TagRevWriter,
     ) {
-        if !EmptyState::is_empty(value) {
-            FieldEncoder::<E, [T; N]>::prepend_field(tag, value, buf, tw);
+        if !<() as EmptyState<E, _>>::is_empty(value) {
+            <() as FieldEncoder<Packed<E>, [T; N]>>::prepend_field(tag, value, buf, tw);
         }
     }
 
     #[inline]
     fn encoded_len(tag: u32, value: &[T; N], tm: &mut impl TagMeasurer) -> usize {
-        if !EmptyState::is_empty(value) {
-            FieldEncoder::<E, [T; N]>::field_encoded_len(tag, value, tm)
+        if !<() as EmptyState<E, _>>::is_empty(value) {
+            <() as FieldEncoder<Packed<E>, [T; N]>>::field_encoded_len(tag, value, tm)
         } else {
             0
         }
@@ -174,7 +174,9 @@ macro_rules! impl_decoders {
         impl<$($lifetime,)? C, T, E> $relaxed_value <$($lifetime,)? Packed<E>, C> for ()
         where
             C: Collection<Item = T>,
-            (): ForOverwrite<E, T> + $relaxed_value<$($lifetime,)? E, T>,
+            (): EmptyState<(), C>
+                + ForOverwrite<E, T>
+                + $relaxed_value<$($lifetime,)? E, T>,
         {
             #[inline]
             fn $relaxed_value_method $($($buf_generic)*)? (
@@ -192,8 +194,8 @@ macro_rules! impl_decoders {
                     return Err(DecodeError::new(Truncated));
                 }
                 while capped.has_remaining()? {
-                    let mut new_val = <() as ForOverwrite::<E, T>>::for_overwrite();
-                    $relaxed_value::<E, _>::$relaxed_value_method(
+                    let mut new_val = <() as ForOverwrite<E, T>>::for_overwrite();
+                    <() as $relaxed_value<E, _>>::$relaxed_value_method(
                         &mut new_val,
                         capped.lend(),
                         ctx.clone(),
@@ -208,7 +210,9 @@ macro_rules! impl_decoders {
         where
             C: DistinguishedCollection<Item = T> + Eq,
             T: Eq,
-            (): ForOverwrite<E, T> + $distinguished_value<$($lifetime,)? E, T>,
+            (): EmptyState<(), C>
+                + ForOverwrite<E, T>
+                + $distinguished_value<$($lifetime,)? E, T>,
         {
             const CHECKS_EMPTY: bool = false;
 
@@ -231,7 +235,7 @@ macro_rules! impl_decoders {
                 while capped.has_remaining()? {
                     let mut new_val = <() as ForOverwrite<E, T>>::for_overwrite();
                     canon.update(
-                        $distinguished_value::<E, _>::$distinguished_value_method::<true>(
+                        <() as $distinguished_value<E, _>>::$distinguished_value_method::<true>(
                             &mut new_val,
                             capped.lend(),
                             ctx.clone(),
@@ -246,7 +250,8 @@ macro_rules! impl_decoders {
         impl<$($lifetime,)? C, T, E> $relaxed <$($lifetime,)? Packed<E>, C> for ()
         where
             C: Collection<Item = T>,
-            (): ForOverwrite<E, T>
+            (): EmptyState<(), C>
+                + ForOverwrite<E, T>
                 + $relaxed_value <$($lifetime,)? E, T>
                 + $relaxed_value <$($lifetime,)? Packed<E>, C>,
         {
@@ -272,7 +277,8 @@ macro_rules! impl_decoders {
         where
             C: DistinguishedCollection<Item = T>,
             T: Eq,
-            (): ForOverwrite<E, T>
+            (): EmptyState<(), C>
+                + ForOverwrite<E, T>
                 + $relaxed_value <$($lifetime,)? E, T>
                 + $distinguished_value <$($lifetime,)? Packed<E>, C>,
         {
@@ -286,7 +292,7 @@ macro_rules! impl_decoders {
                 if wire_type == WireType::LengthDelimited {
                     // We've encountered the expected length-delimited type: decode it in packed
                     // format. Set ALLOW_EMPTY to false: empty collections are not canonical
-                    let canon = $distinguished_value::<Packed<E>, _>::
+                    let canon = <() as $distinguished_value<Packed<E>, _>>::
                         $distinguished_value_method::<false>
                     (
                         value,
@@ -294,7 +300,7 @@ macro_rules! impl_decoders {
                         ctx.clone(),
                     )?;
                     if !<() as $distinguished_value<Packed<E>, C>>::CHECKS_EMPTY
-                        && EmptyState::is_empty(value)
+                        && <() as EmptyState<(), C>>::is_empty(value)
                     {
                         ctx.check(Canonicity::NotCanonical)
                     } else {
@@ -343,7 +349,7 @@ macro_rules! impl_decoders {
                         // Not enough values
                         return Err(DecodeError::new(InvalidValue));
                     }
-                    $relaxed_value::<E, _>::$relaxed_value_method(
+                    <() as $relaxed_value<E, _>>::$relaxed_value_method(
                         dest, capped.lend(), ctx.clone())?;
                 }
 
@@ -393,7 +399,7 @@ macro_rules! impl_decoders {
                     }
                     canon.update(
                         // Empty values are allowed because they are nested
-                        $distinguished_value::<E, _>::$distinguished_value_method::<true>(
+                        <() as $distinguished_value<E, _>>::$distinguished_value_method::<true>(
                             dest,
                             capped.lend(),
                             ctx.clone(),
@@ -461,7 +467,7 @@ macro_rules! impl_decoders {
                     // We've encountered the expected length-delimited type: decode it in packed
                     // format.
                     // Set ALLOW_EMPTY to false: empty collections are not canonical
-                    let canon = $distinguished_value::<Packed<E>, _>::
+                    let canon = <() as $distinguished_value<Packed<E>, _>>::
                         $distinguished_value_method::<false>
                     (
                         value,
@@ -471,7 +477,7 @@ macro_rules! impl_decoders {
 
                     if
                     /* !<[T; N]>::CHECKS_EMPTY && /* it never checks */ */
-                    EmptyState::is_empty(value) {
+                    <() as EmptyState<E, [T; N]>>::is_empty(value) {
                         ctx.check(Canonicity::NotCanonical)
                     } else {
                         Ok(canon)

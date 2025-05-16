@@ -50,7 +50,7 @@ macro_rules! define_decoders {
             loop {
                 // Decode one item
                 let mut new_item = <() as ForOverwrite<E, T::Item>>::for_overwrite();
-                $relaxed_value::<E, _>::$relaxed_value_method(&mut new_item, buf.lend(), ctx.clone())?;
+                <() as $relaxed_value<E, _>>::$relaxed_value_method(&mut new_item, buf.lend(), ctx.clone())?;
                 collection.insert(new_item)?;
 
                 if let Some(next_wire_type) = peek_repeated_field(&mut buf) {
@@ -79,7 +79,7 @@ macro_rules! define_decoders {
             {
                 // We've encountered a length-delimited field when we aren't expecting one; try
                 // decoding it in packed format instead.
-                $relaxed_value::<Packed<E>, _>::$relaxed_value_method(arr, buf, ctx)
+                <() as $relaxed_value<Packed<E>, _>>::$relaxed_value_method(arr, buf, ctx)
             } else {
                 // Otherwise, decode in unpacked mode.
                 decode_array_unpacked_only(wire_type, arr, buf, ctx)
@@ -111,7 +111,7 @@ macro_rules! define_decoders {
                     }
                 }
                 // Decode one item
-                $relaxed_value::<E, _>::$relaxed_value_method(dest, buf.lend(), ctx.clone())?;
+                <() as $relaxed_value<E, _>>::$relaxed_value_method(dest, buf.lend(), ctx.clone())?;
             }
             if peek_repeated_field(&mut buf).is_some() {
                 // Too many value fields
@@ -144,7 +144,7 @@ macro_rules! define_decoders {
                 let mut new_item = <() as ForOverwrite<E, T::Item>>::for_overwrite();
                 // Decoded field values are nested within the collection; empty values are OK
                 canon.update(
-                    $distinguished_value::<E, _>::$distinguished_value_method::<true>(
+                    <() as $distinguished_value<E, _>>::$distinguished_value_method::<true>(
                         &mut new_item,
                         buf.lend(),
                         ctx.clone(),
@@ -182,7 +182,9 @@ macro_rules! define_decoders {
                 // decoding it in packed format instead.
                 // The data is already known to be non-canonical; use relaxed decoding
                 _ = ctx.check(Canonicity::NotCanonical)?;
-                $relaxed_value::<Packed<E>, _>::$relaxed_value_method(arr, buf, ctx.into_inner())?;
+                <() as $relaxed_value<Packed<E>, _>>::$relaxed_value_method(
+                    arr, buf, ctx.into_inner(),
+                )?;
                 Ok(Canonicity::NotCanonical)
             } else {
                 // Otherwise, decode in unpacked mode.
@@ -218,7 +220,7 @@ macro_rules! define_decoders {
                 }
                 // Decode one item. Empty values are allowed
                 canon.update(
-                    $distinguished_value::<E, _>::$distinguished_value_method::<true>(
+                    <() as $distinguished_value<E, _>>::$distinguished_value_method::<true>(
                         dest,
                         buf.lend(),
                         ctx.clone(),
@@ -363,7 +365,8 @@ where
     fn encoded_len(tag: u32, value: &Option<[T; N]>, tm: &mut impl TagMeasurer) -> usize {
         if let Some(values) = value.as_ref() {
             // Each *additional* field encoded after the first needs only 1 byte for the field key.
-            tm.key_len(tag) + ValueEncoder::<E, T>::many_values_encoded_len(values.iter()) + N - 1
+            tm.key_len(tag) + <() as ValueEncoder<E, T>>::many_values_encoded_len(values.iter()) + N
+                - 1
         } else {
             0
         }
@@ -401,7 +404,7 @@ macro_rules! impl_decoders {
                 {
                     // We've encountered a length-delimited field when we aren't expecting one; try decoding
                     // it in packed format instead.
-                    $relaxed_value::<Packed<E>, _>::$relaxed_value_method(value, buf, ctx)
+                    <() as $relaxed_value<Packed<E>, _>>::$relaxed_value_method(value, buf, ctx)
                 } else {
                     // Otherwise, decode in unpacked mode.
                     $mode::decode::<C, E>(wire_type, value, buf, ctx)
@@ -434,7 +437,7 @@ macro_rules! impl_decoders {
                     // it in packed format instead.
                     // The data is already known to be non-canonical; use relaxed decoding
                     _ = ctx.check(Canonicity::NotCanonical)?;
-                    $relaxed_value::<Packed<E>, _>::$relaxed_value_method(
+                    <() as $relaxed_value<Packed<E>, _>>::$relaxed_value_method(
                         value,
                         buf,
                         ctx.into_inner(),

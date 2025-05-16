@@ -242,7 +242,7 @@ where
     #[inline]
     fn encode_field<B: BufMut + ?Sized>(tag: u32, value: &T, buf: &mut B, tw: &mut TagWriter) {
         tw.encode_key(tag, <() as Wiretyped<E, T>>::WIRE_TYPE, buf);
-        ValueEncoder::encode_value(value, buf);
+        <() as ValueEncoder<E, T>>::encode_value(value, buf);
     }
 
     #[inline]
@@ -253,12 +253,12 @@ where
         tw: &mut TagRevWriter,
     ) {
         tw.begin_field(tag, <() as Wiretyped<E, T>>::WIRE_TYPE, buf);
-        ValueEncoder::prepend_value(value, buf);
+        <() as ValueEncoder<E, T>>::prepend_value(value, buf);
     }
 
     #[inline]
     fn field_encoded_len(tag: u32, value: &T, tm: &mut impl TagMeasurer) -> usize {
-        tm.key_len(tag) + ValueEncoder::value_encoded_len(value)
+        tm.key_len(tag) + <() as ValueEncoder<E, T>>::value_encoded_len(value)
     }
 }
 
@@ -274,7 +274,7 @@ where
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         check_wire_type(<() as Wiretyped<E, T>>::WIRE_TYPE, wire_type)?;
-        ValueDecoder::decode_value(value, buf, ctx)
+        <() as ValueDecoder<E, T>>::decode_value(value, buf, ctx)
     }
 }
 
@@ -290,7 +290,9 @@ where
         ctx: RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
         check_wire_type(<() as Wiretyped<E, T>>::WIRE_TYPE, wire_type)?;
-        DistinguishedValueDecoder::decode_value_distinguished::<ALLOW_EMPTY>(value, buf, ctx)
+        <() as DistinguishedValueDecoder<E, T>>::decode_value_distinguished::<ALLOW_EMPTY>(
+            value, buf, ctx,
+        )
     }
 }
 
@@ -306,7 +308,7 @@ where
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         check_wire_type(<() as Wiretyped<E, T>>::WIRE_TYPE, wire_type)?;
-        ValueBorrowDecoder::borrow_decode_value(value, buf, ctx)
+        <() as ValueBorrowDecoder<E, T>>::borrow_decode_value(value, buf, ctx)
     }
 }
 
@@ -322,9 +324,9 @@ where
         ctx: RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
         check_wire_type(<() as Wiretyped<E, T>>::WIRE_TYPE, wire_type)?;
-        DistinguishedValueBorrowDecoder::borrow_decode_value_distinguished::<ALLOW_EMPTY>(
-            value, buf, ctx,
-        )
+        <() as DistinguishedValueBorrowDecoder<E, T>>::borrow_decode_value_distinguished::<
+            ALLOW_EMPTY,
+        >(value, buf, ctx)
     }
 }
 
@@ -390,7 +392,7 @@ mod generic_optional {
         ) -> Result<(), DecodeError> {
             <() as FieldDecoder<E, T>>::decode_field(
                 wire_type,
-                value.get_or_insert_with(ForOverwrite::for_overwrite),
+                value.get_or_insert_with(<() as ForOverwrite<E, T>>::for_overwrite),
                 buf,
                 ctx,
             )
@@ -410,8 +412,8 @@ mod generic_optional {
             ctx: RestrictedDecodeContext,
         ) -> Result<Canonicity, DecodeError> {
             check_wire_type(<() as Wiretyped<E, T>>::WIRE_TYPE, wire_type)?;
-            DistinguishedValueDecoder::decode_value_distinguished::<true>(
-                value.get_or_insert_with(ForOverwrite::for_overwrite),
+            <() as DistinguishedValueDecoder<E, T>>::decode_value_distinguished::<true>(
+                value.get_or_insert_with(<() as ForOverwrite<E, T>>::for_overwrite),
                 buf,
                 ctx,
             )
@@ -431,7 +433,7 @@ mod generic_optional {
         ) -> Result<(), DecodeError> {
             <() as FieldBorrowDecoder<E, T>>::borrow_decode_field(
                 wire_type,
-                value.get_or_insert_with(ForOverwrite::for_overwrite),
+                value.get_or_insert_with(<() as ForOverwrite<E, T>>::for_overwrite),
                 buf,
                 ctx,
             )
@@ -451,8 +453,8 @@ mod generic_optional {
             ctx: RestrictedDecodeContext,
         ) -> Result<Canonicity, DecodeError> {
             check_wire_type(<() as Wiretyped<E, T>>::WIRE_TYPE, wire_type)?;
-            DistinguishedValueBorrowDecoder::borrow_decode_value_distinguished::<true>(
-                value.get_or_insert_with(ForOverwrite::for_overwrite),
+            <() as DistinguishedValueBorrowDecoder<E, T>>::borrow_decode_value_distinguished::<true>(
+                value.get_or_insert_with(<() as ForOverwrite<E, T>>::for_overwrite),
                 buf,
                 ctx,
             )

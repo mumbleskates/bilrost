@@ -671,7 +671,6 @@ macro_rules! __impl_decoder_where_value_decoder {
         }
     };
 }
-pub(crate) use __impl_decoder_where_value_decoder;
 
 #[macro_export]
 macro_rules! encoding_implemented_via_value_encoding {
@@ -795,17 +794,17 @@ macro_rules! impl_cow_value_encoding {
             impl$(<$($generic)*>)? ValueEncoder<$E, Cow<'_, $T>> for () {
                 #[inline]
                 fn encode_value<B: BufMut + ?Sized>(value: &Cow<$T>, buf: &mut B) {
-                    ValueEncoder::<$E, _>::encode_value(&&**value, buf)
+                    <() as ValueEncoder<$E, _>>::encode_value(&&**value, buf)
                 }
 
                 #[inline]
                 fn prepend_value<B: ReverseBuf + ?Sized>(value: &Cow<$T>, buf: &mut B) {
-                    ValueEncoder::<$E, _>::prepend_value(&&**value, buf)
+                    <() as ValueEncoder<$E, _>>::prepend_value(&&**value, buf)
                 }
 
                 #[inline]
                 fn value_encoded_len(value: &Cow<$T>) -> usize {
-                    ValueEncoder::<$E, _>::value_encoded_len(&&**value)
+                    <() as ValueEncoder<$E, _>>::value_encoded_len(&&**value)
                 }
             }
 
@@ -816,7 +815,7 @@ macro_rules! impl_cow_value_encoding {
                     buf: Capped<B>,
                     ctx: DecodeContext,
                 ) -> Result<(), DecodeError> {
-                    ValueDecoder::<$E, _>::decode_value(value.to_mut(), buf, ctx)
+                    <() as ValueDecoder<$E, _>>::decode_value(value.to_mut(), buf, ctx)
                 }
             }
 
@@ -830,7 +829,9 @@ macro_rules! impl_cow_value_encoding {
                     buf: Capped<impl Buf + ?Sized>,
                     ctx: RestrictedDecodeContext,
                 ) -> Result<Canonicity, DecodeError> {
-                    DistinguishedValueDecoder::<$E, _>::decode_value_distinguished::<ALLOW_EMPTY>(
+                    <() as DistinguishedValueDecoder<$E, _>>::
+                        decode_value_distinguished::<ALLOW_EMPTY>
+                    (
                         value.to_mut(),
                         buf,
                         ctx,
@@ -846,7 +847,7 @@ macro_rules! impl_cow_value_encoding {
                     ctx: DecodeContext,
                 ) -> Result<(), DecodeError> {
                     let mut s = <() as ForOverwrite<$E, &$T>>::for_overwrite();
-                    ValueBorrowDecoder::<$E, _>::borrow_decode_value(&mut s, buf, ctx)?;
+                    <() as ValueBorrowDecoder<$E, _>>::borrow_decode_value(&mut s, buf, ctx)?;
                     *value = Cow::Borrowed(s);
                     Ok(())
                 }
@@ -864,7 +865,7 @@ macro_rules! impl_cow_value_encoding {
                     ctx: RestrictedDecodeContext,
                 ) -> Result<Canonicity, DecodeError> {
                     let mut s = <() as ForOverwrite<$E, &$T>>::for_overwrite();
-                    let canon = DistinguishedValueBorrowDecoder::<$E, _>::
+                    let canon = <() as DistinguishedValueBorrowDecoder<$E, _>>::
                         borrow_decode_value_distinguished::<ALLOW_EMPTY>
                     (
                         &mut s,

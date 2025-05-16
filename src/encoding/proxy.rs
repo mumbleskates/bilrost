@@ -77,17 +77,17 @@ where
 {
     #[inline]
     fn encode_value<B: BufMut + ?Sized>(value: &T, buf: &mut B) {
-        ValueEncoder::<E, _>::encode_value(&value.encode_proxy(), buf);
+        <() as ValueEncoder<E, _>>::encode_value(&value.encode_proxy(), buf);
     }
 
     #[inline]
     fn prepend_value<B: ReverseBuf + ?Sized>(value: &T, buf: &mut B) {
-        ValueEncoder::<E, _>::prepend_value(&value.encode_proxy(), buf);
+        <() as ValueEncoder<E, _>>::prepend_value(&value.encode_proxy(), buf);
     }
 
     #[inline]
     fn value_encoded_len(value: &T) -> usize {
-        ValueEncoder::<E, _>::value_encoded_len(&value.encode_proxy())
+        <() as ValueEncoder<E, _>>::value_encoded_len(&value.encode_proxy())
     }
 
     #[inline]
@@ -109,7 +109,7 @@ where
             }
         }
 
-        ValueEncoder::<E, _>::many_values_encoded_len(
+        <() as ValueEncoder<E, _>>::many_values_encoded_len(
             values.map(|item| WrapDeref(item.encode_proxy())),
         )
     }
@@ -127,7 +127,7 @@ where
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         let mut proxy = T::new_proxy();
-        ValueDecoder::<E, _>::decode_value(&mut proxy, buf, ctx)?;
+        <() as ValueDecoder<E, _>>::decode_value(&mut proxy, buf, ctx)?;
         Ok(value.decode_proxy(proxy)?)
     }
 }
@@ -145,11 +145,9 @@ where
         ctx: RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
         let mut proxy = T::new_proxy();
-        let mut canon = DistinguishedValueDecoder::<E, _>::decode_value_distinguished::<ALLOW_EMPTY>(
-            &mut proxy,
-            buf,
-            ctx.clone(),
-        )?;
+        let mut canon = <() as DistinguishedValueDecoder<E, _>>::decode_value_distinguished::<
+            ALLOW_EMPTY,
+        >(&mut proxy, buf, ctx.clone())?;
         canon.update(ctx.check(value.decode_proxy_distinguished(proxy)?)?);
         Ok(canon)
     }
@@ -167,7 +165,7 @@ where
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         let mut proxy = T::new_proxy();
-        ValueBorrowDecoder::<E, _>::borrow_decode_value(&mut proxy, buf, ctx)?;
+        <() as ValueBorrowDecoder<E, _>>::borrow_decode_value(&mut proxy, buf, ctx)?;
         Ok(value.decode_proxy(proxy)?)
     }
 }
@@ -185,9 +183,10 @@ where
         ctx: RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
         let mut proxy = T::new_proxy();
-        let mut canon = DistinguishedValueBorrowDecoder::<E, _>::borrow_decode_value_distinguished::<
-            ALLOW_EMPTY,
-        >(&mut proxy, buf, ctx.clone())?;
+        let mut canon =
+            <() as DistinguishedValueBorrowDecoder<E, _>>::borrow_decode_value_distinguished::<
+                ALLOW_EMPTY,
+            >(&mut proxy, buf, ctx.clone())?;
         canon.update(ctx.check(value.decode_proxy_distinguished(proxy)?)?);
         Ok(canon)
     }

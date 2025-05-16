@@ -45,8 +45,8 @@ where
             value
                 .iter()
                 .map(|(k, v)| {
-                    ValueEncoder::<KE, _>::value_encoded_len(k)
-                        + ValueEncoder::<VE, _>::value_encoded_len(v)
+                    <() as ValueEncoder<KE, _>>::value_encoded_len(k)
+                        + <() as ValueEncoder<VE, _>>::value_encoded_len(v)
                 })
                 .sum()
         },
@@ -66,16 +66,16 @@ where
     fn encode_value<B: BufMut + ?Sized>(value: &M, buf: &mut B) {
         encode_varint(map_encoded_length::<M, KE, VE>(value) as u64, buf);
         for (key, val) in value.iter() {
-            ValueEncoder::<KE, _>::encode_value(key, buf);
-            ValueEncoder::<VE, _>::encode_value(val, buf);
+            <() as ValueEncoder<KE, _>>::encode_value(key, buf);
+            <() as ValueEncoder<VE, _>>::encode_value(val, buf);
         }
     }
 
     fn prepend_value<B: ReverseBuf + ?Sized>(value: &M, buf: &mut B) {
         let end = buf.remaining();
         for (key, val) in value.reversed() {
-            ValueEncoder::<VE, _>::prepend_value(val, buf);
-            ValueEncoder::<KE, _>::prepend_value(key, buf);
+            <() as ValueEncoder<VE, _>>::prepend_value(val, buf);
+            <() as ValueEncoder<KE, _>>::prepend_value(key, buf);
         }
         prepend_varint((buf.remaining() - end) as u64, buf);
     }
@@ -129,9 +129,9 @@ macro_rules! impl_decoders {
                 while capped.has_remaining()? {
                     let mut new_key = <() as ForOverwrite::<KE, K>>::for_overwrite();
                     let mut new_val = <() as ForOverwrite::<VE, V>>::for_overwrite();
-                    $relaxed_value::<KE, _>::$relaxed_value_method(
+                    <() as $relaxed_value<KE, _>>::$relaxed_value_method(
                         &mut new_key, capped.lend(), ctx.clone())?;
-                    $relaxed_value::<VE, _>::$relaxed_value_method(
+                    <() as $relaxed_value<VE, _>>::$relaxed_value_method(
                         &mut new_val, capped.lend(), ctx.clone())?;
                     value.insert(new_key, new_val)?;
                 }
@@ -175,14 +175,14 @@ macro_rules! impl_decoders {
                     let mut new_key = <() as ForOverwrite<KE, K>>::for_overwrite();
                     let mut new_val = <() as ForOverwrite<VE, V>>::for_overwrite();
                     canon.update(
-                        $distinguished_value::<KE, _>::$distinguished_value_method::<true>(
+                        <() as $distinguished_value<KE, _>>::$distinguished_value_method::<true>(
                             &mut new_key,
                             capped.lend(),
                             ctx.clone(),
                         )?,
                     );
                     canon.update(
-                        $distinguished_value::<VE, _>::$distinguished_value_method::<true>(
+                        <() as $distinguished_value<VE, _>>::$distinguished_value_method::<true>(
                             &mut new_val,
                             capped.lend(),
                             ctx.clone(),

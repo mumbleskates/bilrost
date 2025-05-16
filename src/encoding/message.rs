@@ -326,6 +326,7 @@ where
 impl<T> Wiretyped<MessageEncoding, T> for ()
 where
     T: RawMessage,
+    (): EmptyState<(), T>,
 {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
 }

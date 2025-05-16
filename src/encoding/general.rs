@@ -120,17 +120,17 @@ impl<const P: u8> Wiretyped<GeneralGeneric<P>, &str> for () {
 impl<const P: u8> ValueEncoder<GeneralGeneric<P>, &str> for () {
     #[inline]
     fn encode_value<B: BufMut + ?Sized>(value: &&str, buf: &mut B) {
-        ValueEncoder::<PlainBytes, _>::encode_value(&value.as_bytes(), buf)
+        <() as ValueEncoder<PlainBytes, _>>::encode_value(&value.as_bytes(), buf)
     }
 
     #[inline]
     fn prepend_value<B: ReverseBuf + ?Sized>(value: &&str, buf: &mut B) {
-        ValueEncoder::<PlainBytes, _>::prepend_value(&value.as_bytes(), buf)
+        <() as ValueEncoder<PlainBytes, _>>::prepend_value(&value.as_bytes(), buf)
     }
 
     #[inline]
     fn value_encoded_len(value: &&str) -> usize {
-        ValueEncoder::<PlainBytes, _>::value_encoded_len(&value.as_bytes())
+        <() as ValueEncoder<PlainBytes, _>>::value_encoded_len(&value.as_bytes())
     }
 }
 
@@ -155,7 +155,7 @@ impl<'a, const P: u8> DistinguishedValueBorrowDecoder<'a, GeneralGeneric<P>, &'a
         buf: Capped<&'a [u8]>,
         ctx: RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
-        ValueBorrowDecoder::<GeneralGeneric<P>, _>::borrow_decode_value(
+        <() as ValueBorrowDecoder<GeneralGeneric<P>, _>>::borrow_decode_value(
             value,
             buf,
             ctx.into_inner(),
@@ -177,17 +177,17 @@ impl<const P: u8> Wiretyped<GeneralGeneric<P>, String> for () {
 impl<const P: u8> ValueEncoder<GeneralGeneric<P>, String> for () {
     #[inline]
     fn encode_value<B: BufMut + ?Sized>(value: &String, buf: &mut B) {
-        ValueEncoder::<PlainBytes, _>::encode_value(&value.as_bytes(), buf)
+        <() as ValueEncoder<PlainBytes, _>>::encode_value(&value.as_bytes(), buf)
     }
 
     #[inline]
     fn prepend_value<B: ReverseBuf + ?Sized>(value: &String, buf: &mut B) {
-        ValueEncoder::<PlainBytes, _>::prepend_value(&value.as_bytes(), buf)
+        <() as ValueEncoder<PlainBytes, _>>::prepend_value(&value.as_bytes(), buf)
     }
 
     #[inline]
     fn value_encoded_len(value: &String) -> usize {
-        ValueEncoder::<PlainBytes, _>::value_encoded_len(&value.as_bytes())
+        <() as ValueEncoder<PlainBytes, _>>::value_encoded_len(&value.as_bytes())
     }
 }
 
@@ -247,7 +247,7 @@ impl<const P: u8> DistinguishedValueDecoder<GeneralGeneric<P>, String> for () {
         buf: Capped<impl Buf + ?Sized>,
         ctx: RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
-        ValueDecoder::<GeneralGeneric<P>, _>::decode_value(value, buf, ctx.into_inner())?;
+        <() as ValueDecoder<GeneralGeneric<P>, _>>::decode_value(value, buf, ctx.into_inner())?;
         Ok(Canonicity::Canonical)
     }
 }
@@ -289,17 +289,17 @@ impl<const P: u8> Wiretyped<GeneralGeneric<P>, Bytes> for () {
 impl<const P: u8> ValueEncoder<GeneralGeneric<P>, Bytes> for () {
     #[inline]
     fn encode_value<B: BufMut + ?Sized>(value: &Bytes, buf: &mut B) {
-        ValueEncoder::<PlainBytes, _>::encode_value(&&**value, buf)
+        <() as ValueEncoder<PlainBytes, _>>::encode_value(&&**value, buf)
     }
 
     #[inline]
     fn prepend_value<B: ReverseBuf + ?Sized>(value: &Bytes, buf: &mut B) {
-        ValueEncoder::<PlainBytes, _>::prepend_value(&&**value, buf)
+        <() as ValueEncoder<PlainBytes, _>>::prepend_value(&&**value, buf)
     }
 
     #[inline]
     fn value_encoded_len(value: &Bytes) -> usize {
-        ValueEncoder::<PlainBytes, _>::value_encoded_len(&&**value)
+        <() as ValueEncoder<PlainBytes, _>>::value_encoded_len(&&**value)
     }
 }
 
@@ -326,7 +326,7 @@ impl<const P: u8> DistinguishedValueDecoder<GeneralGeneric<P>, Bytes> for () {
         buf: Capped<impl Buf + ?Sized>,
         ctx: RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
-        ValueDecoder::<GeneralGeneric<P>, _>::decode_value(value, buf, ctx.into_inner())?;
+        <() as ValueDecoder<GeneralGeneric<P>, _>>::decode_value(value, buf, ctx.into_inner())?;
         Ok(Canonicity::Canonical)
     }
 }
@@ -353,17 +353,17 @@ impl<const P: u8> Wiretyped<GeneralGeneric<P>, Blob> for () {
 impl<const P: u8> ValueEncoder<GeneralGeneric<P>, Blob> for () {
     #[inline]
     fn encode_value<B: BufMut + ?Sized>(value: &Blob, buf: &mut B) {
-        ValueEncoder::<PlainBytes, _>::encode_value(&value.as_slice(), buf)
+        <() as ValueEncoder<PlainBytes, _>>::encode_value(&value.as_slice(), buf)
     }
 
     #[inline]
     fn prepend_value<B: ReverseBuf + ?Sized>(value: &Blob, buf: &mut B) {
-        ValueEncoder::<PlainBytes, _>::prepend_value(&value.as_slice(), buf)
+        <() as ValueEncoder<PlainBytes, _>>::prepend_value(&value.as_slice(), buf)
     }
 
     #[inline]
     fn value_encoded_len(value: &Blob) -> usize {
-        ValueEncoder::<PlainBytes, _>::value_encoded_len(&value.as_slice())
+        <() as ValueEncoder<PlainBytes, _>>::value_encoded_len(&value.as_slice())
     }
 }
 
@@ -374,7 +374,7 @@ impl<const P: u8> ValueDecoder<GeneralGeneric<P>, Blob> for () {
         buf: Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
-        ValueDecoder::<PlainBytes, _>::decode_value(&mut **value, buf, ctx)
+        <() as ValueDecoder<PlainBytes, _>>::decode_value(&mut **value, buf, ctx)
     }
 }
 
@@ -387,7 +387,7 @@ impl<const P: u8> DistinguishedValueDecoder<GeneralGeneric<P>, Blob> for () {
         buf: Capped<impl Buf + ?Sized>,
         ctx: RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
-        DistinguishedValueDecoder::<PlainBytes, _>::decode_value_distinguished::<ALLOW_EMPTY>(
+        <() as DistinguishedValueDecoder<PlainBytes, _>>::decode_value_distinguished::<ALLOW_EMPTY>(
             &mut **value,
             buf,
             ctx,
@@ -488,17 +488,17 @@ mod delegate_to_message_encoding {
     {
         #[inline(always)]
         fn encode_value<B: BufMut + ?Sized>(value: &T, buf: &mut B) {
-            ValueEncoder::<MessageEncoding, _>::encode_value(value, buf)
+            <() as ValueEncoder<MessageEncoding, _>>::encode_value(value, buf)
         }
 
         #[inline(always)]
         fn prepend_value<B: ReverseBuf + ?Sized>(value: &T, buf: &mut B) {
-            ValueEncoder::<MessageEncoding, _>::prepend_value(value, buf)
+            <() as ValueEncoder<MessageEncoding, _>>::prepend_value(value, buf)
         }
 
         #[inline(always)]
         fn value_encoded_len(value: &T) -> usize {
-            ValueEncoder::<MessageEncoding, _>::value_encoded_len(value)
+            <() as ValueEncoder<MessageEncoding, _>>::value_encoded_len(value)
         }
     }
 
@@ -513,7 +513,7 @@ mod delegate_to_message_encoding {
             buf: Capped<B>,
             ctx: DecodeContext,
         ) -> Result<(), DecodeError> {
-            ValueDecoder::<MessageEncoding, _>::decode_value(value, buf, ctx)
+            <() as ValueDecoder<MessageEncoding, _>>::decode_value(value, buf, ctx)
         }
     }
 
@@ -531,9 +531,9 @@ mod delegate_to_message_encoding {
             buf: Capped<impl Buf + ?Sized>,
             ctx: RestrictedDecodeContext,
         ) -> Result<Canonicity, DecodeError> {
-            DistinguishedValueDecoder::<MessageEncoding, _>::decode_value_distinguished::<ALLOW_EMPTY>(
-                value, buf, ctx,
-            )
+            <() as DistinguishedValueDecoder<MessageEncoding, _>>::decode_value_distinguished::<
+                ALLOW_EMPTY,
+            >(value, buf, ctx)
         }
     }
 
@@ -548,7 +548,7 @@ mod delegate_to_message_encoding {
             buf: Capped<&'a [u8]>,
             ctx: DecodeContext,
         ) -> Result<(), DecodeError> {
-            ValueBorrowDecoder::<MessageEncoding, _>::borrow_decode_value(value, buf, ctx)
+            <() as ValueBorrowDecoder<MessageEncoding, _>>::borrow_decode_value(value, buf, ctx)
         }
     }
 
@@ -566,7 +566,7 @@ mod delegate_to_message_encoding {
             buf: Capped<&'a [u8]>,
             ctx: RestrictedDecodeContext,
         ) -> Result<Canonicity, DecodeError> {
-            DistinguishedValueBorrowDecoder::<MessageEncoding, _>::borrow_decode_value_distinguished::<
+            <() as DistinguishedValueBorrowDecoder<MessageEncoding, _>>::borrow_decode_value_distinguished::<
                 ALLOW_EMPTY,
             >(value, buf, ctx)
         }
