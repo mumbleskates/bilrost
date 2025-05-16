@@ -9,30 +9,30 @@ use crate::{Canonicity, DecodeError};
 use alloc::vec::Vec;
 use bytes::{Buf, BufMut};
 
-empty_state_via_default!(&bstr::BStr);
+empty_state_via_default!(&'a bstr::BStr, with generics ('a));
 
-impl<const P: u8> Wiretyped<GeneralGeneric<P>> for &bstr::BStr {
+impl<const P: u8> Wiretyped<GeneralGeneric<P>, &bstr::BStr> for () {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
 }
 
-impl<const P: u8> ValueEncoder<GeneralGeneric<P>> for &bstr::BStr {
+impl<const P: u8> ValueEncoder<GeneralGeneric<P>, &bstr::BStr> for () {
     #[inline]
     fn encode_value<B: BufMut + ?Sized>(value: &&bstr::BStr, buf: &mut B) {
-        ValueEncoder::<PlainBytes>::encode_value(&&***value, buf)
+        <() as ValueEncoder<PlainBytes, _>>::encode_value(&&***value, buf)
     }
 
     #[inline]
     fn prepend_value<B: ReverseBuf + ?Sized>(value: &&bstr::BStr, buf: &mut B) {
-        ValueEncoder::<PlainBytes>::prepend_value(&&***value, buf)
+        <() as ValueEncoder<PlainBytes, _>>::prepend_value(&&***value, buf)
     }
 
     #[inline]
     fn value_encoded_len(value: &&bstr::BStr) -> usize {
-        ValueEncoder::<PlainBytes>::value_encoded_len(&&***value)
+        <() as ValueEncoder<PlainBytes, _>>::value_encoded_len(&&***value)
     }
 }
 
-impl<'a, const P: u8> ValueBorrowDecoder<'a, GeneralGeneric<P>> for &'a bstr::BStr {
+impl<'a, const P: u8> ValueBorrowDecoder<'a, GeneralGeneric<P>, &'a bstr::BStr> for () {
     #[inline]
     fn borrow_decode_value(
         value: &mut &'a bstr::BStr,
@@ -44,7 +44,9 @@ impl<'a, const P: u8> ValueBorrowDecoder<'a, GeneralGeneric<P>> for &'a bstr::BS
     }
 }
 
-impl<'a, const P: u8> DistinguishedValueBorrowDecoder<'a, GeneralGeneric<P>> for &'a bstr::BStr {
+impl<'a, const P: u8> DistinguishedValueBorrowDecoder<'a, GeneralGeneric<P>, &'a bstr::BStr>
+    for ()
+{
     const CHECKS_EMPTY: bool = false;
 
     #[inline]
@@ -53,7 +55,11 @@ impl<'a, const P: u8> DistinguishedValueBorrowDecoder<'a, GeneralGeneric<P>> for
         buf: Capped<&'a [u8]>,
         ctx: RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
-        ValueBorrowDecoder::<GeneralGeneric<P>>::borrow_decode_value(value, buf, ctx.into_inner())?;
+        <() as ValueBorrowDecoder<GeneralGeneric<P>, _>>::borrow_decode_value(
+            value,
+            buf,
+            ctx.into_inner(),
+        )?;
         Ok(Canonicity::Canonical)
     }
 }
@@ -69,60 +75,60 @@ mod ref_bstr {
 
 for_overwrite_via_default!(bstr::BString);
 
-impl EmptyState for bstr::BString {
+impl EmptyState<(), bstr::BString> for () {
     #[inline]
-    fn is_empty(&self) -> bool {
-        Vec::is_empty(self)
+    fn is_empty(val: &bstr::BString) -> bool {
+        val.is_empty()
     }
 
     #[inline]
-    fn clear(&mut self) {
-        Vec::clear(self)
+    fn clear(val: &mut bstr::BString) {
+        val.clear();
     }
 }
 
-impl<const P: u8> Wiretyped<GeneralGeneric<P>> for bstr::BString {
+impl<const P: u8> Wiretyped<GeneralGeneric<P>, bstr::BString> for () {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
 }
 
-impl<const P: u8> ValueEncoder<GeneralGeneric<P>> for bstr::BString {
+impl<const P: u8> ValueEncoder<GeneralGeneric<P>, bstr::BString> for () {
     #[inline(always)]
     fn encode_value<B: BufMut + ?Sized>(value: &bstr::BString, buf: &mut B) {
-        ValueEncoder::<PlainBytes>::encode_value(&**value, buf);
+        <() as ValueEncoder<PlainBytes, _>>::encode_value(&**value, buf);
     }
 
     #[inline(always)]
     fn prepend_value<B: ReverseBuf + ?Sized>(value: &bstr::BString, buf: &mut B) {
-        ValueEncoder::<PlainBytes>::prepend_value(&**value, buf);
+        <() as ValueEncoder<PlainBytes, _>>::prepend_value(&**value, buf);
     }
 
     #[inline(always)]
     fn value_encoded_len(value: &bstr::BString) -> usize {
-        ValueEncoder::<PlainBytes>::value_encoded_len(&**value)
+        <() as ValueEncoder<PlainBytes, _>>::value_encoded_len(&**value)
     }
 }
 
-impl<const P: u8> ValueDecoder<GeneralGeneric<P>> for bstr::BString {
+impl<const P: u8> ValueDecoder<GeneralGeneric<P>, bstr::BString> for () {
     #[inline(always)]
     fn decode_value<B: Buf + ?Sized>(
         value: &mut bstr::BString,
         buf: Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
-        ValueDecoder::<PlainBytes>::decode_value(&mut **value, buf, ctx)
+        <() as ValueDecoder<PlainBytes, _>>::decode_value(&mut **value, buf, ctx)
     }
 }
 
-impl<const P: u8> DistinguishedValueDecoder<GeneralGeneric<P>> for bstr::BString {
-    const CHECKS_EMPTY: bool = <Vec<u8> as DistinguishedValueDecoder<PlainBytes>>::CHECKS_EMPTY;
+impl<const P: u8> DistinguishedValueDecoder<GeneralGeneric<P>, bstr::BString> for () {
+    const CHECKS_EMPTY: bool = <() as DistinguishedValueDecoder<PlainBytes, Vec<u8>>>::CHECKS_EMPTY;
 
     #[inline(always)]
     fn decode_value_distinguished<const ALLOW_EMPTY: bool>(
-        value: &mut Self,
+        value: &mut bstr::BString,
         buf: Capped<impl Buf + ?Sized>,
         ctx: RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
-        DistinguishedValueDecoder::<PlainBytes>::decode_value_distinguished::<ALLOW_EMPTY>(
+        <() as DistinguishedValueDecoder<PlainBytes, _>>::decode_value_distinguished::<ALLOW_EMPTY>(
             &mut **value,
             buf,
             ctx,
