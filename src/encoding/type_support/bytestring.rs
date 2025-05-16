@@ -11,23 +11,23 @@ use bytes::{Buf, BufMut};
 
 for_overwrite_via_default!(bytestring::ByteString);
 
-impl EmptyState for bytestring::ByteString {
+impl EmptyState<(), bytestring::ByteString> for () {
     #[inline]
-    fn is_empty(&self) -> bool {
-        str::is_empty(self)
+    fn is_empty(val: &bytestring::ByteString) -> bool {
+        val.is_empty()
     }
 
     #[inline]
-    fn clear(&mut self) {
-        *self = <_ as EmptyState>::empty();
+    fn clear(val: &mut bytestring::ByteString) {
+        *val = Default::default();
     }
 }
 
-impl<const P: u8> Wiretyped<GeneralGeneric<P>> for bytestring::ByteString {
+impl<const P: u8> Wiretyped<GeneralGeneric<P>, bytestring::ByteString> for () {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
 }
 
-impl<const P: u8> ValueEncoder<GeneralGeneric<P>> for bytestring::ByteString {
+impl<const P: u8> ValueEncoder<GeneralGeneric<P>, bytestring::ByteString> for () {
     #[inline]
     fn encode_value<B: BufMut + ?Sized>(value: &bytestring::ByteString, buf: &mut B) {
         encode_varint(value.len() as u64, buf);
@@ -46,7 +46,7 @@ impl<const P: u8> ValueEncoder<GeneralGeneric<P>> for bytestring::ByteString {
     }
 }
 
-impl<const P: u8> ValueDecoder<GeneralGeneric<P>> for bytestring::ByteString {
+impl<const P: u8> ValueDecoder<GeneralGeneric<P>, bytestring::ByteString> for () {
     #[inline]
     fn decode_value<B: Buf + ?Sized>(
         value: &mut bytestring::ByteString,
@@ -61,7 +61,7 @@ impl<const P: u8> ValueDecoder<GeneralGeneric<P>> for bytestring::ByteString {
     }
 }
 
-impl<const P: u8> DistinguishedValueDecoder<GeneralGeneric<P>> for bytestring::ByteString {
+impl<const P: u8> DistinguishedValueDecoder<GeneralGeneric<P>, bytestring::ByteString> for () {
     const CHECKS_EMPTY: bool = false;
 
     #[inline]
@@ -70,7 +70,7 @@ impl<const P: u8> DistinguishedValueDecoder<GeneralGeneric<P>> for bytestring::B
         buf: Capped<impl Buf + ?Sized>,
         ctx: RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
-        ValueDecoder::<GeneralGeneric<P>>::decode_value(value, buf, ctx.into_inner())?;
+        <() as ValueDecoder<GeneralGeneric<P>, _>>::decode_value(value, buf, ctx.into_inner())?;
         Ok(Canonicity::Canonical)
     }
 }
