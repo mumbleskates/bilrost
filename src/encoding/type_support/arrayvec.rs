@@ -10,15 +10,15 @@ use bytes::Buf;
 
 for_overwrite_via_default!(arrayvec::ArrayVec<T, N>, with generics (T, const N: usize));
 
-impl<T, const N: usize> EmptyState for arrayvec::ArrayVec<T, N> {
+impl<T, const N: usize> EmptyState<(), arrayvec::ArrayVec<T, N>> for () {
     #[inline]
-    fn is_empty(&self) -> bool {
-        arrayvec::ArrayVec::is_empty(self)
+    fn is_empty(val: &arrayvec::ArrayVec<T, N>) -> bool {
+        val.is_empty()
     }
 
     #[inline]
-    fn clear(&mut self) {
-        arrayvec::ArrayVec::clear(self)
+    fn clear(val: &mut arrayvec::ArrayVec<T, N>) {
+        val.clear();
     }
 }
 

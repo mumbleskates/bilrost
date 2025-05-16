@@ -11,19 +11,19 @@ for_overwrite_via_default!(hashbrown::HashSet<T, S>,
         with generics (T, S),
         with where clause (T: Eq + Hash, S: Default + core::hash::BuildHasher));
 
-impl<T, S> EmptyState for hashbrown::HashSet<T, S>
+impl<T, S> EmptyState<(), hashbrown::HashSet<T, S>> for ()
 where
     T: Eq + Hash,
     S: Default + core::hash::BuildHasher,
 {
     #[inline]
-    fn is_empty(&self) -> bool {
-        hashbrown::HashSet::is_empty(self)
+    fn is_empty(val: &hashbrown::HashSet<T, S>) -> bool {
+        val.is_empty()
     }
 
     #[inline]
-    fn clear(&mut self) {
-        hashbrown::HashSet::clear(self)
+    fn clear(val: &mut hashbrown::HashSet<T, S>) {
+        val.clear();
     }
 }
 
@@ -72,19 +72,19 @@ for_overwrite_via_default!(hashbrown::HashMap<K, V, S>,
         with generics (K, V, S),
         with where clause (K: Eq + Hash, S: Default + core::hash::BuildHasher));
 
-impl<K, V, S> EmptyState for hashbrown::HashMap<K, V, S>
+impl<K, V, S> EmptyState<(), hashbrown::HashMap<K, V, S>> for ()
 where
     K: Eq + Hash,
     S: Default + core::hash::BuildHasher,
 {
     #[inline]
-    fn is_empty(&self) -> bool {
-        hashbrown::HashMap::is_empty(self)
+    fn is_empty(val: &hashbrown::HashMap<K, V, S>) -> bool {
+        val.is_empty()
     }
 
     #[inline]
-    fn clear(&mut self) {
-        hashbrown::HashMap::clear(self)
+    fn clear(val: &mut hashbrown::HashMap<K, V, S>) {
+        val.clear();
     }
 }
 

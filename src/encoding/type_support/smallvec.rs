@@ -7,19 +7,21 @@ use crate::encoding::{
 use crate::DecodeErrorKind;
 use bytes::Buf;
 
-for_overwrite_via_default!(smallvec::SmallVec<A>,
+for_overwrite_via_default!(
+    smallvec::SmallVec<A>,
     with generics(A),
-    with where clause (A: smallvec::Array));
+    with where clause (A: smallvec::Array)
+);
 
-impl<A: smallvec::Array> EmptyState for smallvec::SmallVec<A> {
+impl<A: smallvec::Array> EmptyState<(), smallvec::SmallVec<A>> for () {
     #[inline]
-    fn is_empty(&self) -> bool {
-        Self::is_empty(self)
+    fn is_empty(val: &smallvec::SmallVec<A>) -> bool {
+        val.is_empty()
     }
 
     #[inline]
-    fn clear(&mut self) {
-        Self::clear(self)
+    fn clear(val: &mut smallvec::SmallVec<A>) {
+        val.clear();
     }
 }
 

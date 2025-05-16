@@ -9,15 +9,15 @@ use bytes::Buf;
 
 for_overwrite_via_default!(thin_vec::ThinVec<T>, with generics (T));
 
-impl<T> EmptyState for thin_vec::ThinVec<T> {
+impl<T> EmptyState<(), thin_vec::ThinVec<T>> for () {
     #[inline]
-    fn is_empty(&self) -> bool {
-        Self::is_empty(self)
+    fn is_empty(val: &thin_vec::ThinVec<T>) -> bool {
+        val.is_empty()
     }
 
     #[inline]
-    fn clear(&mut self) {
-        Self::clear(self)
+    fn clear(val: &mut thin_vec::ThinVec<T>) {
+        val.clear();
     }
 }
 

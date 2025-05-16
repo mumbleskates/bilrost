@@ -12,15 +12,15 @@ for_overwrite_via_default!(tinyvec::ArrayVec<A>,
     with generics (A),
     with where clause (A: tinyvec::Array));
 
-impl<A: tinyvec::Array> EmptyState for tinyvec::ArrayVec<A> {
+impl<A: tinyvec::Array> EmptyState<(), tinyvec::ArrayVec<A>> for () {
     #[inline]
-    fn is_empty(&self) -> bool {
-        tinyvec::ArrayVec::is_empty(self)
+    fn is_empty(val: &tinyvec::ArrayVec<A>) -> bool {
+        val.is_empty()
     }
 
     #[inline]
-    fn clear(&mut self) {
-        tinyvec::ArrayVec::clear(self)
+    fn clear(val: &mut tinyvec::ArrayVec<A>) {
+        val.clear();
     }
 }
 
@@ -67,15 +67,15 @@ for_overwrite_via_default!(tinyvec::TinyVec<A>,
     with generics (A),
     with where clause (A: tinyvec::Array));
 
-impl<A: tinyvec::Array> EmptyState for tinyvec::TinyVec<A> {
+impl<A: tinyvec::Array> EmptyState<(), tinyvec::TinyVec<A>> for () {
     #[inline]
-    fn is_empty(&self) -> bool {
-        Self::is_empty(self)
+    fn is_empty(val: &tinyvec::TinyVec<A>) -> bool {
+        val.is_empty()
     }
 
     #[inline]
-    fn clear(&mut self) {
-        Self::clear(self)
+    fn clear(val: &mut tinyvec::TinyVec<A>) {
+        val.clear();
     }
 }
 
