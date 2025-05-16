@@ -8,7 +8,7 @@
 macro_rules! underived_encode {
     (
         $name:ident {
-            $($tag:literal: $encoder:ty => $field_name:ident: $target:expr),* $(,)?
+            $($tag:literal: $encoding:ty => $field_name:ident: $target:expr),* $(,)?
         },
         $buf:ident
     ) => {
@@ -16,10 +16,12 @@ macro_rules! underived_encode {
             use crate::encoding::{encode_varint, Encoder, RuntimeTagMeasurer, TagWriter};
             let buf = $buf;
             let tm = &mut RuntimeTagMeasurer::new();
-            let message_len = 0usize $(+ Encoder::<$encoder>::encoded_len($tag, $target, tm))*;
+            let message_len = 0usize $(
+               + <() as Encoder<$encoding, _>>::encoded_len($tag, $target, tm)
+            )*;
             encode_varint(message_len as u64, buf);
             let tw = &mut TagWriter::new();
-            $(Encoder::<$encoder>::encode($tag, $target, buf, tw);)*
+            $(<() as Encoder<$encoding, _>>::encode($tag, $target, buf, tw);)*
         }
     }
 }
@@ -31,7 +33,7 @@ pub(crate) use underived_encode;
 macro_rules! underived_prepend {
     (
         $name:ident {
-            $($tag:literal: $encoder:ty => $field_name:ident: $target:expr),* $(,)?
+            $($tag:literal: $encoding:ty => $field_name:ident: $target:expr),* $(,)?
         },
         $buf:ident
     ) => {
@@ -40,7 +42,7 @@ macro_rules! underived_prepend {
             let buf = $buf;
             let end = buf.remaining();
             let tw = &mut TagRevWriter::new();
-            $(Encoder::<$encoder>::prepend_encode($tag, $target, buf, tw);)*
+            $(<() as Encoder<$encoding, _>>::prepend_encode($tag, $target, buf, tw);)*
             tw.finalize(buf);
             prepend_varint((buf.remaining() - end) as u64, buf);
         }
@@ -54,13 +56,15 @@ pub(crate) use underived_prepend;
 macro_rules! underived_encoded_len {
     (
         $name:ident {
-            $($tag:literal: $encoder:ty => $field_name:ident: $target:expr),* $(,)?
+            $($tag:literal: $encoding:ty => $field_name:ident: $target:expr),* $(,)?
         }
     ) => {
         {
             use crate::encoding::{encoded_len_varint, Encoder, RuntimeTagMeasurer};
             let tm = &mut RuntimeTagMeasurer::new();
-            let message_len = 0usize $(+ Encoder::<$encoder>::encoded_len($tag, $target, tm))*;
+            let message_len = 0usize $(
+               + <() as Encoder<$encoding, _>>::encoded_len($tag, $target, tm)
+            )*;
             encoded_len_varint(message_len as u64) + message_len
         }
     }
@@ -73,7 +77,7 @@ pub(crate) use underived_encoded_len;
 macro_rules! underived_decode {
     (
         $name:ident {
-            $($tag:literal: $encoder:ty => $field_name:ident: $target:expr),* $(,)?
+            $($tag:literal: $encoding:ty => $field_name:ident: $target:expr),* $(,)?
         },
         $buf:ident,
         $ctx:ident
@@ -97,7 +101,7 @@ macro_rules! underived_decode {
                         if duplicated {
                             Err(DecodeError::new(UnexpectedlyRepeated))
                         } else {
-                            Decoder::<$encoder>::decode(
+                            <() as Decoder<$encoding, _>>::decode(
                                 wire_type,
                                 $target,
                                 buf.lend(),
@@ -124,7 +128,7 @@ pub(crate) use underived_decode;
 macro_rules! underived_decode_distinguished {
     (
         $name:ident {
-            $($tag:literal: $encoder:ty => $field_name:ident: $target:expr),* $(,)?
+            $($tag:literal: $encoding:ty => $field_name:ident: $target:expr),* $(,)?
         },
         $buf:ident,
         $ctx:ident
@@ -153,7 +157,9 @@ macro_rules! underived_decode_distinguished {
                                 if duplicated {
                                     Err(DecodeError::new(UnexpectedlyRepeated))
                                 } else {
-                                    DistinguishedDecoder::<$encoder>::decode_distinguished(
+                                    <() as DistinguishedDecoder<$encoding, _>>::
+                                        decode_distinguished
+                                    (
                                         wire_type,
                                         $target,
                                         buf.lend(),
