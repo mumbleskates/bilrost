@@ -35,6 +35,9 @@
 
 ### Fixes
 
+* The `empty_state_via_default!` macro no longer produces malformed output when
+  used with a generic.
+
 ### Cleanups
 
 ## v0.1012.3
