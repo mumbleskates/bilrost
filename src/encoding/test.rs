@@ -1,4 +1,10 @@
-use crate::encoding::{const_varint, decode_varint, decode_varint_slow, encode_varint, encoded_len_varint, Capped, DecodeContext, Decoder, DistinguishedDecoder, DistinguishedProxiable, DistinguishedValueDecoder, EmptyState, Encoder, FieldEncoder, Fixed, ForOverwrite, General, Map, Packed, PlainBytes, Proxiable, RestrictedDecodeContext, RuntimeTagMeasurer, TagReader, TagRevWriter, TagWriter, ValueDecoder, ValueEncoder, Varint, WireType};
+use crate::encoding::{
+    const_varint, decode_varint, decode_varint_slow, encode_varint, encoded_len_varint, Capped,
+    DecodeContext, Decoder, DistinguishedDecoder, DistinguishedProxiable,
+    DistinguishedValueDecoder, EmptyState, Encoder, FieldEncoder, Fixed, ForOverwrite, General,
+    Map, Packed, PlainBytes, Proxiable, RestrictedDecodeContext, RuntimeTagMeasurer, TagReader,
+    TagRevWriter, TagWriter, ValueDecoder, ValueEncoder, Varint, WireType,
+};
 use crate::DecodeErrorKind::{
     InvalidVarint, OutOfDomainValue, TagOverflowed, Truncated, WrongWireType,
 };
@@ -292,7 +298,7 @@ macro_rules! check_type {
             ) -> TestCaseResult
             where
                 T: Debug + PartialEq,
-                (): ForOverwrite<E, T> + $decoder_trait<E, T>
+                (): ForOverwrite<E, T> + $decoder_trait<E, T>,
             {
                 let expected_len =
                     <() as Encoder<E, T>>::encoded_len(tag, &value, &mut RuntimeTagMeasurer::new());
@@ -645,9 +651,7 @@ fn unaligned_fixed64_packed() {
             .kind(),
         Truncated
     );
-    let res = <() as DistinguishedValueDecoder<Packed<Fixed>, _>>::
-        decode_value_distinguished::<true>
-    (
+    let res = <() as DistinguishedValueDecoder<Packed<Fixed>, _>>::decode_value_distinguished::<true>(
         &mut parsed,
         Capped::new(&mut buf.as_slice()),
         RestrictedDecodeContext::new(Canonicity::NotCanonical),
@@ -677,9 +681,7 @@ fn unaligned_fixed32_packed() {
             .kind(),
         Truncated
     );
-    let res = <() as DistinguishedValueDecoder<Packed<Fixed>, _>>::
-        decode_value_distinguished::<true>
-    (
+    let res = <() as DistinguishedValueDecoder<Packed<Fixed>, _>>::decode_value_distinguished::<true>(
         &mut parsed,
         Capped::new(&mut buf.as_slice()),
         RestrictedDecodeContext::new(Canonicity::NotCanonical),
@@ -712,9 +714,9 @@ fn unaligned_map_packed() {
             .kind(),
         Truncated
     );
-    let res = <() as DistinguishedValueDecoder<Map<Fixed, Fixed>, _>>::
-        decode_value_distinguished::<true>
-    (
+    let res = <() as DistinguishedValueDecoder<Map<Fixed, Fixed>, _>>::decode_value_distinguished::<
+        true,
+    >(
         &mut parsed,
         Capped::new(&mut buf.as_slice()),
         RestrictedDecodeContext::new(Canonicity::NotCanonical),
@@ -972,7 +974,7 @@ fn varint_truncated() {
 
 fn check_rejects_wrong_wire_type<T, E>(wire_type: WireType)
 where
-(): ForOverwrite<E, T> + Decoder<E, T>,
+    (): ForOverwrite<E, T> + Decoder<E, T>,
 {
     let mut out = <() as ForOverwrite<E, T>>::for_overwrite();
     assert_eq!(
