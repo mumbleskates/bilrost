@@ -281,12 +281,21 @@ impl Field {
         }
     }
 
-    /// Returns an expression which initializes the field's type with the encoding.
+    /// Returns an expression which initializes the field's type with its encoding.
     pub fn for_overwrite(&self) -> TokenStream {
         let crate_ = crate_name();
         let encoding = &self.encoding;
         let ty = &self.ty;
         quote!(<() as #crate_::encoding::ForOverwrite<#encoding, #ty>>::for_overwrite())
+    }
+
+    /// Returns an expression which initializes the field's type as a guaranteed empty value with
+    /// its encoding.
+    pub fn empty(&self) -> TokenStream {
+        let crate_ = crate_name();
+        let encoding = &self.encoding;
+        let ty = &self.ty;
+        quote!(<() as #crate_::encoding::EmptyState<#encoding, #ty>>::empty())
     }
 
     /// Returns an expression which returns whether the field is considered empty in the encoding.
@@ -301,8 +310,9 @@ impl Field {
     pub fn clear(&self, ident: TokenStream) -> TokenStream {
         let crate_ = crate_name();
         let encoding = &self.encoding;
+        let ty = &self.ty;
         quote! {
-            #crate_::encoding::EmptyState<#encoding>::clear(#ident);
+            <() as #crate_::encoding::EmptyState<#encoding, #ty>>::clear(#ident);
         }
     }
 

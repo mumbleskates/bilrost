@@ -106,6 +106,14 @@ impl Field {
         )
     }
 
+    /// Returns an expression which initializes the field's type as a guaranteed empty value with
+    /// its encoding.
+    pub fn empty(&self) -> TokenStream {
+        let crate_ = crate_name();
+        let ty = &self.ty;
+        quote!(<() as #crate_::encoding::EmptyState<(), #ty>>::empty())
+    }
+
     /// Returns an expression which returns whether the field is considered empty in the encoding.
     pub fn is_empty(&self, ident: TokenStream) -> TokenStream {
         let crate_ = crate_name();

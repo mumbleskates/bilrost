@@ -171,11 +171,20 @@ impl Field {
         }
     }
 
-    /// Returns an expression which initializes the field's type with the encoding.
+    /// Returns an expression which initializes the field's type with its encoding.
     pub fn for_overwrite(&self) -> TokenStream {
         match self {
             Field::Value(scalar) => scalar.for_overwrite(),
             Field::Oneof(oneof) => oneof.for_overwrite(),
+        }
+    }
+
+    /// Returns an expression which initializes the field's type with its encoding with a guaranteed
+    /// empty value.
+    pub fn empty(&self) -> TokenStream {
+        match self {
+            Field::Value(scalar) => scalar.empty(),
+            Field::Oneof(oneof) => oneof.empty(),
         }
     }
 
