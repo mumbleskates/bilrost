@@ -123,6 +123,7 @@ pub trait Enumeration: Eq + Sized {
 }
 
 /// Trait for containers that store multiple items such as `Vec`, `BTreeSet`, and `HashSet`
+#[allow(clippy::len_without_is_empty)]
 pub trait Collection
 where
     (): EmptyState<(), Self>,
@@ -166,6 +167,7 @@ where
 }
 
 /// Trait for associative containers, such as `BTreeMap` and `HashMap`.
+#[allow(clippy::len_without_is_empty)]
 pub trait Mapping
 where
     (): EmptyState<(), Self>,
