@@ -172,10 +172,10 @@ mod assert {
 
     pub(super) fn decodes_owned<'a, M>(from: &'a [u8], into: M)
     where
-        M: OwnedMessage + BorrowedMessage<'a> + Debug + PartialEq + EmptyState,
+        M: OwnedMessage + BorrowedMessage<'a> + Debug + PartialEq,
     {
         assert_eq!(M::decode(from).as_ref(), Ok(&into));
-        let mut to_replace = M::empty();
+        let mut to_replace = M::new_empty();
         to_replace.replace_from(from).unwrap();
         assert_eq!(&to_replace, &into);
         decodes_borrowed(from, into);
@@ -186,21 +186,21 @@ mod assert {
         M: BorrowedMessage<'a> + PartialEq + Debug,
     {
         assert_eq!(M::decode_borrowed(from).as_ref(), Ok(&into));
-        let mut to_replace = M::empty();
+        let mut to_replace = M::new_empty();
         to_replace.replace_borrowed_from(from).unwrap();
         assert_eq!(&to_replace, &into);
     }
 
     pub(super) fn doesnt_decode_owned<'a, M>(from: &'a [u8], err: DecodeErrorKind, err_path: &str)
     where
-        M: OwnedMessage + BorrowedMessage<'a> + Debug + EmptyState,
+        M: OwnedMessage + BorrowedMessage<'a> + Debug,
     {
         assert_error(
             M::decode(from).expect_err("unexpectedly decoded without error"),
             err,
             err_path,
         );
-        let mut to_replace = M::empty();
+        let mut to_replace = M::new_empty();
         assert_error(
             to_replace
                 .replace_from(from)
@@ -216,14 +216,14 @@ mod assert {
         err: DecodeErrorKind,
         err_path: &str,
     ) where
-        M: BorrowedMessage<'a> + Debug + EmptyState,
+        M: BorrowedMessage<'a> + Debug,
     {
         assert_error(
             M::decode_borrowed(from).expect_err("unexpectedly decoded without error"),
             err,
             err_path,
         );
-        let mut to_replace = M::empty();
+        let mut to_replace = M::new_empty();
         assert_error(
             to_replace
                 .replace_borrowed_from(from)
@@ -235,17 +235,17 @@ mod assert {
 
     pub(super) fn decodes_distinguished_owned<'a, M>(from: &'a [u8], into: M)
     where
-        M: DistinguishedOwnedMessage + DistinguishedBorrowedMessage<'a> + Debug + Eq + EmptyState,
+        M: DistinguishedOwnedMessage + DistinguishedBorrowedMessage<'a> + Debug + Eq,
     {
         assert_eq!(M::decode(from).as_ref(), Ok(&into));
         let (decoded, canon) =
             M::decode_distinguished(from).expect("distinguished decoding failed");
         assert_eq!(&decoded, &into, "distinguished decoded doesn't match");
         assert_eq!(canon, Canonical);
-        let mut to_replace = M::empty();
+        let mut to_replace = M::new_empty();
         to_replace.replace_from(from).unwrap();
         assert_eq!(&to_replace, &into, "doesn't match after relaxed replace");
-        to_replace = M::empty();
+        to_replace = M::new_empty();
         assert_eq!(to_replace.replace_distinguished_from(from), Ok(Canonical));
         assert_eq!(
             &to_replace, &into,
@@ -269,7 +269,7 @@ mod assert {
 
     pub(super) fn decodes_distinguished_borrowed<'a, M>(from: &'a [u8], into: M)
     where
-        M: DistinguishedBorrowedMessage<'a> + Debug + Eq + EmptyState,
+        M: DistinguishedBorrowedMessage<'a> + Debug + Eq,
     {
         assert_eq!(M::decode_borrowed(from).as_ref(), Ok(&into));
         let (decoded, canon) =
@@ -279,13 +279,13 @@ mod assert {
             "distinguished borrowed decoded doesn't match"
         );
         assert_eq!(canon, Canonical);
-        let mut to_replace = M::empty();
+        let mut to_replace = M::new_empty();
         to_replace.replace_borrowed_from(from).unwrap();
         assert_eq!(
             &to_replace, &into,
             "doesn't match after relaxed borrowed replace"
         );
-        to_replace = M::empty();
+        to_replace = M::new_empty();
         assert_eq!(
             to_replace.replace_distinguished_borrowed_from(from),
             Ok(Canonical)
@@ -348,13 +348,13 @@ mod assert {
         expected_canon: Canonicity,
         err_expectations: impl RestrictedExpectations,
     ) where
-        M: DistinguishedOwnedMessage + DistinguishedBorrowedMessage<'a> + Debug + Eq + EmptyState,
+        M: DistinguishedOwnedMessage + DistinguishedBorrowedMessage<'a> + Debug + Eq,
     {
         assert_ne!(expected_canon, Canonical); // otherwise why call this function
 
         assert_eq!(M::decode(from).as_ref(), Ok(&into));
 
-        let mut to_replace = M::empty();
+        let mut to_replace = M::new_empty();
         to_replace.replace_from(from).unwrap();
         assert_eq!(&to_replace, &into);
 
@@ -363,7 +363,7 @@ mod assert {
         assert_eq!(&decoded, &into, "distinguished decoded doesn't match");
         assert_eq!(canon, expected_canon);
 
-        let mut to_replace = M::empty();
+        let mut to_replace = M::new_empty();
         assert_eq!(
             to_replace
                 .replace_distinguished_from(from)
@@ -411,13 +411,13 @@ mod assert {
         expected_canon: Canonicity,
         err_expectations: impl RestrictedExpectations,
     ) where
-        M: DistinguishedBorrowedMessage<'a> + Debug + Eq + EmptyState,
+        M: DistinguishedBorrowedMessage<'a> + Debug + Eq,
     {
         assert_ne!(expected_canon, Canonical); // otherwise why call this function
 
         assert_eq!(M::decode_borrowed(from).as_ref(), Ok(&into));
 
-        let mut to_replace = M::empty();
+        let mut to_replace = M::new_empty();
         to_replace.replace_borrowed_from(from).unwrap();
         assert_eq!(&to_replace, &into);
 
@@ -426,7 +426,7 @@ mod assert {
         assert_eq!(&decoded, &into, "distinguished decoded doesn't match");
         assert_eq!(canon, expected_canon);
 
-        let mut to_replace = M::empty();
+        let mut to_replace = M::new_empty();
         assert_eq!(
             to_replace
                 .replace_distinguished_borrowed_from(from)
@@ -480,14 +480,14 @@ mod assert {
 
     pub(super) fn never_decodes_owned<'a, M>(from: &'a [u8], err: DecodeErrorKind, err_path: &str)
     where
-        M: DistinguishedOwnedMessage + DistinguishedBorrowedMessage<'a> + Debug + EmptyState,
+        M: DistinguishedOwnedMessage + DistinguishedBorrowedMessage<'a> + Debug,
     {
         assert_error(
             M::decode(from).expect_err("unepectedly decoded in relaxed mode without error"),
             err,
             err_path,
         );
-        let mut to_replace = M::empty();
+        let mut to_replace = M::new_empty();
         assert_error(
             to_replace
                 .replace_from(from)
@@ -501,7 +501,7 @@ mod assert {
             err,
             err_path,
         );
-        let mut to_replace = M::empty();
+        let mut to_replace = M::new_empty();
         assert_error(
             to_replace
                 .replace_distinguished_from(from)
@@ -517,7 +517,7 @@ mod assert {
         err: DecodeErrorKind,
         err_path: &str,
     ) where
-        M: DistinguishedBorrowedMessage<'a> + Debug + EmptyState,
+        M: DistinguishedBorrowedMessage<'a> + Debug,
     {
         assert_error(
             M::decode_borrowed(from)
@@ -525,7 +525,7 @@ mod assert {
             err,
             err_path,
         );
-        let mut to_replace = M::empty();
+        let mut to_replace = M::new_empty();
         assert_error(
             to_replace
                 .replace_borrowed_from(from)
@@ -539,7 +539,7 @@ mod assert {
             err,
             err_path,
         );
-        let mut to_replace = M::empty();
+        let mut to_replace = M::new_empty();
         assert_error(
             to_replace
                 .replace_distinguished_borrowed_from(from)
