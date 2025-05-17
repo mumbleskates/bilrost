@@ -954,7 +954,7 @@ fn ignored_fields_with_defaults() {
     // The empty value for the message will still have the empty value for all non-ignored
     // fields; the rest will be taken from the `Default` implementation.
     assert_eq!(
-        <FooPlus as EmptyState>::empty(),
+        FooPlus::new_empty(),
         FooPlus {
             x: 0,
             y: 0,
@@ -1148,10 +1148,10 @@ fn field_clearing() {
     }
 
     let mut clearable = Clearable::default();
-    assert!(!<_ as EmptyState>::is_empty(&clearable));
-    <_ as EmptyState>::clear(&mut clearable);
-    assert_eq!(clearable, <Clearable as EmptyState>::empty());
-    assert!(<_ as EmptyState>::is_empty(&clearable));
+    assert!(!clearable.message_is_empty());
+    clearable.clear_message();
+    assert_eq!(clearable, Clearable::new_empty());
+    assert!(clearable.message_is_empty());
     assert!(clearable.string.capacity() >= 64);
     assert!(clearable.blob.capacity() >= 64);
     assert!(clearable.vec.capacity() >= 64);
@@ -1179,7 +1179,7 @@ fn field_clearing() {
     assert!(clearable.hbset.capacity() >= 64);
 
     assert::decodes!(owned relaxed, Clearable::default().encode_to_vec(), Clearable::default());
-    assert::decodes!(owned relaxed, [], <Clearable as EmptyState>::empty());
+    assert::decodes!(owned relaxed, [], Clearable::new_empty());
 }
 
 #[test]
@@ -1188,7 +1188,7 @@ fn generic_encodings() {
     // This works perfectly because all usages of that name appear in-scope with the generic.
     #[allow(dead_code)]
     #[derive(Message)]
-    struct Foo<T, E>(#[bilrost(encoding(E))] T, #[bilrost(ignore)] PhantomData<E>);
+    struct Foo<T: Default, E>(#[bilrost(encoding(E))] T, #[bilrost(ignore)] PhantomData<E>);
 
     impl<T, E> Default for Foo<T, E>
     where
@@ -1224,7 +1224,7 @@ fn parsing_varints() {
         isize,
     );
 
-    assert::decodes!(owned distinguished, [], <Foo as EmptyState>::empty());
+    assert::decodes!(owned distinguished, [], Foo::new_empty());
     assert::decodes!(
         owned distinguished,
         (0..11).map(|tag| (tag, OV::Varint(1))),
@@ -1374,7 +1374,7 @@ fn parsing_fixed_width_ints() {
         #[bilrost(encoding(fixed))] i64,
     );
 
-    assert::decodes!(owned distinguished, [], <Foo as EmptyState>::empty());
+    assert::decodes!(owned distinguished, [], Foo::new_empty());
     assert::decodes!(
         owned distinguished,
         [
@@ -1500,8 +1500,8 @@ fn floating_point_zero_is_present_nested() {
     #[derive(Debug, Message)]
     struct Outer(#[bilrost(1)] Inner);
 
-    assert!(!<_ as EmptyState>::is_empty(&Inner(-0.0)));
-    assert!(!<_ as EmptyState>::is_empty(&Outer(Inner(-0.0))));
+    assert!(!Inner(-0.0).message_is_empty());
+    assert!(!Outer(Inner(-0.0)).message_is_empty());
     assert::encodes(
         Outer(Inner(-0.0)),
         [(1, OV::message(&[(1, OV::f32(-0.0))].into_opaque_message()))],
@@ -1669,7 +1669,7 @@ fn parsing_strings() {
 #[test]
 fn owned_empty_cow_str_is_still_empty() {
     let owned_empty = Cow::<str>::Owned(String::with_capacity(32));
-    assert!(<_ as EmptyState>::is_empty(&owned_empty));
+    assert!(<() as EmptyState<(), _>>::is_empty(&owned_empty));
 
     #[derive(Message)]
     struct Foo<'a>(Cow<'a, str>);
@@ -3719,7 +3719,7 @@ fn enumeration_helpers() {
         .unwrap()
         .expect_err("bad enumeration value parsed successfully");
 
-    let val = <HelpedStruct as EmptyState>::empty();
+    let val = HelpedStruct::new_empty();
     assert_eq!(val.optional(), None);
 
     // Demonstrate that the same errors happen when we decode to a struct with strict
@@ -3823,7 +3823,7 @@ fn directly_included_message() {
         owned distinguished,
         [(2, OV::string("abc"))],
         OuterDirect {
-            inner: <_ as EmptyState>::empty(),
+            inner: Inner::new_empty(),
             also: "abc".into(),
         },
     );
@@ -3841,7 +3841,7 @@ fn directly_included_message() {
     assert::decodes!(
         owned non-canonically,
         [(1, OV::message(&[].into_opaque_message()))],
-        <OuterDirect as EmptyState>::empty(),
+        OuterDirect::new_empty(),
         NotCanonical,
         "OuterDirect.inner",
     );
@@ -3849,7 +3849,7 @@ fn directly_included_message() {
         owned distinguished,
         [(1, OV::message(&[].into_opaque_message()))],
         OuterOptional {
-            inner: Some(<_ as EmptyState>::empty()),
+            inner: Some(Message::new_empty()),
             also: None,
         },
     );
@@ -4112,7 +4112,7 @@ fn unknown_fields_distinguished() {
             zero: "hello".into(),
             four: Some(Nested(555)),
             oneof: Three(Nested(301)),
-            ..EmptyState::<()>::empty()
+            ..Message::new_empty()
         },
     );
     assert::decodes!(
@@ -4127,7 +4127,7 @@ fn unknown_fields_distinguished() {
             zero: "hello".into(),
             four: Some(Nested(555)),
             oneof: Three(Nested(301)),
-            ..EmptyState::<()>::empty()
+            ..Message::new_empty()
         },
         HasExtensions,
         "",
@@ -4152,7 +4152,7 @@ fn unknown_fields_distinguished() {
             zero: "hello".into(),
             four: Some(Nested(555)),
             oneof: Three(Nested(301)),
-            ..EmptyState::<()>::empty()
+            ..Message::new_empty()
         },
         HasExtensions,
         "Foo.four",
@@ -4177,7 +4177,7 @@ fn unknown_fields_distinguished() {
             zero: "hello".into(),
             four: Some(Nested(555)),
             oneof: Three(Nested(301)),
-            ..EmptyState::<()>::empty()
+            ..Message::new_empty()
         },
         HasExtensions,
         "Foo.oneof/InnerOneof.Three",
@@ -4193,7 +4193,7 @@ fn unknown_fields_distinguished() {
         Foo {
             one: 1,
             oneof: Three(Nested(1)),
-            ..EmptyState::<()>::empty()
+            ..Message::new_empty()
         },
     );
     // We can see when there are extensions in both the inner and outer message...
@@ -4209,7 +4209,7 @@ fn unknown_fields_distinguished() {
         Foo {
             one: 1,
             oneof: Three(Nested(1)),
-            ..EmptyState::<()>::empty()
+            ..Message::new_empty()
         },
         HasExtensions,
         "Foo.oneof/InnerOneof.Three",
@@ -4224,7 +4224,7 @@ fn unknown_fields_distinguished() {
         Foo {
             one: 1,
             oneof: Three(Nested(1)),
-            ..EmptyState::<()>::empty()
+            ..Message::new_empty()
         },
         HasExtensions,
         "",
@@ -4241,7 +4241,7 @@ fn unknown_fields_distinguished() {
         Foo {
             one: 1,
             oneof: Three(Nested(0)),
-            ..EmptyState::<()>::empty()
+            ..Message::new_empty()
         },
         NotCanonical,
         // depending on how constrained a mode we parse in we can get different errors back from
@@ -4287,7 +4287,7 @@ fn length_delimited_borrowed_decoding_shortens_input_slices() {
             .ok_or(bilrost::DecodeError::new(DecodeErrorKind::Other))
     };
 
-    let mut replaceable = <Foo as EmptyState>::empty();
+    let mut replaceable = Foo::new_empty();
 
     assert_eq!(
         Foo::decode_borrowed_length_delimited(&mut slice),
