@@ -295,7 +295,7 @@ where
 {
     #[inline]
     fn encode<B: BufMut + ?Sized>(tag: u32, value: &[T; N], buf: &mut B, tw: &mut TagWriter) {
-        if !value.is_empty() {
+        if !<() as EmptyState<E, _>>::is_empty(value) {
             for val in value.iter() {
                 <() as FieldEncoder<E, T>>::encode_field(tag, val, buf, tw);
             }
@@ -309,7 +309,7 @@ where
         buf: &mut B,
         tw: &mut TagRevWriter,
     ) {
-        if !value.is_empty() {
+        if !<() as EmptyState<E, _>>::is_empty(value) {
             for val in value.iter().rev() {
                 <() as FieldEncoder<E, T>>::prepend_field(tag, val, buf, tw);
             }
@@ -318,7 +318,7 @@ where
 
     #[inline]
     fn encoded_len(tag: u32, value: &[T; N], tm: &mut impl TagMeasurer) -> usize {
-        if !value.is_empty() {
+        if !<() as EmptyState<E, _>>::is_empty(value) {
             // Each *additional* field encoded after the first needs only 1 byte for the field key.
             tm.key_len(tag) + <() as ValueEncoder<E, T>>::many_values_encoded_len(value.iter()) + N
                 - 1
