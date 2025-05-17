@@ -1012,6 +1012,21 @@ fn try_message_via_oneof(input: DeriveInput) -> Result<TokenStream, Error> {
             const __ASSERTIONS: () = ();
 
             #[inline(always)]
+            fn empty() -> Self {
+                <Self as #crate_::encoding::Oneof>::empty()
+            }
+
+            #[inline(always)]
+            fn is_empty(&self) -> bool {
+                <Self as #crate_::encoding::Oneof>::is_empty(self)
+            }
+
+            #[inline(always)]
+            fn clear(&mut self) {
+                <Self as #crate_::encoding::Oneof>::clear(self)
+            }
+
+            #[inline(always)]
             fn raw_encode<__B>(&self, buf: &mut __B)
             where
                 __B: #crate_::bytes::BufMut + ?Sized,
@@ -1675,7 +1690,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
     let decode_field_return_ty;
     let current_tag_ty;
     let current_tag: Vec<TokenStream>;
-    let empty_state_impl;
+    let empty_methods_impl;
     let some;
 
     if let Some(empty_ident) = &empty_variant {
@@ -1700,26 +1715,17 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         prepend.push(quote!(#ident::#empty_ident => {}));
         encoded_len.push(quote!(#ident::#empty_ident => 0));
 
-        empty_state_impl = Some(quote! {
-            impl #impl_generics #crate_::encoding::ForOverwrite<(), #ident #ty_generics> for ()
-            #encoder_where_clause {
-                #[inline]
-                fn for_overwrite() -> #ident #ty_generics {
-                    #ident::#empty_ident
-                }
+        empty_methods_impl = Some(quote! {
+            fn empty() -> Self {
+                Self::#empty_ident
             }
 
-            impl #impl_generics #crate_::encoding::EmptyState<(), #ident #ty_generics> for ()
-            #encoder_where_clause {
-                #[inline]
-                fn is_empty(val: &#ident #ty_generics) -> bool {
-                    matches!(val, #ident::#empty_ident)
-                }
+            fn is_empty(&self) -> bool {
+                matches!(self, Self::#empty_ident)
+            }
 
-                #[inline]
-                fn clear(val: &mut #ident #ty_generics) {
-                    *val = #ident::#empty_ident;
-                }
+            fn clear(&mut self) {
+                *self = Self::#empty_ident;
             }
         });
     } else {
@@ -1741,7 +1747,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
             })
             .collect();
 
-        empty_state_impl = None;
+        empty_methods_impl = None;
     };
 
     let variant_name_arms = fields.iter().map(|(variant_ident, field)| {
@@ -1846,6 +1852,8 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         {
             const FIELD_TAGS: &'static [u32] = &[#(#sorted_tags),*];
 
+            #empty_methods_impl
+
             fn oneof_encode<__B: #crate_::bytes::BufMut + ?Sized>(
                 &self,
                 buf: &mut __B,
@@ -1904,8 +1912,6 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
                 #decode_borrowed
             }
         }
-
-        #empty_state_impl
     };
 
     let distinguished_impls = distinguished.then(|| {

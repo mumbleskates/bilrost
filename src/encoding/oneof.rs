@@ -1,7 +1,6 @@
 use crate::buf::ReverseBuf;
 use crate::encoding::{
-    Capped, DecodeContext, EmptyState, RestrictedDecodeContext, TagMeasurer, TagRevWriter,
-    TagWriter, WireType,
+    Capped, DecodeContext, RestrictedDecodeContext, TagMeasurer, TagRevWriter, TagWriter, WireType,
 };
 use crate::{Canonicity, DecodeError};
 use alloc::boxed::Box;
@@ -34,11 +33,17 @@ use bytes::{Buf, BufMut};
 ///
 /// Other than that: Both empty and non-empty oneofs can be `Box`ed, as there are also wrapper impls
 /// to cover that.
-pub trait Oneof
-where
-    (): EmptyState<(), Self>,
-{
+pub trait Oneof {
     const FIELD_TAGS: &'static [u32];
+
+    /// Returns a new empty oneof.
+    fn empty() -> Self;
+
+    /// Returns whether the oneof is in the empty variant.
+    fn is_empty(&self) -> bool;
+
+    /// Resets the oneof to the empty variant.
+    fn clear(&mut self);
 
     /// Encodes the fields of the oneof into the given buffer.
     fn oneof_encode<B: BufMut + ?Sized>(&self, buf: &mut B, tw: &mut TagWriter);
@@ -58,10 +63,7 @@ where
 }
 
 /// Relaxed owned decoding trait for oneofs.
-pub trait OneofDecoder: Oneof
-where
-    (): EmptyState<(), Self>,
-{
+pub trait OneofDecoder: Oneof {
     /// Decodes from the given buffer.
     fn oneof_decode_field<B: Buf + ?Sized>(
         value: &mut Self,
@@ -73,10 +75,7 @@ where
 }
 
 /// Distinguished owned decoding trait for oneofs.
-pub trait DistinguishedOneofDecoder: Oneof
-where
-    (): EmptyState<(), Self>,
-{
+pub trait DistinguishedOneofDecoder: Oneof {
     /// Decodes from the given buffer in distinguished mode.
     fn oneof_decode_field_distinguished<B: Buf + ?Sized>(
         value: &mut Self,
@@ -88,10 +87,7 @@ where
 }
 
 /// Relaxed borrowed decoding trait for oneofs.
-pub trait OneofBorrowDecoder<'a>: Oneof
-where
-    (): EmptyState<(), Self>,
-{
+pub trait OneofBorrowDecoder<'a>: Oneof {
     fn oneof_borrow_decode_field(
         value: &mut Self,
         tag: u32,
@@ -102,10 +98,7 @@ where
 }
 
 /// Distinguished borrowed decoding trait for oneofs.
-pub trait DistinguishedOneofBorrowDecoder<'a>: Oneof
-where
-    (): EmptyState<(), Self>,
-{
+pub trait DistinguishedOneofBorrowDecoder<'a>: Oneof {
     fn oneof_borrow_decode_field_distinguished(
         value: &mut Self,
         tag: u32,
@@ -192,6 +185,18 @@ mod generic_oneof_grant_empty_state_impls {
         T: NonEmptyOneof,
     {
         const FIELD_TAGS: &'static [u32] = T::FIELD_TAGS;
+
+        fn empty() -> Self {
+            None
+        }
+
+        fn is_empty(&self) -> bool {
+            self.is_none()
+        }
+
+        fn clear(&mut self) {
+            *self = None;
+        }
 
         #[inline]
         fn oneof_encode<B: BufMut + ?Sized>(&self, buf: &mut B, tw: &mut TagWriter) {
@@ -365,9 +370,23 @@ mod generic_boxed_oneof_impls {
     impl<T> Oneof for Box<T>
     where
         T: Oneof,
-        (): EmptyState<(), T>,
     {
         const FIELD_TAGS: &'static [u32] = <T as Oneof>::FIELD_TAGS;
+
+        #[inline]
+        fn empty() -> Self {
+            Box::new(T::empty())
+        }
+
+        #[inline]
+        fn is_empty(&self) -> bool {
+            self.as_ref().is_empty()
+        }
+
+        #[inline]
+        fn clear(&mut self) {
+            self.as_mut().clear()
+        }
 
         #[inline]
         fn oneof_encode<B: BufMut + ?Sized>(&self, buf: &mut B, tw: &mut TagWriter) {
@@ -398,7 +417,6 @@ mod generic_boxed_oneof_impls {
     impl<T> OneofDecoder for Box<T>
     where
         T: OneofDecoder,
-        (): EmptyState<(), T>,
     {
         #[inline]
         fn oneof_decode_field<B: Buf + ?Sized>(
@@ -415,7 +433,6 @@ mod generic_boxed_oneof_impls {
     impl<T> DistinguishedOneofDecoder for Box<T>
     where
         T: DistinguishedOneofDecoder,
-        (): EmptyState<(), T>,
     {
         #[inline]
         fn oneof_decode_field_distinguished<B: Buf + ?Sized>(
@@ -438,7 +455,6 @@ mod generic_boxed_oneof_impls {
     impl<'a, T> OneofBorrowDecoder<'a> for Box<T>
     where
         T: OneofBorrowDecoder<'a>,
-        (): EmptyState<(), T>,
     {
         #[inline]
         fn oneof_borrow_decode_field(
@@ -455,7 +471,6 @@ mod generic_boxed_oneof_impls {
     impl<'a, T> DistinguishedOneofBorrowDecoder<'a> for Box<T>
     where
         T: DistinguishedOneofBorrowDecoder<'a>,
-        (): EmptyState<(), T>,
     {
         #[inline]
         fn oneof_borrow_decode_field_distinguished(
