@@ -1676,24 +1676,24 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         encoded_len.push(quote!(#ident::#empty_ident => 0));
 
         empty_state_impl = Some(quote! {
-            impl #impl_generics #crate_::encoding::ForOverwrite
-            for #ident #ty_generics #encoder_where_clause {
+            impl #impl_generics #crate_::encoding::ForOverwrite<(), #ident #ty_generics> for ()
+            #encoder_where_clause {
                 #[inline]
-                fn for_overwrite() -> Self {
+                fn for_overwrite() -> #ident #ty_generics {
                     #ident::#empty_ident
                 }
             }
 
-            impl #impl_generics #crate_::encoding::EmptyState
-            for #ident #ty_generics #encoder_where_clause {
+            impl #impl_generics #crate_::encoding::EmptyState<(), #ident #ty_generics> for ()
+            #encoder_where_clause {
                 #[inline]
-                fn is_empty(&self) -> bool {
-                    matches!(self, #ident::#empty_ident)
+                fn is_empty(val: &#ident #ty_generics) -> bool {
+                    matches!(val, #ident::#empty_ident)
                 }
 
                 #[inline]
-                fn clear(&mut self) {
-                    *self = #ident::#empty_ident;
+                fn clear(val: &mut #ident #ty_generics) {
+                    *val = #ident::#empty_ident;
                 }
             }
         });
