@@ -1,12 +1,7 @@
 struct CustomEncoding;
 struct Tag;
 
-bilrost::implement_core_empty_state_rules!(CustomEncoding);
-// TODO(widders): neither of these are possible, it turns out, because implementing
-//  `bilrost::Trait<crate::Something> for T` is disallowed: T is a type parameter, is uncovered, and
-//  appears before the first local type (the type implemented "for" is ordered first). the traits
-//  must be rejiggered to make this possible
-// bilrost::encoding_implemented_via_value_encoding!(CustomEncoding);
+bilrost::encoding_implemented_via_value_encoding!(CustomEncoding);
 bilrost::encoding_uses_base_empty_state!(CustomEncoding);
 
 mod crate_defined_structs {
@@ -125,30 +120,24 @@ mod implement_encoding_for_those_structs {
         }
     }
 
-    impl ForOverwrite for AlwaysEven {
-        fn for_overwrite() -> Self
-        where
-            Self: Sized,
-        {
+    impl ForOverwrite<(), AlwaysEven> for () {
+        fn for_overwrite() -> AlwaysEven {
             AlwaysEven::new(0).unwrap()
         }
     }
 
-    impl EmptyState for AlwaysEven {
-        fn is_empty(&self) -> bool {
-            self.value() == 0
+    impl EmptyState<(), AlwaysEven> for () {
+        fn is_empty(val: &AlwaysEven) -> bool {
+            val.value() == 0
         }
 
-        fn clear(&mut self) {
-            *self = AlwaysEven::new(0).unwrap();
+        fn clear(val: &mut AlwaysEven) {
+            *val = AlwaysEven::new(0).unwrap();
         }
     }
 
-    impl ForOverwrite for AlwaysOdd {
-        fn for_overwrite() -> Self
-        where
-            Self: Sized,
-        {
+    impl ForOverwrite<(), AlwaysOdd> for () {
+        fn for_overwrite() -> AlwaysOdd {
             AlwaysOdd::new(1).unwrap()
         }
     }
