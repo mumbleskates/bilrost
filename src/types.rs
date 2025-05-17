@@ -151,6 +151,14 @@ impl proptest::arbitrary::Arbitrary for Blob {
 impl RawMessage for () {
     const __ASSERTIONS: () = ();
 
+    fn empty() {}
+
+    fn is_empty(&self) -> bool {
+        true
+    }
+
+    fn clear(&mut self) {}
+
     fn raw_encode<B: BufMut + ?Sized>(&self, _buf: &mut B) {}
 
     fn raw_prepend<B: ReverseBuf + ?Sized>(&self, _buf: &mut B) {}

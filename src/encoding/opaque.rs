@@ -10,7 +10,7 @@ use bytes::{Buf, BufMut};
 use crate::buf::ReverseBuf;
 use crate::encoding::{
     encode_varint, encoded_len_varint, prepend_varint, Capped, DecodeContext, EmptyState,
-    ForOverwrite, RawDistinguishedMessageBorrowDecoder, RawDistinguishedMessageDecoder, RawMessage,
+    RawDistinguishedMessageBorrowDecoder, RawDistinguishedMessageDecoder, RawMessage,
     RawMessageBorrowDecoder, RawMessageDecoder, RestrictedDecodeContext, RuntimeTagMeasurer,
     TagMeasurer, TagRevWriter, TagWriter, WireType,
 };
@@ -360,26 +360,22 @@ impl<'a> FromIterator<(u32, OpaqueValue<'a>)> for OpaqueMessage<'a> {
     }
 }
 
-impl<'a> ForOverwrite<(), OpaqueMessage<'a>> for () {
-    fn for_overwrite() -> OpaqueMessage<'a> {
-        OpaqueMessage::new()
-    }
-}
-
-impl<'a> EmptyState<(), OpaqueMessage<'a>> for () {
-    #[inline]
-    fn is_empty(val: &OpaqueMessage<'a>) -> bool {
-        val.0.is_empty()
-    }
-
-    #[inline]
-    fn clear(val: &mut OpaqueMessage<'a>) {
-        val.0.clear()
-    }
-}
-
 impl RawMessage for OpaqueMessage<'_> {
     const __ASSERTIONS: () = ();
+
+    fn empty() -> Self {
+        OpaqueMessage::new()
+    }
+
+    #[inline]
+    fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    #[inline]
+    fn clear(&mut self) {
+        self.0.clear()
+    }
 
     fn raw_encode<B: BufMut + ?Sized>(&self, buf: &mut B) {
         let mut tw = TagWriter::new();

@@ -1,9 +1,9 @@
 use crate::buf::ReverseBuf;
 use crate::encoding::{
-    encode_varint, encoded_len_varint, encoding_uses_base_empty_state, prepend_varint, Canonicity,
-    Capped, DecodeContext, DistinguishedValueBorrowDecoder, DistinguishedValueDecoder, EmptyState,
-    RestrictedDecodeContext, TagReader, ValueBorrowDecoder, ValueDecoder, ValueEncoder, WireType,
-    Wiretyped,
+    encode_varint, encoded_len_varint, implement_core_empty_state_rules, prepend_varint,
+    Canonicity, Capped, DecodeContext, DistinguishedValueBorrowDecoder, DistinguishedValueDecoder,
+    EmptyState, ForOverwrite, RestrictedDecodeContext, TagReader, ValueBorrowDecoder, ValueDecoder,
+    ValueEncoder, WireType, Wiretyped,
 };
 use crate::Canonicity::Canonical;
 use crate::DecodeError;
@@ -15,7 +15,7 @@ use bytes::{Buf, BufMut};
 /// the general encodings.
 pub struct MessageEncoding;
 
-encoding_uses_base_empty_state!(MessageEncoding);
+implement_core_empty_state_rules!(MessageEncoding);
 
 /// Merges fields from the given buffer, to its cap, into the given owned message value.
 /// Implemented as a private standalone method to discourage "merging" as a usage pattern.
@@ -24,10 +24,7 @@ pub(crate) fn merge<T: RawMessageDecoder, B: Buf + ?Sized>(
     value: &mut T,
     mut buf: Capped<B>,
     ctx: DecodeContext,
-) -> Result<(), DecodeError>
-where
-    (): EmptyState<(), T>,
-{
+) -> Result<(), DecodeError> {
     let tr = &mut TagReader::new();
     let mut last_tag = None::<u32>;
     while buf.has_remaining()? {
@@ -46,10 +43,7 @@ pub(crate) fn merge_distinguished<T: RawDistinguishedMessageDecoder, B: Buf + ?S
     value: &mut T,
     mut buf: Capped<B>,
     ctx: RestrictedDecodeContext,
-) -> Result<Canonicity, DecodeError>
-where
-    (): EmptyState<(), T>,
-{
+) -> Result<Canonicity, DecodeError> {
     let tr = &mut TagReader::new();
     let mut last_tag = None::<u32>;
     let mut canon = Canonical;
@@ -80,10 +74,7 @@ pub(crate) fn borrow_merge<'a, T: RawMessageBorrowDecoder<'a>>(
     value: &mut T,
     mut buf: Capped<&'a [u8]>,
     ctx: DecodeContext,
-) -> Result<(), DecodeError>
-where
-    (): EmptyState<(), T>,
-{
+) -> Result<(), DecodeError> {
     let tr = &mut TagReader::new();
     let mut last_tag = None::<u32>;
     while buf.has_remaining()? {
@@ -102,10 +93,7 @@ pub(crate) fn borrow_merge_distinguished<'a, T: RawDistinguishedMessageBorrowDec
     value: &mut T,
     mut buf: Capped<&'a [u8]>,
     ctx: RestrictedDecodeContext,
-) -> Result<Canonicity, DecodeError>
-where
-    (): EmptyState<(), T>,
-{
+) -> Result<Canonicity, DecodeError> {
     let tr = &mut TagReader::new();
     let mut last_tag = None::<u32>;
     let mut canon = Canonical;
@@ -131,11 +119,19 @@ where
 
 /// Encoding trait to be implemented by messages. The methods of this trait are meant to only be
 /// used by the `Message` implementation.
-pub trait RawMessage
-where
-    (): EmptyState<(), Self>,
-{
+pub trait RawMessage {
     const __ASSERTIONS: ();
+
+    /// Returns an initialized message in an empty state.
+    fn empty() -> Self
+    where
+        Self: Sized;
+
+    /// Returns whether the message is currently empty.
+    fn is_empty(&self) -> bool;
+
+    /// Resets the message to an empty state.
+    fn clear(&mut self);
 
     /// Encodes the message to a buffer.
     ///
@@ -151,10 +147,7 @@ where
 
 /// Decoding trait to be implemented by messages. The methods of this trait are meant to only be
 /// used by the `OwnedMessage` implementation.
-pub trait RawMessageDecoder: RawMessage
-where
-    (): EmptyState<(), Self>,
-{
+pub trait RawMessageDecoder: RawMessage {
     /// Decodes a field from a buffer into `self`.
     fn raw_decode_field<B: Buf + ?Sized>(
         &mut self,
@@ -170,10 +163,7 @@ where
 
 /// Distinguished decoding trait to be implemented by messages. The methods of this trait are meant
 /// to only be used by the `DistinguishedOwnedMessage` implementation.
-pub trait RawDistinguishedMessageDecoder: RawMessage + Eq
-where
-    (): EmptyState<(), Self>,
-{
+pub trait RawDistinguishedMessageDecoder: RawMessage + Eq {
     fn raw_decode_field_distinguished<B: Buf + ?Sized>(
         &mut self,
         tag: u32,
@@ -188,10 +178,7 @@ where
 
 /// Borrowed decoding trait to be implemented by messages. The methods of this trait are meant to
 /// only be used by the `BorrowedMessage` implementation.
-pub trait RawMessageBorrowDecoder<'a>: RawMessage
-where
-    (): EmptyState<(), Self>,
-{
+pub trait RawMessageBorrowDecoder<'a>: RawMessage {
     /// Decodes a field from a buffer into `self` from a borrowed slice.
     fn raw_borrow_decode_field(
         &mut self,
@@ -207,10 +194,7 @@ where
 
 /// Borrowed distinguished decoding trait to be implemented by messages. The methods of this trait
 /// are meant to only be used by the `DistinguishedBorrowedMessage` implementation.
-pub trait RawDistinguishedMessageBorrowDecoder<'a>: RawMessage + Eq
-where
-    (): EmptyState<(), Self>,
-{
+pub trait RawDistinguishedMessageBorrowDecoder<'a>: RawMessage + Eq {
     fn raw_borrow_decode_field_distinguished(
         &mut self,
         tag: u32,
@@ -225,10 +209,24 @@ where
 
 impl<T> RawMessage for Box<T>
 where
-    T: RawMessage,
-    (): EmptyState<(), T>,
+    T: RawMessage + Sized,
 {
     const __ASSERTIONS: () = ();
+
+    fn empty() -> Self
+    where
+        Self: Sized,
+    {
+        Box::new(T::empty())
+    }
+
+    fn is_empty(&self) -> bool {
+        self.as_ref().is_empty()
+    }
+
+    fn clear(&mut self) {
+        self.as_mut().clear();
+    }
 
     fn raw_encode<B: BufMut + ?Sized>(&self, buf: &mut B) {
         (**self).raw_encode(buf)
@@ -246,7 +244,6 @@ where
 impl<T> RawMessageDecoder for Box<T>
 where
     T: RawMessageDecoder,
-    (): EmptyState<(), T>,
 {
     fn raw_decode_field<B: Buf + ?Sized>(
         &mut self,
@@ -266,7 +263,6 @@ where
 impl<'a, T> RawMessageBorrowDecoder<'a> for Box<T>
 where
     T: RawMessageBorrowDecoder<'a>,
-    (): EmptyState<(), T>,
 {
     fn raw_borrow_decode_field(
         &mut self,
@@ -286,7 +282,6 @@ where
 impl<T> RawDistinguishedMessageDecoder for Box<T>
 where
     T: RawDistinguishedMessageDecoder,
-    (): EmptyState<(), T>,
 {
     fn raw_decode_field_distinguished<B: Buf + ?Sized>(
         &mut self,
@@ -306,7 +301,6 @@ where
 impl<'a, T> RawDistinguishedMessageBorrowDecoder<'a> for Box<T>
 where
     T: RawDistinguishedMessageBorrowDecoder<'a>,
-    (): EmptyState<(), T>,
 {
     fn raw_borrow_decode_field_distinguished(
         &mut self,
@@ -323,10 +317,34 @@ where
     }
 }
 
+impl<T> ForOverwrite<MessageEncoding, T> for ()
+where
+    T: RawMessage,
+{
+    fn for_overwrite() -> T
+    where
+        T: Sized,
+    {
+        T::empty()
+    }
+}
+
+impl<T> EmptyState<MessageEncoding, T> for ()
+where
+    T: RawMessage,
+{
+    fn is_empty(val: &T) -> bool {
+        val.is_empty()
+    }
+
+    fn clear(val: &mut T) {
+        val.clear();
+    }
+}
+
 impl<T> Wiretyped<MessageEncoding, T> for ()
 where
     T: RawMessage,
-    (): EmptyState<(), T>,
 {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
 }
@@ -334,7 +352,6 @@ where
 impl<T> ValueEncoder<MessageEncoding, T> for ()
 where
     T: RawMessage,
-    (): EmptyState<(), T>,
 {
     #[inline]
     fn encode_value<B: BufMut + ?Sized>(value: &T, buf: &mut B) {
@@ -359,7 +376,6 @@ where
 impl<T> ValueDecoder<MessageEncoding, T> for ()
 where
     T: RawMessageDecoder,
-    (): EmptyState<(), T>,
 {
     #[inline]
     fn decode_value<B: Buf + ?Sized>(
@@ -375,7 +391,6 @@ where
 impl<T> DistinguishedValueDecoder<MessageEncoding, T> for ()
 where
     T: RawDistinguishedMessageDecoder + Eq,
-    (): EmptyState<(), T>,
 {
     const CHECKS_EMPTY: bool = true; // Empty messages are always zero-length
 
@@ -400,7 +415,6 @@ where
 impl<'a, T> ValueBorrowDecoder<'a, MessageEncoding, T> for ()
 where
     T: RawMessageBorrowDecoder<'a>,
-    (): EmptyState<(), T>,
 {
     #[inline]
     fn borrow_decode_value(
@@ -416,7 +430,6 @@ where
 impl<'a, T> DistinguishedValueBorrowDecoder<'a, MessageEncoding, T> for ()
 where
     T: RawDistinguishedMessageBorrowDecoder<'a> + Eq,
-    (): EmptyState<(), T>,
 {
     const CHECKS_EMPTY: bool = true; // Empty messages are always zero-length
 

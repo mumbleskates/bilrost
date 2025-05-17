@@ -13,10 +13,7 @@ use alloc::vec::Vec;
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 
 /// A Bilrost message. Provides basic encoding functionality for message types.
-pub trait Message
-where
-    (): EmptyState<(), Self>,
-{
+pub trait Message {
     /// Encodes the message to a buffer.
     ///
     /// An error will be returned if the buffer does not have sufficient capacity.
@@ -76,10 +73,7 @@ where
 
 /// Basic decoding functionality for a Bilrost message that can decode to an owned form. This
 /// trait's decoding methods can decode from any byte buffer that implements `bytes::Buf`.
-pub trait OwnedMessage: Message
-where
-    (): EmptyState<(), Self>,
-{
+pub trait OwnedMessage: Message {
     /// Decodes an instance of the message from a buffer.
     ///
     /// The entire buffer will be consumed.
@@ -164,10 +158,7 @@ where
 /// `NotCanonical`, and when `Canonical` is passed only `Canonical` can be returned from a
 /// successful result (hence the "canonical" methods). It can of course make sense to call these
 /// methods with a varying restriction level.
-pub trait DistinguishedOwnedMessage: OwnedMessage
-where
-    (): EmptyState<(), Self>,
-{
+pub trait DistinguishedOwnedMessage: OwnedMessage {
     // ------------ Distinguished mode ------------
 
     /// Decodes an instance of the message from a buffer in distinguished mode.
@@ -434,10 +425,7 @@ where
 }
 
 /// Basic decoding functionality for a Bilrost message that can decode from a borrowed slice.
-pub trait BorrowedMessage<'a>: Message
-where
-    (): EmptyState<(), Self>,
-{
+pub trait BorrowedMessage<'a>: Message {
     /// Decodes an instance of the message from a buffer.
     ///
     /// The entire buffer will be consumed.
@@ -505,10 +493,7 @@ where
 /// `NotCanonical`, and when `Canonical` is passed only `Canonical` can be returned from a
 /// successful result (hence the "canonical" methods). It can of course make sense to call these
 /// methods with a varying restriction level.
-pub trait DistinguishedBorrowedMessage<'a>: BorrowedMessage<'a>
-where
-    (): EmptyState<(), Self>,
-{
+pub trait DistinguishedBorrowedMessage<'a>: BorrowedMessage<'a> {
     // ------------ Distinguished mode ------------
 
     /// Decodes an instance of the message from a buffer in distinguished mode.
@@ -668,7 +653,6 @@ where
 impl<T> Message for T
 where
     T: RawMessage + Sized,
-    (): EmptyState<(), Self>,
 {
     fn encode<B: BufMut + ?Sized>(&self, buf: &mut B) -> Result<(), EncodeError> {
         let required = self.encoded_len();
@@ -773,7 +757,6 @@ where
 impl<T> OwnedMessage for T
 where
     T: RawMessageDecoder + Sized,
-    (): EmptyState<(), Self>,
 {
     fn decode<B: Buf>(mut buf: B) -> Result<Self, DecodeError> {
         Self::decode_capped(Capped::new(&mut buf))
@@ -785,7 +768,7 @@ where
 
     #[doc(hidden)]
     fn decode_capped<B: Buf + ?Sized>(buf: Capped<B>) -> Result<Self, DecodeError> {
-        let mut message = <() as EmptyState<(), Self>>::empty();
+        let mut message = Self::empty();
         merge(&mut message, buf, DecodeContext::default())?;
         Ok(message)
     }
@@ -800,10 +783,10 @@ where
 
     #[doc(hidden)]
     fn replace_from_capped<B: Buf + ?Sized>(&mut self, buf: Capped<B>) -> Result<(), DecodeError> {
-        <() as EmptyState<(), Self>>::clear(self);
+        self.clear();
         // MSRV: here, and elsewhere, this `map_err` could be `inspect_err` (1.76)
         merge(self, buf, DecodeContext::default()).map_err(|err| {
-            <() as EmptyState<(), Self>>::clear(self);
+            self.clear();
             err
         })
     }
@@ -833,7 +816,6 @@ where
 impl<T> DistinguishedOwnedMessage for T
 where
     T: RawDistinguishedMessageDecoder + RawMessageDecoder,
-    (): EmptyState<(), Self>,
 {
     fn decode_distinguished<B: Buf>(buf: B) -> Result<(Self, Canonicity), DecodeError> {
         Self::decode_restricted(buf, NotCanonical)
@@ -931,7 +913,7 @@ where
     where
         Self: Sized,
     {
-        let mut message = <() as EmptyState<(), Self>>::empty();
+        let mut message = Self::empty();
         let ctx = RestrictedDecodeContext::new(restrict_to);
         let canon = merge_distinguished(&mut message, buf, ctx.clone())
             // Safety backstop to ensure we do not return a canonicity worse than restrict_to.
@@ -971,11 +953,11 @@ where
     where
         Self: Sized,
     {
-        <() as EmptyState<(), Self>>::clear(self);
+        self.clear();
         let ctx = RestrictedDecodeContext::new(restrict_to);
         merge_distinguished(self, buf, ctx.clone())
             .map_err(|err| {
-                <() as EmptyState<(), Self>>::clear(self);
+                self.clear();
                 err
             })
             // Safety backstop to ensure we do not return a canonicity worse than restrict_to.
@@ -1095,10 +1077,9 @@ where
 impl<'a, T> BorrowedMessage<'a> for T
 where
     T: RawMessageBorrowDecoder<'a> + Sized,
-    (): EmptyState<(), Self>,
 {
     fn decode_borrowed(mut buf: &'a [u8]) -> Result<Self, DecodeError> {
-        let mut message = <() as EmptyState<(), Self>>::empty();
+        let mut message = Self::empty();
         borrow_merge(
             &mut message,
             Capped::new(&mut buf),
@@ -1112,9 +1093,9 @@ where
     }
 
     fn replace_borrowed_from(&mut self, mut buf: &'a [u8]) -> Result<(), DecodeError> {
-        <() as EmptyState<(), Self>>::clear(self);
+        self.clear();
         borrow_merge(self, Capped::new(&mut buf), DecodeContext::default()).map_err(|err| {
-            <() as EmptyState<(), Self>>::clear(self);
+            self.clear();
             err
         })
     }
@@ -1130,7 +1111,6 @@ where
 impl<'a, T> DistinguishedBorrowedMessage<'a> for T
 where
     T: RawDistinguishedMessageBorrowDecoder<'a> + RawMessageBorrowDecoder<'a>,
-    (): EmptyState<(), Self>,
 {
     fn decode_distinguished_borrowed(buf: &'a [u8]) -> Result<(Self, Canonicity), DecodeError> {
         Self::decode_restricted_borrowed(buf, NotCanonical)
@@ -1163,7 +1143,7 @@ where
     where
         Self: Sized,
     {
-        let mut message = <() as EmptyState<(), Self>>::empty();
+        let mut message = Self::empty();
         let ctx = RestrictedDecodeContext::new(restrict_to);
         let canon = borrow_merge_distinguished(&mut message, Capped::new(&mut buf), ctx.clone())
             // Safety backstop to ensure we do not return a canonicity worse than restrict_to.
@@ -1192,13 +1172,14 @@ where
         restrict_to: Canonicity,
     ) -> Result<Canonicity, DecodeError>
     where
+        // TODO(widders): why is this bound here again?
         Self: Sized,
     {
-        <() as EmptyState<(), Self>>::clear(self);
+        self.clear();
         let ctx = RestrictedDecodeContext::new(restrict_to);
         borrow_merge_distinguished(self, Capped::new(&mut buf), ctx.clone())
             .map_err(|err| {
-                <() as EmptyState<(), Self>>::clear(self);
+                self.clear();
                 err
             })
             // Safety backstop to ensure we do not return a canonicity worse than restrict_to.
