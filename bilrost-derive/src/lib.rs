@@ -1233,34 +1233,34 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
     // directly with an arbitrary variant.
     let creation_impl = if let Some(zero) = &zero_variant_ident {
         quote! {
-            impl #impl_generics #crate_::encoding::ForOverwrite
-            for #ident #ty_generics #where_clause {
+            impl #impl_generics #crate_::encoding::ForOverwrite<(), #ident #ty_generics> for ()
+            #where_clause {
                 #[inline]
-                fn for_overwrite() -> Self {
-                    Self::#zero
+                fn for_overwrite() -> #ident #ty_generics {
+                    #ident::#zero
                 }
             }
 
-            impl #impl_generics #crate_::encoding::EmptyState
-            for #ident #ty_generics #where_clause {
+            impl #impl_generics #crate_::encoding::EmptyState<(), #ident #ty_generics> for ()
+            #where_clause {
                 #[inline]
-                fn is_empty(&self) -> bool {
-                    matches!(self, Self::#zero)
+                fn is_empty(val: &#ident #ty_generics) -> bool {
+                    matches!(val, #ident::#zero)
                 }
 
                 #[inline]
-                fn clear(&mut self) {
-                    *self = Self::#zero;
+                fn clear(val: &mut #ident #ty_generics) {
+                    *val = #ident::#zero;
                 }
             }
         }
     } else {
         let (first_variant, _) = variants.first().unwrap();
         quote! {
-            impl #impl_generics #crate_::encoding::ForOverwrite
-            for #ident #ty_generics #where_clause {
-                fn for_overwrite() -> Self {
-                    Self::#first_variant
+            impl #impl_generics #crate_::encoding::ForOverwrite<(), #ident #ty_generics> for ()
+            #where_clause {
+                fn for_overwrite() -> #ident #ty_generics {
+                    #ident::#first_variant
                 }
             }
         }
