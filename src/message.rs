@@ -3,7 +3,7 @@ use crate::encoding::message::{
     borrow_merge, borrow_merge_distinguished, merge, merge_distinguished,
 };
 use crate::encoding::{
-    encode_varint, encoded_len_varint, prepend_varint, Capped, DecodeContext, EmptyState,
+    encode_varint, encoded_len_varint, prepend_varint, Capped, DecodeContext,
     RawDistinguishedMessageBorrowDecoder, RawDistinguishedMessageDecoder, RawMessage,
     RawMessageBorrowDecoder, RawMessageDecoder, RestrictedDecodeContext,
 };
@@ -14,6 +14,11 @@ use bytes::{Buf, BufMut, Bytes, BytesMut};
 
 /// A Bilrost message. Provides basic encoding functionality for message types.
 pub trait Message {
+    /// Creates a new message with an empty state.
+    fn new_empty() -> Self
+    where
+        Self: Sized;
+
     /// Encodes the message to a buffer.
     ///
     /// An error will be returned if the buffer does not have sufficient capacity.
@@ -34,6 +39,12 @@ pub trait Message {
         Self: Sized;
 
     // ------------ Dyn-compatible methods follow ------------
+
+    /// Returns whether the message is currently in an empty state.
+    fn message_is_empty(&self) -> bool;
+
+    /// Resets the message to an empty state.
+    fn clear_message(&mut self);
 
     /// Returns the encoded length of the message without a length delimiter.
     fn encoded_len(&self) -> usize;
@@ -654,6 +665,10 @@ impl<T> Message for T
 where
     T: RawMessage + Sized,
 {
+    fn new_empty() -> Self {
+        T::empty()
+    }
+
     fn encode<B: BufMut + ?Sized>(&self, buf: &mut B) -> Result<(), EncodeError> {
         let required = self.encoded_len();
         let remaining = buf.remaining_mut();
@@ -679,6 +694,14 @@ where
         encode_varint(len as u64, buf);
         self.raw_encode(buf);
         Ok(())
+    }
+
+    fn message_is_empty(&self) -> bool {
+        self.is_empty()
+    }
+
+    fn clear_message(&mut self) {
+        self.clear();
     }
 
     fn encoded_len(&self) -> usize {
@@ -1222,19 +1245,19 @@ mod tests {
         assert_eq!(vec, safe.encode_contiguous().into_vec());
         safe.replace_from_length_delimited_dyn(&mut [0u8].as_slice())
             .unwrap();
-        assert!(safe.is_empty());
+        assert!(safe.message_is_empty());
         safe.replace_canonical_from_length_delimited_dyn(&mut [0u8].as_slice())
             .unwrap();
-        assert!(safe.is_empty());
+        assert!(safe.message_is_empty());
         safe.replace_from_slice(&[]).unwrap();
-        assert!(safe.is_empty());
+        assert!(safe.message_is_empty());
         safe.replace_canonical_from_slice(&[]).unwrap();
-        assert!(safe.is_empty());
+        assert!(safe.message_is_empty());
 
         msg.encoded_len();
         msg = M::decode_length_delimited(&mut [0u8].as_slice()).unwrap();
         msg.encode(&mut vec).unwrap();
-        msg.clear();
+        msg.clear_message();
     }
 
     fn use_dyn_borrowed_messages<'a, M: DistinguishedBorrowedMessage<'a>>(
@@ -1248,15 +1271,15 @@ mod tests {
         assert_eq!(vec, safe.encode_to_vec());
         safe.replace_borrowed_from_length_delimited(&mut [0u8].as_slice())
             .unwrap();
-        assert!(safe.is_empty());
+        assert!(safe.message_is_empty());
         safe.replace_canonical_borrowed_from_length_delimited(&mut [0u8].as_slice())
             .unwrap();
-        assert!(safe.is_empty());
+        assert!(safe.message_is_empty());
 
         msg.encoded_len();
         msg = M::decode_borrowed_length_delimited(&mut [0u8].as_slice()).unwrap();
         msg.encode(&mut vec).unwrap();
-        msg.clear();
+        msg.clear_message();
     }
 
     #[test]
