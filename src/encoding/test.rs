@@ -124,11 +124,11 @@ macro_rules! check_borrowable {
                 fn check($from_value: $from_ty) {
                     let val = $convert;
                     let mut buf = Vec::new();
-                    ValueEncoder::<$encoding>::encode_value(&val, &mut buf);
+                    <() as ValueEncoder<$encoding, _>>::encode_value(&val, &mut buf);
 
                     // relaxed borrowed decoding
-                    let mut borrowed = <&$ty as EmptyState>::empty();
-                    ValueBorrowDecoder::<$encoding>::borrow_decode_value
+                    let mut borrowed = <() as EmptyState<(), &$ty>>::empty();
+                    <() as ValueBorrowDecoder<$encoding, _>>::borrow_decode_value
                     (
                         &mut borrowed,
                         Capped::new(&mut buf.as_slice()),
@@ -140,9 +140,9 @@ macro_rules! check_borrowable {
                     );
 
                     // distinguished borrowed decoding
-                    let mut borrowed = <&$ty as EmptyState>::empty();
+                    let mut borrowed = <() as EmptyState<(), &$ty>>::empty();
                     prop_assert_eq!(
-                        DistinguishedValueBorrowDecoder::<$encoding>::
+                        <() as DistinguishedValueBorrowDecoder<$encoding, _>>::
                             borrow_decode_value_distinguished::<true>
                         (
                             &mut borrowed,
@@ -439,12 +439,12 @@ pub(crate) use check_type_empty;
 pub(crate) fn check_type_empty_impl<T, E>()
 where
     T: Debug + PartialEq,
-    (): EmptyState<T, E>,
+    (): EmptyState<E, T>,
 {
     let mut empty = <() as EmptyState<E, T>>::empty();
-    assert!(empty.is_empty());
-    empty.clear();
-    assert!(empty.is_empty());
+    assert!(<() as EmptyState<E, T>>::is_empty(&empty));
+    <() as EmptyState<E, T>>::clear(&mut empty);
+    assert!(<() as EmptyState<E, T>>::is_empty(&empty));
     assert_eq!(empty, <() as EmptyState<E, T>>::empty());
 }
 
@@ -454,8 +454,8 @@ where
     T::Proxy: Debug + PartialEq,
     (): EmptyState<(), T> + EmptyState<(), T::Proxy>,
 {
-    check_type_empty_impl::<T, crate::encoding::Proxied<General, Tag>>();
-    check_type_empty_impl::<T::Proxy, General>();
+    check_type_empty_impl::<T, ()>();
+    check_type_empty_impl::<T::Proxy, ()>();
 }
 
 pub(crate) fn check_proxy_round_trip<T, Tag>()
@@ -464,12 +464,12 @@ where
     T::Proxy: Debug + PartialEq,
     (): EmptyState<(), T> + EmptyState<(), T::Proxy>,
 {
-    let start = T::empty();
+    let start = <() as EmptyState<(), T>>::empty();
     let proxy = start.encode_proxy();
-    assert!(proxy.is_empty());
-    let mut end = T::for_overwrite();
+    assert!(<() as EmptyState<(), _>>::is_empty(&proxy));
+    let mut end = <() as ForOverwrite<(), T>>::for_overwrite();
     end.decode_proxy(proxy).unwrap();
-    assert!(end.is_empty());
+    assert!(<() as EmptyState<(), _>>::is_empty(&end));
     assert_eq!(start, end);
 }
 
@@ -479,13 +479,13 @@ where
     T::Proxy: Debug + Eq,
     (): EmptyState<(), T> + EmptyState<(), T::Proxy>,
 {
-    let start = T::empty();
+    let start = <() as EmptyState<(), T>>::empty();
     let proxy = start.encode_proxy();
-    assert!(proxy.is_empty());
-    let mut end = T::for_overwrite();
+    assert!(<() as EmptyState<(), _>>::is_empty(&proxy));
+    let mut end = <() as ForOverwrite<(), T>>::for_overwrite();
     let canon = end.decode_proxy_distinguished(proxy).unwrap();
     assert_eq!(canon, Canonicity::Canonical);
-    assert!(end.is_empty());
+    assert!(<() as EmptyState<(), T>>::is_empty(&end));
     assert_eq!(start, end);
 }
 
@@ -505,7 +505,7 @@ where
     let mut capped = Capped::new(&mut buf);
     let (tag, wire_type) = TagReader::new().decode_key(capped.lend()).unwrap();
     assert_eq!(tag, 123);
-    let mut decoded = T::for_overwrite();
+    let mut decoded = <() as ForOverwrite<E, T>>::for_overwrite();
     assert_eq!(
         <() as DistinguishedDecoder<E, T>>::decode_distinguished(
             wire_type,
@@ -515,7 +515,7 @@ where
         ),
         Ok(Canonicity::NotCanonical)
     );
-    assert!(decoded.is_empty());
+    assert!(<() as EmptyState<E, T>>::is_empty(&decoded));
 }
 
 #[test]
