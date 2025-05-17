@@ -16,96 +16,96 @@ bilrost::implement_core_empty_state_rules!(ArcEncoding<E>, with generics (E));
 
 // The rest of the file is trait implementations that perform direct method pass-through.
 
-impl<T, E> ForOverwrite<ArcEncoding<E>> for Arc<T>
+impl<T, E> ForOverwrite<ArcEncoding<E>, Arc<T>> for ()
 where
-    T: ForOverwrite<E>,
+    (): ForOverwrite<E, T>,
 {
     #[inline(always)]
-    fn for_overwrite() -> Self
+    fn for_overwrite() -> Arc<T>
     where
         Self: Sized,
     {
-        Arc::new(T::for_overwrite())
+        Arc::new(<() as ForOverwrite<E, T>>::for_overwrite())
     }
 }
 
-impl<T, E> EmptyState<ArcEncoding<E>> for Arc<T>
+impl<T, E> EmptyState<ArcEncoding<E>, Arc<T>> for ()
 where
-    T: Clone + EmptyState<E>,
+    T: Clone,
+    (): EmptyState<E, T>,
 {
     #[inline(always)]
-    fn empty() -> Self
-    where
-        Self: Sized,
-    {
-        Arc::new(T::empty())
+    fn empty() -> Arc<T> {
+        Arc::new(<() as EmptyState<E, T>>::empty())
     }
 
     #[inline(always)]
-    fn is_empty(&self) -> bool {
-        (**self).is_empty()
+    fn is_empty(val: &Arc<T>) -> bool {
+        <() as EmptyState<E, T>>::is_empty(val)
     }
 
     #[inline(always)]
-    fn clear(&mut self) {
-        Arc::make_mut(self).clear()
+    fn clear(val: &mut Arc<T>) {
+        <() as EmptyState<E, T>>::clear(Arc::make_mut(val))
     }
 }
 
-impl<T, E> Wiretyped<ArcEncoding<E>> for Arc<T>
+impl<T, E> Wiretyped<ArcEncoding<E>, Arc<T>> for ()
 where
-    T: Wiretyped<E>,
+    (): Wiretyped<E, T>,
 {
-    const WIRE_TYPE: WireType = <T as Wiretyped<E>>::WIRE_TYPE;
+    const WIRE_TYPE: WireType = <() as Wiretyped<E, T>>::WIRE_TYPE;
 }
 
-impl<T, E> ValueEncoder<ArcEncoding<E>> for Arc<T>
+impl<T, E> ValueEncoder<ArcEncoding<E>, Arc<T>> for ()
 where
-    T: ValueEncoder<E>,
+    (): ValueEncoder<E, T>,
 {
     #[inline(always)]
-    fn encode_value<B: BufMut + ?Sized>(value: &Self, buf: &mut B) {
-        <T as ValueEncoder<E>>::encode_value(&**value, buf)
+    fn encode_value<B: BufMut + ?Sized>(value: &Arc<T>, buf: &mut B) {
+        <() as ValueEncoder<E, T>>::encode_value(value, buf)
     }
 
     #[inline(always)]
-    fn prepend_value<B: ReverseBuf + ?Sized>(value: &Self, buf: &mut B) {
-        <T as ValueEncoder<E>>::prepend_value(&**value, buf)
+    fn prepend_value<B: ReverseBuf + ?Sized>(value: &Arc<T>, buf: &mut B) {
+        <() as ValueEncoder<E, T>>::prepend_value(value, buf)
     }
 
     #[inline(always)]
-    fn value_encoded_len(value: &Self) -> usize {
-        <T as ValueEncoder<E>>::value_encoded_len(&**value)
+    fn value_encoded_len(value: &Arc<T>) -> usize {
+        <() as ValueEncoder<E, T>>::value_encoded_len(value)
     }
 }
 
-impl<T, E> ValueDecoder<ArcEncoding<E>> for Arc<T>
+impl<T, E> ValueDecoder<ArcEncoding<E>, Arc<T>> for ()
 where
-    T: Clone + ValueDecoder<E>,
+    T: Clone,
+    (): ValueDecoder<E, T>,
 {
     #[inline(always)]
     fn decode_value<B: Buf + ?Sized>(
-        value: &mut Self,
+        value: &mut Arc<T>,
         buf: Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
-        <T as ValueDecoder<E>>::decode_value(Arc::make_mut(value), buf, ctx)
+        <() as ValueDecoder<E, T>>::decode_value(Arc::make_mut(value), buf, ctx)
     }
 }
 
-impl<T, E> DistinguishedValueDecoder<ArcEncoding<E>> for Arc<T>
+impl<T, E> DistinguishedValueDecoder<ArcEncoding<E>, Arc<T>> for ()
 where
-    T: Clone + DistinguishedValueDecoder<E>,
+    T: Clone,
+    (): DistinguishedValueDecoder<E, T>,
 {
-    const CHECKS_EMPTY: bool = <T as DistinguishedValueDecoder<E>>::CHECKS_EMPTY;
+    const CHECKS_EMPTY: bool = <() as DistinguishedValueDecoder<E, T>>::CHECKS_EMPTY;
 
     #[inline(always)]
     fn decode_value_distinguished<const ALLOW_EMPTY: bool>(
-        value: &mut Self,
+        value: &mut Arc<T>,
         buf: Capped<impl Buf + ?Sized>,
         ctx: RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
-        <T as DistinguishedValueDecoder<E>>::decode_value_distinguished::<ALLOW_EMPTY>(
+        <() as DistinguishedValueDecoder<E, T>>::decode_value_distinguished::<ALLOW_EMPTY>(
             Arc::make_mut(value),
             buf,
             ctx,
@@ -113,92 +113,94 @@ where
     }
 }
 
-impl<'a, T, E> ValueBorrowDecoder<'a, ArcEncoding<E>> for Arc<T>
+impl<'a, T, E> ValueBorrowDecoder<'a, ArcEncoding<E>, Arc<T>> for ()
 where
-    T: Clone + ValueBorrowDecoder<'a, E>,
+    T: Clone,
+    (): ValueBorrowDecoder<'a, E, T>,
 {
     #[inline(always)]
     fn borrow_decode_value(
-        value: &mut Self,
+        value: &mut Arc<T>,
         buf: Capped<&'a [u8]>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
-        <T as ValueBorrowDecoder<E>>::borrow_decode_value(Arc::make_mut(value), buf, ctx)
+        <() as ValueBorrowDecoder<E, T>>::borrow_decode_value(Arc::make_mut(value), buf, ctx)
     }
 }
 
-impl<'a, T, E> DistinguishedValueBorrowDecoder<'a, ArcEncoding<E>> for Arc<T>
+impl<'a, T, E> DistinguishedValueBorrowDecoder<'a, ArcEncoding<E>, Arc<T>> for ()
 where
-    T: Clone + DistinguishedValueBorrowDecoder<'a, E>,
+    T: Clone,
+    (): DistinguishedValueBorrowDecoder<'a, E, T>,
 {
-    const CHECKS_EMPTY: bool = <T as DistinguishedValueBorrowDecoder<'a, E>>::CHECKS_EMPTY;
+    const CHECKS_EMPTY: bool = <() as DistinguishedValueBorrowDecoder<'a, E, T>>::CHECKS_EMPTY;
 
     #[inline(always)]
     fn borrow_decode_value_distinguished<const ALLOW_EMPTY: bool>(
-        value: &mut Self,
+        value: &mut Arc<T>,
         buf: Capped<&'a [u8]>,
         ctx: RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
-        <T as DistinguishedValueBorrowDecoder<E>>::borrow_decode_value_distinguished::<ALLOW_EMPTY>(
-            Arc::make_mut(value),
-            buf,
-            ctx,
-        )
+        <() as DistinguishedValueBorrowDecoder<E, T>>::borrow_decode_value_distinguished::<
+            ALLOW_EMPTY,
+        >(Arc::make_mut(value), buf, ctx)
     }
 }
 
-impl<T, E> Encoder<ArcEncoding<E>> for Arc<T>
+impl<T, E> Encoder<ArcEncoding<E>, Arc<T>> for ()
 where
-    T: Encoder<E>,
+    (): Encoder<E, T>,
 {
     #[inline(always)]
-    fn encode<B: BufMut + ?Sized>(tag: u32, value: &Self, buf: &mut B, tw: &mut TagWriter) {
-        <T as Encoder<E>>::encode(tag, value, buf, tw)
+    fn encode<B: BufMut + ?Sized>(tag: u32, value: &Arc<T>, buf: &mut B, tw: &mut TagWriter) {
+        <() as Encoder<E, T>>::encode(tag, value, buf, tw)
     }
 
     #[inline(always)]
     fn prepend_encode<B: ReverseBuf + ?Sized>(
         tag: u32,
-        value: &Self,
+        value: &Arc<T>,
         buf: &mut B,
         tw: &mut TagRevWriter,
     ) {
-        <T as Encoder<E>>::prepend_encode(tag, value, buf, tw)
+        <() as Encoder<E, T>>::prepend_encode(tag, value, buf, tw)
     }
 
     #[inline(always)]
-    fn encoded_len(tag: u32, value: &Self, tm: &mut impl TagMeasurer) -> usize {
-        <T as Encoder<E>>::encoded_len(tag, value, tm)
+    fn encoded_len(tag: u32, value: &Arc<T>, tm: &mut impl TagMeasurer) -> usize {
+        <() as Encoder<E, T>>::encoded_len(tag, value, tm)
     }
 }
 
-impl<T, E> Decoder<ArcEncoding<E>> for Arc<T>
+impl<T, E> Decoder<ArcEncoding<E>, Arc<T>> for ()
 where
-    T: Clone + Decoder<E>,
+    T: Clone,
+    (): Decoder<E, T>,
 {
     #[inline(always)]
     fn decode<B: Buf + ?Sized>(
         wire_type: WireType,
-        value: &mut Self,
+        value: &mut Arc<T>,
         buf: Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
-        <T as Decoder<E>>::decode(wire_type, Arc::make_mut(value), buf, ctx)
+        <() as Decoder<E, T>>::decode(wire_type, Arc::make_mut(value), buf, ctx)
     }
 }
 
-impl<T, E> DistinguishedDecoder<ArcEncoding<E>> for Arc<T>
+impl<T, E> DistinguishedDecoder<ArcEncoding<E>, Arc<T>> for ()
 where
-    T: Clone + DistinguishedDecoder<E>,
+    T: Clone,
+    (): DistinguishedDecoder<E, T>,
 {
     #[inline(always)]
     fn decode_distinguished<B: Buf + ?Sized>(
         wire_type: WireType,
-        value: &mut Self,
+        value: &mut Arc<T>,
         buf: Capped<B>,
         ctx: RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
-        <T as DistinguishedDecoder<E>>::decode_distinguished(
+        <() as DistinguishedDecoder<E, T>>::decode_distinguished(
             wire_type,
             Arc::make_mut(value),
             buf,
@@ -207,33 +209,35 @@ where
     }
 }
 
-impl<'a, T, E> BorrowDecoder<'a, ArcEncoding<E>> for Arc<T>
+impl<'a, T, E> BorrowDecoder<'a, ArcEncoding<E>, Arc<T>> for ()
 where
-    T: Clone + BorrowDecoder<'a, E>,
+    T: Clone,
+    (): BorrowDecoder<'a, E, T>,
 {
     #[inline(always)]
     fn borrow_decode(
         wire_type: WireType,
-        value: &mut Self,
+        value: &mut Arc<T>,
         buf: Capped<&'a [u8]>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
-        <T as BorrowDecoder<'a, E>>::borrow_decode(wire_type, Arc::make_mut(value), buf, ctx)
+        <() as BorrowDecoder<E, T>>::borrow_decode(wire_type, Arc::make_mut(value), buf, ctx)
     }
 }
 
-impl<'a, T, E> DistinguishedBorrowDecoder<'a, ArcEncoding<E>> for Arc<T>
+impl<'a, T, E> DistinguishedBorrowDecoder<'a, ArcEncoding<E>, Arc<T>> for ()
 where
-    T: Clone + DistinguishedBorrowDecoder<'a, E>,
+    T: Clone,
+    (): DistinguishedBorrowDecoder<'a, E, T>,
 {
     #[inline(always)]
     fn borrow_decode_distinguished(
         wire_type: WireType,
-        value: &mut Self,
+        value: &mut Arc<T>,
         buf: Capped<&'a [u8]>,
         ctx: RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
-        <T as DistinguishedBorrowDecoder<E>>::borrow_decode_distinguished(
+        <() as DistinguishedBorrowDecoder<E, T>>::borrow_decode_distinguished(
             wire_type,
             Arc::make_mut(value),
             buf,

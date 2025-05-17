@@ -20,6 +20,7 @@ fn main() {
         scalar: Option<u64>,
         #[bilrost(tag(2))]
         name: String,
+        #[allow(clippy::vec_box)]
         #[bilrost(tag(3), recurses)]
         tree_children: Vec<Box<Self>>,
     }
@@ -66,9 +67,9 @@ fn main() {
             }),
         ],
     };
-    println!("input: {:#?}", input);
+    println!("input: {input:#?}");
     let encoded = input.encode_to_vec();
     let output = DemoCustom::decode(encoded.as_slice()).expect("should decode");
-    println!("output: {:#?}", output);
+    println!("output: {output:#?}");
     assert_eq!(encoded, output.encode_to_vec());
 }
