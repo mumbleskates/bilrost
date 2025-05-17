@@ -14,6 +14,7 @@ mod oneof;
 mod value;
 
 #[derive(Clone)]
+#[allow(clippy::large_enum_variant)]
 pub enum Field {
     /// A scalar field.
     Value(value::Field),
