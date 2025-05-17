@@ -680,9 +680,9 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         .map(|(field_ident, _)| field_ident)
         .collect();
 
-    let for_overwrites: Vec<_> = unsorted_fields
+    let empties: Vec<_> = unsorted_fields
         .iter()
-        .map(|(_, field)| field.for_overwrite())
+        .map(|(_, field)| field.empty())
         .collect();
     let is_empties: Vec<_> = unsorted_fields
         .iter()
@@ -739,6 +739,21 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         for #ident #ty_generics #encoder_where_clause {
             const __ASSERTIONS: () = { #(#static_guards)* };
 
+            fn empty() -> Self {
+                #ident {
+                    #(#field_idents: #empties,)*
+                    #initialize_ignored
+                }
+            }
+
+            fn is_empty(&self) -> bool {
+                true #(&& #is_empties)*
+            }
+
+            fn clear(&mut self) {
+                #(#clears)*
+            }
+
             #[allow(unused_variables)]
             fn raw_encode<__B>(&self, buf: &mut __B)
             where
@@ -791,24 +806,21 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
             }
         }
 
-        impl #impl_generics #crate_::encoding::ForOverwrite
-        for #ident #ty_generics #encoder_where_clause {
-            fn for_overwrite() -> Self {
-                Self {
-                    #(#field_idents: #for_overwrites,)*
-                    #initialize_ignored
-                }
+        impl #impl_generics #crate_::encoding::ForOverwrite<(), #ident #ty_generics> for ()
+        #encoder_where_clause {
+            fn for_overwrite() -> #ident #ty_generics {
+                <#ident #ty_generics as #crate_::encoding::RawMessage>::empty()
             }
         }
 
-        impl #impl_generics #crate_::encoding::EmptyState
-        for #ident #ty_generics #encoder_where_clause {
-            fn is_empty(&self) -> bool {
-                true #(&& #is_empties)*
+        impl #impl_generics #crate_::encoding::EmptyState<(), #ident #ty_generics> for ()
+        #encoder_where_clause {
+            fn is_empty(val: &#ident #ty_generics) -> bool {
+                <#ident #ty_generics as #crate_::encoding::RawMessage>::is_empty(val)
             }
 
-            fn clear(&mut self) {
-                #(#clears)*
+            fn clear(val: &mut #ident #ty_generics) {
+                <#ident #ty_generics as #crate_::encoding::RawMessage>::clear(val);
             }
         }
     };
