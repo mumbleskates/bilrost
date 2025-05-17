@@ -9,7 +9,7 @@ use bytes::{Buf, BufMut};
 
 use crate::buf::ReverseBuf;
 use crate::encoding::{
-    encode_varint, encoded_len_varint, prepend_varint, Capped, DecodeContext, EmptyState,
+    encode_varint, encoded_len_varint, prepend_varint, Capped, DecodeContext,
     RawDistinguishedMessageBorrowDecoder, RawDistinguishedMessageDecoder, RawMessage,
     RawMessageBorrowDecoder, RawMessageDecoder, RestrictedDecodeContext, RuntimeTagMeasurer,
     TagMeasurer, TagRevWriter, TagWriter, WireType,
@@ -106,10 +106,7 @@ impl OpaqueValue<'_> {
         LengthDelimited(Cow::Owned(value.into()))
     }
 
-    pub fn message<M: Message>(value: &M) -> OpaqueValue<'static>
-    where
-        (): EmptyState<(), M>,
-    {
+    pub fn message<M: Message>(value: &M) -> OpaqueValue<'static> {
         LengthDelimited(Cow::Owned(value.encode_to_vec()))
     }
 
