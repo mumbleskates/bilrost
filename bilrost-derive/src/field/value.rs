@@ -156,7 +156,7 @@ impl Field {
         let ty = &self.ty;
         if self.in_oneof {
             quote! {
-                <#ty as #crate_::encoding::FieldEncoder<#encoder>>::encode_field(
+                <() as #crate_::encoding::FieldEncoder<#encoder, #ty>>::encode_field(
                     #tag,
                     &#ident,
                     buf,
@@ -165,7 +165,7 @@ impl Field {
             }
         } else {
             quote! {
-                <#ty as #crate_::encoding::Encoder<#encoder>>::encode(#tag, &#ident, buf, tw);
+                <() as #crate_::encoding::Encoder<#encoder, #ty>>::encode(#tag, &#ident, buf, tw);
             }
         }
     }
@@ -178,7 +178,7 @@ impl Field {
         let ty = &self.ty;
         if self.in_oneof {
             quote! {
-                <#ty as #crate_::encoding::FieldEncoder<#encoder>>::prepend_field(
+                <() as #crate_::encoding::FieldEncoder<#encoder, #ty>>::prepend_field(
                     #tag,
                     &#ident,
                     buf,
@@ -187,7 +187,7 @@ impl Field {
             }
         } else {
             quote! {
-                <#ty as #crate_::encoding::Encoder<#encoder>>::prepend_encode(
+                <() as #crate_::encoding::Encoder<#encoder, #ty>>::prepend_encode(
                     #tag,
                     &#ident,
                     buf,
@@ -235,7 +235,7 @@ impl Field {
             }
         };
         let decode = quote!(
-            <#ty as #crate_::encoding::#decoder_trait<#encoding>>::#call(
+            <() as #crate_::encoding::#decoder_trait<#encoding, #ty>>::#call(
                 wire_type,
                 #ident,
                 buf,
@@ -268,7 +268,7 @@ impl Field {
         let ty = &self.ty;
         if self.in_oneof {
             quote! {
-                <#ty as #crate_::encoding::FieldEncoder<#encoder>>::field_encoded_len(
+                <() as #crate_::encoding::FieldEncoder<#encoder, #ty>>::field_encoded_len(
                     #tag,
                     &#ident,
                     tm,
@@ -276,7 +276,7 @@ impl Field {
             }
         } else {
             quote! {
-                <#ty as #crate_::encoding::Encoder<#encoder>>::encoded_len(#tag, &#ident, tm)
+                <() as #crate_::encoding::Encoder<#encoder, #ty>>::encoded_len(#tag, &#ident, tm)
             }
         }
     }
@@ -285,14 +285,16 @@ impl Field {
     pub fn for_overwrite(&self) -> TokenStream {
         let crate_ = crate_name();
         let encoding = &self.encoding;
-        quote!(#crate_::encoding::ForOverwrite::<#encoding>::for_overwrite())
+        let ty = &self.ty;
+        quote!(<() as #crate_::encoding::ForOverwrite<#encoding, #ty>>::for_overwrite())
     }
 
     /// Returns an expression which returns whether the field is considered empty in the encoding.
     pub fn is_empty(&self, ident: TokenStream) -> TokenStream {
         let crate_ = crate_name();
         let encoding = &self.encoding;
-        quote!(#crate_::encoding::EmptyState::<#encoding>::is_empty(#ident))
+        let ty = &self.ty;
+        quote!(<() as #crate_::encoding::EmptyState<#encoding, #ty>>::is_empty(#ident))
     }
 
     /// Returns an expression which resets the field's value to empty with its encoding.
@@ -300,7 +302,7 @@ impl Field {
         let crate_ = crate_name();
         let encoding = &self.encoding;
         quote! {
-            #crate_::encoding::EmptyState::<#encoding>::clear(#ident);
+            #crate_::encoding::EmptyState<#encoding>::clear(#ident);
         }
     }
 
@@ -315,51 +317,51 @@ impl Field {
         if self.in_oneof {
             vec![
                 match purpose {
-                    Encode => quote!(#ty: #crate_::encoding::ValueEncoder<#encoding>),
+                    Encode => quote!((): #crate_::encoding::ValueEncoder<#encoding, #ty>),
                     Decode(Owned, Relaxed) => {
-                        quote!(#ty: #crate_::encoding::ValueDecoder<#encoding>)
+                        quote!((): #crate_::encoding::ValueDecoder<#encoding, #ty>)
                     }
                     Decode(Borrowed, Relaxed) => {
-                        quote!(#ty: #crate_::encoding::ValueBorrowDecoder<'__a, #encoding>)
+                        quote!((): #crate_::encoding::ValueBorrowDecoder<'__a, #encoding, #ty>)
                     }
                     Decode(Owned, Distinguished) => {
-                        quote!(#ty: #crate_::encoding::DistinguishedValueDecoder<#encoding>)
+                        quote!((): #crate_::encoding::DistinguishedValueDecoder<#encoding, #ty>)
                     }
                     Decode(Borrowed, Distinguished) => {
                         quote!(
-                            #ty: #crate_::encoding::
-                                DistinguishedValueBorrowDecoder<'__a, #encoding>
+                            (): #crate_::encoding::
+                                DistinguishedValueBorrowDecoder<'__a, #encoding, #ty>
                         )
                     }
                 },
                 // Encoding or decoding a oneof field always has trivially externally determined
                 // presence, and we never need to know whether or not the value is empty; it never
                 // needs to implement the empty state.
-                quote!(#ty: #crate_::encoding::ForOverwrite<#encoding>),
+                quote!((): #crate_::encoding::ForOverwrite<#encoding, #ty>),
             ]
         } else {
             vec![
                 match purpose {
-                    Encode => quote!(#ty: #crate_::encoding::Encoder<#encoding>),
+                    Encode => quote!((): #crate_::encoding::Encoder<#encoding, #ty>),
                     Decode(Owned, Relaxed) => {
-                        quote!(#ty: #crate_::encoding::Decoder<#encoding>)
+                        quote!((): #crate_::encoding::Decoder<#encoding, #ty>)
                     }
                     Decode(Borrowed, Relaxed) => {
-                        quote!(#ty: #crate_::encoding::BorrowDecoder<'__a, #encoding>)
+                        quote!((): #crate_::encoding::BorrowDecoder<'__a, #encoding, #ty>)
                     }
                     Decode(Owned, Distinguished) => {
-                        quote!(#ty: #crate_::encoding::DistinguishedDecoder<#encoding>)
+                        quote!((): #crate_::encoding::DistinguishedDecoder<#encoding, #ty>)
                     }
                     Decode(Borrowed, Distinguished) => {
                         quote!(
-                            #ty: #crate_::encoding::DistinguishedBorrowDecoder<'__a, #encoding>
+                            (): #crate_::encoding::DistinguishedBorrowDecoder<'__a, #encoding, #ty>
                         )
                     }
                 },
                 // Message field encoding always requires EmptyState instead of just ForOverwrite
                 // because we need to know whether a field is empty to know whether we should write
                 // anything; and all the decoding traits imply the encoding trait.
-                quote!(#ty: #crate_::encoding::EmptyState<#encoding>),
+                quote!((): #crate_::encoding::EmptyState<#encoding, #ty>),
             ]
         }
     }
