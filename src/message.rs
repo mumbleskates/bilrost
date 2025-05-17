@@ -889,30 +889,21 @@ where
     fn decode_restricted<B: Buf>(
         mut buf: B,
         restrict_to: Canonicity,
-    ) -> Result<(Self, Canonicity), DecodeError>
-    where
-        Self: Sized,
-    {
+    ) -> Result<(Self, Canonicity), DecodeError> {
         Self::decode_restricted_capped(Capped::new(&mut buf), restrict_to)
     }
 
     fn decode_restricted_length_delimited<B: Buf>(
         mut buf: B,
         restrict_to: Canonicity,
-    ) -> Result<(Self, Canonicity), DecodeError>
-    where
-        Self: Sized,
-    {
+    ) -> Result<(Self, Canonicity), DecodeError> {
         Self::decode_restricted_capped(Capped::new_length_delimited(&mut buf)?, restrict_to)
     }
 
     fn decode_restricted_capped<B: Buf + ?Sized>(
         buf: Capped<B>,
         restrict_to: Canonicity,
-    ) -> Result<(Self, Canonicity), DecodeError>
-    where
-        Self: Sized,
-    {
+    ) -> Result<(Self, Canonicity), DecodeError> {
         let mut message = Self::empty();
         let ctx = RestrictedDecodeContext::new(restrict_to);
         let canon = merge_distinguished(&mut message, buf, ctx.clone())
@@ -927,10 +918,7 @@ where
         &mut self,
         mut buf: B,
         restrict_to: Canonicity,
-    ) -> Result<Canonicity, DecodeError>
-    where
-        Self: Sized,
-    {
+    ) -> Result<Canonicity, DecodeError> {
         self.replace_restricted_from_capped(Capped::new(&mut buf), restrict_to)
     }
 
@@ -938,10 +926,7 @@ where
         &mut self,
         mut buf: B,
         restrict_to: Canonicity,
-    ) -> Result<Canonicity, DecodeError>
-    where
-        Self: Sized,
-    {
+    ) -> Result<Canonicity, DecodeError> {
         self.replace_restricted_from_capped(Capped::new_length_delimited(&mut buf)?, restrict_to)
     }
 
@@ -949,10 +934,7 @@ where
         &mut self,
         buf: Capped<B>,
         restrict_to: Canonicity,
-    ) -> Result<Canonicity, DecodeError>
-    where
-        Self: Sized,
-    {
+    ) -> Result<Canonicity, DecodeError> {
         self.clear();
         let ctx = RestrictedDecodeContext::new(restrict_to);
         merge_distinguished(self, buf, ctx.clone())
@@ -1139,10 +1121,7 @@ where
     fn decode_restricted_borrowed(
         mut buf: &'a [u8],
         restrict_to: Canonicity,
-    ) -> Result<(Self, Canonicity), DecodeError>
-    where
-        Self: Sized,
-    {
+    ) -> Result<(Self, Canonicity), DecodeError> {
         let mut message = Self::empty();
         let ctx = RestrictedDecodeContext::new(restrict_to);
         let canon = borrow_merge_distinguished(&mut message, Capped::new(&mut buf), ctx.clone())
@@ -1156,10 +1135,7 @@ where
     fn decode_restricted_borrowed_length_delimited(
         buf: &mut &'a [u8],
         restrict_to: Canonicity,
-    ) -> Result<(Self, Canonicity), DecodeError>
-    where
-        Self: Sized,
-    {
+    ) -> Result<(Self, Canonicity), DecodeError> {
         Self::decode_restricted_borrowed(
             Capped::new(buf).take_borrowed_length_delimited()?,
             restrict_to,
@@ -1170,11 +1146,7 @@ where
         &mut self,
         mut buf: &'a [u8],
         restrict_to: Canonicity,
-    ) -> Result<Canonicity, DecodeError>
-    where
-        // TODO(widders): why is this bound here again?
-        Self: Sized,
-    {
+    ) -> Result<Canonicity, DecodeError> {
         self.clear();
         let ctx = RestrictedDecodeContext::new(restrict_to);
         borrow_merge_distinguished(self, Capped::new(&mut buf), ctx.clone())
@@ -1192,10 +1164,7 @@ where
         &mut self,
         buf: &mut &'a [u8],
         restrict_to: Canonicity,
-    ) -> Result<Canonicity, DecodeError>
-    where
-        Self: Sized,
-    {
+    ) -> Result<Canonicity, DecodeError> {
         self.replace_restricted_borrowed_from(
             Capped::new(buf).take_borrowed_length_delimited()?,
             restrict_to,
