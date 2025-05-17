@@ -693,8 +693,8 @@ macro_rules! encoding_implemented_via_value_encoding {
                 buf: &mut B,
                 tw: &mut $crate::encoding::TagWriter,
             ) {
-                if !<() as $crate::encoding::EmptyState::<$encoding, _>>::is_empty(value) {
-                    <() as $crate::encoding::FieldEncoder::<$encoding, _>>::encode_field(
+                if !<() as $crate::encoding::EmptyState::<$encoding, T>>::is_empty(value) {
+                    <() as $crate::encoding::FieldEncoder::<$encoding, T>>::encode_field(
                         tag, value, buf, tw);
                 }
             }
@@ -706,8 +706,8 @@ macro_rules! encoding_implemented_via_value_encoding {
                 buf: &mut B,
                 tw: &mut $crate::encoding::TagRevWriter,
             ) {
-                if !<() as $crate::encoding::EmptyState::<$encoding, _>>::is_empty(value) {
-                    <() as $crate::encoding::FieldEncoder::<$encoding, _>>::prepend_field(
+                if !<() as $crate::encoding::EmptyState::<$encoding, T>>::is_empty(value) {
+                    <() as $crate::encoding::FieldEncoder::<$encoding, T>>::prepend_field(
                         tag, value, buf, tw);
                 }
             }
@@ -718,8 +718,8 @@ macro_rules! encoding_implemented_via_value_encoding {
                 value: &T,
                 tm: &mut impl $crate::encoding::TagMeasurer,
             ) -> usize {
-                if !<() as $crate::encoding::EmptyState::<$encoding, _>>::is_empty(value) {
-                    <() as $crate::encoding::FieldEncoder::<$encoding, _>>::field_encoded_len(
+                if !<() as $crate::encoding::EmptyState::<$encoding, T>>::is_empty(value) {
+                    <() as $crate::encoding::FieldEncoder::<$encoding, T>>::field_encoded_len(
                         tag, value, tm)
                 } else {
                     0
