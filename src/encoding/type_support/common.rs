@@ -106,9 +106,9 @@ mod chrono_time_value_compat {
         (): ValueEncoder<General, T> + ValueEncoder<General, U>,
     {
         let mut tbuf = Vec::new();
-        T::encode_value(t, &mut tbuf);
+        <() as ValueEncoder<General, T>>::encode_value(t, &mut tbuf);
         let mut ubuf = Vec::new();
-        U::encode_value(u, &mut ubuf);
+        <() as ValueEncoder<General, U>>::encode_value(u, &mut ubuf);
         if tbuf != ubuf {
             assert_eq!(tbuf, ubuf, "asserting that {t:?} and {u:?} encode the same");
         }
@@ -230,7 +230,7 @@ mod chrono_time_value_compat {
     fn aware_compose_chrono(
         pair: (chrono::NaiveDateTime, FixedOffset),
     ) -> Option<chrono::DateTime<FixedOffset>> {
-        let mut result = <chrono::DateTime<FixedOffset> as EmptyState>::empty();
+        let mut result = <() as EmptyState<(), chrono::DateTime<FixedOffset>>>::empty();
         result.decode_proxy(pair).ok()?;
         Some(result)
     }
@@ -238,7 +238,7 @@ mod chrono_time_value_compat {
     fn aware_compose_time(
         pair: (time::PrimitiveDateTime, time::UtcOffset),
     ) -> Option<time::OffsetDateTime> {
-        let mut result = <time::OffsetDateTime as EmptyState>::empty();
+        let mut result = <() as EmptyState<(), time::OffsetDateTime>>::empty();
         result.decode_proxy(pair).ok()?;
         Some(result)
     }

@@ -38,19 +38,19 @@ mod helpers {
     }
 }
 
-impl ForOverwrite for Date {
-    fn for_overwrite() -> Self {
-        Self::from_ordinal_date(0, 1).unwrap()
+impl ForOverwrite<(), Date> for () {
+    fn for_overwrite() -> Date {
+        Date::from_ordinal_date(0, 1).unwrap()
     }
 }
 
-impl EmptyState for Date {
-    fn is_empty(&self) -> bool {
-        *self == <_ as EmptyState>::empty()
+impl EmptyState<(), Date> for () {
+    fn is_empty(val: &Date) -> bool {
+        *val == <() as ForOverwrite<(), Date>>::for_overwrite()
     }
 
-    fn clear(&mut self) {
-        *self = <_ as EmptyState>::empty();
+    fn clear(val: &mut Date) {
+        *val = <() as ForOverwrite<(), Date>>::for_overwrite();
     }
 }
 
@@ -110,7 +110,7 @@ mod date {
         [
             Date::MIN,
             Date::MAX,
-            <Date as EmptyState>::empty(),
+            <() as EmptyState<(), Date>>::empty(),
             Date::from_calendar_date(1970, January, 1).unwrap(),
             Date::from_calendar_date(1998, June, 28).unwrap(),
         ]
@@ -129,19 +129,19 @@ mod date {
     check_type_empty!(Date, via distinguished proxy with tag SealedBilrostTag);
 }
 
-impl ForOverwrite for Time {
-    fn for_overwrite() -> Self {
+impl ForOverwrite<(), Time> for () {
+    fn for_overwrite() -> Time {
         Time::MIDNIGHT
     }
 }
 
-impl EmptyState for Time {
-    fn is_empty(&self) -> bool {
-        *self == Time::MIDNIGHT
+impl EmptyState<(), Time> for () {
+    fn is_empty(val: &Time) -> bool {
+        *val == Time::MIDNIGHT
     }
 
-    fn clear(&mut self) {
-        *self = Time::MIDNIGHT;
+    fn clear(val: &mut Time) {
+        *val = Time::MIDNIGHT;
     }
 }
 
@@ -211,7 +211,7 @@ mod time_ty {
         [
             Time::MIDNIGHT,
             Time::from_hms_nano(23, 59, 59, 999_999_999).unwrap(),
-            <Time as EmptyState>::empty(),
+            <() as EmptyState<(), Time>>::empty(),
             Time::from_hms(17, 0, 0).unwrap(),
             Time::from_hms_nano(11, 11, 11, 111_111_111).unwrap(),
         ]
@@ -230,19 +230,23 @@ mod time_ty {
     check_type_empty!(Time, via distinguished proxy with tag SealedBilrostTag);
 }
 
-impl ForOverwrite for PrimitiveDateTime {
-    fn for_overwrite() -> Self {
-        Self::new(<_ as EmptyState>::empty(), <_ as EmptyState>::empty())
+impl ForOverwrite<(), PrimitiveDateTime> for () {
+    fn for_overwrite() -> PrimitiveDateTime {
+        PrimitiveDateTime::new(
+            <() as EmptyState<(), _>>::empty(),
+            <() as EmptyState<(), _>>::empty(),
+        )
     }
 }
 
-impl EmptyState for PrimitiveDateTime {
-    fn is_empty(&self) -> bool {
-        <_ as EmptyState>::is_empty(&self.date()) && <_ as EmptyState>::is_empty(&self.time())
+impl EmptyState<(), PrimitiveDateTime> for () {
+    fn is_empty(val: &PrimitiveDateTime) -> bool {
+        <() as EmptyState<(), _>>::is_empty(&val.date())
+            && <() as EmptyState<(), _>>::is_empty(&val.time())
     }
 
-    fn clear(&mut self) {
-        *self = <_ as EmptyState>::empty();
+    fn clear(val: &mut PrimitiveDateTime) {
+        *val = <() as EmptyState<(), _>>::empty();
     }
 }
 
@@ -308,7 +312,7 @@ mod primitivedatetime {
 
     pub(in super::super) fn test_datetimes() -> impl IntoIterator<Item = PrimitiveDateTime> {
         [
-            <PrimitiveDateTime as EmptyState>::empty(),
+            <() as EmptyState<(), PrimitiveDateTime>>::empty(),
             PrimitiveDateTime::new(
                 Date::from_calendar_date(-44, March, 15).unwrap(),
                 Time::from_hms(12, 36, 27).unwrap(),
@@ -337,19 +341,19 @@ mod primitivedatetime {
     check_type_empty!(PrimitiveDateTime, via distinguished proxy with tag SealedBilrostTag);
 }
 
-impl ForOverwrite for UtcOffset {
-    fn for_overwrite() -> Self {
-        Self::UTC
+impl ForOverwrite<(), UtcOffset> for () {
+    fn for_overwrite() -> UtcOffset {
+        UtcOffset::UTC
     }
 }
 
-impl EmptyState for UtcOffset {
-    fn is_empty(&self) -> bool {
-        *self == Self::UTC
+impl EmptyState<(), UtcOffset> for () {
+    fn is_empty(val: &UtcOffset) -> bool {
+        *val == UtcOffset::UTC
     }
 
-    fn clear(&mut self) {
-        *self = Self::UTC;
+    fn clear(val: &mut UtcOffset) {
+        *val = UtcOffset::UTC;
     }
 }
 
@@ -419,7 +423,7 @@ mod utcoffset {
     pub(in super::super) fn test_zones() -> impl Iterator<Item = UtcOffset> + Clone {
         [
             UtcOffset::UTC,
-            <UtcOffset as EmptyState>::empty(),
+            <() as EmptyState<(), UtcOffset>>::empty(),
             UtcOffset::from_hms(-7, -15, 0).unwrap(),
             UtcOffset::from_hms(14, 0, 0).unwrap(),
         ]
@@ -442,10 +446,10 @@ mod utcoffset {
         {
             let mut buf = Vec::new();
             let out_of_range: (i32, i32, i32) = (10, 0, -10);
-            ValueEncoder::<General>::encode_value(&out_of_range, &mut buf);
-            let mut utc_off = <UtcOffset as ForOverwrite>::for_overwrite();
+            <() as ValueEncoder<General, _>>::encode_value(&out_of_range, &mut buf);
+            let mut utc_off = <() as ForOverwrite<(), UtcOffset>>::for_overwrite();
             assert_eq!(
-                ValueDecoder::<General>::decode_value(
+                <() as ValueDecoder<General, _>>::decode_value(
                     &mut utc_off,
                     Capped::new(&mut buf.as_slice()),
                     DecodeContext::default(),
@@ -453,7 +457,7 @@ mod utcoffset {
                 Err(DecodeError::new(InvalidValue))
             );
             assert_eq!(
-                DistinguishedValueDecoder::<General>::decode_value_distinguished::<true>(
+                <() as DistinguishedValueDecoder<General, _>>::decode_value_distinguished::<true>(
                     &mut utc_off,
                     Capped::new(&mut buf.as_slice()),
                     RestrictedDecodeContext::new(NotCanonical),
@@ -474,21 +478,24 @@ const fn odt_decompose(odt: OffsetDateTime) -> (PrimitiveDateTime, UtcOffset) {
     (PrimitiveDateTime::new(odt.date(), odt.time()), odt.offset())
 }
 
-impl ForOverwrite for OffsetDateTime {
-    fn for_overwrite() -> Self {
-        odt_compose(<_ as EmptyState>::empty(), <_ as EmptyState>::empty())
+impl ForOverwrite<(), OffsetDateTime> for () {
+    fn for_overwrite() -> OffsetDateTime {
+        odt_compose(
+            <() as EmptyState<(), _>>::empty(),
+            <() as EmptyState<(), _>>::empty(),
+        )
     }
 }
 
-impl EmptyState for OffsetDateTime {
-    fn is_empty(&self) -> bool {
-        <_ as EmptyState>::is_empty(&self.date())
-            && <_ as EmptyState>::is_empty(&self.time())
-            && <_ as EmptyState>::is_empty(&self.offset())
+impl EmptyState<(), OffsetDateTime> for () {
+    fn is_empty(val: &OffsetDateTime) -> bool {
+        <() as EmptyState<(), _>>::is_empty(&val.date())
+            && <() as EmptyState<(), _>>::is_empty(&val.time())
+            && <() as EmptyState<(), _>>::is_empty(&val.offset())
     }
 
-    fn clear(&mut self) {
-        *self = <_ as EmptyState>::empty();
+    fn clear(val: &mut OffsetDateTime) {
+        *val = <() as EmptyState<(), _>>::empty();
     }
 }
 
@@ -496,7 +503,7 @@ impl Proxiable<SealedBilrostTag> for OffsetDateTime {
     type Proxy = (PrimitiveDateTime, UtcOffset);
 
     fn new_proxy() -> Self::Proxy {
-        <_ as EmptyState>::empty()
+        <() as EmptyState<(), _>>::empty()
     }
 
     fn encode_proxy(&self) -> Self::Proxy {
@@ -608,7 +615,7 @@ mod duration {
             Duration::ZERO,
             Duration::MIN,
             Duration::MAX,
-            <Duration as EmptyState>::empty(),
+            <() as EmptyState<(), Duration>>::empty(),
             Duration::seconds_f64(900.00000001),
             Duration::seconds(-60),
         ]
