@@ -1,7 +1,19 @@
+use bilrost::{Message, OwnedMessage};
+use std::collections::BTreeMap;
+
 struct CustomEncoding;
 struct Tag;
 
+// When creating a custom encoding, it is almost always desirable to implement the `Encoder` traits
+// exclusively in terms of when `ValueEncoder` traits are implemented. This is needed for the
+// overwhelming majority of types that are encoded, including all proxy-encoded types; only
+// encodings that may take different decoding paths depending on what they encounter need to act
+// otherwise, and those use cases should hopefully be covered by `Packed` and `Unpacked`.
 bilrost::encoding_implemented_via_value_encoding!(CustomEncoding);
+
+// Unless it's necessary to implement encodings for types that our crate does not own, it makes the
+// most sense to always use the "base empty state" and delegate encoding to that, so we can use our
+// types with all of `bilrost`'s built-in encodings as much as possible.
 bilrost::encoding_uses_base_empty_state!(CustomEncoding);
 
 mod crate_defined_structs {
@@ -59,7 +71,7 @@ mod crate_defined_structs {
 mod implement_encoding_for_those_structs {
     use crate::crate_defined_structs::{AlwaysEven, AlwaysOdd};
     use crate::Tag;
-    use bilrost::encoding::{DistinguishedProxiable, EmptyState, ForOverwrite, Proxiable, Proxied};
+    use bilrost::encoding::{DistinguishedProxiable, EmptyState, ForOverwrite, Proxiable};
     use bilrost::Canonicity::Canonical;
     use bilrost::{Canonicity, DecodeErrorKind};
 
@@ -110,6 +122,8 @@ mod implement_encoding_for_those_structs {
         }
     }
 
+    // Reminder: implementing the "distinguished" traits is not required. If distinguished decoding
+    // isn't needed, it doesn't do anything.
     impl DistinguishedProxiable<Tag> for AlwaysOdd {
         fn decode_proxy_distinguished(
             &mut self,
@@ -149,31 +163,76 @@ mod implement_encoding_for_those_structs {
 
     // And now, because we own the `AlwaysEven` and `AlwaysOdd` types, we are able to delegate their
     // encoding directly to the "general" encodings in the bilrost crate if we want to:
-    // bilrost::delegate_proxied_encoding!(
-    //     use encoding (bilrost::encoding::Varint)
-    //     to encode proxied type (AlwaysEven)
-    //     with general encodings including distinguished
-    // );
-    // bilrost::delegate_proxied_encoding!(
-    //     use encoding (bilrost::encoding::Varint)
-    //     to encode proxied type (AlwaysOdd) using proxy tag (Tag)
-    //     with general encodings including distinguished
-    // );
-    //
-    // // We can also delegate these to our own encoding, perhaps with a different default meaning.
-    // bilrost::delegate_proxied_encoding!(
-    //     use encoding(bilrost::encoding::Fixed)
-    //     to encode proxied type (AlwaysEven)
-    //     with encoding (super::CustomEncoding) including distinguished
-    // );
-    // bilrost::delegate_proxied_encoding!(
-    //     use encoding(bilrost::encoding::Fixed)
-    //     to encode proxied type (AlwaysOdd) using proxy tag (Tag)
-    //     with encoding (super::CustomEncoding) including distinguished
-    // );
+    bilrost::delegate_proxied_encoding!(
+        use encoding (bilrost::encoding::Varint)
+        to encode proxied type (AlwaysEven)
+        with general encodings including distinguished
+    );
+    bilrost::delegate_proxied_encoding!(
+        use encoding (bilrost::encoding::Varint)
+        to encode proxied type (AlwaysOdd) using proxy tag (Tag)
+        with general encodings including distinguished
+    );
+
+    // We can also delegate these to our own encoding, perhaps with a different default meaning.
+    bilrost::delegate_proxied_encoding!(
+        use encoding(bilrost::encoding::Fixed)
+        to encode proxied type (AlwaysEven)
+        with encoding (super::CustomEncoding) including distinguished
+    );
+    bilrost::delegate_proxied_encoding!(
+        use encoding(bilrost::encoding::Fixed)
+        to encode proxied type (AlwaysOdd) using proxy tag (Tag)
+        with encoding (super::CustomEncoding) including distinguished
+    );
 }
 
 fn main() {
-    // TODO(widders): this
     use crate_defined_structs::{AlwaysEven, AlwaysOdd};
+
+    #[derive(Debug, PartialEq, Message)]
+    struct MessageWithCustomTypes {
+        plain: AlwaysEven,
+        repeated: Vec<AlwaysEven>,
+        values: BTreeMap<String, AlwaysEven>,
+        // `AlwaysOdd` can't be a plain field because it has no "empty" value
+        must_be_wrapped: Option<AlwaysOdd>,
+        #[bilrost(encoding(CustomEncoding))]
+        encoded_customly: Option<AlwaysOdd>,
+    }
+
+    #[derive(Message)]
+    struct EncodesSingle<T>(T);
+    #[derive(Message)]
+    struct EncodesPacked<T>(#[bilrost(encoding(packed))] T);
+
+    // `AlwaysOdd` doesn't have an empty value. That means that it can't be a message value that
+    // is expected to always be written, whether it is a bare field or an array that has a fixed
+    // number of values that are always present.
+    static_assertions::assert_not_impl_any!(EncodesSingle<AlwaysOdd>: Message);
+    static_assertions::assert_not_impl_any!(EncodesPacked<[AlwaysOdd; 5]>: Message);
+    // However if we nest either one of those things in another type, like an `Option` or a
+    // collection or mapping type, that restriction goes away because now the field that contains
+    // our `AlwaysOdd` value can be empty.
+    static_assertions::assert_impl_all!(EncodesSingle<Option<AlwaysOdd>>: Message);
+    static_assertions::assert_impl_all!(EncodesPacked<Option<[AlwaysOdd; 5]>>: Message);
+    static_assertions::assert_impl_all!(EncodesSingle<Vec<AlwaysOdd>>: Message);
+    static_assertions::assert_impl_all!(EncodesSingle<BTreeMap<String, AlwaysOdd>>: Message);
+
+    let msg = MessageWithCustomTypes {
+        plain: 2.try_into().unwrap(),
+        repeated: [10, 12, 16, 22].into_iter().map(|i| i.try_into().unwrap()).collect(),
+        values: BTreeMap::from_iter([
+            ("hundred".to_owned(), 100.try_into().unwrap()),
+            ("thousand".to_owned(), 1000.try_into().unwrap()),
+            ("six".to_owned(), 6.try_into().unwrap()),
+        ]),
+        must_be_wrapped: None,
+        encoded_customly: Some(13.try_into().unwrap()),
+    };
+    let encoded = msg.encode_to_vec();
+    println!("encoded bytes: {encoded:02x?}");
+    let round_tripped = MessageWithCustomTypes::decode(encoded.as_slice());
+    println!("decoded: {round_tripped:#?}");
+    assert_eq!(round_tripped.as_ref(), Ok(&msg));
 }
