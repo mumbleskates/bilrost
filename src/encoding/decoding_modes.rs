@@ -44,8 +44,8 @@ macro_rules! __invoke {
             distinguished_value: DistinguishedValueDecoder::decode_value_distinguished,
             distinguished_field: DistinguishedFieldDecoder::decode_field_distinguished,
             buf_ty: __B,
-            impl_buf_ty: impl bytes::Buf + ?Sized,
-            buf_generic: (<__B: bytes::Buf + ?Sized>),
+            impl_buf_ty: impl $crate::bytes::Buf + ?Sized,
+            buf_generic: (<__B: $crate::bytes::Buf + ?Sized>),
             $($($more_args)*)?
         );
     };
