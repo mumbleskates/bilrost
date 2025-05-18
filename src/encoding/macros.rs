@@ -256,7 +256,7 @@ macro_rules! delegate_value_encoding {
         $(with where clause for distinguished ($($distinguished_where:tt)+))?
         $(with generics ($($value_generics:tt)*))?
     ) => {
-        delegate_value_encoding!(
+        $crate::delegate_value_encoding!(
             delegate from ($from_ty) to ($to_ty) for type ($value_ty)
             $(with where clause ($($relaxed_where)+))?
             $(with generics ($($value_generics)*))?
@@ -347,7 +347,7 @@ macro_rules! delegate_value_encoding {
         $(with where clause ($($where_clause:tt)+))?
         $(with generics ($($impl_generics:tt)*))?
     ) => {
-        $crate::encoding::delegate_value_encoding!(
+        $crate::delegate_value_encoding!(
             encoding ($encoding) borrows type ($ty) as owned
             $(with where clause ($($where_clause)*))?
             $(with generics ($($impl_generics)*))?
