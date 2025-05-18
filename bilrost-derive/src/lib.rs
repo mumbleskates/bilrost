@@ -963,15 +963,17 @@ fn try_message_via_oneof(input: DeriveInput) -> Result<TokenStream, Error> {
 
     let borrow_generics = prepend_to_generics(impl_generics, quote!('__a));
 
-    let encoder_where_clause =
-        append_self_where(where_clause, Some(quote!(Self: #crate_::encoding::Oneof)));
+    let encoder_where_clause = append_self_where(
+        where_clause,
+        Some(quote!(#ident #ty_generics: #crate_::encoding::Oneof)),
+    );
     let owned_decoder_where_clause = append_self_where(
         where_clause,
-        Some(quote!(Self: #crate_::encoding::OneofDecoder)),
+        Some(quote!(#ident #ty_generics: #crate_::encoding::OneofDecoder)),
     );
     let borrowed_decoder_where_clause = append_self_where(
         where_clause,
-        Some(quote!(Self: #crate_::encoding::OneofBorrowDecoder<'__a>)),
+        Some(quote!(#ident #ty_generics: #crate_::encoding::OneofBorrowDecoder<'__a>)),
     );
 
     let impl_owned_decoder = (!borrow_only).then(|| {
@@ -1054,6 +1056,27 @@ fn try_message_via_oneof(input: DeriveInput) -> Result<TokenStream, Error> {
                     self,
                     &mut #tag_measurer::new(),
                 )
+            }
+        }
+
+        impl #impl_generics #crate_::encoding::ForOverwrite<(), #ident #ty_generics> for ()
+        #encoder_where_clause {
+            #[inline(always)]
+            fn for_overwrite() -> #ident #ty_generics {
+                <#ident #ty_generics as #crate_::encoding::Oneof>::empty()
+            }
+        }
+
+        impl #impl_generics #crate_::encoding::EmptyState<(), #ident #ty_generics> for ()
+        #encoder_where_clause {
+            #[inline(always)]
+            fn is_empty(val: &#ident #ty_generics) -> bool {
+                <#ident #ty_generics as #crate_::encoding::Oneof>::is_empty(val)
+            }
+
+            #[inline(always)]
+            fn clear(val: &mut #ident #ty_generics) {
+                <#ident #ty_generics as #crate_::encoding::Oneof>::clear(val);
             }
         }
 
