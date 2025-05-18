@@ -616,10 +616,10 @@ macro_rules! __impl_decoder_where_value_decoder {
     ) => {
         /// Decodes plain values encoded as whole fields.
         impl<$($lifetime,)? T $(, $($generics)*)?>
-        $crate::encoding::$relaxed <$($lifetime,)? $encoding, T> for ()
+        $crate::encoding::$relaxed<$($lifetime,)? $encoding, T> for ()
         where
             (): $crate::encoding::EmptyState<$encoding, T>
-                + $crate::encoding::$relaxed_value <$($lifetime,)? $encoding, T>,
+                + $crate::encoding::$relaxed_value<$($lifetime,)? $encoding, T>,
             $($($where_clause)*)?
         {
             #[inline(always)]
@@ -629,7 +629,7 @@ macro_rules! __impl_decoder_where_value_decoder {
                 buf: $crate::encoding::Capped<$buf_ty>,
                 ctx: $crate::encoding::DecodeContext,
             ) -> ::core::result::Result<(), $crate::DecodeError> {
-                <() as $crate::encoding::$relaxed_field::<$encoding, _>>::$relaxed_field_method(
+                <() as $crate::encoding::$relaxed_field<$encoding, _>>::$relaxed_field_method(
                     wire_type, value, buf, ctx)
             }
         }
@@ -642,7 +642,7 @@ macro_rules! __impl_decoder_where_value_decoder {
         where
             T: ::core::cmp::Eq,
             (): $crate::encoding::EmptyState<$encoding, T>
-                + $crate::encoding::$distinguished_value <$($lifetime,)? $encoding, T>,
+                + $crate::encoding::$distinguished_value<$($lifetime,)? $encoding, T>,
             $($($where_clause)*)?
         {
             #[inline(always)]
@@ -653,7 +653,7 @@ macro_rules! __impl_decoder_where_value_decoder {
                 ctx: $crate::encoding::RestrictedDecodeContext,
             ) -> ::core::result::Result<$crate::Canonicity, $crate::DecodeError> {
                 // decoding a value as a whole message field, empty values are unacceptable
-                let mut canon = <() as $crate::encoding::$distinguished_field::<$encoding, _>>::
+                let mut canon = <() as $crate::encoding::$distinguished_field<$encoding, _>>::
                     $distinguished_field_method::<false>
                 (
                     wire_type,
@@ -662,7 +662,7 @@ macro_rules! __impl_decoder_where_value_decoder {
                     ctx.clone(),
                 )?;
                 if !<() as $crate::encoding::$distinguished_value<$encoding, T>>::CHECKS_EMPTY
-                    && <() as $crate::encoding::EmptyState::<$encoding, _>>::is_empty(value)
+                    && <() as $crate::encoding::EmptyState<$encoding, _>>::is_empty(value)
                 {
                     canon.update(ctx.check($crate::Canonicity::NotCanonical)?);
                 }
@@ -679,7 +679,7 @@ macro_rules! encoding_implemented_via_value_encoding {
         $(, with where clause ($($where_clause:tt)*))?
         $(, with generics ($($generics:tt)*) $(,)?)?
     ) => {
-        /// Encodes plain values only when they are non-default.
+        /// Encodes plain values only when they are non-empty.
         impl<T $(, $($generics)*)?> $crate::encoding::Encoder<$encoding, T> for ()
         where
             (): $crate::encoding::EmptyState<$encoding, T>
@@ -693,8 +693,8 @@ macro_rules! encoding_implemented_via_value_encoding {
                 buf: &mut B,
                 tw: &mut $crate::encoding::TagWriter,
             ) {
-                if !<() as $crate::encoding::EmptyState::<$encoding, T>>::is_empty(value) {
-                    <() as $crate::encoding::FieldEncoder::<$encoding, T>>::encode_field(
+                if !<() as $crate::encoding::EmptyState<$encoding, T>>::is_empty(value) {
+                    <() as $crate::encoding::FieldEncoder<$encoding, T>>::encode_field(
                         tag, value, buf, tw);
                 }
             }
@@ -706,8 +706,8 @@ macro_rules! encoding_implemented_via_value_encoding {
                 buf: &mut B,
                 tw: &mut $crate::encoding::TagRevWriter,
             ) {
-                if !<() as $crate::encoding::EmptyState::<$encoding, T>>::is_empty(value) {
-                    <() as $crate::encoding::FieldEncoder::<$encoding, T>>::prepend_field(
+                if !<() as $crate::encoding::EmptyState<$encoding, T>>::is_empty(value) {
+                    <() as $crate::encoding::FieldEncoder<$encoding, T>>::prepend_field(
                         tag, value, buf, tw);
                 }
             }
@@ -718,8 +718,8 @@ macro_rules! encoding_implemented_via_value_encoding {
                 value: &T,
                 tm: &mut impl $crate::encoding::TagMeasurer,
             ) -> usize {
-                if !<() as $crate::encoding::EmptyState::<$encoding, T>>::is_empty(value) {
-                    <() as $crate::encoding::FieldEncoder::<$encoding, T>>::field_encoded_len(
+                if !<() as $crate::encoding::EmptyState<$encoding, T>>::is_empty(value) {
+                    <() as $crate::encoding::FieldEncoder<$encoding, T>>::field_encoded_len(
                         tag, value, tm)
                 } else {
                     0
