@@ -134,7 +134,7 @@ pub enum Value {
 #[derive(Clone, Debug, PartialEq, Message)]
 pub struct StructValue {
     /// Unordered map of dynamically typed values.
-    #[bilrost(tag = 1, encoding(map<general_packed, bilrost::encoding::MessageEncoding>), recurses)]
+    #[bilrost(tag = 1, recurses)]
     pub fields: BTreeMap<String, Value>,
 }
 
@@ -142,6 +142,6 @@ pub struct StructValue {
 #[derive(Clone, Debug, PartialEq, Message)]
 pub struct ListValue {
     /// Repeated field of dynamically typed values.
-    #[bilrost(tag = 1, encoding = "packed<bilrost::encoding::MessageEncoding>", recurses)]
+    #[bilrost(tag = 1, encoding = "packed", recurses)]
     pub values: Vec<Value>,
 }
