@@ -221,7 +221,10 @@ fn main() {
 
     let msg = MessageWithCustomTypes {
         plain: 2.try_into().unwrap(),
-        repeated: [10, 12, 16, 22].into_iter().map(|i| i.try_into().unwrap()).collect(),
+        repeated: [10, 12, 16, 22]
+            .into_iter()
+            .map(|i| i.try_into().unwrap())
+            .collect(),
         values: BTreeMap::from_iter([
             ("hundred".to_owned(), 100.try_into().unwrap()),
             ("thousand".to_owned(), 1000.try_into().unwrap()),
@@ -235,4 +238,15 @@ fn main() {
     let round_tripped = MessageWithCustomTypes::decode(encoded.as_slice());
     println!("decoded: {round_tripped:#?}");
     assert_eq!(round_tripped.as_ref(), Ok(&msg));
+
+    // Let's create a message with invalid data, like an odd number 1 in our first field. We defined
+    // the proxy implementations to return the right error code, `InvalidValue`, when the value
+    // can't be converted to our type:
+    use bilrost::encoding::opaque::{OpaqueMessage, OpaqueValue};
+    let message_with_invalid_data =
+        OpaqueMessage::from_iter([(1, OpaqueValue::u64(1))]).encode_to_vec();
+    let decode_error = MessageWithCustomTypes::decode(message_with_invalid_data.as_slice())
+        .expect_err("invalid message should not decode without error");
+    assert_eq!(decode_error.kind(), bilrost::DecodeErrorKind::InvalidValue);
+    println!("got the expected invalid value error -- {decode_error}");
 }
