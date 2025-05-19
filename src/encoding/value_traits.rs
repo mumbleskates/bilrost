@@ -48,7 +48,7 @@ macro_rules! for_overwrite_via_default {
     ) => {
         impl<$($($generics)*)?> $crate::encoding::ForOverwrite<(), $ty> for ()
         where
-            Self: ::core::default::Default,
+            $ty: ::core::default::Default,
             $($($where_clause)*)?
         {
             #[inline]
