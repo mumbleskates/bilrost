@@ -134,6 +134,10 @@ mod implement_encoding_for_those_structs {
         }
     }
 
+    // We implement the "base empty state" traits for our own types that we are encoding. Currently
+    // when we implement them like this with `()` in the first parameter, they apply as the empty
+    // state implementation for almost every encoding inside the `bilrost` crate.
+
     impl ForOverwrite<(), AlwaysEven> for () {
         fn for_overwrite() -> AlwaysEven {
             AlwaysEven::new(0).unwrap()
