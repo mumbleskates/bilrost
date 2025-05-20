@@ -161,9 +161,18 @@ mod implement_encoding_for_those_structs {
     }
 
     // Since we are representing `AlwaysOdd` as its plain integer value, it won't have an "empty"
-    // state because the zero value isn't an odd number. As a result we just won't implement
-    // `EmptyState` for this type. To include it in a message, it will always need to be wrapped in
-    // another type like an `Option`, a `Vec`, or a variant of a oneof.
+    // state; we're just pretending it doesn't have a sane default for the sake of example. As a
+    // result we just won't implement `EmptyState` for this type. To include it in a message, it
+    // will always need to be wrapped in another type like an `Option`, a `Vec`, or a variant of a
+    // oneof.
+    //
+    // Again, this isn't a hard requirement. If we pick a sane default for the type it's totally
+    // possible for us to just have that be its "empty" state, even if it isn't represented the same
+    // as the "empty" value of the integer it is written as. This just means we take on an
+    // additional burden of making sure that this "empty" default never changes, because if it does
+    // it could change the meaning of a lot of our encoded and transmitted data.
+
+    // ---
 
     // And now, because we own the `AlwaysEven` and `AlwaysOdd` types, we are able to delegate their
     // encoding directly to the "general" encodings in the bilrost crate if we want to:
