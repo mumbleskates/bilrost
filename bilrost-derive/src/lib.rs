@@ -119,9 +119,9 @@ struct PreprocessedMessage<'a> {
     ty_generics: TypeGenerics<'a>,
     where_clause: Option<&'a WhereClause>,
     unsorted_fields: Vec<(TokenStream, Field)>,
+    ignored_fields: Vec<(TokenStream, Field)>,
     distinguished: bool,
     borrow_only: bool,
-    has_ignored_fields: bool,
     tag_range: Option<RangeInclusive<u32>>,
 }
 
@@ -186,7 +186,7 @@ fn preprocess_message(input: &DeriveInput) -> Result<PreprocessedMessage, Error>
         Fields::Unnamed(..) => 0,
         _ => 1,
     });
-    let mut has_ignored_fields = false;
+    let mut ignored_fields = vec![];
     let unsorted_fields: Vec<(TokenStream, Field)> = fields
         .into_iter()
         .enumerate()
@@ -199,14 +199,15 @@ fn preprocess_message(input: &DeriveInput) -> Result<PreprocessedMessage, Error>
                 quote!(#index)
             });
             match Field::new(field.ty, field.attrs, next_tag) {
-                Ok(Some(field)) => {
-                    next_tag = field.last_tag().checked_add(1);
-                    Some(Ok((field_ident, field)))
-                }
-                Ok(None) => {
-                    // Field is ignored
-                    has_ignored_fields = true;
-                    None
+                Ok(field) => {
+                    if field.is_ignored() {
+                        // Divert ignored fields into the other vec.
+                        ignored_fields.push((field_ident, field));
+                        None
+                    } else {
+                        next_tag = field.last_tag().checked_add(1);
+                        Some(Ok((field_ident, field)))
+                    }
                 }
                 Err(err) => Some(Err(
                     err.wrap_err(format!("invalid message field {ident}.{field_ident}"))
@@ -248,9 +249,9 @@ fn preprocess_message(input: &DeriveInput) -> Result<PreprocessedMessage, Error>
         ty_generics,
         where_clause,
         unsorted_fields,
+        ignored_fields,
         distinguished,
         borrow_only,
-        has_ignored_fields,
         tag_range,
     })
 }
@@ -429,24 +430,18 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         ty_generics,
         where_clause,
         unsorted_fields,
+        ignored_fields,
         distinguished,
         borrow_only,
-        has_ignored_fields,
         tag_range,
     } = preprocess_message(&input)?;
 
-    if distinguished && has_ignored_fields {
+    if distinguished && !ignored_fields.is_empty() {
         bail!("messages with ignored fields cannot be distinguished");
     }
 
     let fields = sort_fields(unsorted_fields.clone());
-    let self_where = if has_ignored_fields {
-        // When there are ignored fields, the whole message impl should be bounded by
-        // Self: Default
-        Some(quote!(Self: ::core::default::Default))
-    } else {
-        None
-    };
+    let self_where = None;
 
     let borrow_generics = prepend_to_generics(impl_generics, quote!('__a));
 
@@ -695,10 +690,12 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         .map(|(field_ident, field)| field.clear(quote!(&mut self.#field_ident)))
         .collect();
 
-    let initialize_ignored = if has_ignored_fields {
-        quote!(..::core::default::Default::default())
-    } else {
-        quote!()
+    let ignored_idents: Vec<_> = ignored_fields
+        .iter()
+        .map(|(field_ident, _)| field_ident)
+        .collect();
+    let initialize_ignored = quote! {
+        #(#ignored_idents: ::core::default::Default::default(),)*
     };
 
     let impl_owned_decoder = (!borrow_only).then(|| {
@@ -2797,6 +2794,36 @@ mod test {
                 .expect_err("message with duplicated borrowed_only attrs not detected")
                 .to_string(),
             "duplicate borrowed_only attributes"
+        );
+    }
+
+    #[test]
+    fn test_rejects_duplicated_ignore_attrs() {
+        let output = try_message(quote!(
+            struct VeryIgnored {
+                #[bilrost(ignore, ignore)]
+                what: u32,
+            }
+        ));
+        assert_eq!(
+            output
+                .expect_err("field with duplicated ignore attrs not detected")
+                .root_cause()
+                .to_string(),
+            "duplicated ignore attrs for field: ignore , ignore"
+        );
+        let output = try_message(quote!(
+            struct MixedIgnores {
+                #[bilrost(tag(123), ignore, ignore)]
+                what: u32,
+            }
+        ));
+        assert_eq!(
+            output
+                .expect_err("field with duplicated ignore attrs not detected")
+                .root_cause()
+                .to_string(),
+            "duplicated ignore attrs for field: tag (123) , ignore , ignore"
         );
     }
 }

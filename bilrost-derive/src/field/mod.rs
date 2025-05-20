@@ -10,6 +10,7 @@ use quote::{quote, ToTokens};
 use syn::punctuated::Punctuated;
 use syn::{parse2, Attribute, LitInt, Meta, Token, Type};
 
+mod ignored;
 mod oneof;
 mod value;
 
@@ -20,6 +21,8 @@ pub enum Field {
     Value(value::Field),
     /// A oneof field.
     Oneof(oneof::Field),
+    /// An ignored field.
+    Ignored(ignored::Field),
 }
 
 #[derive(Copy, Clone)]
@@ -45,17 +48,15 @@ impl Field {
     ///
     /// If the meta items are invalid, an error will be returned.
     /// If the field should be ignored, `None` is returned.
-    pub fn new(
-        ty: Type,
-        attrs: Vec<Attribute>,
-        inferred_tag: Option<u32>,
-    ) -> Result<Option<Field>, Error> {
+    pub fn new(ty: Type, attrs: Vec<Attribute>, inferred_tag: Option<u32>) -> Result<Field, Error> {
         let attrs = bilrost_attrs(attrs)?;
 
-        Ok(if let Some(field) = oneof::Field::new(&ty, &attrs)? {
-            Some(Field::Oneof(field))
+        Ok(if let Some(field) = ignored::Field::new(&ty, &attrs)? {
+            Field::Ignored(field)
+        } else if let Some(field) = oneof::Field::new(&ty, &attrs)? {
+            Field::Oneof(field)
         } else {
-            value::Field::new(&ty, &attrs, inferred_tag)?.map(Field::Value)
+            Field::Value(value::Field::new(&ty, &attrs, inferred_tag)?)
         })
     }
 
@@ -71,10 +72,15 @@ impl Field {
         )?))
     }
 
+    pub fn is_ignored(&self) -> bool {
+        matches!(self, Field::Ignored(_))
+    }
+
     pub fn tags(&self) -> Vec<u32> {
         match self {
             Field::Value(scalar) => vec![scalar.tag],
             Field::Oneof(oneof) => oneof.tags.clone(),
+            Field::Ignored(_) => panic!("field is ignored"),
         }
     }
 
@@ -93,6 +99,7 @@ impl Field {
         match self {
             Field::Value(field) => field.where_terms(purpose),
             Field::Oneof(field) => field.where_terms(purpose),
+            Field::Ignored(field) => field.where_terms(),
         }
     }
 
@@ -131,6 +138,9 @@ impl Field {
                     oneof, not part of a oneof"
                 );
             }
+            Field::Ignored(_) => {
+                panic!("field is ignored");
+            }
         }
     }
 
@@ -139,6 +149,7 @@ impl Field {
         match self {
             Field::Value(scalar) => scalar.encode(ident),
             Field::Oneof(oneof) => oneof.encode(ident),
+            Field::Ignored(_) => panic!("field is ignored"),
         }
     }
 
@@ -147,6 +158,7 @@ impl Field {
         match self {
             Field::Value(scalar) => scalar.prepend(ident),
             Field::Oneof(oneof) => oneof.prepend(ident),
+            Field::Ignored(_) => panic!("field is ignored"),
         }
     }
 
@@ -160,6 +172,7 @@ impl Field {
         match self {
             Field::Value(scalar) => scalar.decode(ident, lifetime, mode),
             Field::Oneof(oneof) => oneof.decode(ident, lifetime, mode),
+            Field::Ignored(_) => panic!("field is ignored"),
         }
     }
 
@@ -168,6 +181,7 @@ impl Field {
         match self {
             Field::Value(scalar) => scalar.encoded_len(ident),
             Field::Oneof(oneof) => oneof.encoded_len(ident),
+            Field::Ignored(_) => panic!("field is ignored"),
         }
     }
 
@@ -176,6 +190,7 @@ impl Field {
         match self {
             Field::Value(scalar) => scalar.for_overwrite(),
             Field::Oneof(oneof) => oneof.for_overwrite(),
+            Field::Ignored(ignored) => ignored.initialize(),
         }
     }
 
@@ -185,6 +200,7 @@ impl Field {
         match self {
             Field::Value(scalar) => scalar.empty(),
             Field::Oneof(oneof) => oneof.empty(),
+            Field::Ignored(ignored) => ignored.initialize(),
         }
     }
 
@@ -193,6 +209,7 @@ impl Field {
         match self {
             Field::Value(scalar) => scalar.is_empty(ident),
             Field::Oneof(oneof) => oneof.is_empty(ident),
+            Field::Ignored(_) => panic!("field is ignored"),
         }
     }
 
@@ -201,6 +218,7 @@ impl Field {
         match self {
             Field::Value(scalar) => scalar.clear(ident),
             Field::Oneof(oneof) => oneof.clear(ident),
+            Field::Ignored(_) => panic!("field is ignored"),
         }
     }
 

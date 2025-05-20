@@ -937,9 +937,9 @@ struct Foo {
 
 * **"ignore"**: Must be alone, with no tag or other attribute. This causes the
   field to be ignored by the generated message implementation. If any fields in
-  a message are ignored, it must implement `Default` to implement `Message` so
-  there will be a value for those fields to take on when they are created from
-  encoded data.
+  a message are ignored, its ignored fields must each implement `Default` in
+  order for the type to implement `Message`, so there will be a value for those
+  fields to take on when the message is are created from scratch.
 
   Ignored fields are not currently considered compatible with distinguished
   decoding.

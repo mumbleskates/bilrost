@@ -47,11 +47,7 @@ pub struct Field {
 }
 
 impl Field {
-    pub fn new(
-        ty: &Type,
-        attrs: &[Meta],
-        inferred_tag: Option<u32>,
-    ) -> Result<Option<Field>, Error> {
+    pub fn new(ty: &Type, attrs: &[Meta], inferred_tag: Option<u32>) -> Result<Field, Error> {
         Field::new_impl(ty, attrs, inferred_tag, false, None)
     }
 
@@ -60,11 +56,7 @@ impl Field {
         ident_within_variant: Option<Ident>,
         attrs: &[Meta],
     ) -> Result<Field, Error> {
-        match Field::new_impl(ty, attrs, None, true, ident_within_variant) {
-            Ok(Some(field)) => Ok(field),
-            Ok(None) => bail!("Oneof fields cannot be ignored"),
-            Err(err) => Err(err),
-        }
+        Field::new_impl(ty, attrs, None, true, ident_within_variant)
     }
 
     fn new_impl(
@@ -73,12 +65,11 @@ impl Field {
         inferred_tag: Option<u32>,
         in_oneof: bool,
         ident_within_variant: Option<Ident>,
-    ) -> Result<Option<Field>, Error> {
+    ) -> Result<Field, Error> {
         let mut tag = None;
         let mut encoding = None;
         let mut enumeration_ty = None;
         let mut recurses = false;
-        let mut ignore = false;
         let mut unknown_attrs = Vec::new();
 
         for attr in attrs {
@@ -90,8 +81,6 @@ impl Field {
                 set_option(&mut enumeration_ty, t, "duplicate enumeration attributes")?;
             } else if word_attr(attr, "recurses") {
                 set_bool(&mut recurses, "duplicate recurses attributes")?;
-            } else if word_attr(attr, "ignore") {
-                set_bool(&mut ignore, "duplicate ignore attributes")?;
             } else {
                 unknown_attrs.push(attr);
             }
@@ -102,14 +91,6 @@ impl Field {
                 "unknown attribute(s) for field: {}",
                 quote!(#(#unknown_attrs),*)
             )
-        }
-
-        if ignore {
-            if let (None, None, None, false) = (tag, encoding, enumeration_ty, recurses) {
-                return Ok(None);
-            } else {
-                bail!("ignore attribute mixed with other attributes on the same field");
-            }
         }
 
         let tag = match tag.or(inferred_tag) {
@@ -123,7 +104,7 @@ impl Field {
             "general"
         })?);
 
-        Ok(Some(Field {
+        Ok(Field {
             tag,
             ty: ty.clone(),
             encoding,
@@ -131,7 +112,7 @@ impl Field {
             recurses,
             in_oneof,
             ident_within_variant,
-        }))
+        })
     }
 
     /// Spells a value for the field as an enum variant with the given value.
