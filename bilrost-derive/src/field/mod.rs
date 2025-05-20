@@ -240,7 +240,7 @@ impl Field {
 }
 
 /// Get the items belonging to the 'bilrost' list attribute, e.g. `#[bilrost(foo, bar="baz")]`.
-pub(crate) fn bilrost_attrs(attrs: Vec<Attribute>) -> Result<Vec<Meta>, Error> {
+pub fn bilrost_attrs(attrs: Vec<Attribute>) -> Result<Vec<Meta>, Error> {
     let mut result = Vec::new();
     for attr in attrs.iter() {
         if let Meta::List(meta_list) = &attr.meta {

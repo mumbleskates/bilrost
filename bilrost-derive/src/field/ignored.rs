@@ -7,12 +7,12 @@ use quote::quote;
 use syn::{Meta, Type};
 
 #[derive(Clone)]
-pub(crate) struct Field {
+pub struct Field {
     ty: Type,
 }
 
 impl Field {
-    pub(crate) fn new(ty: &Type, attrs: &[Meta]) -> Result<Option<Self>, Error> {
+    pub fn new(ty: &Type, attrs: &[Meta]) -> Result<Option<Self>, Error> {
         let ignore_attr_count = attrs
             .iter()
             .filter(|attr| word_attr(attr, "ignore"))
@@ -32,11 +32,11 @@ impl Field {
         Ok(Some(Self { ty: ty.clone() }))
     }
 
-    pub(crate) fn initialize(&self) -> TokenStream {
+    pub fn initialize(&self) -> TokenStream {
         quote!(::core::default::Default::default())
     }
 
-    pub(crate) fn where_terms(&self) -> Vec<TokenStream> {
+    pub fn where_terms(&self) -> Vec<TokenStream> {
         let ty = &self.ty;
         vec![quote!(#ty: ::core::default::Default)]
     }
