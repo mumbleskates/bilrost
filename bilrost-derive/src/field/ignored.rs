@@ -21,10 +21,7 @@ impl Field {
             return Ok(None); // Field is not ignored
         }
         if ignore_attr_count > 1 {
-            bail!(
-                "duplicated ignore attrs for field: {}",
-                quote!(#(#attrs),*)
-            );
+            bail!("duplicated ignore attrs for field: {}", quote!(#(#attrs),*));
         }
         if attrs.len() > 1 {
             bail!(
