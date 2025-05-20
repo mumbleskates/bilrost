@@ -209,7 +209,7 @@ fn preprocess_message(input: &DeriveInput) -> Result<PreprocessedMessage, Error>
                     None
                 }
                 Err(err) => Some(Err(
-                    err.wrap_err(format!("invalid message field {}.{}", ident, field_ident))
+                    err.wrap_err(format!("invalid message field {ident}.{field_ident}"))
                 )),
             }
         })
