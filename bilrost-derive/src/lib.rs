@@ -2736,7 +2736,7 @@ mod test {
             output
                 .expect_err("message with duplicated distinguished attrs not detected")
                 .to_string(),
-            "duplicate distinguished attrs"
+            "duplicated distinguished attrs"
         );
         let output = try_message(quote!(
             #[bilrost(borrowed_only, distinguished, borrowed_only)]
@@ -2748,7 +2748,7 @@ mod test {
             output
                 .expect_err("message with duplicated borrowed_only attrs not detected")
                 .to_string(),
-            "duplicate borrowed_only attrs"
+            "duplicated borrowed_only attrs"
         );
 
         let output = try_message(quote!(
