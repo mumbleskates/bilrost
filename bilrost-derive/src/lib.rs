@@ -1563,9 +1563,9 @@ fn preprocess_oneof(input: &DeriveInput) -> Result<PreprocessedOneof, Error> {
     let mut borrow_only = false;
     for attr in bilrost_attrs(input.attrs.clone())? {
         if word_attr(&attr, "distinguished") {
-            set_bool(&mut distinguished, "duplicate distinguished attributes")?;
+            set_bool(&mut distinguished, "duplicated distinguished attrs")?;
         } else if word_attr(&attr, "borrowed_only") {
-            set_bool(&mut borrow_only, "duplicate borrowed_only attributes")?;
+            set_bool(&mut borrow_only, "duplicated borrowed_only attrs")?;
         } else {
             unknown_attrs.push(attr);
         }
