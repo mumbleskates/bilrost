@@ -930,6 +930,51 @@ fn ignored_fields() {
 
 #[test]
 fn ignored_fields_with_defaults() {
+    #[derive(Debug, PartialEq, Message)]
+    struct FooPlus {
+        x: i64,
+        y: i64,
+        #[bilrost(ignore)]
+        also: usize,
+    }
+
+    // Some Default implementation is required when there are ignored fields. It doesn't have
+    // to be the derived implementation, and it can have non-empty values for non-ignored
+    // fields.
+    impl Default for FooPlus {
+        fn default() -> Self {
+            Self {
+                x: 111,
+                y: 222,
+                also: 12345,
+            }
+        }
+    }
+
+    // The empty value for the message will still have the empty value for all non-ignored
+    // fields; the rest will be taken from the `Default` implementation.
+    assert_eq!(
+        FooPlus::new_empty(),
+        FooPlus {
+            x: 0,
+            y: 0,
+            also: 12345,
+        }
+    );
+
+    assert::decodes!(
+        owned relaxed,
+        [(1, OV::i64(1))],
+        FooPlus {
+            x: 1,
+            y: 0,
+            also: 12345,
+        },
+    )
+}
+
+#[test]
+fn ignored_fields_with_per_field_defaults() {
     #[derive(Debug, PartialEq)]
     struct Undecodable(usize);
 
@@ -940,6 +985,7 @@ fn ignored_fields_with_defaults() {
     }
 
     #[derive(Debug, PartialEq, Message)]
+    #[bilrost(default_per_field)]
     struct FooPlus {
         x: i64,
         y: i64,
@@ -1186,9 +1232,27 @@ fn generic_encodings() {
     #[derive(Message)]
     struct Foo<T: Default, E>(#[bilrost(encoding(E))] T, #[bilrost(ignore)] PhantomData<E>);
 
+    impl<T, E> Default for Foo<T, E>
+    where
+        T: Default,
+    {
+        fn default() -> Self {
+            Self(Default::default(), PhantomData)
+        }
+    }
+
     static_assertions::assert_impl_all!(Foo<String, General>: OwnedMessage);
     static_assertions::assert_not_impl_any!(Foo<u8, General>: Message);
     static_assertions::assert_impl_all!(Foo<u8, Varint>: OwnedMessage);
+
+    #[allow(dead_code)]
+    #[derive(Message)]
+    #[bilrost(default_per_field)]
+    struct Bar<T: Default, E>(#[bilrost(encoding(E))] T, #[bilrost(ignore)] PhantomData<E>);
+
+    static_assertions::assert_impl_all!(Bar<String, General>: OwnedMessage);
+    static_assertions::assert_not_impl_any!(Bar<u8, General>: Message);
+    static_assertions::assert_impl_all!(Bar<u8, Varint>: OwnedMessage);
 }
 
 // Varint tests

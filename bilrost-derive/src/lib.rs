@@ -122,6 +122,7 @@ struct PreprocessedMessage<'a> {
     ignored_fields: Vec<(TokenStream, Field)>,
     distinguished: bool,
     borrow_only: bool,
+    default_per_field: bool,
     tag_range: Option<RangeInclusive<u32>>,
 }
 
@@ -138,6 +139,7 @@ fn preprocess_message(input: &DeriveInput) -> Result<PreprocessedMessage, Error>
     let mut unknown_attrs = Vec::new();
     let mut distinguished = false;
     let mut borrow_only = false;
+    let mut default_per_field = false;
     for attr in bilrost_attrs(input.attrs.clone())? {
         if let Some(tags) = tag_list_attr(&attr, "reserved_tags", None)? {
             set_option(
@@ -146,9 +148,11 @@ fn preprocess_message(input: &DeriveInput) -> Result<PreprocessedMessage, Error>
                 "duplicate reserved_tags attributes",
             )?;
         } else if word_attr(&attr, "distinguished") {
-            set_bool(&mut distinguished, "duplicate distinguished attributes")?;
+            set_bool(&mut distinguished, "duplicated distinguished attrs")?;
         } else if word_attr(&attr, "borrowed_only") {
-            set_bool(&mut borrow_only, "duplicate borrowed_only attributes")?;
+            set_bool(&mut borrow_only, "duplicated borrowed_only attrs")?;
+        } else if word_attr(&attr, "default_per_field") {
+            set_bool(&mut default_per_field, "duplicated default_per_field attrs")?;
         } else {
             unknown_attrs.push(attr);
         }
@@ -252,6 +256,7 @@ fn preprocess_message(input: &DeriveInput) -> Result<PreprocessedMessage, Error>
         ignored_fields,
         distinguished,
         borrow_only,
+        default_per_field,
         tag_range,
     })
 }
@@ -433,6 +438,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         ignored_fields,
         distinguished,
         borrow_only,
+        default_per_field,
         tag_range,
     } = preprocess_message(&input)?;
 
@@ -441,7 +447,13 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     }
 
     let fields = sort_fields(unsorted_fields.clone());
-    let self_where = None;
+    let self_where = if default_per_field || ignored_fields.is_empty() {
+        None
+    } else {
+        // When there are ignored fields that we are taking from <Self as Default>, the whole
+        // message impl should be bounded by Self: Default
+        Some(quote!(Self: ::core::default::Default))
+    };
 
     let borrow_generics = prepend_to_generics(impl_generics, quote!('__a));
 
@@ -694,8 +706,10 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         .iter()
         .map(|(field_ident, _)| field_ident)
         .collect();
-    let initialize_ignored = quote! {
-        #(#ignored_idents: ::core::default::Default::default(),)*
+    let initialize_ignored = if default_per_field || ignored_idents.is_empty() {
+        quote!(#(#ignored_idents: ::core::default::Default::default(),)*)
+    } else {
+        quote!(..::core::default::Default::default())
     };
 
     let impl_owned_decoder = (!borrow_only).then(|| {
@@ -2722,7 +2736,7 @@ mod test {
             output
                 .expect_err("message with duplicated distinguished attrs not detected")
                 .to_string(),
-            "duplicate distinguished attributes"
+            "duplicate distinguished attrs"
         );
         let output = try_message(quote!(
             #[bilrost(borrowed_only, distinguished, borrowed_only)]
@@ -2734,7 +2748,7 @@ mod test {
             output
                 .expect_err("message with duplicated borrowed_only attrs not detected")
                 .to_string(),
-            "duplicate borrowed_only attributes"
+            "duplicate borrowed_only attrs"
         );
 
         let output = try_message(quote!(
@@ -2749,7 +2763,7 @@ mod test {
             output
                 .expect_err("message with duplicated distinguished attrs not detected")
                 .to_string(),
-            "duplicate distinguished attributes"
+            "duplicated distinguished attrs"
         );
         let output = try_message(quote!(
             #[bilrost(borrowed_only, distinguished, borrowed_only)]
@@ -2763,7 +2777,7 @@ mod test {
             output
                 .expect_err("message with duplicated borrowed_only attrs not detected")
                 .to_string(),
-            "duplicate borrowed_only attributes"
+            "duplicated borrowed_only attrs"
         );
     }
 
@@ -2780,7 +2794,7 @@ mod test {
             output
                 .expect_err("message with duplicated distinguished attrs not detected")
                 .to_string(),
-            "duplicate distinguished attributes"
+            "duplicated distinguished attrs"
         );
         let output = try_message(quote!(
             #[bilrost(borrowed_only, distinguished, borrowed_only)]
@@ -2793,7 +2807,7 @@ mod test {
             output
                 .expect_err("message with duplicated borrowed_only attrs not detected")
                 .to_string(),
-            "duplicate borrowed_only attributes"
+            "duplicated borrowed_only attrs"
         );
     }
 
@@ -2824,6 +2838,16 @@ mod test {
                 .root_cause()
                 .to_string(),
             "duplicated ignore attrs for field: tag (123) , ignore , ignore"
+        );
+        let output = try_message(quote!(
+            #[bilrost(default_per_field, default_per_field)]
+            struct DuplicatedOnStruct {}
+        ));
+        assert_eq!(
+            output
+                .expect_err("field with duplicated ignore attrs not detected")
+                .to_string(),
+            "duplicated default_per_field attrs"
         );
     }
 }

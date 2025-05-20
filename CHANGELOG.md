@@ -32,9 +32,10 @@
   * This means that *many* new types can now be encoded without specifying an
     explicit field `encoding`. This can be very helpful as the compiler error
     messages from the missing trait are unlikely to ever be very good.
-* Ignored fields, via the `#[bilrost(ignore)]` attr, no longer require the whole
-  message struct to implement `Default`; only the types of the individually
-  ignored fields need to implement `Default`.
+* Ignored fields, via the `#[bilrost(ignore)]` attr, no longer always require
+  the whole message struct to implement `Default`; when the message struct is
+  given the `#[bilrost(default_per_field)]` attr, only the types of the
+  individually ignored fields need to implement `Default`.
 
 ### Fixes
 
