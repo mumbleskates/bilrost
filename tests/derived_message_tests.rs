@@ -1012,7 +1012,19 @@ fn ignored_fields_with_per_field_defaults() {
             y: 0,
             also: Undecodable(12345),
         },
-    )
+    );
+
+    #[derive(Message)]
+    #[bilrost(default_per_field)]
+    struct IgnoredGeneric<T> {
+        #[bilrost(ignore)]
+        _whatever: T,
+    }
+
+    struct _NoDefault;
+
+    static_assertions::assert_not_impl_any!(IgnoredGeneric<_NoDefault>: Message);
+    static_assertions::assert_impl_all!(IgnoredGeneric<Undecodable>: Message);
 }
 
 #[test]
@@ -1230,29 +1242,12 @@ fn generic_encodings() {
     // This works perfectly because all usages of that name appear in-scope with the generic.
     #[allow(dead_code)]
     #[derive(Message)]
-    struct Foo<T: Default, E>(#[bilrost(encoding(E))] T, #[bilrost(ignore)] PhantomData<E>);
-
-    impl<T, E> Default for Foo<T, E>
-    where
-        T: Default,
-    {
-        fn default() -> Self {
-            Self(Default::default(), PhantomData)
-        }
-    }
+    #[bilrost(default_per_field)]
+    struct Foo<T, E>(#[bilrost(encoding(E))] T, #[bilrost(ignore)] PhantomData<E>);
 
     static_assertions::assert_impl_all!(Foo<String, General>: OwnedMessage);
     static_assertions::assert_not_impl_any!(Foo<u8, General>: Message);
     static_assertions::assert_impl_all!(Foo<u8, Varint>: OwnedMessage);
-
-    #[allow(dead_code)]
-    #[derive(Message)]
-    #[bilrost(default_per_field)]
-    struct Bar<T: Default, E>(#[bilrost(encoding(E))] T, #[bilrost(ignore)] PhantomData<E>);
-
-    static_assertions::assert_impl_all!(Bar<String, General>: OwnedMessage);
-    static_assertions::assert_not_impl_any!(Bar<u8, General>: Message);
-    static_assertions::assert_impl_all!(Bar<u8, Varint>: OwnedMessage);
 }
 
 // Varint tests
