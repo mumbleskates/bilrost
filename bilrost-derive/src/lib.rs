@@ -468,8 +468,12 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
             } else {
                 [].iter() // defaulting via `Self: Default`; no additional field bounds
             });
-    let encoder_where_clause =
-        append_wheres(where_clause, self_where.clone(), where_fields.clone(), Encode);
+    let encoder_where_clause = append_wheres(
+        where_clause,
+        self_where.clone(),
+        where_fields.clone(),
+        Encode,
+    );
     let [owned_decoder_where_clause, borrowed_decoder_where_clause] =
         [Owned, Borrowed].map(|lifetime| {
             append_wheres(
