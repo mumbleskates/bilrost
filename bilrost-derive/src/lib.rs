@@ -457,11 +457,9 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
 
     let borrow_generics = prepend_to_generics(impl_generics, quote!('__a));
 
-    let encoder_where_clause =
-        append_wheres(where_clause, self_where.clone(), &unsorted_fields, Encode);
     // if we are defaulting ignored fields per-field, we need to include where-clause bounds for
     // each one of them as well.
-    let decode_where_fields =
+    let where_fields =
         unsorted_fields
             .iter()
             .chain(if default_per_field || ignored_fields.is_empty() {
@@ -470,12 +468,14 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
             } else {
                 [].iter() // defaulting via `Self: Default`; no additional field bounds
             });
+    let encoder_where_clause =
+        append_wheres(where_clause, self_where.clone(), where_fields.clone(), Encode);
     let [owned_decoder_where_clause, borrowed_decoder_where_clause] =
         [Owned, Borrowed].map(|lifetime| {
             append_wheres(
                 where_clause,
                 self_where.clone(),
-                decode_where_fields.clone(),
+                where_fields.clone(),
                 Decode(lifetime, Relaxed),
             )
         });
@@ -852,7 +852,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     let distinguished_impls = distinguished.then(|| {
         // if we are defaulting ignored fields per-field, we need to include where-clause bounds for
         // each one of them as well.
-        let decode_where_fields =
+        let where_fields =
             unsorted_fields
                 .iter()
                 .chain(if default_per_field || ignored_fields.is_empty() {
@@ -866,7 +866,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
                 append_wheres(
                     where_clause,
                     Some(quote!(Self: ::core::cmp::Eq)),
-                    decode_where_fields.clone(),
+                    where_fields.clone(),
                     Decode(lifetime, Distinguished),
                 )
             });
