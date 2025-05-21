@@ -392,15 +392,15 @@ fn append_self_where(
 
 /// Combines an optional already-existing where clause with additional terms for each field's
 /// encoder to assert that it supports the field's type.
-fn append_wheres<T>(
+fn append_wheres<'a, T: 'a>(
     where_clause: Option<&WhereClause>,
     self_where: Option<TokenStream>,
-    fields: &[(T, Field)],
+    fields: impl IntoIterator<Item = &'a (T, Field)>,
     field_purpose: WhereFor,
 ) -> Option<TokenStream> {
     // dedup the where clauses by their String values
     let encoder_wheres: BTreeMap<_, _> = fields
-        .iter()
+        .into_iter()
         .flat_map(|(_, field)| field.where_terms(field_purpose))
         .map(|where_| (where_.to_string(), where_))
         .collect();
@@ -459,12 +459,23 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
 
     let encoder_where_clause =
         append_wheres(where_clause, self_where.clone(), &unsorted_fields, Encode);
+    // if we are defaulting ignored fields per-field, we need to include where-clause bounds for
+    // each one of them as well.
+    let decode_where_fields =
+        unsorted_fields
+            .iter()
+            .chain(if default_per_field || ignored_fields.is_empty() {
+                // defaulting via `Self: Default`; no additional field bounds
+                ignored_fields.iter() // include the ignored fields' bounds
+            } else {
+                [].iter() // defaulting via `Self: Default`; no additional field bounds
+            });
     let [owned_decoder_where_clause, borrowed_decoder_where_clause] =
         [Owned, Borrowed].map(|lifetime| {
             append_wheres(
                 where_clause,
                 self_where.clone(),
-                &unsorted_fields,
+                decode_where_fields.clone(),
                 Decode(lifetime, Relaxed),
             )
         });
@@ -839,12 +850,23 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     };
 
     let distinguished_impls = distinguished.then(|| {
+        // if we are defaulting ignored fields per-field, we need to include where-clause bounds for
+        // each one of them as well.
+        let decode_where_fields =
+            unsorted_fields
+                .iter()
+                .chain(if default_per_field || ignored_fields.is_empty() {
+                    // defaulting via `Self: Default`; no additional field bounds
+                    ignored_fields.iter() // include the ignored fields' bounds
+                } else {
+                    [].iter() // defaulting via `Self: Default`; no additional field bounds
+                });
         let [owned_decoder_where_clause, borrowed_decoder_where_clause] =
             [Owned, Borrowed].map(|lifetime| {
                 append_wheres(
                     where_clause,
                     Some(quote!(Self: ::core::cmp::Eq)),
-                    &unsorted_fields,
+                    decode_where_fields.clone(),
                     Decode(lifetime, Distinguished),
                 )
             });
