@@ -1284,7 +1284,7 @@ fn parsing_varints() {
         OV::string("1"),
     ]) {
         let tag = field.0;
-        assert::decodes!(owned never decodes Foo, [field], WrongWireType, &format!("Foo.{}", tag));
+        assert::decodes!(owned never decodes Foo, [field], WrongWireType, &format!("Foo.{tag}"));
     }
     for (tag, out_of_range) in [
         (0, 2),
@@ -1303,7 +1303,7 @@ fn parsing_varints() {
             owned never decodes Foo,
             [(tag, OV::u64(out_of_range))],
             OutOfDomainValue,
-            &format!("Foo.{}", tag),
+            &format!("Foo.{tag}"),
         );
         let should_fit = [(tag, OV::u64(out_of_range - 1))];
         assert::decodes!(owned distinguished, &should_fit, Foo::from_opaque(&should_fit));
@@ -1437,7 +1437,7 @@ fn parsing_fixed_width_ints() {
             owned never decodes Foo,
             [(tag, OV::Varint(1))],
             WrongWireType,
-            &format!("Foo.{}", tag),
+            &format!("Foo.{tag}"),
         );
     }
 }
@@ -1458,8 +1458,8 @@ fn parsing_floats() {
     for wrong_size_value in [(0, OV::f64(1.0)), (1, OV::f32(2.0))] {
         let tag = wrong_size_value.0;
         let msg = &[wrong_size_value];
-        assert::decodes!(owned relaxed errs for Foo, msg, WrongWireType, &format!("Foo.{}", tag));
-        assert::decodes!(owned relaxed errs for Bar, msg, WrongWireType, &format!("Bar.{}", tag));
+        assert::decodes!(owned relaxed errs for Foo, msg, WrongWireType, &format!("Foo.{tag}"));
+        assert::decodes!(owned relaxed errs for Bar, msg, WrongWireType, &format!("Bar.{tag}"));
     }
 }
 
