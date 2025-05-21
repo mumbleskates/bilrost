@@ -563,9 +563,7 @@ impl DecodeContext {
     pub fn limit_reached(&self) -> Result<(), DecodeError> {
         #[cfg(not(feature = "no-recursion-limit"))]
         if self.recurse_count == 0 {
-            return Err(DecodeError::new(
-                crate::DecodeErrorKind::RecursionLimitReached,
-            ));
+            return Err(DecodeError::new(DecodeErrorKind::RecursionLimitReached));
         }
         Ok(())
     }
