@@ -630,8 +630,8 @@ impl RestrictedDecodeContext {
     /// 2. After calling one of the distinguished helper trait methods that does not have a
     ///    restricted context in its parameters to check against, and therefore could not possibly
     ///    have converted a non-canonical state into an error yet:
-    ///     2a. `DistinguishedProxiable::decode_proxy_distinguished`
-    ///     2b. `DistinguishedCollection::insert_distinguished`
+    ///    2a. `DistinguishedProxiable::decode_proxy_distinguished`
+    ///    2b. `DistinguishedCollection::insert_distinguished`
     ///
     /// After these canonicity values have been checked, and at all other times, it should be safe
     /// to directly update the canonicity that an implementation will itself return since each value
