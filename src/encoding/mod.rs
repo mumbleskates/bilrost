@@ -36,17 +36,17 @@
 //! ...And here are the names of the traits we define for all the above combinations:
 //!
 //! * Supported value with an empty state:
-//!     * `Encoder<E>`
-//!     * `Decoder<E>`
-//!     * `DistinguishedDecoder<E>`
-//!     * `BorrowDecoder<'a, E>`
-//!     * `DistinguishedBorrowDecoder<'a, E>`
+//!     * `Encoder<E, T>`
+//!     * `Decoder<E, T>`
+//!     * `DistinguishedDecoder<E, T>`
+//!     * `BorrowDecoder<'a, E, T>`
+//!     * `DistinguishedBorrowDecoder<'a, E, T>`
 //! * Any supported value:
-//!     * `ValueEncoder<E>`
-//!     * `ValueDecoder<E>`
-//!     * `DistinguishedValueDecoder<E>`
-//!     * `ValueBorrowDecoder<'a, E>`
-//!     * `DistinguishedValueBorrowDecoder<'a, E>`
+//!     * `ValueEncoder<E, T>`
+//!     * `ValueDecoder<E, T>`
+//!     * `DistinguishedValueDecoder<E, T>`
+//!     * `ValueBorrowDecoder<'a, E, T>`
+//!     * `DistinguishedValueBorrowDecoder<'a, E, T>`
 //! * Oneof with no empty state:
 //!     * `NonEmptyOneof`
 //!     * `NonEmptyOneofDecoder`

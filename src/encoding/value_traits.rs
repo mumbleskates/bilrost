@@ -6,7 +6,10 @@ use crate::{Canonicity, DecodeErrorKind};
 /// This type must be implemented for every type encodable as a directly included field in a bilrost
 /// message.
 ///
-// TODO(widders): document () delegation and tagged implementations
+/// When `E` is the unit type `()`, this is the "base" implementation. Most encodings in the
+/// `bilrost` crate use base implementations for all types. However, it is not possible for a crate
+/// that does not own a type to implement this trait for the base implementation, only for an
+/// encoding type that it *does* own.
 pub trait EmptyState<E, T: ?Sized>: ForOverwrite<E, T> {
     #[inline(always)]
     /// Produces the empty state for this type.
@@ -28,7 +31,10 @@ pub trait EmptyState<E, T: ?Sized>: ForOverwrite<E, T> {
 /// optionally (in `Option` or `Vec`, for instance) but don't have an "empty" value, such as
 /// enumerations without a zero value.
 ///
-// TODO(widders): document () delegation and tagged implementations
+/// When `E` is the unit type `()`, this is the "base" implementation. Most encodings in the
+/// `bilrost` crate use base implementations for all types. However, it is not possible for a crate
+/// that does not own a type to implement this trait for the base implementation, only for an
+/// encoding type that it *does* own.
 pub trait ForOverwrite<E, T: ?Sized> {
     /// Produces a new `Self` value to be overwritten.
     fn for_overwrite() -> T
