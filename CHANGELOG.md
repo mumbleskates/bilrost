@@ -19,9 +19,17 @@
   https://rust-lang.github.io/api-guidelines/naming.html#ad-hoc-conversions-follow-as_-to_-into_-conventions-c-conv)
 * The "fixed" encoding no longer automatically covers `Vec<T>` by delegating to
   "unpacked<fixed>" when `T` is supported by the "fixed" encoding.
+* Virtually all the internal encoding traits have changed to better facilitate
+  second party implementations for third-party types.
+  * Each updated trait's form has changed from `impl Encoder<E> for T` to
+    `impl Encoder<E, T> for ()`.
 
 ### New features
 
+* The `Message` trait now has the methods `new_empty`, `message_is_empty`, and
+  `clear_message`. These provide the same functionality that was available by
+  using `EmptyState` previously, but that trait is no longer available to `dyn`
+  messages in a usable form.
 * There is a new encoding available, `general_packed` (exported as
   `bilrost::encoding::GeneralPacked`) that defaults to packed representations
   rather than unpacked for its supported collection types.
@@ -36,13 +44,23 @@
   the whole message struct to implement `Default`; when the message struct is
   given the `#[bilrost(default_per_field)]` attr, only the types of the
   individually ignored fields need to implement `Default`.
+* Added (or publicized) some new macros for facilitating advanced usage:
+  * `encoding_implemented_via_value_encoding!` -- implements encoding/decoding
+    for message fields for all types where encoding/decoding of values is
+    available and the `EmptyState` trait is implemented. Recommended for
+    virtually all encodings.
+  * `encoding_uses_base_empty_state!` -- delegates all `EmptyState` and
+    `ForOverwrite` implementations to the "base" implementations used by the
+    encodings in the `bilrost` crate. See the "proxy_own_type" example.
+  * `implement_core_empty_state_rules!` -- adds some covering implementations
+    of the `EmptyState` and `ForOverwrite` traits for a custom encoding intended
+    to be used for types not owned by your crate. See the
+    "proxy_third_party_type" example.
 
 ### Fixes
 
 * The `empty_state_via_default!` macro no longer produces malformed output when
   used with a generic.
-
-### Cleanups
 
 ## v0.1012.3
 
