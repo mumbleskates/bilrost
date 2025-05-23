@@ -94,7 +94,6 @@ fn encoder_alias_header() -> TokenStream {
     }
 }
 
-#[allow(clippy::large_enum_variant)]
 enum SortGroupPart {
     // A set of fields that can be sorted by any of their tags, as they are always contiguous
     Contiguous(Vec<(TokenStream, Field)>),
@@ -104,7 +103,6 @@ enum SortGroupPart {
 
 use SortGroupPart::*;
 
-#[allow(clippy::large_enum_variant)]
 enum FieldChunk {
     // A field that does not need to be sorted
     AlwaysOrdered((TokenStream, Field)),

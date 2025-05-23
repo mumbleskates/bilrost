@@ -6,6 +6,7 @@ use crate::field::{
     DecodeMode::{self, Distinguished, Relaxed},
     WhereFor::{self, Decode, Encode},
 };
+use alloc::boxed::Box;
 use alloc::vec;
 use alloc::vec::Vec;
 use eyre::{bail, Error};
@@ -20,7 +21,7 @@ pub struct Field {
 }
 
 impl Field {
-    pub fn new(ty: &Type, attrs: &[Meta]) -> Result<Option<Field>, Error> {
+    pub fn new(ty: &Type, attrs: &[Meta]) -> Result<Option<Box<Field>>, Error> {
         let mut oneof_tags = None;
         let mut unknown_attrs = Vec::new();
 
@@ -43,10 +44,10 @@ impl Field {
             );
         }
 
-        Ok(Some(Field {
+        Ok(Some(Box::new(Field {
             ty: ty.clone(),
             tags: tags.iter_tags().collect(),
-        }))
+        })))
     }
 
     /// Returns a statement which encodes the oneof field.

@@ -6,6 +6,7 @@ use crate::field::{
     DecodeMode::{self, Distinguished, Relaxed},
     WhereFor::{self, Decode, Encode},
 };
+use alloc::boxed::Box;
 use alloc::format;
 use alloc::string::ToString;
 use alloc::vec;
@@ -47,7 +48,7 @@ pub struct Field {
 }
 
 impl Field {
-    pub fn new(ty: &Type, attrs: &[Meta], inferred_tag: Option<u32>) -> Result<Field, Error> {
+    pub fn new(ty: &Type, attrs: &[Meta], inferred_tag: Option<u32>) -> Result<Box<Field>, Error> {
         Field::new_impl(ty, attrs, inferred_tag, false, None)
     }
 
@@ -55,7 +56,7 @@ impl Field {
         ty: &Type,
         ident_within_variant: Option<Ident>,
         attrs: &[Meta],
-    ) -> Result<Field, Error> {
+    ) -> Result<Box<Field>, Error> {
         Field::new_impl(ty, attrs, None, true, ident_within_variant)
     }
 
@@ -65,7 +66,7 @@ impl Field {
         inferred_tag: Option<u32>,
         in_oneof: bool,
         ident_within_variant: Option<Ident>,
-    ) -> Result<Field, Error> {
+    ) -> Result<Box<Field>, Error> {
         let mut tag = None;
         let mut encoding = None;
         let mut enumeration_ty = None;
@@ -104,7 +105,7 @@ impl Field {
             "general"
         })?);
 
-        Ok(Field {
+        Ok(Box::new(Field {
             tag,
             ty: ty.clone(),
             encoding,
@@ -112,7 +113,7 @@ impl Field {
             recurses,
             in_oneof,
             ident_within_variant,
-        })
+        }))
     }
 
     /// Spells a value for the field as an enum variant with the given value.

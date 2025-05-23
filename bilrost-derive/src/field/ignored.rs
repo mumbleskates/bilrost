@@ -1,4 +1,5 @@
 use crate::attrs::word_attr;
+use alloc::boxed::Box;
 use alloc::vec;
 use alloc::vec::Vec;
 use eyre::{bail, Error};
@@ -12,7 +13,7 @@ pub struct Field {
 }
 
 impl Field {
-    pub fn new(ty: &Type, attrs: &[Meta]) -> Result<Option<Self>, Error> {
+    pub fn new(ty: &Type, attrs: &[Meta]) -> Result<Option<Box<Self>>, Error> {
         let ignore_attr_count = attrs
             .iter()
             .filter(|attr| word_attr(attr, "ignore"))
@@ -29,7 +30,7 @@ impl Field {
                 quote!(#(#attrs),*)
             );
         }
-        Ok(Some(Self { ty: ty.clone() }))
+        Ok(Some(Box::new(Self { ty: ty.clone() })))
     }
 
     pub fn initialize(&self) -> TokenStream {

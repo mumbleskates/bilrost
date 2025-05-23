@@ -1,4 +1,5 @@
 use crate::crate_name;
+use alloc::boxed::Box;
 use alloc::fmt::Debug;
 use alloc::format;
 use alloc::string::{String, ToString};
@@ -15,14 +16,13 @@ mod oneof;
 mod value;
 
 #[derive(Clone)]
-#[allow(clippy::large_enum_variant)]
 pub enum Field {
     /// A scalar field.
-    Value(value::Field),
+    Value(Box<value::Field>),
     /// A oneof field.
-    Oneof(oneof::Field),
+    Oneof(Box<oneof::Field>),
     /// An ignored field.
-    Ignored(ignored::Field),
+    Ignored(Box<ignored::Field>),
 }
 
 #[derive(Copy, Clone)]
