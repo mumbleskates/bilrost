@@ -8,7 +8,7 @@ use bytes::{Buf, BufMut};
 use core::ops::Deref;
 
 /// The core trait for encoding bilrost data.
-pub trait Encoder<E, T> {
+pub trait Encoder<E, T: ?Sized> {
     /// Encodes the a field with the given tag and value.
     fn encode<B: BufMut + ?Sized>(tag: u32, value: &T, buf: &mut B, tw: &mut TagWriter);
 
@@ -76,13 +76,13 @@ pub trait DistinguishedBorrowDecoder<'a, E, T>: Encoder<E, T> {
 /// distinguished decoding without also implementing the corresponding relaxed decoding, but
 /// this means that it can become a typo to use the relaxed decoding functions by accident when
 /// implementing the distinguished decoders, which could cause serious mishaps.
-pub trait Wiretyped<E, T> {
+pub trait Wiretyped<E, T: ?Sized> {
     const WIRE_TYPE: WireType;
 }
 
 /// The core trait for encoding implementations for raw values that always encode to a single value.
 /// This is the basis for all the other plain, optional, and repeated encodings.
-pub trait ValueEncoder<E, T>: Wiretyped<E, T> {
+pub trait ValueEncoder<E, T: ?Sized>: Wiretyped<E, T> {
     /// Encodes the given value unconditionally. This is guaranteed to emit data to the buffer.
     fn encode_value<B: BufMut + ?Sized>(value: &T, buf: &mut B);
 
