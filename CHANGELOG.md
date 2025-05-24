@@ -6,6 +6,10 @@
 
 ### Fixes
 
+* Relaxed the `Sized` constraint on the `Encoder` and `ValueEncoder`.
+  * This allows adding bounds like `(): Encoder<E, [T]>` when an encoding `E`
+    is encoding a slice of values.
+
 ### Cleanups
 
 ## v0.1013.0-rc.1
