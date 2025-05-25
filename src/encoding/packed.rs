@@ -18,7 +18,7 @@ pub struct Packed<E = GeneralPacked>(E);
 encoding_uses_base_empty_state!(Packed<E>, with generics (E));
 
 /// Packed encodings always prefer to encode length delimited.
-impl<T, E> Wiretyped<Packed<E>, T> for () {
+impl<E, T: ?Sized> Wiretyped<Packed<E>, T> for () {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
 }
 
@@ -151,6 +151,75 @@ where
     fn encoded_len(tag: u32, value: &[T; N], tm: &mut impl TagMeasurer) -> usize {
         if !<() as EmptyState<E, _>>::is_empty(value) {
             <() as FieldEncoder<Packed<E>, [T; N]>>::field_encoded_len(tag, value, tm)
+        } else {
+            0
+        }
+    }
+}
+
+/// Packed encodes slices the same way as arrays. This implementation always uses the natural
+/// emptiness and item iteration of the slice, since implementing `EmptyState` for the unsized `[T]`
+/// isn't practical.
+impl<T, E> ValueEncoder<Packed<E>, [T]> for ()
+where
+    (): ValueEncoder<E, T>,
+{
+    #[inline]
+    fn encode_value<B: BufMut + ?Sized>(value: &[T], buf: &mut B) {
+        encode_varint(
+            <() as ValueEncoder<E, _>>::many_values_encoded_len(value.iter()) as u64,
+            buf,
+        );
+        for val in value.iter() {
+            <() as ValueEncoder<E, _>>::encode_value(val, buf);
+        }
+    }
+
+    #[inline]
+    fn prepend_value<B: ReverseBuf + ?Sized>(value: &[T], buf: &mut B) {
+        let end = buf.remaining();
+        for val in value.iter().rev() {
+            <() as ValueEncoder<E, _>>::prepend_value(val, buf);
+        }
+        prepend_varint((buf.remaining() - end) as u64, buf);
+    }
+
+    #[inline]
+    fn value_encoded_len(value: &[T]) -> usize {
+        let inner_len = <() as ValueEncoder<E, _>>::many_values_encoded_len(value.iter());
+        encoded_len_varint(inner_len as u64)
+            .checked_add(inner_len)
+            .unwrap()
+    }
+}
+
+impl<T, E> Encoder<Packed<E>, [T]> for ()
+where
+    (): ValueEncoder<E, T>,
+{
+    #[inline]
+    fn encode<B: BufMut + ?Sized>(tag: u32, value: &[T], buf: &mut B, tw: &mut TagWriter) {
+        if !value.is_empty() {
+            <() as FieldEncoder<Packed<E>, [T]>>::encode_field(tag, value, buf, tw);
+        }
+    }
+
+    #[inline]
+    fn prepend_encode<B: ReverseBuf + ?Sized>(
+        tag: u32,
+        value: &[T],
+        buf: &mut B,
+        tw: &mut TagRevWriter,
+    ) {
+        if !value.is_empty() {
+            <() as FieldEncoder<Packed<E>, [T]>>::prepend_field(tag, value, buf, tw);
+        }
+    }
+
+    #[inline]
+    fn encoded_len(tag: u32, value: &[T], tm: &mut impl TagMeasurer) -> usize {
+        if !value.is_empty() {
+            <() as FieldEncoder<Packed<E>, [T]>>::field_encoded_len(tag, value, tm)
         } else {
             0
         }

@@ -328,6 +328,46 @@ where
     }
 }
 
+/// Unpacked encodes slices the same way as arrays. This implementation always uses the natural
+/// emptiness and item iteration of the slice, since implementing `EmptyState` for the unsized `[T]`
+/// isn't practical.
+impl<T, E> Encoder<Unpacked<E>, [T]> for ()
+where
+    (): ValueEncoder<E, T>,
+{
+    #[inline]
+    fn encode<B: BufMut + ?Sized>(tag: u32, value: &[T], buf: &mut B, tw: &mut TagWriter) {
+        for val in value.iter() {
+            <() as FieldEncoder<E, T>>::encode_field(tag, val, buf, tw);
+        }
+    }
+
+    #[inline]
+    fn prepend_encode<B: ReverseBuf + ?Sized>(
+        tag: u32,
+        value: &[T],
+        buf: &mut B,
+        tw: &mut TagRevWriter,
+    ) {
+        for val in value.iter().rev() {
+            <() as FieldEncoder<E, T>>::prepend_field(tag, val, buf, tw);
+        }
+    }
+
+    #[inline]
+    fn encoded_len(tag: u32, value: &[T], tm: &mut impl TagMeasurer) -> usize {
+        if value.is_empty() {
+            // Each *additional* field encoded after the first needs only 1 byte for the field key.
+            tm.key_len(tag)
+                + <() as ValueEncoder<E, T>>::many_values_encoded_len(value.iter())
+                + value.len()
+                - 1
+        } else {
+            0
+        }
+    }
+}
+
 /// Unpacked encodes arrays as repeated fields if any of the values are non-empty.
 impl<T, const N: usize, E> Encoder<Unpacked<E>, Option<[T; N]>> for ()
 where
