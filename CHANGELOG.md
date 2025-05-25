@@ -4,6 +4,10 @@
 
 ### New features
 
+* Relaxed the `Sized` constraint in the `FieldEncoder` trait as well.
+* Added explicit encoding implementations for `[T]` in the `Packed` and
+  `Unpacked` encodings.
+
 ### Fixes
 
 ### Cleanups
