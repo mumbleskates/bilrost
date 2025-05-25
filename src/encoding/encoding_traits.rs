@@ -169,7 +169,7 @@ pub trait DistinguishedValueBorrowDecoder<'a, E, T>: ValueEncoder<E, T> + Eq {
 
 /// Affiliated helper trait for ValueEncoder that provides obligate implementations for handling
 /// field keys and wire types.
-pub trait FieldEncoder<E, T>: ValueEncoder<E, T> {
+pub trait FieldEncoder<E, T: ?Sized>: ValueEncoder<E, T> {
     /// Encodes exactly one field with the given tag and value into the buffer.
     fn encode_field<B: BufMut + ?Sized>(tag: u32, value: &T, buf: &mut B, tw: &mut TagWriter);
 
@@ -235,7 +235,7 @@ pub trait DistinguishedFieldBorrowDecoder<'a, E, T>:
     ) -> Result<Canonicity, DecodeError>;
 }
 
-impl<T, E> FieldEncoder<E, T> for ()
+impl<E, T: ?Sized> FieldEncoder<E, T> for ()
 where
     (): ValueEncoder<E, T>,
 {
