@@ -20,7 +20,7 @@
 
 ### Fixes
 
-* Relaxed the `Sized` constraint on the `Encoder` and `ValueEncoder`.
+* Relaxed the `Sized` constraint on the `Encoder` and `ValueEncoder` traits.
   * This allows adding bounds like `(): Encoder<E, [T]>` when an encoding `E`
     is encoding a slice of values.
 
