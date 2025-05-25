@@ -1,15 +1,9 @@
-## v0.1013.0-dev
-
-### Breaking changes
-
-### New features
+## v0.1013.0-rc.4
 
 ### Fixes
 
 * Fixed the broken `Unpacked` encoding for `[T]` and covered that type with
   tests by delegating existing types' encoding to it.
-
-### Cleanups
 
 ## v0.1013.0-rc.3
 
