@@ -356,7 +356,7 @@ where
 
     #[inline]
     fn encoded_len(tag: u32, value: &[T], tm: &mut impl TagMeasurer) -> usize {
-        if value.is_empty() {
+        if !value.is_empty() {
             // Each *additional* field encoded after the first needs only 1 byte for the field key.
             tm.key_len(tag)
                 + <() as ValueEncoder<E, T>>::many_values_encoded_len(value.iter())
