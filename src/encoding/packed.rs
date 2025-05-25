@@ -97,30 +97,17 @@ where
 {
     #[inline]
     fn encode_value<B: BufMut + ?Sized>(value: &[T; N], buf: &mut B) {
-        encode_varint(
-            <() as ValueEncoder<E, _>>::many_values_encoded_len(value.iter()) as u64,
-            buf,
-        );
-        for val in value.iter() {
-            <() as ValueEncoder<E, _>>::encode_value(val, buf);
-        }
+        <() as ValueEncoder<Packed<E>, [T]>>::encode_value(value, buf)
     }
 
     #[inline]
     fn prepend_value<B: ReverseBuf + ?Sized>(value: &[T; N], buf: &mut B) {
-        let end = buf.remaining();
-        for val in value.iter().rev() {
-            <() as ValueEncoder<E, _>>::prepend_value(val, buf);
-        }
-        prepend_varint((buf.remaining() - end) as u64, buf);
+        <() as ValueEncoder<Packed<E>, [T]>>::prepend_value(value, buf)
     }
 
     #[inline]
     fn value_encoded_len(value: &[T; N]) -> usize {
-        let inner_len = <() as ValueEncoder<E, _>>::many_values_encoded_len(value.iter());
-        encoded_len_varint(inner_len as u64)
-            .checked_add(inner_len)
-            .unwrap()
+        <() as ValueEncoder<Packed<E>, [T]>>::value_encoded_len(value)
     }
 }
 
@@ -131,7 +118,7 @@ where
     #[inline]
     fn encode<B: BufMut + ?Sized>(tag: u32, value: &[T; N], buf: &mut B, tw: &mut TagWriter) {
         if !<() as EmptyState<E, _>>::is_empty(value) {
-            <() as FieldEncoder<Packed<E>, [T; N]>>::encode_field(tag, value, buf, tw);
+            <() as FieldEncoder<Packed<E>, [T]>>::encode_field(tag, value, buf, tw);
         }
     }
 
@@ -143,14 +130,14 @@ where
         tw: &mut TagRevWriter,
     ) {
         if !<() as EmptyState<E, _>>::is_empty(value) {
-            <() as FieldEncoder<Packed<E>, [T; N]>>::prepend_field(tag, value, buf, tw);
+            <() as FieldEncoder<Packed<E>, [T]>>::prepend_field(tag, value, buf, tw);
         }
     }
 
     #[inline]
     fn encoded_len(tag: u32, value: &[T; N], tm: &mut impl TagMeasurer) -> usize {
         if !<() as EmptyState<E, _>>::is_empty(value) {
-            <() as FieldEncoder<Packed<E>, [T; N]>>::field_encoded_len(tag, value, tm)
+            <() as FieldEncoder<Packed<E>, [T]>>::field_encoded_len(tag, value, tm)
         } else {
             0
         }
