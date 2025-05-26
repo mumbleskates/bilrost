@@ -21,10 +21,7 @@ where
     (): ForOverwrite<E, T>,
 {
     #[inline(always)]
-    fn for_overwrite() -> Arc<T>
-    where
-        Self: Sized,
-    {
+    fn for_overwrite() -> Arc<T> {
         Arc::new(<() as ForOverwrite<E, T>>::for_overwrite())
     }
 }
