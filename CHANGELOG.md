@@ -2,6 +2,10 @@
 
 ### Breaking changes
 
+* Removed the `new_proxy` method from the `Proxiable` trait; the `Proxy` type
+  that your type will be encoded as must have `ForOverwrite` in the encoding `E`
+  that is used to encode it instead.
+
 ### New features
 
 ### Fixes
