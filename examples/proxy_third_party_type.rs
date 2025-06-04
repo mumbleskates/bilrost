@@ -40,10 +40,6 @@ mod implement_encoding_for_range {
     {
         type Proxy = (T, T);
 
-        fn new_proxy() -> Self::Proxy {
-            <() as ForOverwrite<(), Self::Proxy>>::for_overwrite()
-        }
-
         fn encode_proxy(&self) -> Self::Proxy {
             (self.start().clone(), self.end().clone())
         }

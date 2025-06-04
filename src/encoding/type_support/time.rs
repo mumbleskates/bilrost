@@ -64,10 +64,6 @@ fn parts_to_date(year: i32, ordinal0: i32) -> Option<Date> {
 impl Proxiable<SealedBilrostTag> for Date {
     type Proxy = LocalProxy<i32, 2>;
 
-    fn new_proxy() -> Self::Proxy {
-        Self::Proxy::new_empty()
-    }
-
     fn encode_proxy(&self) -> Self::Proxy {
         Self::Proxy::new_without_empty_suffix([self.year(), (self.ordinal() - 1) as i32])
     }
@@ -161,10 +157,6 @@ where
 impl Proxiable<SealedBilrostTag> for Time {
     type Proxy = LocalProxy<u32, 4>;
 
-    fn new_proxy() -> Self::Proxy {
-        Self::Proxy::new_empty()
-    }
-
     fn encode_proxy(&self) -> Self::Proxy {
         Self::Proxy::new_without_empty_suffix([
             self.hour() as u32,
@@ -251,10 +243,6 @@ impl EmptyState<(), PrimitiveDateTime> for () {
 
 impl Proxiable<SealedBilrostTag> for PrimitiveDateTime {
     type Proxy = LocalProxy<i32, 6>;
-
-    fn new_proxy() -> Self::Proxy {
-        Self::Proxy::new_empty()
-    }
 
     fn encode_proxy(&self) -> Self::Proxy {
         Self::Proxy::new_without_empty_suffix([
@@ -358,10 +346,6 @@ impl EmptyState<(), UtcOffset> for () {
 
 impl Proxiable<SealedBilrostTag> for UtcOffset {
     type Proxy = (i8, i8, i8);
-
-    fn new_proxy() -> Self::Proxy {
-        (0, 0, 0)
-    }
 
     fn encode_proxy(&self) -> Self::Proxy {
         self.as_hms()
@@ -501,10 +485,6 @@ impl EmptyState<(), OffsetDateTime> for () {
 impl Proxiable<SealedBilrostTag> for OffsetDateTime {
     type Proxy = (PrimitiveDateTime, UtcOffset);
 
-    fn new_proxy() -> Self::Proxy {
-        <() as EmptyState<(), _>>::empty()
-    }
-
     fn encode_proxy(&self) -> Self::Proxy {
         odt_decompose(*self)
     }
@@ -561,10 +541,6 @@ empty_state_via_default!(Duration);
 
 impl Proxiable<SealedBilrostTag> for Duration {
     type Proxy = TimeDeltaProxy;
-
-    fn new_proxy() -> Self::Proxy {
-        TimeDeltaProxy::default()
-    }
 
     fn encode_proxy(&self) -> Self::Proxy {
         TimeDeltaProxy {

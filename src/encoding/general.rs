@@ -411,10 +411,6 @@ mod blob {
 impl Proxiable<SealedBilrostTag> for core::time::Duration {
     type Proxy = crate::encoding::local_proxy::LocalProxy<u64, 2>;
 
-    fn new_proxy() -> Self::Proxy {
-        Self::Proxy::new_empty()
-    }
-
     fn encode_proxy(&self) -> Self::Proxy {
         Self::Proxy::new_without_empty_suffix([self.as_secs(), self.subsec_nanos() as u64])
     }

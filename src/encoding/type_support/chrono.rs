@@ -45,10 +45,6 @@ fn parts_to_naivedate(year: i32, ordinal0: i32) -> Option<NaiveDate> {
 impl Proxiable<SealedBilrostTag> for NaiveDate {
     type Proxy = LocalProxy<i32, 2>;
 
-    fn new_proxy() -> Self::Proxy {
-        Self::Proxy::new_empty()
-    }
-
     fn encode_proxy(&self) -> Self::Proxy {
         Self::Proxy::new_without_empty_suffix([self.year(), self.ordinal0() as i32])
     }
@@ -155,10 +151,6 @@ impl EmptyState<(), NaiveTime> for () {
 
 impl Proxiable<SealedBilrostTag> for NaiveTime {
     type Proxy = LocalProxy<u32, 4>;
-
-    fn new_proxy() -> Self::Proxy {
-        Self::Proxy::new_empty()
-    }
 
     fn encode_proxy(&self) -> Self::Proxy {
         Self::Proxy::new_without_empty_suffix([
@@ -288,10 +280,6 @@ fn parts_to_naivetime(hour: i32, min: i32, sec: i32, nanos: i32) -> Option<Naive
 
 impl Proxiable<SealedBilrostTag> for NaiveDateTime {
     type Proxy = LocalProxy<i32, 6>;
-
-    fn new_proxy() -> Self::Proxy {
-        Self::Proxy::new_empty()
-    }
 
     fn encode_proxy(&self) -> Self::Proxy {
         Self::Proxy::new_without_empty_suffix([
@@ -426,16 +414,12 @@ impl EmptyState<(), Utc> for () {
 impl Proxiable<SealedBilrostTag> for Utc {
     type Proxy = (i8, i8, i8);
 
-    fn new_proxy() -> Self::Proxy {
+    fn encode_proxy(&self) -> Self::Proxy {
         (0, 0, 0)
     }
 
-    fn encode_proxy(&self) -> Self::Proxy {
-        Self::new_proxy()
-    }
-
     fn decode_proxy(&mut self, proxy: Self::Proxy) -> Result<(), DecodeErrorKind> {
-        if proxy == Self::new_proxy() {
+        if proxy == (0, 0, 0) {
             Ok(())
         } else {
             Err(OutOfDomainValue)
@@ -542,10 +526,6 @@ impl EmptyState<(), FixedOffset> for () {
 
 impl Proxiable<SealedBilrostTag> for FixedOffset {
     type Proxy = (i8, i8, i8);
-
-    fn new_proxy() -> Self::Proxy {
-        (0, 0, 0)
-    }
 
     fn encode_proxy(&self) -> Self::Proxy {
         let offset_secs = self.local_minus_utc();
@@ -751,10 +731,6 @@ where
 {
     type Proxy = (NaiveDateTime, Z::Offset);
 
-    fn new_proxy() -> Self::Proxy {
-        <() as EmptyState<(), Self::Proxy>>::empty()
-    }
-
     fn encode_proxy(&self) -> Self::Proxy {
         (self.naive_utc(), self.offset().clone())
     }
@@ -844,10 +820,6 @@ empty_state_via_default!(TimeDelta);
 
 impl Proxiable<SealedBilrostTag> for TimeDelta {
     type Proxy = TimeDeltaProxy;
-
-    fn new_proxy() -> Self::Proxy {
-        TimeDeltaProxy::default()
-    }
 
     fn encode_proxy(&self) -> Self::Proxy {
         TimeDeltaProxy {

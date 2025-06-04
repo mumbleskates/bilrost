@@ -153,9 +153,6 @@ impl EmptyState<(), SystemTime> for () {
 
 impl Proxiable<SealedBilrostTag> for SystemTime {
     type Proxy = crate::encoding::local_proxy::LocalProxy<u64, 3>;
-    fn new_proxy() -> Self::Proxy {
-        Self::Proxy::new_empty()
-    }
 
     fn encode_proxy(&self) -> Self::Proxy {
         let (symbol, small, big) = match self.cmp(&UNIX_EPOCH) {

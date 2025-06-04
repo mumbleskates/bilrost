@@ -78,10 +78,6 @@ mod implement_encoding_for_those_structs {
     impl Proxiable for AlwaysEven {
         type Proxy = u64;
 
-        fn new_proxy() -> Self::Proxy {
-            0
-        }
-
         fn encode_proxy(&self) -> Self::Proxy {
             self.value()
         }
@@ -107,10 +103,6 @@ mod implement_encoding_for_those_structs {
     // will not be able to name the private tag.
     impl Proxiable<Tag> for AlwaysOdd {
         type Proxy = u64;
-
-        fn new_proxy() -> Self::Proxy {
-            0
-        }
 
         fn encode_proxy(&self) -> Self::Proxy {
             self.value()

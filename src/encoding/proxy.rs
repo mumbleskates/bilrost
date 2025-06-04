@@ -1,7 +1,8 @@
 use crate::buf::ReverseBuf;
 use crate::encoding::{
     Capped, DecodeContext, DistinguishedValueBorrowDecoder, DistinguishedValueDecoder,
-    RestrictedDecodeContext, ValueBorrowDecoder, ValueDecoder, ValueEncoder, WireType, Wiretyped,
+    ForOverwrite, RestrictedDecodeContext, ValueBorrowDecoder, ValueDecoder, ValueEncoder,
+    WireType, Wiretyped,
 };
 use crate::{Canonicity, DecodeError, DecodeErrorKind};
 use bytes::{Buf, BufMut};
@@ -31,10 +32,6 @@ pub trait Proxiable<Tag = ()> {
     /// The type that the value should appear as when it is encoded on the wire.
     type Proxy;
 
-    /// Return a fresh proxy value. This should just be a cheap default, its value needn't be
-    /// significant.
-    fn new_proxy() -> Self::Proxy;
-
     /// Convert this value into a value of the proxy's type.
     fn encode_proxy(&self) -> Self::Proxy;
 
@@ -60,7 +57,7 @@ pub trait DistinguishedProxiable<Tag = ()>: Proxiable<Tag> {
 impl<T, E, Tag> Wiretyped<Proxied<E, Tag>, T> for ()
 where
     T: Proxiable<Tag>,
-    (): Wiretyped<E, T::Proxy>,
+    (): Wiretyped<E, T::Proxy> + ForOverwrite<E, T::Proxy>,
 {
     const WIRE_TYPE: WireType = <() as Wiretyped<E, T::Proxy>>::WIRE_TYPE;
 }
@@ -68,7 +65,7 @@ where
 impl<T, E, Tag> ValueEncoder<Proxied<E, Tag>, T> for ()
 where
     T: Proxiable<Tag>,
-    (): ValueEncoder<E, T::Proxy>,
+    (): ForOverwrite<E, T::Proxy> + ValueEncoder<E, T::Proxy>,
 {
     #[inline]
     fn encode_value<B: BufMut + ?Sized>(value: &T, buf: &mut B) {
@@ -113,7 +110,7 @@ where
 impl<T, E, Tag> ValueDecoder<Proxied<E, Tag>, T> for ()
 where
     T: Proxiable<Tag>,
-    (): ValueDecoder<E, T::Proxy>,
+    (): ForOverwrite<E, T::Proxy> + ValueDecoder<E, T::Proxy>,
 {
     #[inline]
     fn decode_value<B: Buf + ?Sized>(
@@ -121,7 +118,7 @@ where
         buf: Capped<B>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
-        let mut proxy = T::new_proxy();
+        let mut proxy = <() as ForOverwrite<E, T::Proxy>>::for_overwrite();
         <() as ValueDecoder<E, _>>::decode_value(&mut proxy, buf, ctx)?;
         Ok(value.decode_proxy(proxy)?)
     }
@@ -130,7 +127,7 @@ where
 impl<T, E, Tag> DistinguishedValueDecoder<Proxied<E, Tag>, T> for ()
 where
     T: DistinguishedProxiable<Tag> + Eq,
-    (): DistinguishedValueDecoder<E, T::Proxy>,
+    (): ForOverwrite<E, T::Proxy> + DistinguishedValueDecoder<E, T::Proxy>,
 {
     const CHECKS_EMPTY: bool = <() as DistinguishedValueDecoder<E, T::Proxy>>::CHECKS_EMPTY;
 
@@ -139,7 +136,7 @@ where
         buf: Capped<impl Buf + ?Sized>,
         ctx: RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
-        let mut proxy = T::new_proxy();
+        let mut proxy = <() as ForOverwrite<E, T::Proxy>>::for_overwrite();
         let mut canon = <() as DistinguishedValueDecoder<E, _>>::decode_value_distinguished::<
             ALLOW_EMPTY,
         >(&mut proxy, buf, ctx.clone())?;
@@ -151,7 +148,7 @@ where
 impl<'a, T, E, Tag> ValueBorrowDecoder<'a, Proxied<E, Tag>, T> for ()
 where
     T: Proxiable<Tag>,
-    (): ValueBorrowDecoder<'a, E, T::Proxy>,
+    (): ForOverwrite<E, T::Proxy> + ValueBorrowDecoder<'a, E, T::Proxy>,
 {
     #[inline]
     fn borrow_decode_value(
@@ -159,7 +156,7 @@ where
         buf: Capped<&'a [u8]>,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
-        let mut proxy = T::new_proxy();
+        let mut proxy = <() as ForOverwrite<E, T::Proxy>>::for_overwrite();
         <() as ValueBorrowDecoder<E, _>>::borrow_decode_value(&mut proxy, buf, ctx)?;
         Ok(value.decode_proxy(proxy)?)
     }
@@ -168,7 +165,7 @@ where
 impl<'a, T, E, Tag> DistinguishedValueBorrowDecoder<'a, Proxied<E, Tag>, T> for ()
 where
     T: DistinguishedProxiable<Tag> + Eq,
-    (): DistinguishedValueBorrowDecoder<'a, E, T::Proxy>,
+    (): ForOverwrite<E, T::Proxy> + DistinguishedValueBorrowDecoder<'a, E, T::Proxy>,
 {
     const CHECKS_EMPTY: bool = <() as DistinguishedValueBorrowDecoder<E, T::Proxy>>::CHECKS_EMPTY;
 
@@ -177,7 +174,7 @@ where
         buf: Capped<&'a [u8]>,
         ctx: RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
-        let mut proxy = T::new_proxy();
+        let mut proxy = <() as ForOverwrite<E, T::Proxy>>::for_overwrite();
         let mut canon =
             <() as DistinguishedValueBorrowDecoder<E, _>>::borrow_decode_value_distinguished::<
                 ALLOW_EMPTY,
