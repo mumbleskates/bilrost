@@ -653,14 +653,14 @@ pub trait DistinguishedBorrowedMessage<'a>: BorrowedMessage<'a> {
 
 /// `Message` is implemented as a usability layer on top of the basic functionality afforded by
 /// `RawMessage`.
-// TODO(widders): in the future, make it possible to decode with extension Message types for all
-//  fields not covered by the own type. The default extension can be `()`, which always skips in
-//  relaxed mode and always errs in distinguished mode; the most permissive possible extension
-//  would then be OpaqueMessage, which losslessly captures all unknown fields. A composing wrapper
-//  type that combines two message types in an overlay can be implemented. This will require an
-//  alternate encoding mode which emits field groups to be sorted in a stricter way, only grouping
-//  truly contiguous runs of field ids so that they can be sorted with any other type's fields at
-//  runtime.
+// TODO: extension decoding: extensions can't be provided singly alongside the message that's to be
+//  decoded and capture extensions in anything but the top layer message's extension fields. doing
+//  this in a really robust way that people will probably eventually want will probably require some
+//  kind of moderately robust semi-reflective mapping that mirrors the parsed structure of the
+//  message that it came from; re-encoding from this type could be similarly difficult to implement
+//  efficiently, since the way inlining is done now type-erases the implementations of each field's
+//  encoding and applying extensions would need to either interleave encoded message data (which is
+//  honestly probably faster) or make all of the field encodings reachable polymorphically.
 impl<T> Message for T
 where
     T: RawMessage + Sized,

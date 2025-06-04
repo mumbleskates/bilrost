@@ -30,7 +30,7 @@ pub use types::*;
 const NANOS_PER_SECOND: i32 = 1_000_000_000;
 const NANOS_MAX: i32 = NANOS_PER_SECOND - 1;
 
-// TODO(widders): Message and into/from impls on time::Duration, time::Instant as optional features
+// TODO: Message and into/from impls on time::Duration, time::Instant as optional features
 
 impl core::ops::Neg for Duration {
     type Output = Self;
@@ -43,7 +43,7 @@ impl core::ops::Neg for Duration {
     }
 }
 
-// TODO(widders): addition and subtraction with Timestamp & Duration
+// TODO: addition and subtraction with Timestamp & Duration
 
 impl Duration {
     /// Returns true iff the duration is already normalized.

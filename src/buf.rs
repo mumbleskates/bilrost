@@ -762,9 +762,9 @@ impl Buf for ReverseBufferReader<'_> {
     }
 }
 
-// TODO(widders): if and when we want to also implement borrowable encoding for non-contiguous
-//  borrowed bufs, we can bring this back. for now that feels like too much, as the only thing that
-//  would make use of this is Cow
+// TODO: if and when we want to also implement borrowable encoding for non-contiguous borrowed bufs,
+//  we can bring this back. for now that feels like too much, as the only thing that would make use
+//  of this is Cow (since we do not have implementations for any rope-like storage)
 //
 // pub trait BorrowBuf<'a>: Buf {
 //     fn borrow_chunk(&self) -> &'a [u8];

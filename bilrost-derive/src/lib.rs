@@ -1680,10 +1680,13 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
     let crate_ = crate_name();
     let input: DeriveInput = parse2(input)?;
 
-    // TODO(widders): support a "message" word attr that converts an enum variant, with possibly
-    //  more than one field, to be interpreted as a non-nested message value with its own set of
-    //  fields. this still shouldn't support zero fields: the blessed way to encode a zero-field
-    //  message enum variant would be to use a variant with a single field with the type ().
+    // TODO: support a "message" word attr that converts any enum variant into an embedded message.
+    //  Unit variants would become the equivalent of an embedded `()` message, tuple variants with
+    //  anonymous fields would work like tuple messages, and braced variants would work just like
+    //  braced messages; the exact same `#[bilrost(..)]` attrs would apply to all the fields inside
+    //  and would encode the variant as if it were a message. This would have to be implemented as a
+    //  special case of the "value" field probably that takes a set of fields that were parsed as if
+    //  it was a (non-oneof) message.
     let PreprocessedOneof {
         ident,
         impl_generics,

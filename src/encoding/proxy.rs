@@ -33,8 +33,6 @@ pub trait Proxiable<Tag = ()> {
 
     /// Return a fresh proxy value. This should just be a cheap default, its value needn't be
     /// significant.
-    // TODO(widders): eliminate new_proxy, use ForOverwrite<E> and EmptyState<E> for the proxy type
-    //  instead
     fn new_proxy() -> Self::Proxy;
 
     /// Convert this value into a value of the proxy's type.
@@ -58,9 +56,6 @@ pub trait DistinguishedProxiable<Tag = ()>: Proxiable<Tag> {
         proxy: Self::Proxy,
     ) -> Result<Canonicity, DecodeErrorKind>;
 }
-
-// TODO(widders): consider implementing proxied empty states in terms of the proxy's empty state
-//  instead, from here
 
 impl<T, E, Tag> Wiretyped<Proxied<E, Tag>, T> for ()
 where
