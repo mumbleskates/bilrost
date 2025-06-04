@@ -156,9 +156,7 @@ impl Proxiable<SealedBilrostTag> for SystemTime {
 
     fn encode_proxy(&self) -> Self::Proxy {
         let (symbol, small, big) = match self.cmp(&UNIX_EPOCH) {
-            Ordering::Equal => {
-                return Self::Proxy::new_empty();
-            }
+            Ordering::Equal => return <() as EmptyState<(), Self::Proxy>>::empty(),
             // lacking a simpler way, we put a literal ascii + or - to indicate the sign of the
             // timestamp.
             Ordering::Greater => ('+', &UNIX_EPOCH, self),

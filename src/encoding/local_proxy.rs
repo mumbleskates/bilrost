@@ -32,11 +32,6 @@ impl<T, const N: usize> LocalProxy<T, N>
 where
     (): EmptyState<(), T>,
 {
-    /// Creates a new, empty array-list proxy.
-    pub fn new_empty() -> Self {
-        <() as EmptyState<(), Self>>::empty()
-    }
-
     /// Creates a new value that only contains the values in the given backing array that are not
     /// contiguously empty at the end of the array. This is equivalent to creating a new empty proxy
     /// and then inserting each value in order until all remaining values that would be inserted are
