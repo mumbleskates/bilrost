@@ -11,7 +11,7 @@ use std::sync::Arc;
 /// cause `bilrost` to crash the program when encoding. It's still very useful for the careful user
 /// though, and serves as an excellent example of how something like this can be implemented.
 mod arc_encoding;
-use arc_encoding::ArcEncoding as arced;
+use arc_encoding::{Arced, ArcedSlice};
 
 fn main() {
     #[derive(Debug, Default, Message)]
@@ -27,12 +27,12 @@ fn main() {
 
     #[derive(Clone, Debug, Message)]
     struct DemoCustom {
-        #[bilrost(tag(1), encoding(arced<varint>))] // Any field can be wrapped in Arc
+        #[bilrost(tag(1), encoding(Arced<varint>))] // Any field can be wrapped in Arc
         scalar: Option<Arc<u64>>,
         #[bilrost(tag(2))]
         name: String,
-        #[bilrost(tag(3), encoding(unpacked<arced<general>>), recurses)]
-        tree_children: Vec<Arc<Self>>,
+        #[bilrost(tag(3), encoding(ArcedSlice<unpacked>), recurses)]
+        tree_children: Arc<[Self]>,
     }
 
     let input = Plain {
