@@ -1,6 +1,39 @@
-## v0.1013.0-dev
+## v0.1013.0
 
 ### Breaking changes
+
+#### For normal use
+
+* There should be no breaking changes. Any breaking changes may be reported as
+  bugs and will be either fixed or documented in a patch release.
+
+#### Advanced usage
+
+Since 0.1012:
+
+* The `bilrost::encoding::General` encoding type has become a specific
+  definition of a generic type, `bilrost::encoding::GeneralGeneric<P>`. Anything
+  that implements encoders specifically for `General` or sets up encoding
+  delegation for it may find that it no longer works inside nested values or in
+  `Oneof` variants, since those values are encoded with a specific definition of
+  the generic. If this is a problem, it can be solved one of two ways:
+  1. explicitly annotate the encodings of the values that aren't working with
+     the "general" encoding, overriding "general_packed"
+  2. change the implementation or delegation to be not just for `General`, but
+     for `GeneralGeneric<P>` for all `const P: u8` instead; this will include
+     both of the general encodings.
+* Renamed `OpaqueMessage::{borrowed, convert_to_owned}` to `to_borrowed` and
+  `into_owned`, and `OpaqueValue::convert_to_owned` to `into_owned` to better
+  match [common naming conventions](
+  https://rust-lang.github.io/api-guidelines/naming.html#ad-hoc-conversions-follow-as_-to_-into_-conventions-c-conv)
+* The "fixed" encoding no longer automatically covers `Vec<T>` by delegating to
+  "unpacked<fixed>" when `T` is supported by the "fixed" encoding.
+* Virtually all the internal encoding traits have changed to better facilitate
+  second party implementations for third-party types.
+  * Each updated trait's form has changed from `impl Encoder<E> for T` to
+    `impl Encoder<E, T> for ()`.
+
+Since 0.1013.0-rc.4:
 
 * Removed the `new_proxy` method from the `Proxiable` trait; the `Proxy` type
   that your type will be encoded as must have `ForOverwrite` in the encoding `E`
@@ -8,9 +41,52 @@
 
 ### New features
 
+#### For normal use
+
+* The `Message` trait now has the methods `new_empty`, `message_is_empty`, and
+  `clear_message`. These provide the same functionality that was available by
+  using `EmptyState` from the advanced-usage space traits previously, but that
+  trait is no longer available to `dyn` messages in a usable form.
+* There is a new encoding available, `general_packed` (exported as
+  `bilrost::encoding::GeneralPacked`) that defaults to packed representations
+  rather than unpacked for its supported collection types.
+  * `general_packed` is now the implicit default when no encoding is specified
+    for `Oneof` variants, as well as the default inner encoding for values
+    nested inside `packed`, `unpacked`, and `map` values.
+  * In all other ways, `general_packed` should behave the same as `general`.
+  * This means that *many* new types can now be encoded without specifying an
+    explicit field `encoding`. This can be very helpful as the compiler error
+    messages from the missing trait are unlikely to ever be very good.
+* Ignored fields, via the `#[bilrost(ignore)]` attr, no longer always require
+  the whole message struct to implement `Default`; when the message struct is
+  given the `#[bilrost(default_per_field)]` attr, only the types of the
+  individually ignored fields need to implement `Default`.
+
+#### Advanced usage
+
+* Added (or publicized) some new macros for facilitating advanced usage:
+  * `encoding_implemented_via_value_encoding!` -- implements encoding/decoding
+    for message fields for all types where encoding/decoding of values is
+    available and the `EmptyState` trait is implemented. Recommended for
+    virtually all encodings.
+  * `encoding_uses_base_empty_state!` -- delegates all `EmptyState` and
+    `ForOverwrite` implementations to the "base" implementations used by the
+    encodings in the `bilrost` crate. See the "proxy_own_type" example.
+  * `implement_core_empty_state_rules!` -- adds some covering implementations
+    of the `EmptyState` and `ForOverwrite` traits for a custom encoding intended
+    to be used for types not owned by your crate. See the
+    "proxy_third_party_type" example.
+* The `Sized` constraints have been relaxed on the `Encoder`, `ValueEncoder`,
+  and `WireTyped` traits.
+* Added some examples to the crate demonstrating newly-possible advanced usage
+  patterns for implementing encoding & decoding types not naturally supported by
+  the `bilrost` crate, for cases when those types are and are not owned by your
+  own crate.
+
 ### Fixes
 
-### Cleanups
+* The `empty_state_via_default!` macro no longer produces malformed output when
+  used with a generic.
 
 ## v0.1013.0-rc.4
 
