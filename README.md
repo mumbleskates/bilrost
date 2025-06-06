@@ -97,6 +97,7 @@ decoding.
 
 - [Quick start](#getting-started)
     - [Using the derive macros](#deriving-message)
+      - [Special attributes](#other-attributes)
     - [Encoding and decoding](#encoding-and-decoding-messages)
       - [Decoding distinguished canonical data](#decoding-in-distinguished-mode)
       - [Borrowed decoding](#borrowed-messages)
