@@ -25,7 +25,7 @@ serde_json = { version = "1", default-features = false, features = ["alloc", "fl
 
 [dev-dependencies]
 bilrost = { version = "=0.1012.4", path = "..", default-features = false, features = ["derive"] }
-proptest = "1"
+proptest = ">=1.6,<1.7"
 
 [features]
 default = ["std"]
