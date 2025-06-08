@@ -4,6 +4,9 @@
 
 ### New features
 
+* Added support for the `#[bilrost(reserved_tags(..))]` attribute for the
+  `Oneof` derive macro as well.
+
 ### Fixes
 
 ### Cleanups
