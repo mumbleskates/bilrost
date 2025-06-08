@@ -1582,11 +1582,18 @@ fn preprocess_oneof(input: &DeriveInput) -> Result<PreprocessedOneof, Error> {
         Data::Union(..) => bail!("Oneof can not be derived for a union"),
     };
 
+    let mut reserved_tags = None;
     let mut unknown_attrs = Vec::new();
     let mut distinguished = false;
     let mut borrow_only = false;
     for attr in bilrost_attrs(input.attrs.clone())? {
-        if word_attr(&attr, "distinguished") {
+        if let Some(tags) = tag_list_attr(&attr, "reserved_tags", None)? {
+            set_option(
+                &mut reserved_tags,
+                tags,
+                "duplicate reserved_tags attributes",
+            )?
+        } else if word_attr(&attr, "distinguished") {
             set_bool(&mut distinguished, "duplicated distinguished attrs")?;
         } else if word_attr(&attr, "borrowed_only") {
             set_bool(&mut borrow_only, "duplicated borrowed_only attrs")?;
@@ -1659,6 +1666,17 @@ fn preprocess_oneof(input: &DeriveInput) -> Result<PreprocessedOneof, Error> {
                 _ => bail!("Oneof enum variants must have at most a single field"),
             },
         };
+    }
+
+    // Index all fields by their tag(s) and check them against the forbidden tag ranges
+    let all_tags: BTreeMap<u32, &Ident> = fields
+        .iter()
+        .flat_map(|(ident, field)| field.tags().into_iter().zip(repeat(ident)))
+        .collect();
+    for reserved_range in reserved_tags.unwrap_or_default().iter_tag_ranges() {
+        if let Some((forbidden_tag, variant_ident)) = all_tags.range(reserved_range).next() {
+            bail!("oneof {ident} variant {variant_ident} has reserved tag {forbidden_tag}");
+        }
     }
 
     let generics = &input.generics;
@@ -2305,6 +2323,79 @@ mod test {
         assert_eq!(
             output.expect_err("reserved tags not detected").to_string(),
             "message Invalid field b has reserved tag 5"
+        );
+    }
+
+    #[test]
+    fn test_rejects_reserved_oneof_fields() {
+        let output = try_message(quote! {
+            #[bilrost(reserved_tags(1, 100))]
+            enum Invalid {
+                #[bilrost(tag = "1")]
+                A(bool),
+                #[bilrost(5)]
+                B(super::Whatever),
+            }
+        });
+        assert_eq!(
+            output.expect_err("reserved tags not detected").to_string(),
+            "oneof Invalid variant A has reserved tag 1"
+        );
+
+        let output = try_message(quote! {
+            #[bilrost(reserved_tags(5, 55))]
+            enum Invalid {
+                #[bilrost(tag = "1")]
+                A(bool),
+                #[bilrost(5)]
+                B(super::Whatever),
+            }
+        });
+        assert_eq!(
+            output.expect_err("reserved tags not detected").to_string(),
+            "oneof Invalid variant B has reserved tag 5"
+        );
+
+        let output = try_message(quote! {
+            #[bilrost(reserved_tags(5-10, 55))]
+            enum Invalid {
+                #[bilrost(tag = "1")]
+                A(bool),
+                #[bilrost(5)]
+                B(super::Whatever),
+            }
+        });
+        assert_eq!(
+            output.expect_err("reserved tags not detected").to_string(),
+            "oneof Invalid variant B has reserved tag 5"
+        );
+
+        let output = try_message(quote! {
+            #[bilrost(reserved_tags(..=3, 55))]
+            enum Invalid {
+                #[bilrost(tag = "1")]
+                A(bool),
+                #[bilrost(5)]
+                B(super::Whatever),
+            }
+        });
+        assert_eq!(
+            output.expect_err("reserved tags not detected").to_string(),
+            "oneof Invalid variant A has reserved tag 1"
+        );
+
+        let output = try_message(quote! {
+            #[bilrost(reserved_tags(0, 5..))]
+            enum Invalid {
+                #[bilrost(tag = "1")]
+                A(bool),
+                #[bilrost(5)]
+                B(super::Whatever),
+            }
+        });
+        assert_eq!(
+            output.expect_err("reserved tags not detected").to_string(),
+            "oneof Invalid variant B has reserved tag 5"
         );
     }
 
