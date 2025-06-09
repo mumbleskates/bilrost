@@ -138,7 +138,7 @@ fn preprocess_message(input: &DeriveInput) -> Result<PreprocessedMessage, Error>
     let mut distinguished = false;
     let mut borrow_only = false;
     let mut default_per_field = false;
-    for attr in bilrost_attrs(input.attrs.clone())? {
+    for attr in bilrost_attrs(&input.attrs)? {
         if let Some(tags) = tag_list_attr(&attr, "reserved_tags", None)? {
             set_option(
                 &mut reserved_tags,
@@ -200,7 +200,7 @@ fn preprocess_message(input: &DeriveInput) -> Result<PreprocessedMessage, Error>
                 };
                 quote!(#index)
             });
-            match Field::new(field.ty, field.attrs, next_tag) {
+            match Field::new(field.ty, &field.attrs, next_tag) {
                 Ok(field) => {
                     if field.is_ignored() {
                         // Divert ignored fields into the other vec.
@@ -1586,7 +1586,7 @@ fn preprocess_oneof(input: &DeriveInput) -> Result<PreprocessedOneof, Error> {
     let mut unknown_attrs = Vec::new();
     let mut distinguished = false;
     let mut borrow_only = false;
-    for attr in bilrost_attrs(input.attrs.clone())? {
+    for attr in bilrost_attrs(&input.attrs)? {
         if let Some(tags) = tag_list_attr(&attr, "reserved_tags", None)? {
             set_option(
                 &mut reserved_tags,

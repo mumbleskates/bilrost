@@ -48,7 +48,7 @@ impl Field {
     ///
     /// If the meta items are invalid, an error will be returned.
     /// If the field should be ignored, `None` is returned.
-    pub fn new(ty: Type, attrs: Vec<Attribute>, inferred_tag: Option<u32>) -> Result<Field, Error> {
+    pub fn new(ty: Type, attrs: &[Attribute], inferred_tag: Option<u32>) -> Result<Field, Error> {
         let attrs = bilrost_attrs(attrs)?;
 
         Ok(if let Some(field) = ignored::Field::new(&ty, &attrs)? {
@@ -63,7 +63,7 @@ impl Field {
     pub fn new_in_oneof(
         ty: Type,
         ident_within_variant: Option<Ident>,
-        attrs: Vec<Attribute>,
+        attrs: &[Attribute],
     ) -> Result<Field, Error> {
         Ok(Field::Value(value::Field::new_in_oneof(
             &ty,
@@ -240,9 +240,9 @@ impl Field {
 }
 
 /// Get the items belonging to the 'bilrost' list attribute, e.g. `#[bilrost(foo, bar="baz")]`.
-pub fn bilrost_attrs(attrs: Vec<Attribute>) -> Result<Vec<Meta>, Error> {
+pub fn bilrost_attrs(attrs: &[Attribute]) -> Result<Vec<Meta>, Error> {
     let mut result = Vec::new();
-    for attr in attrs.iter() {
+    for attr in attrs {
         if let Meta::List(meta_list) = &attr.meta {
             if meta_list.path.is_ident("bilrost") {
                 // `bilrost(1)` is transformed into `bilrost(tag = 1)` as a shorthand
