@@ -24,10 +24,9 @@ pub struct Field {
     pub encoding: Type,
     pub enumeration_ty: Option<Type>,
     /// If a field is part of a recursion of messages, currently the chain needs to be broken so
-    /// that there is not a cyclic dependency of type constraints on the implementation of `Message`
-    /// or `DistinguishedMessage`. When a field is marked with the "recurses" attribute, it will not
-    /// be checked in the `where` clause of the implementation, and the type must always be
-    /// supported by its encoder.
+    /// that there is not a cyclic dependency of type constraints on the implementation of message
+    /// traits. When a field is marked with the "recurses" attribute, it will not be checked in the
+    /// `where` clause of the implementation, and the type must always be supported by its encoder.
     pub recurses: bool,
     /// When a value field is in a oneof, it must always encode a nonzero amount of data. The
     /// encoder must be a ValueEncoder to satisfy this; effectively, Oneof types are much like
