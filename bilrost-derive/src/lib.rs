@@ -1628,7 +1628,7 @@ fn preprocess_oneof(input: &DeriveInput) -> Result<PreprocessedOneof, Error> {
                 if empty_variant.replace(variant_ident).is_some() {
                     bail!("Oneofs may have at most one empty enum variant");
                 }
-                let attrs = bilrost_attrs(attrs)?;
+                let attrs = bilrost_attrs(&attrs)?;
                 if !attrs.is_empty() {
                     bail!(
                         "Unknown attribute(s) on empty Oneof variant: {}",
@@ -1648,7 +1648,7 @@ fn preprocess_oneof(input: &DeriveInput) -> Result<PreprocessedOneof, Error> {
                     if empty_variant.replace(variant_ident).is_some() {
                         bail!("Oneofs may have at most one empty enum variant");
                     }
-                    let attrs = bilrost_attrs(attrs)?;
+                    let attrs = bilrost_attrs(&attrs)?;
                     if !attrs.is_empty() {
                         bail!(
                             "Unknown attribute(s) on empty Oneof variant: {}",
@@ -1660,7 +1660,7 @@ fn preprocess_oneof(input: &DeriveInput) -> Result<PreprocessedOneof, Error> {
                     let field = variant_fields.first().unwrap();
                     fields.push((
                         variant_ident,
-                        Field::new_in_oneof(field.ty.clone(), field.ident.clone(), attrs)?,
+                        Field::new_in_oneof(field.ty.clone(), field.ident.clone(), &attrs)?,
                     ));
                 }
                 _ => bail!("Oneof enum variants must have at most a single field"),
