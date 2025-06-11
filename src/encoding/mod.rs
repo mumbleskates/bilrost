@@ -910,7 +910,7 @@ impl<'a, B: 'a + Buf + ?Sized> Capped<'a, B> {
     }
 
     #[inline(always)]
-    pub fn lend(&mut self) -> Capped<B> {
+    pub fn lend(&mut self) -> Capped<'_, B> {
         Capped {
             buf: self.buf,
             extra_bytes_remaining: self.extra_bytes_remaining,
@@ -921,7 +921,7 @@ impl<'a, B: 'a + Buf + ?Sized> Capped<'a, B> {
     /// Capped instance for the delineated bytes if it does not overrun the underlying buffer or
     /// this instance's cap.
     #[inline(always)]
-    pub fn take_length_delimited(&mut self) -> Result<Capped<B>, DecodeError> {
+    pub fn take_length_delimited(&mut self) -> Result<Capped<'_, B>, DecodeError> {
         let len = decode_length_delimiter(&mut *self.buf)?;
         // Rather than checking that len + extra_bytes_remaining fits in remaining, we subtract and
         // compare the smaller values to avoid situations that may overflow.

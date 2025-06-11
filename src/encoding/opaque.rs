@@ -293,7 +293,7 @@ impl<'a> OpaqueMessage<'a> {
     }
 
     /// Produces a full copy of the message with all borrowable data (re-)borrowed.
-    pub fn to_borrowed(&self) -> OpaqueMessage {
+    pub fn to_borrowed(&self) -> OpaqueMessage<'_> {
         self.iter().map(|(k, v)| (*k, v.borrow())).collect()
     }
 

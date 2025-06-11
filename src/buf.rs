@@ -443,7 +443,7 @@ impl ReverseBuffer {
 
     /// Returns a reader that references this buf's contents, which implements `bytes::Buf` without
     /// draining bytes from the buffer.
-    pub fn buf_reader(&self) -> ReverseBufferReader {
+    pub fn buf_reader(&self) -> ReverseBufferReader<'_> {
         ReverseBufferReader {
             chunks: self.chunks.as_slice(),
             front: self.front,

@@ -124,7 +124,7 @@ struct PreprocessedMessage<'a> {
     tag_range: Option<RangeInclusive<u32>>,
 }
 
-fn preprocess_message(input: &DeriveInput) -> Result<PreprocessedMessage, Error> {
+fn preprocess_message(input: &DeriveInput) -> Result<PreprocessedMessage<'_>, Error> {
     let ident = input.ident.clone();
 
     let variant_data = match &input.data {
@@ -1573,7 +1573,7 @@ struct PreprocessedOneof<'a> {
     empty_variant: Option<Ident>,
 }
 
-fn preprocess_oneof(input: &DeriveInput) -> Result<PreprocessedOneof, Error> {
+fn preprocess_oneof(input: &DeriveInput) -> Result<PreprocessedOneof<'_>, Error> {
     let ident = input.ident.clone();
 
     let variants = match &input.data {
