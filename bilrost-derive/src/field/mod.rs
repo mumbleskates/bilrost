@@ -6,10 +6,10 @@ use alloc::string::{String, ToString};
 use alloc::vec;
 use alloc::vec::Vec;
 use eyre::{bail, Error};
-use proc_macro2::{Ident, TokenStream};
+use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 use syn::punctuated::Punctuated;
-use syn::{parse2, Attribute, LitInt, Meta, Token, Type};
+use syn::{parse2, Attribute, LitInt, Meta, Token, Type, Variant};
 
 mod ignored;
 mod oneof;
@@ -60,16 +60,9 @@ impl Field {
         })
     }
 
-    pub fn new_in_oneof(
-        ty: Type,
-        ident_within_variant: Option<Ident>,
-        attrs: &[Attribute],
-    ) -> Result<Field, Error> {
-        Ok(Field::Value(value::Field::new_in_oneof(
-            &ty,
-            ident_within_variant,
-            &bilrost_attrs(attrs)?,
-        )?))
+    /// Returns `Ok` for data variants, and `Err` with just the ident for an empty variant.
+    pub fn new_in_oneof(variant: Variant) -> Result<Option<Field>, Error> {
+        Ok(value::Field::new_in_oneof(variant)?.map(Field::Value))
     }
 
     pub fn is_ignored(&self) -> bool {

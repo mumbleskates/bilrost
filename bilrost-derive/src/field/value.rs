@@ -1,7 +1,7 @@
 use crate::attrs::{named_attr, tag_attr, word_attr};
 use crate::crate_name;
 use crate::field::{
-    set_bool, set_option,
+    bilrost_attrs, set_bool, set_option,
     DecodeLifetime::{self, Borrowed, Owned},
     DecodeMode::{self, Distinguished, Relaxed},
     WhereFor::{self, Decode, Encode},
@@ -14,7 +14,7 @@ use alloc::vec::Vec;
 use eyre::{bail, Error};
 use proc_macro2::{Ident, Span, TokenStream};
 use quote::quote;
-use syn::{parse_str, Index, Meta, Type};
+use syn::{parse2, parse_str, Fields, Index, Meta, Type, Variant};
 
 /// A field in a bilrost message or oneof
 #[derive(Clone)]
@@ -41,14 +41,6 @@ pub struct Field {
 impl Field {
     pub fn new(ty: &Type, attrs: &[Meta], inferred_tag: Option<u32>) -> Result<Box<Field>, Error> {
         Field::new_impl(ty, attrs, inferred_tag, false, None)
-    }
-
-    pub fn new_in_oneof(
-        ty: &Type,
-        ident_within_variant: Option<Ident>,
-        attrs: &[Meta],
-    ) -> Result<Box<Field>, Error> {
-        Field::new_impl(ty, attrs, None, true, ident_within_variant)
     }
 
     fn new_impl(
@@ -89,7 +81,7 @@ impl Field {
             Some(tag) => tag,
             None => bail!(
                 "missing tag attribute for Oneof variant {}",
-                ident_within_variant
+                quote!(#ident_within_variant)
             ),
         };
 
@@ -108,6 +100,100 @@ impl Field {
             in_oneof,
             ident_within_variant,
         }))
+    }
+
+    /// Parses values specifically for within a Oneof variant, which works differently than fields
+    /// within a Message.
+    ///
+    /// Returns `Ok` for data variants, and `Err` with just the ident for an empty variant.
+    pub fn new_in_oneof(variant: Variant) -> Result<Option<Box<Field>>, Error> {
+        let mut tag = None; // tag number
+        let mut encoding = false; // encoding
+        let mut recurses = false; // marks a value-variant as recursive
+        let mut message = false; // whether this variant is marked as a "message" variant
+        let mut empty = false; // whether this unit is marked as an "empty" variant
+        let mut unknown_attrs = vec![];
+        let our_attrs = bilrost_attrs(&variant.attrs)?;
+
+        for attr in &our_attrs {
+            if let Some(t) = tag_attr(attr)? {
+                set_option(&mut tag, t, "duplicate tag attributes")?;
+            } else if let Some(t) = named_attr(attr, "encoding")? {
+                parse2::<Type>(t)?;
+                set_bool(&mut encoding, "duplicate encoding attributes")?;
+            } else if word_attr(attr, "recurses") {
+                set_bool(&mut recurses, "duplicate recurses attributes")?;
+            } else if word_attr(attr, "message") {
+                set_bool(&mut message, "duplicate message attributes")?;
+            } else if word_attr(attr, "empty") {
+                set_bool(&mut empty, "duplicate empty attributes")?;
+            } else {
+                unknown_attrs.push(attr);
+            }
+        }
+
+        if !unknown_attrs.is_empty() {
+            bail!(
+                "unknown attribute(s) for field: {}",
+                quote!(#(#unknown_attrs),*)
+            )
+        }
+
+        match (tag, encoding, recurses, message, empty) {
+            // Implicitly or explicitly empty variant
+            (None, false, false, false, _) => {
+                if match variant.fields {
+                    Fields::Named(fields) => fields.named.is_empty(),
+                    Fields::Unnamed(fields) => fields.unnamed.is_empty(),
+                    Fields::Unit => true,
+                } {
+                    Ok(None)
+                } else {
+                    // Return a error message depending on whether the variant is explicitly marked
+                    // empty
+                    bail!(if empty {
+                        "empty Oneof variants must not have fields"
+                    } else {
+                        "missing tag attribute"
+                    });
+                }
+            }
+
+            // Empty attribute plus any other attribute
+            (_, _, _, _, true) => {
+                bail!("the 'empty' attribute cannot be combined with other attributes");
+            }
+
+            // Valid message variant
+            (Some(_), false, false, true, false) => {
+                Ok(None) // TODO: this
+            }
+
+            // Invalid message variant
+            (_, _, _, true, _) => { // TODO: maybe better pattern(s) here
+                bail!("invalid attributes for message variant"); // TODO: better error
+            }
+
+            // Normal value variant
+            (_, _, _, false, false) => {
+                let fields = match &variant.fields {
+                    Fields::Named(fields) => &fields.named,
+                    Fields::Unnamed(fields) => &fields.unnamed,
+                    Fields::Unit => bail!(
+                        "Oneof variant {} has no fields and cannot have a value",
+                        variant.ident
+                    ),
+                };
+                let field = fields.first().unwrap();
+                Ok(Some(Field::new_impl(
+                    &field.ty,
+                    &our_attrs,
+                    None,
+                    true,
+                    field.ident.clone(),
+                )?))
+            }
+        }
     }
 
     /// Spells a value for the field as an enum variant with the given value.

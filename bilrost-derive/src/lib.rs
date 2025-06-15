@@ -1619,56 +1619,20 @@ fn preprocess_oneof(input: &DeriveInput) -> Result<PreprocessedOneof<'_>, Error>
     let mut empty_variant: Option<Ident> = None;
     let mut fields: Vec<(Ident, Field)> = Vec::new();
     // Map the variants into 'fields'.
-    for Variant {
-        attrs,
-        ident: variant_ident,
-        fields: variant_fields,
-        ..
-    } in variants
-    {
-        match variant_fields {
-            Fields::Unit => {
-                if empty_variant.replace(variant_ident).is_some() {
-                    bail!("Oneofs may have at most one empty enum variant");
-                }
-                let attrs = bilrost_attrs(&attrs)?;
-                if !attrs.is_empty() {
-                    bail!(
-                        "Unknown attribute(s) on empty Oneof variant: {}",
-                        quote!(#(#attrs),*)
-                    );
-                }
+    for variant in variants {
+        let variant_ident = variant.ident.clone();
+        match Field::new_in_oneof(variant)? {
+            None => {
+                set_option(
+                    &mut empty_variant,
+                    variant_ident,
+                    "Oneofs may have at most one empty enum variant",
+                )?;
             }
-            Fields::Named(FieldsNamed {
-                named: variant_fields,
-                ..
-            })
-            | Fields::Unnamed(FieldsUnnamed {
-                unnamed: variant_fields,
-                ..
-            }) => match variant_fields.len() {
-                0 => {
-                    if empty_variant.replace(variant_ident).is_some() {
-                        bail!("Oneofs may have at most one empty enum variant");
-                    }
-                    let attrs = bilrost_attrs(&attrs)?;
-                    if !attrs.is_empty() {
-                        bail!(
-                            "Unknown attribute(s) on empty Oneof variant: {}",
-                            quote!(#(#attrs),*)
-                        );
-                    }
-                }
-                1 => {
-                    let field = variant_fields.first().unwrap();
-                    fields.push((
-                        variant_ident,
-                        Field::new_in_oneof(field.ty.clone(), field.ident.clone(), &attrs)?,
-                    ));
-                }
-                _ => bail!("Oneof enum variants must have at most a single field"),
-            },
-        };
+            Some(field) => {
+                fields.push((variant_ident, field));
+            }
+        }
     }
 
     // Index all fields by their tag(s) and check them against the forbidden tag ranges
