@@ -87,7 +87,10 @@ impl Field {
 
         let tag = match tag.or(inferred_tag) {
             Some(tag) => tag,
-            None => bail!("missing tag attribute"),
+            None => bail!(
+                "missing tag attribute for Oneof variant {}",
+                ident_within_variant
+            ),
         };
 
         let encoding = encoding.unwrap_or(parse_str::<Type>(if in_oneof {

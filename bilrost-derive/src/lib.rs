@@ -146,11 +146,14 @@ fn preprocess_message(input: &DeriveInput) -> Result<PreprocessedMessage<'_>, Er
                 "duplicate reserved_tags attributes",
             )?;
         } else if word_attr(&attr, "distinguished") {
-            set_bool(&mut distinguished, "duplicated distinguished attrs")?;
+            set_bool(&mut distinguished, "duplicated distinguished attributes")?;
         } else if word_attr(&attr, "borrowed_only") {
-            set_bool(&mut borrow_only, "duplicated borrowed_only attrs")?;
+            set_bool(&mut borrow_only, "duplicated borrowed_only attributes")?;
         } else if word_attr(&attr, "default_per_field") {
-            set_bool(&mut default_per_field, "duplicated default_per_field attrs")?;
+            set_bool(
+                &mut default_per_field,
+                "duplicated default_per_field attributes",
+            )?;
         } else {
             unknown_attrs.push(attr);
         }
@@ -1594,9 +1597,9 @@ fn preprocess_oneof(input: &DeriveInput) -> Result<PreprocessedOneof<'_>, Error>
                 "duplicate reserved_tags attributes",
             )?
         } else if word_attr(&attr, "distinguished") {
-            set_bool(&mut distinguished, "duplicated distinguished attrs")?;
+            set_bool(&mut distinguished, "duplicated distinguished attributes")?;
         } else if word_attr(&attr, "borrowed_only") {
-            set_bool(&mut borrow_only, "duplicated borrowed_only attrs")?;
+            set_bool(&mut borrow_only, "duplicated borrowed_only attributes")?;
         } else {
             unknown_attrs.push(attr);
         }
@@ -2693,7 +2696,8 @@ mod test {
             output
                 .expect_err("unknown attrs on empty variant not detected")
                 .to_string(),
-            "Unknown attribute(s) on empty Oneof variant: tag = 0 , encoding (usize) , anything_else"
+            "unknown attribute(s) on empty Oneof variant: tag = 0 , encoding (usize) , \
+            anything_else"
         );
     }
 
@@ -2852,9 +2856,9 @@ mod test {
         ));
         assert_eq!(
             output
-                .expect_err("message with duplicated distinguished attrs not detected")
+                .expect_err("message with duplicated distinguished attributes not detected")
                 .to_string(),
-            "duplicated distinguished attrs"
+            "duplicated distinguished attributes"
         );
         let output = try_message(quote!(
             #[bilrost(borrowed_only, distinguished, borrowed_only)]
@@ -2864,9 +2868,9 @@ mod test {
         ));
         assert_eq!(
             output
-                .expect_err("message with duplicated borrowed_only attrs not detected")
+                .expect_err("message with duplicated borrowed_only attributes not detected")
                 .to_string(),
-            "duplicated borrowed_only attrs"
+            "duplicated borrowed_only attributes"
         );
 
         let output = try_message(quote!(
@@ -2879,9 +2883,9 @@ mod test {
         ));
         assert_eq!(
             output
-                .expect_err("message with duplicated distinguished attrs not detected")
+                .expect_err("message with duplicated distinguished attributes not detected")
                 .to_string(),
-            "duplicated distinguished attrs"
+            "duplicated distinguished attributes"
         );
         let output = try_message(quote!(
             #[bilrost(borrowed_only, distinguished, borrowed_only)]
@@ -2893,9 +2897,9 @@ mod test {
         ));
         assert_eq!(
             output
-                .expect_err("message with duplicated borrowed_only attrs not detected")
+                .expect_err("message with duplicated borrowed_only attributes not detected")
                 .to_string(),
-            "duplicated borrowed_only attrs"
+            "duplicated borrowed_only attributes"
         );
     }
 
@@ -2910,9 +2914,9 @@ mod test {
         ));
         assert_eq!(
             output
-                .expect_err("message with duplicated distinguished attrs not detected")
+                .expect_err("message with duplicated distinguished attributes not detected")
                 .to_string(),
-            "duplicated distinguished attrs"
+            "duplicated distinguished attributes"
         );
         let output = try_message(quote!(
             #[bilrost(borrowed_only, distinguished, borrowed_only)]
@@ -2923,9 +2927,9 @@ mod test {
         ));
         assert_eq!(
             output
-                .expect_err("message with duplicated borrowed_only attrs not detected")
+                .expect_err("message with duplicated borrowed_only attributes not detected")
                 .to_string(),
-            "duplicated borrowed_only attrs"
+            "duplicated borrowed_only attributes"
         );
     }
 
@@ -2939,10 +2943,10 @@ mod test {
         ));
         assert_eq!(
             output
-                .expect_err("field with duplicated ignore attrs not detected")
+                .expect_err("field with duplicated ignore attributes not detected")
                 .root_cause()
                 .to_string(),
-            "duplicated ignore attrs for field: ignore , ignore"
+            "duplicated ignore attributes for field: ignore , ignore"
         );
         let output = try_message(quote!(
             struct MixedIgnores {
@@ -2952,10 +2956,10 @@ mod test {
         ));
         assert_eq!(
             output
-                .expect_err("field with duplicated ignore attrs not detected")
+                .expect_err("field with duplicated ignore attributes not detected")
                 .root_cause()
                 .to_string(),
-            "duplicated ignore attrs for field: tag (123) , ignore , ignore"
+            "duplicated ignore attributes for field: tag (123) , ignore , ignore"
         );
         let output = try_message(quote!(
             #[bilrost(default_per_field, default_per_field)]
@@ -2963,9 +2967,9 @@ mod test {
         ));
         assert_eq!(
             output
-                .expect_err("field with duplicated ignore attrs not detected")
+                .expect_err("field with duplicated ignore attributes not detected")
                 .to_string(),
-            "duplicated default_per_field attrs"
+            "duplicated default_per_field attributes"
         );
     }
 }

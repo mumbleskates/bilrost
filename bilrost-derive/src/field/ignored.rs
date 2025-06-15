@@ -22,11 +22,14 @@ impl Field {
             return Ok(None); // Field is not ignored
         }
         if ignore_attr_count > 1 {
-            bail!("duplicated ignore attrs for field: {}", quote!(#(#attrs),*));
+            bail!(
+                "duplicated ignore attributes for field: {}",
+                quote!(#(#attrs),*)
+            );
         }
         if attrs.len() > 1 {
             bail!(
-                "ignore attribute mixed with other attrs on the same field: {}",
+                "ignore attribute mixed with other attributes on the same field: {}",
                 quote!(#(#attrs),*)
             );
         }
