@@ -13,11 +13,7 @@ extern crate alloc;
 
 use crate::attrs::{tag_list_attr, word_attr, TagList};
 use crate::field::{
-    bilrost_attrs, set_bool, set_option,
-    DecodeLifetime::{self, Borrowed, Owned},
-    DecodeMode::{self, Distinguished, Relaxed},
-    Field,
-    WhereFor::{self, Decode, Encode},
+    bilrost_attrs, set_bool, set_option, Field, FieldInVariant, OneofVariant, VariantContents,
 };
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::format;
@@ -27,7 +23,13 @@ use alloc::vec::Vec;
 use core::iter::repeat;
 use core::mem::take;
 use core::ops::{Deref, RangeInclusive};
+use core::slice;
 use eyre::{bail, eyre as err, Error};
+use field::traits::{
+    DecodeLifetime::{self, Borrowed, Owned},
+    DecodeMode::{self, Distinguished, Relaxed},
+    WhereFor::{self, Decode, Encode},
+};
 use itertools::Itertools;
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, ToTokens, TokenStreamExt};
@@ -109,6 +111,7 @@ enum FieldChunk {
     // A set of fields that must be sorted before emitting
     SortGroup(Vec<SortGroupPart>),
 }
+use crate::field::traits::FieldBearer;
 use FieldChunk::*;
 
 struct PreprocessedMessage<'a> {
@@ -220,6 +223,19 @@ fn preprocess_message(input: &DeriveInput) -> Result<PreprocessedMessage<'_>, Er
             }
         })
         .collect::<Result<Vec<_>, _>>()?;
+
+    // TODO: the field structs really need a lot of refactoring, the fact that there's this
+    //  (TokenStream, Field) opaque tuple nonsense everywhere is such a mess
+    if default_per_field {
+        for ignored_field in &mut ignored_fields {
+            match ignored_field {
+                (_, Field::Ignored(ignored)) => {
+                    ignored.requires_default = true;
+                }
+                _ => panic!("non-ignored field in ignored fields"),
+            }
+        }
+    }
 
     // Index all fields by their tag(s) and check them against the forbidden tag ranges
     let all_tags: BTreeMap<u32, &TokenStream> = unsorted_fields
@@ -393,16 +409,16 @@ fn append_self_where(
 
 /// Combines an optional already-existing where clause with additional terms for each field's
 /// encoder to assert that it supports the field's type.
-fn append_wheres<'a, T: 'a>(
+fn append_wheres(
     where_clause: Option<&WhereClause>,
     self_where: Option<TokenStream>,
-    fields: impl IntoIterator<Item = &'a (T, Field)>,
+    fields: impl IntoIterator<Item = impl FieldBearer>,
     field_purpose: WhereFor,
 ) -> Option<TokenStream> {
     // dedup the where clauses by their String values
     let encoder_wheres: BTreeMap<_, _> = fields
         .into_iter()
-        .flat_map(|(_, field)| field.where_terms(field_purpose))
+        .flat_map(|bearer| bearer.where_terms(field_purpose))
         .map(|where_| (where_.to_string(), where_))
         .collect();
     let mut appended_wheres = encoder_wheres.values().peekable();
@@ -460,15 +476,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
 
     // if we are defaulting ignored fields per-field, we need to include where-clause bounds for
     // each one of them as well.
-    let where_fields =
-        unsorted_fields
-            .iter()
-            .chain(if default_per_field || ignored_fields.is_empty() {
-                // defaulting via `Self: Default`; no additional field bounds
-                ignored_fields.iter() // include the ignored fields' bounds
-            } else {
-                [].iter() // defaulting via `Self: Default`; no additional field bounds
-            });
+    let where_fields = unsorted_fields.iter().chain(&ignored_fields);
     let encoder_where_clause = append_wheres(
         where_clause,
         self_where.clone(),
@@ -982,14 +990,14 @@ fn try_message_via_oneof(input: DeriveInput) -> Result<TokenStream, Error> {
         impl_generics,
         ty_generics,
         where_clause,
-        fields,
+        variants,
         distinguished,
         borrow_only,
         empty_variant,
     } = preprocess_oneof(&input)?;
 
     let tag_measurer = if matches!(
-        fields.iter().map(|(_, field)| field.last_tag()).max(),
+        variants.iter().map(|variant| variant.tag).max(),
         Some(last_tag) if last_tag >= 32
     ) {
         quote!(#crate_::encoding::RuntimeTagMeasurer)
@@ -1570,7 +1578,7 @@ struct PreprocessedOneof<'a> {
     impl_generics: &'a Generics,
     ty_generics: TypeGenerics<'a>,
     where_clause: Option<&'a WhereClause>,
-    fields: Vec<(Ident, Field)>,
+    variants: Vec<OneofVariant>,
     distinguished: bool,
     borrow_only: bool,
     empty_variant: Option<Ident>,
@@ -1579,7 +1587,7 @@ struct PreprocessedOneof<'a> {
 fn preprocess_oneof(input: &DeriveInput) -> Result<PreprocessedOneof<'_>, Error> {
     let ident = input.ident.clone();
 
-    let variants = match &input.data {
+    let input_variants = match &input.data {
         Data::Enum(DataEnum { variants, .. }) => variants.clone(),
         Data::Struct(..) => bail!("Oneof can not be derived for a struct"),
         Data::Union(..) => bail!("Oneof can not be derived for a union"),
@@ -1617,11 +1625,11 @@ fn preprocess_oneof(input: &DeriveInput) -> Result<PreprocessedOneof<'_>, Error>
     // is such a variant, it becomes the empty state for the type and stands in for no fields being
     // set.
     let mut empty_variant: Option<Ident> = None;
-    let mut fields: Vec<(Ident, Field)> = Vec::new();
+    let mut variants = vec![];
     // Map the variants into 'fields'.
-    for variant in variants {
+    for variant in input_variants {
         let variant_ident = variant.ident.clone();
-        match Field::new_in_oneof(variant)? {
+        match OneofVariant::new(variant)? {
             None => {
                 set_option(
                     &mut empty_variant,
@@ -1629,16 +1637,16 @@ fn preprocess_oneof(input: &DeriveInput) -> Result<PreprocessedOneof<'_>, Error>
                     "Oneofs may have at most one empty enum variant",
                 )?;
             }
-            Some(field) => {
-                fields.push((variant_ident, field));
+            Some(variant) => {
+                variants.push(variant);
             }
         }
     }
 
     // Index all fields by their tag(s) and check them against the forbidden tag ranges
-    let all_tags: BTreeMap<u32, &Ident> = fields
+    let all_tags: BTreeMap<u32, &Ident> = variants
         .iter()
-        .flat_map(|(ident, field)| field.tags().into_iter().zip(repeat(ident)))
+        .map(|variant| (variant.tag, &ident))
         .collect();
     for reserved_range in reserved_tags.unwrap_or_default().iter_tag_ranges() {
         if let Some((forbidden_tag, variant_ident)) = all_tags.range(reserved_range).next() {
@@ -1654,7 +1662,7 @@ fn preprocess_oneof(input: &DeriveInput) -> Result<PreprocessedOneof<'_>, Error>
         impl_generics: generics,
         ty_generics,
         where_clause,
-        fields,
+        variants,
         distinguished,
         borrow_only,
         empty_variant,
@@ -1677,7 +1685,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         impl_generics,
         ty_generics,
         where_clause,
-        fields,
+        variants: fields,
         distinguished,
         borrow_only,
         empty_variant,
@@ -1693,7 +1701,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
 
     let sorted_tags: Vec<u32> = fields
         .iter()
-        .flat_map(|(_, field)| field.tags())
+        .map(|variant| variant.tag)
         .sorted_unstable()
         .collect();
     if let Some((duplicate_tag, _)) = sorted_tags.iter().tuple_windows().find(|(a, b)| a == b) {
@@ -1706,29 +1714,17 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
 
     let mut encode: Vec<TokenStream> = fields
         .iter()
-        .map(|(variant_ident, field)| {
-            let encode = field.encode(quote!(*value));
-            let with_value = field.with_value(quote!(value));
-            quote!(#ident::#variant_ident #with_value => { #encode })
-        })
+        .map(|variant| variant.encode(&ident))
         .collect();
 
     let mut prepend: Vec<TokenStream> = fields
         .iter()
-        .map(|(variant_ident, field)| {
-            let prepend = field.prepend(quote!(*value));
-            let with_value = field.with_value(quote!(value));
-            quote!(#ident::#variant_ident #with_value => { #prepend })
-        })
+        .map(|variant| variant.prepend(&ident))
         .collect();
 
     let mut encoded_len: Vec<TokenStream> = fields
         .iter()
-        .map(|(variant_ident, field)| {
-            let encoded_len = field.encoded_len(quote!(*value));
-            let with_value = field.with_value(quote!(value));
-            quote!(#ident::#variant_ident #with_value => #encoded_len)
-        })
+        .map(|variant| variant.encoded_len(&ident))
         .collect();
 
     let encoder_trait;
@@ -1752,10 +1748,10 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         current_tag_ty = quote!(::core::option::Option<u32>);
         current_tag = fields
             .iter()
-            .map(|(variant_ident, field)| {
-                let tag = field.tags()[0];
-                let ignored = field.with_value(quote!(_));
-                quote!(#ident::#variant_ident #ignored => ::core::option::Option::Some(#tag))
+            .map(|variant| {
+                let tag = variant.tag;
+                let variant_ident = &variant.variant_ident;
+                quote!(#ident::#variant_ident { .. } => ::core::option::Option::Some(#tag))
             })
             .chain([quote!(#ident::#empty_ident => ::core::option::Option::None)])
             .collect();
@@ -1788,28 +1784,28 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         current_tag_ty = quote!(u32);
         current_tag = fields
             .iter()
-            .map(|(variant_ident, field)| {
-                let tag = field.tags()[0];
-                let ignored = field.with_value(quote!(_));
-                quote!(#ident::#variant_ident #ignored => #tag)
+            .map(|variant| {
+                let tag = variant.tag;
+                let variant_ident = &variant.variant_ident;
+                quote!(#ident::#variant_ident { .. } => #tag)
             })
             .collect();
 
         empty_methods_impl = None;
     };
 
-    let variant_name_arms = fields.iter().map(|(variant_ident, field)| {
-        let tag = field.first_tag();
+    let variant_name_arms = fields.iter().map(|variant| {
+        let tag = variant.tag;
+        let variant_ident = &variant.variant_ident;
         quote! {
             #tag => (stringify!(#ident), stringify!(#variant_ident)),
         }
     });
 
     let decode_arms = |lifetime, mode| {
-        let arms = fields.iter().map(|(variant_ident, field)| DecoderForOneof {
+        let arms = fields.iter().map(|variant| DecoderForOneof {
             ident: &ident,
-            variant_ident,
-            field,
+            variant: &variant,
             lifetime,
             mode,
         });
@@ -2101,10 +2097,8 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
 struct DecoderForOneof<'a> {
     /// The ident of the oneof enum itself
     ident: &'a Ident,
-    /// The ident of this variant
-    variant_ident: &'a Ident,
-    /// The Field struct for this variant
-    field: &'a Field,
+    /// The variant in question
+    variant: &'a OneofVariant,
     /// Decoded ownership lifetime
     lifetime: DecodeLifetime,
     /// Decoding mode
@@ -2114,12 +2108,20 @@ struct DecoderForOneof<'a> {
 impl ToTokens for DecoderForOneof<'_> {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let ident = self.ident;
-        let variant_ident = self.variant_ident;
-        let field = self.field;
-        let tag = field.first_tag();
-        let with_new_value = field.with_value(quote!(new_value));
-        let decode = field.decode(quote!(&mut new_value), self.lifetime, self.mode);
-        let for_overwrite = field.for_overwrite();
+        let variant_ident = &self.variant.variant_ident;
+        let tag = self.variant.tag;
+        let fields: &[FieldInVariant] = match &self.variant.contents {
+            VariantContents::Value(field) => slice::from_ref(field),
+            VariantContents::Message(fields) => fields.as_slice(),
+        };
+        let &[one_field] = fields else {
+            todo!("not supporting multiple fields yet");
+        };
+        // TODO: these three methods with a slice of variable names: init for overwrite, decode, &
+        //  create-variant. or should we decode into a variant in-situ? maybe worth benching
+        let with_new_value = one_field.with_value(quote!(new_value));
+        let decode = one_field.decode(quote!(&mut new_value), self.lifetime, self.mode);
+        let for_overwrite = one_field.for_overwrite();
 
         // It's important that we spell the whole expression for the decoder matching for oneofs as
         // a single Result expression that never early-returns with `?`; that way when we add guards

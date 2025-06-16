@@ -1,4 +1,5 @@
 use crate::attrs::word_attr;
+use crate::field::traits::{FieldBearer, WhereFor};
 use alloc::boxed::Box;
 use alloc::vec;
 use alloc::vec::Vec;
@@ -8,12 +9,16 @@ use quote::quote;
 use syn::{Meta, Type};
 
 #[derive(Clone)]
-pub struct Field {
+pub struct IgnoredField {
     ty: Type,
+    pub requires_default: bool,
 }
 
-impl Field {
-    pub fn new(ty: &Type, attrs: &[Meta]) -> Result<Option<Box<Self>>, Error> {
+impl IgnoredField {
+    pub fn new(
+        ty: &Type,
+        attrs: &[Meta],
+    ) -> Result<Option<Box<Self>>, Error> {
         let ignore_attr_count = attrs
             .iter()
             .filter(|attr| word_attr(attr, "ignore"))
@@ -33,15 +38,24 @@ impl Field {
                 quote!(#(#attrs),*)
             );
         }
-        Ok(Some(Box::new(Self { ty: ty.clone() })))
+        Ok(Some(Box::new(Self {
+            ty: ty.clone(),
+            requires_default: false,
+        })))
     }
 
     pub fn initialize(&self) -> TokenStream {
         quote!(::core::default::Default::default())
     }
+}
 
-    pub fn where_terms(&self) -> Vec<TokenStream> {
-        let ty = &self.ty;
-        vec![quote!(#ty: ::core::default::Default)]
+impl FieldBearer for &IgnoredField {
+    fn where_terms(self, _purpose: WhereFor) -> Vec<TokenStream> {
+        if self.requires_default {
+            let ty = &self.ty;
+            vec![quote!(#ty: ::core::default::Default)]
+        } else {
+            vec![]
+        }
     }
 }

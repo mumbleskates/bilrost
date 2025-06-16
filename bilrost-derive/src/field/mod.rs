@@ -9,38 +9,25 @@ use eyre::{bail, Error};
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 use syn::punctuated::Punctuated;
-use syn::{parse2, Attribute, LitInt, Meta, Token, Type, Variant};
+use syn::{parse2, Attribute, LitInt, Meta, Token, Type};
+use traits::{DecodeLifetime, DecodeMode, WhereFor};
 
 mod ignored;
 mod oneof;
+pub mod traits;
 mod value;
+
+pub use value::{FieldInVariant, OneofVariant, VariantContents};
+use crate::field::traits::FieldBearer;
 
 #[derive(Clone)]
 pub enum Field {
-    /// A scalar field.
-    Value(Box<value::Field>),
+    /// A single-value message field.
+    Value(Box<value::MessageField>),
     /// A oneof field.
-    Oneof(Box<oneof::Field>),
+    Oneof(Box<oneof::OneofInclusion>),
     /// An ignored field.
-    Ignored(Box<ignored::Field>),
-}
-
-#[derive(Copy, Clone)]
-pub enum DecodeMode {
-    Relaxed,
-    Distinguished,
-}
-
-#[derive(Copy, Clone)]
-pub enum DecodeLifetime {
-    Owned,
-    Borrowed,
-}
-
-#[derive(Copy, Clone)]
-pub enum WhereFor {
-    Encode,
-    Decode(DecodeLifetime, DecodeMode),
+    Ignored(Box<ignored::IgnoredField>),
 }
 
 impl Field {
@@ -51,18 +38,13 @@ impl Field {
     pub fn new(ty: Type, attrs: &[Attribute], inferred_tag: Option<u32>) -> Result<Field, Error> {
         let attrs = bilrost_attrs(attrs)?;
 
-        Ok(if let Some(field) = ignored::Field::new(&ty, &attrs)? {
+        Ok(if let Some(field) = ignored::IgnoredField::new(&ty, &attrs)? {
             Field::Ignored(field)
-        } else if let Some(field) = oneof::Field::new(&ty, &attrs)? {
+        } else if let Some(field) = oneof::OneofInclusion::new(&ty, &attrs)? {
             Field::Oneof(field)
         } else {
-            Field::Value(value::Field::new(&ty, &attrs, inferred_tag)?)
+            Field::Value(value::MessageField::new(&ty, &attrs, inferred_tag)?)
         })
-    }
-
-    /// Returns `Ok` for data variants, and `Err` with just the ident for an empty variant.
-    pub fn new_in_oneof(variant: Variant) -> Result<Option<Field>, Error> {
-        Ok(value::Field::new_in_oneof(variant)?.map(Field::Value))
     }
 
     pub fn is_ignored(&self) -> bool {
@@ -87,15 +69,6 @@ impl Field {
         self.tags().into_iter().max().unwrap()
     }
 
-    /// Returns the where clause condition asserting that this field has the given capability.
-    pub fn where_terms(&self, purpose: WhereFor) -> Vec<TokenStream> {
-        match self {
-            Field::Value(field) => field.where_terms(purpose),
-            Field::Oneof(field) => field.where_terms(purpose),
-            Field::Ignored(field) => field.where_terms(),
-        }
-    }
-
     pub fn tag_list_guard(&self, field_name: String) -> Option<TokenStream> {
         let crate_ = crate_name();
         match self {
@@ -118,22 +91,6 @@ impl Field {
                 ))
             }
             _ => None,
-        }
-    }
-
-    /// Spells a value for the field as an enum variant with the given value.
-    pub fn with_value(&self, value: TokenStream) -> TokenStream {
-        match self {
-            Field::Value(field) => field.with_value(value),
-            Field::Oneof(_) => {
-                panic!(
-                    "trying to spell a field's value within a oneof variant, but the field is a \
-                    oneof, not part of a oneof"
-                );
-            }
-            Field::Ignored(_) => {
-                panic!("field is ignored");
-            }
         }
     }
 
@@ -229,6 +186,22 @@ impl Field {
             Field::Value(scalar) => scalar.methods(ident),
             _ => None,
         }
+    }
+}
+
+impl FieldBearer for &Field {
+    fn where_terms(self, purpose: WhereFor) -> Vec<TokenStream> {
+        match self {
+            Field::Value(field) => field.where_terms(purpose),
+            Field::Oneof(field) => field.where_terms(purpose),
+            Field::Ignored(field) => field.where_terms(purpose),
+        }
+    }
+}
+
+impl FieldBearer for &(TokenStream, Field) {
+    fn where_terms(self, purpose: WhereFor) -> Vec<TokenStream> {
+        self.1.where_terms(purpose)
     }
 }
 

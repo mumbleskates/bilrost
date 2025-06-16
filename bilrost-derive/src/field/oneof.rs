@@ -1,11 +1,6 @@
 use crate::attrs::tag_list_attr;
 use crate::crate_name;
-use crate::field::{
-    set_option,
-    DecodeLifetime::{self, Borrowed, Owned},
-    DecodeMode::{self, Distinguished, Relaxed},
-    WhereFor::{self, Decode, Encode},
-};
+use crate::field::set_option;
 use alloc::boxed::Box;
 use alloc::vec;
 use alloc::vec::Vec;
@@ -13,15 +8,18 @@ use eyre::{bail, Error};
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{Meta, Type};
+use crate::field::traits::DecodeLifetime::{self, Borrowed, Owned};
+use crate::field::traits::DecodeMode::{self, Distinguished, Relaxed};
+use crate::field::traits::WhereFor::{self, Decode, Encode};
 
 #[derive(Clone)]
-pub struct Field {
+pub struct OneofInclusion {
     pub ty: Type,
     pub tags: Vec<u32>,
 }
 
-impl Field {
-    pub fn new(ty: &Type, attrs: &[Meta]) -> Result<Option<Box<Field>>, Error> {
+impl OneofInclusion {
+    pub fn new(ty: &Type, attrs: &[Meta]) -> Result<Option<Box<OneofInclusion>>, Error> {
         let mut oneof_tags = None;
         let mut unknown_attrs = Vec::new();
 
@@ -44,7 +42,7 @@ impl Field {
             );
         }
 
-        Ok(Some(Box::new(Field {
+        Ok(Some(Box::new(OneofInclusion {
             ty: ty.clone(),
             tags: tags.iter_tags().collect(),
         })))
