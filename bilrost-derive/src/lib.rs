@@ -458,13 +458,13 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
 
     let borrow_generics = prepend_to_generics(impl_generics, quote!('__a));
 
+    let mut field_slices = vec![unsorted_fields.as_slice()];
     // if we are defaulting ignored fields per-field, we need to include where-clause bounds for
     // each one of them as well.
-    let where_fields: &[_] = if default_per_field {
-        &[unsorted_fields.as_slice(), ignored_fields.as_slice()]
-    } else {
-        &[unsorted_fields.as_slice()]
-    };
+    if default_per_field {
+        field_slices.push(ignored_fields.as_slice());
+    }
+    let where_fields = field_slices.as_slice();
     let encoder_where_clause =
         append_wheres_with_fields(where_clause, self_where.clone(), where_fields, Encode);
     let [owned_decoder_where_clause, borrowed_decoder_where_clause] =
