@@ -31,6 +31,8 @@ where
     T: FieldBearer,
 {
     fn where_terms(&self, purpose: WhereFor) -> Vec<TokenStream> {
-        self.iter().flat_map(|bearer| bearer.where_terms(purpose)).collect()
+        self.iter()
+            .flat_map(|bearer| bearer.where_terms(purpose))
+            .collect()
     }
 }

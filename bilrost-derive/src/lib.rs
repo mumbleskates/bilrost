@@ -12,9 +12,7 @@
 extern crate alloc;
 
 use crate::attrs::{tag_list_attr, word_attr, TagList};
-use crate::field::{
-    bilrost_attrs, set_bool, set_option, Field, FieldInVariant, OneofVariant, VariantContents,
-};
+use crate::field::{bilrost_attrs, set_bool, set_option, Field, OneofVariant};
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::format;
 use alloc::string::ToString;
@@ -23,7 +21,6 @@ use alloc::vec::Vec;
 use core::iter::repeat;
 use core::mem::take;
 use core::ops::{Deref, RangeInclusive};
-use core::slice;
 use eyre::{bail, eyre as err, Error};
 use field::traits::{
     DecodeLifetime::{self, Borrowed, Owned},

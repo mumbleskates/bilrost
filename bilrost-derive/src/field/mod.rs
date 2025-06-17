@@ -17,8 +17,8 @@ mod oneof;
 pub mod traits;
 mod value;
 
-pub use value::{FieldInVariant, OneofVariant, VariantContents};
 use crate::field::traits::FieldBearer;
+pub use value::OneofVariant;
 
 #[derive(Clone)]
 pub enum Field {

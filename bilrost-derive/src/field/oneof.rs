@@ -1,6 +1,11 @@
 use crate::attrs::tag_list_attr;
 use crate::crate_name;
 use crate::field::set_option;
+use crate::field::traits::{
+    DecodeLifetime::{self, Borrowed, Owned},
+    DecodeMode::{self, Distinguished, Relaxed},
+    WhereFor::{self, Decode, Encode},
+};
 use alloc::boxed::Box;
 use alloc::vec;
 use alloc::vec::Vec;
@@ -8,9 +13,6 @@ use eyre::{bail, Error};
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{Meta, Type};
-use crate::field::traits::DecodeLifetime::{self, Borrowed, Owned};
-use crate::field::traits::DecodeMode::{self, Distinguished, Relaxed};
-use crate::field::traits::WhereFor::{self, Decode, Encode};
 
 #[derive(Clone)]
 pub struct OneofInclusion {

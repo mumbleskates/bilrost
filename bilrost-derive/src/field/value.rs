@@ -1,8 +1,12 @@
 use crate::attrs::{named_attr, tag_attr, word_attr};
 use crate::crate_name;
-use crate::field::{
-    bilrost_attrs, set_bool, set_option,
+use crate::field::traits::{
+    DecodeLifetime::{self, Borrowed, Owned},
+    DecodeMode::{self, Distinguished, Relaxed},
+    FieldBearer,
+    WhereFor::{self, Decode, Encode},
 };
+use crate::field::{bilrost_attrs, set_bool, set_option};
 use alloc::boxed::Box;
 use alloc::format;
 use alloc::string::ToString;
@@ -13,10 +17,6 @@ use eyre::{bail, Error};
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use syn::{parse2, parse_str, Fields, Ident, Index, Meta, Type, Variant};
-use crate::field::traits::DecodeLifetime::{self, Borrowed, Owned};
-use crate::field::traits::DecodeMode::{self, Distinguished, Relaxed};
-use crate::field::traits::FieldBearer;
-use crate::field::traits::WhereFor::{self, Decode, Encode};
 
 /// A field in a bilrost message or oneof
 #[derive(Clone)]
