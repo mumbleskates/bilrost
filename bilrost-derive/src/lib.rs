@@ -401,7 +401,7 @@ fn append_wheres(
         None
     } else {
         let each_where_term = where_terms.values();
-        Some(quote! { where #(#each_where_term)*, })
+        Some(quote! { where #(#each_where_term,)* })
     }
 }
 
