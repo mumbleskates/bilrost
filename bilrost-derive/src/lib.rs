@@ -850,22 +850,17 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     };
 
     let distinguished_impls = distinguished.then(|| {
-        // if we are defaulting ignored fields per-field, we need to include where-clause bounds for
-        // each one of them as well.
-        let where_fields =
-            unsorted_fields
-                .iter()
-                .chain(if default_per_field || ignored_fields.is_empty() {
-                    // defaulting via `Self: Default`; no additional field bounds
-                    ignored_fields.iter() // include the ignored fields' bounds
-                } else {
-                    [].iter() // defaulting via `Self: Default`; no additional field bounds
-                });
+        // At time of commenting distinguished mode precludes any additional self-bounds, as there
+        // cannot be ignored fields. If we add any in the future, we want to catch that
+        // automatically.
+        let distinguished_self_where = [quote!(Self: ::core::cmp::Eq)]
+            .into_iter()
+            .chain(self_where);
         let [owned_decoder_where_clause, borrowed_decoder_where_clause] =
             [Owned, Borrowed].map(|lifetime| {
                 append_wheres_with_fields(
                     where_clause,
-                    Some(quote!(Self: ::core::cmp::Eq)),
+                    distinguished_self_where.clone(),
                     where_fields,
                     Decode(lifetime, Distinguished),
                 )
