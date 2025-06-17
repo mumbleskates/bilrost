@@ -19,6 +19,7 @@ use quote::quote;
 use syn::{parse2, parse_str, Fields, Ident, Index, Meta, Type, Variant};
 
 /// A field in a bilrost message or oneof
+// TODO: message fields should know what the field's ident is
 #[derive(Clone)]
 pub struct MessageField {
     pub tag: u32,
@@ -341,9 +342,10 @@ impl OneofVariant {
         }
 
         if !unknown_attrs.is_empty() {
+            let variant_ident = &variant.ident;
             bail!(
-                "unknown attribute(s) for field: {}",
-                quote!(#(#unknown_attrs),*)
+                "unknown attribute(s) on variant {}: {}",
+                quote!(#variant_ident), quote!(#(#unknown_attrs),*)
             )
         }
 

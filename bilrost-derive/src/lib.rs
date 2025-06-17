@@ -1625,7 +1625,7 @@ fn preprocess_oneof(input: &DeriveInput) -> Result<PreprocessedOneof<'_>, Error>
     // Index all fields by their tag(s) and check them against the forbidden tag ranges
     let all_tags: BTreeMap<u32, &Ident> = variants
         .iter()
-        .map(|variant| (variant.tag, &ident))
+        .map(|variant| (variant.tag, &variant.variant_ident))
         .collect();
     for reserved_range in reserved_tags.unwrap_or_default().iter_tag_ranges() {
         if let Some((forbidden_tag, variant_ident)) = all_tags.range(reserved_range).next() {
@@ -2617,7 +2617,7 @@ mod test {
             output
                 .expect_err("conflicting empty variants not detected")
                 .to_string(),
-            "Oneofs may have at most one empty enum variant"
+            "Oneofs may have at most one empty enum variant: Ident(Empty) and Ident(AlsoEmpty)"
         );
     }
 
@@ -2637,8 +2637,7 @@ mod test {
             output
                 .expect_err("unknown attrs on empty variant not detected")
                 .to_string(),
-            "unknown attribute(s) on empty Oneof variant: tag = 0 , encoding (usize) , \
-            anything_else"
+            "unknown attribute(s) on variant Empty: anything_else"
         );
     }
 
