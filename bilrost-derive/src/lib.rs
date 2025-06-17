@@ -2101,7 +2101,7 @@ impl ToTokens for DecoderForOneof<'_> {
             VariantContents::Value(field) => slice::from_ref(field),
             VariantContents::Message(fields) => fields.as_slice(),
         };
-        let &[one_field] = fields else {
+        let [one_field] = fields else {
             todo!("not supporting multiple fields yet");
         };
         // TODO: these three methods with a slice of variable names: init for overwrite, decode, &
