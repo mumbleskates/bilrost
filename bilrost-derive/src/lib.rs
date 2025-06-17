@@ -380,42 +380,43 @@ fn sort_fields(unsorted_fields: Vec<(TokenStream, Field)>) -> Vec<FieldChunk> {
     chunks
 }
 
-/// Appends a WhereClause and a provided optional where term(s) into a phrase that will always be a
-/// valid where clause if present.
-fn append_self_where(
+/// Combines an optional WhereClause and any number of additional provided where term(s) into a
+/// phrase that will always be a valid where clause if present.
+fn append_wheres(
     where_clause: Option<&WhereClause>,
-    self_where: Option<TokenStream>,
+    wheres: impl IntoIterator<Item = TokenStream>,
 ) -> Option<TokenStream> {
-    match (where_clause, self_where) {
-        (Some(a), Some(b)) => Some(quote!(#a, #b)),
-        (Some(a), None) => Some(quote!(#a)),
-        (None, Some(b)) => Some(quote!(where #b)),
-        _ => None,
+    // dedup the where clauses by their String values
+    let where_terms: BTreeMap<_, _> = wheres
+        .into_iter()
+        .chain(
+            where_clause
+                .into_iter()
+                .flat_map(|w| w.predicates.iter().map(|term| quote!(#term))),
+        )
+        .map(|where_| (where_.to_string(), where_))
+        .collect();
+    // append our encoder where terms to the existing where clause if there is one
+    if where_terms.is_empty() {
+        None
+    } else {
+        let each_where_term = where_terms.values();
+        Some(quote! { where #(#each_where_term)*, })
     }
 }
 
-/// Combines an optional already-existing where clause with additional terms for each field's
-/// encoder to assert that it supports the field's type.
-fn append_wheres(
+/// Combines an optional where clause with additional terms for each field's encoder to assert that
+/// it supports the field's type.
+fn append_wheres_with_fields(
     where_clause: Option<&WhereClause>,
-    self_where: Option<TokenStream>,
+    wheres: impl IntoIterator<Item = TokenStream>,
     fields: impl FieldBearer,
     field_purpose: WhereFor,
 ) -> Option<TokenStream> {
-    // dedup the where clauses by their String values
-    let encoder_wheres: BTreeMap<_, _> = fields
-        .where_terms(field_purpose)
-        .map(|where_| (where_.to_string(), where_))
-        .collect();
-    let mut appended_wheres = encoder_wheres.values().peekable();
-    // append our encoder where terms to the existing where clause if there is one
-    if let Some(header) = append_self_where(where_clause, self_where) {
-        Some(quote! { #header #(, #appended_wheres)* })
-    } else if appended_wheres.peek().is_none() {
-        None
-    } else {
-        Some(quote! { where #(#appended_wheres),*})
-    }
+    append_wheres(
+        where_clause,
+        wheres.into_iter().chain(fields.where_terms(field_purpose)),
+    )
 }
 
 /// Adds the given identifier to the generics list
@@ -467,15 +468,11 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     } else {
         &[unsorted_fields.as_slice()]
     };
-    let encoder_where_clause = append_wheres(
-        where_clause,
-        self_where.clone(),
-        where_fields,
-        Encode,
-    );
+    let encoder_where_clause =
+        append_wheres_with_fields(where_clause, self_where.clone(), where_fields, Encode);
     let [owned_decoder_where_clause, borrowed_decoder_where_clause] =
         [Owned, Borrowed].map(|lifetime| {
-            append_wheres(
+            append_wheres_with_fields(
                 where_clause,
                 self_where.clone(),
                 where_fields,
@@ -866,7 +863,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
                 });
         let [owned_decoder_where_clause, borrowed_decoder_where_clause] =
             [Owned, Borrowed].map(|lifetime| {
-                append_wheres(
+                append_wheres_with_fields(
                     where_clause,
                     Some(quote!(Self: ::core::cmp::Eq)),
                     where_fields,
@@ -1001,17 +998,17 @@ fn try_message_via_oneof(input: DeriveInput) -> Result<TokenStream, Error> {
 
     let borrow_generics = prepend_to_generics(impl_generics, quote!('__a));
 
-    let encoder_where_clause = append_self_where(
+    let encoder_where_clause = append_wheres(
         where_clause,
-        Some(quote!(#ident #ty_generics: #crate_::encoding::Oneof)),
+        [quote!(#ident #ty_generics: #crate_::encoding::Oneof)],
     );
-    let owned_decoder_where_clause = append_self_where(
+    let owned_decoder_where_clause = append_wheres(
         where_clause,
-        Some(quote!(#ident #ty_generics: #crate_::encoding::OneofDecoder)),
+        [quote!(#ident #ty_generics: #crate_::encoding::OneofDecoder)],
     );
-    let borrowed_decoder_where_clause = append_self_where(
+    let borrowed_decoder_where_clause = append_wheres(
         where_clause,
-        Some(quote!(#ident #ty_generics: #crate_::encoding::OneofBorrowDecoder<'__a>)),
+        [quote!(#ident #ty_generics: #crate_::encoding::OneofBorrowDecoder<'__a>)],
     );
 
     let impl_owned_decoder = (!borrow_only).then(|| {
@@ -1147,17 +1144,17 @@ fn try_message_via_oneof(input: DeriveInput) -> Result<TokenStream, Error> {
     };
 
     let distinguished_impls = distinguished.then(|| {
-        let owned_decoder_where_clause = append_self_where(
+        let owned_decoder_where_clause = append_wheres(
             where_clause,
-            Some(quote!(
+            [quote!(
                 Self: #crate_::encoding::DistinguishedOneofDecoder + ::core::cmp::Eq
-            )),
+            )],
         );
-        let borrowed_decoder_where_clause = append_self_where(
+        let borrowed_decoder_where_clause = append_wheres(
             where_clause,
-            Some(quote!(
+            [quote!(
                 Self: #crate_::encoding::DistinguishedOneofBorrowDecoder<'__a> + ::core::cmp::Eq
-            )),
+            )],
         );
 
         let impl_owned_decoder = (!borrow_only).then(|| {
@@ -1683,11 +1680,11 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
 
     let borrow_generics = prepend_to_generics(impl_generics, quote!('__a));
 
-    let encoder_where_clause = append_wheres(where_clause, None, &fields, Encode);
+    let encoder_where_clause = append_wheres_with_fields(where_clause, None, &*fields, Encode);
     let owned_decoder_where_clause =
-        append_wheres(where_clause, None, &fields, Decode(Owned, Relaxed));
+        append_wheres_with_fields(where_clause, None, &*fields, Decode(Owned, Relaxed));
     let borrowed_decoder_where_clause =
-        append_wheres(where_clause, None, &fields, Decode(Borrowed, Relaxed));
+        append_wheres_with_fields(where_clause, None, &*fields, Decode(Borrowed, Relaxed));
 
     let sorted_tags: Vec<u32> = fields
         .iter()
@@ -1966,10 +1963,10 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
             some = Some(quote!(::core::option::Option::Some));
             [owned_decoder_where_clause, borrowed_decoder_where_clause] =
                 [Owned, Borrowed].map(|lifetime| {
-                    append_wheres(
+                    append_wheres_with_fields(
                         where_clause,
-                        Some(quote!(Self: #crate_::encoding::Oneof)),
-                        &fields,
+                        [quote!(Self: #crate_::encoding::Oneof)],
+                        &*fields,
                         Decode(lifetime, Distinguished),
                     )
                 });
@@ -1982,7 +1979,12 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
             some = None;
             [owned_decoder_where_clause, borrowed_decoder_where_clause] =
                 [Owned, Borrowed].map(|lifetime| {
-                    append_wheres(where_clause, None, &fields, Decode(lifetime, Distinguished))
+                    append_wheres_with_fields(
+                        where_clause,
+                        None,
+                        &*fields,
+                        Decode(lifetime, Distinguished),
+                    )
                 });
         };
 
