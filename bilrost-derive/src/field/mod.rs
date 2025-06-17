@@ -38,13 +38,20 @@ impl Field {
     pub fn new(ty: Type, attrs: &[Attribute], inferred_tag: Option<u32>) -> Result<Field, Error> {
         let attrs = bilrost_attrs(attrs)?;
 
-        Ok(if let Some(field) = ignored::IgnoredField::new(&ty, &attrs)? {
-            Field::Ignored(field)
-        } else if let Some(field) = oneof::OneofInclusion::new(&ty, &attrs)? {
-            Field::Oneof(field)
-        } else {
-            Field::Value(value::MessageField::new(&ty, &attrs, inferred_tag)?)
-        })
+        Ok(
+            if let Some(field) = ignored::IgnoredField::new(&ty, &attrs)? {
+                Field::Ignored(field)
+            } else if let Some(field) = oneof::OneofInclusion::new(&ty, &attrs)? {
+                Field::Oneof(field)
+            } else {
+                Field::Value(value::MessageField::new(
+                    &ty,
+                    &attrs,
+                    inferred_tag,
+                    "general",
+                )?)
+            },
+        )
     }
 
     pub fn is_ignored(&self) -> bool {

@@ -37,6 +37,7 @@ impl MessageField {
         ty: &Type,
         attrs: &[Meta],
         inferred_tag: Option<u32>,
+        implicit_default_encoding: &str,
     ) -> Result<Box<MessageField>, Error> {
         let mut tag = None;
         let mut encoding = None;
@@ -70,7 +71,7 @@ impl MessageField {
             None => bail!("missing tag attribute"),
         };
 
-        let encoding = encoding.unwrap_or(parse_str::<Type>("general")?);
+        let encoding = encoding.unwrap_or(parse_str::<Type>(implicit_default_encoding)?);
 
         Ok(Box::new(MessageField {
             tag,
@@ -409,7 +410,7 @@ impl OneofVariant {
                     tag,
                     variant_ident: variant.ident.clone(),
                     contents: VariantContents::Value(
-                        MessageField::new(&field.ty, &our_attrs, None)?
+                        MessageField::new(&field.ty, &our_attrs, None, "general_packed")?
                             .as_field_in_variant(field.ident.clone()),
                     ),
                 }))
