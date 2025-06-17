@@ -345,7 +345,8 @@ impl OneofVariant {
             let variant_ident = &variant.ident;
             bail!(
                 "unknown attribute(s) on variant {}: {}",
-                quote!(#variant_ident), quote!(#(#unknown_attrs),*)
+                quote!(#variant_ident),
+                quote!(#(#unknown_attrs),*)
             )
         }
 
