@@ -2094,21 +2094,12 @@ struct DecoderForOneof<'a> {
 
 impl ToTokens for DecoderForOneof<'_> {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        let ident = self.ident;
-        let variant_ident = &self.variant.variant_ident;
         let tag = self.variant.tag;
-        let fields: &[FieldInVariant] = match &self.variant.contents {
-            VariantContents::Value(field) => slice::from_ref(field),
-            VariantContents::Message(fields) => fields.as_slice(),
-        };
-        let [one_field] = fields else {
-            todo!("not supporting multiple fields yet");
-        };
-        // TODO: these three methods with a slice of variable names: init for overwrite, decode, &
-        //  create-variant. or should we decode into a variant in-situ? maybe worth benching
-        let with_new_value = one_field.with_value(quote!(new_value));
-        let decode = one_field.decode(quote!(&mut new_value), self.lifetime, self.mode);
-        let for_overwrite = one_field.for_overwrite();
+        let for_overwrite = self.variant.for_overwrite();
+        let decode = self.variant.decode(self.lifetime, self.mode);
+        let construct = self.variant.construct(self.ident);
+
+        // TODO: this is a lot less complex now, maybe we can get rid of this type
 
         // It's important that we spell the whole expression for the decoder matching for oneofs as
         // a single Result expression that never early-returns with `?`; that way when we add guards
@@ -2119,10 +2110,10 @@ impl ToTokens for DecoderForOneof<'_> {
         tokens.append_all(match self.mode {
             Relaxed => quote! {
                 #tag => {
-                    let mut new_value = #for_overwrite;
+                    #for_overwrite
                     match #decode {
                         ::core::result::Result::Ok(()) => {
-                            ::core::result::Result::Ok(#ident::#variant_ident #with_new_value)
+                            ::core::result::Result::Ok(#construct)
                         },
                         ::core::result::Result::Err(error) => ::core::result::Result::Err(error),
                     }
@@ -2130,10 +2121,10 @@ impl ToTokens for DecoderForOneof<'_> {
             },
             Distinguished => quote! {
                 #tag => {
-                    let mut new_value = #for_overwrite;
+                    #for_overwrite
                     match #decode {
                         ::core::result::Result::Ok(canon) => ::core::result::Result::Ok((
-                            #ident::#variant_ident #with_new_value,
+                            #construct,
                             canon
                         )),
                         ::core::result::Result::Err(error) => ::core::result::Result::Err(error),

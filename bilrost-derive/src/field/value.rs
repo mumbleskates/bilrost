@@ -171,14 +171,6 @@ impl MessageField {
         }
     }
 
-    /// Returns an expression which initializes the field's type with its encoding.
-    pub fn for_overwrite(&self) -> TokenStream {
-        let crate_ = crate_name();
-        let encoding = &self.encoding;
-        let ty = &self.ty;
-        quote!(<() as #crate_::encoding::ForOverwrite<#encoding, #ty>>::for_overwrite())
-    }
-
     /// Returns an expression which initializes the field's type as a guaranteed empty value with
     /// its encoding.
     pub fn empty(&self) -> TokenStream {
@@ -448,7 +440,7 @@ impl OneofVariant {
                     }
                 }
             }
-            VariantContents::Message(_) => todo!(),
+            VariantContents::Message(..) => todo!(),
         }
     }
 
@@ -475,7 +467,7 @@ impl OneofVariant {
                     }
                 }
             }
-            VariantContents::Message(_) => todo!(),
+            VariantContents::Message(..) => todo!(),
         }
     }
 
@@ -501,25 +493,29 @@ impl OneofVariant {
                     }
                 }
             }
-            VariantContents::Message(_) => todo!(),
+            VariantContents::Message(..) => todo!(),
         }
     }
 
-    pub fn decode(
-        &self,
-        field_destinations: &[TokenStream],
-        lifetime: DecodeLifetime,
-        mode: DecodeMode,
-    ) -> TokenStream {
+    pub fn for_overwrite(&self) -> TokenStream {
         let crate_ = crate_name();
         match &self.contents {
             VariantContents::Value(field) => {
-                let &[destination] = &field_destinations else {
-                    panic!(
-                        "decoding a 'value' oneof variant but had {} destinations",
-                        field_destinations.len()
-                    );
-                };
+                let encoding = &field.encoding;
+                let ty = &field.ty;
+                quote! {
+                    let mut value =
+                        <() as #crate_::encoding::ForOverwrite<#encoding, #ty>>::for_overwrite();
+                }
+            }
+            VariantContents::Message(..) => todo!(),
+        }
+    }
+
+    pub fn decode(&self, lifetime: DecodeLifetime, mode: DecodeMode) -> TokenStream {
+        let crate_ = crate_name();
+        match &self.contents {
+            VariantContents::Value(field) => {
                 let encoding = &field.encoding;
                 let ty = &field.ty;
                 let (decoder_trait, call) = match (lifetime, mode) {
@@ -539,13 +535,27 @@ impl OneofVariant {
                 quote!(
                     <() as #crate_::encoding::#decoder_trait<#encoding, #ty>>::#call(
                         wire_type,
-                        #destination,
+                        &mut value,
                         buf,
                         ctx,
                     )
                 )
             }
-            VariantContents::Message(_) => todo!(),
+            VariantContents::Message(..) => todo!(),
+        }
+    }
+
+    pub fn construct(&self, type_ident: &Ident) -> TokenStream {
+        let variant_ident = &self.variant_ident;
+        match &self.contents {
+            VariantContents::Value(field) => {
+                let value_in_ident = match &field.ident_within_variant {
+                    None => quote!((value)),
+                    Some(inner_ident) => quote!( { #inner_ident: value } ),
+                };
+                quote!( #type_ident::#variant_ident #value_in_ident )
+            }
+            VariantContents::Message(..) => todo!(),
         }
     }
 }

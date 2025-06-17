@@ -96,11 +96,6 @@ impl OneofInclusion {
         quote!(#crate_::encoding::Oneof::oneof_encoded_len(&#ident, tm))
     }
 
-    /// Returns an expression which initializes the field's type with the encoding.
-    pub fn for_overwrite(&self) -> TokenStream {
-        self.empty()
-    }
-
     /// Returns an expression which initializes the field's type as a guaranteed empty value with
     /// its encoding.
     pub fn empty(&self) -> TokenStream {
