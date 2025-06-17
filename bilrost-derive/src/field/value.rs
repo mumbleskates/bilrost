@@ -550,8 +550,8 @@ impl OneofVariant {
     }
 }
 
-impl FieldBearer for &OneofVariant {
-    fn where_terms(self, purpose: WhereFor) -> Vec<TokenStream> {
+impl FieldBearer for OneofVariant {
+    fn where_terms(&self, purpose: WhereFor) -> Vec<TokenStream> {
         let crate_ = crate_name();
         let fields: &[FieldInVariant] = match &self.contents {
             VariantContents::Value(field) => slice::from_ref(field),

@@ -11,14 +11,10 @@ use syn::{Meta, Type};
 #[derive(Clone)]
 pub struct IgnoredField {
     ty: Type,
-    pub requires_default: bool,
 }
 
 impl IgnoredField {
-    pub fn new(
-        ty: &Type,
-        attrs: &[Meta],
-    ) -> Result<Option<Box<Self>>, Error> {
+    pub fn new(ty: &Type, attrs: &[Meta]) -> Result<Option<Box<Self>>, Error> {
         let ignore_attr_count = attrs
             .iter()
             .filter(|attr| word_attr(attr, "ignore"))
@@ -38,10 +34,7 @@ impl IgnoredField {
                 quote!(#(#attrs),*)
             );
         }
-        Ok(Some(Box::new(Self {
-            ty: ty.clone(),
-            requires_default: false,
-        })))
+        Ok(Some(Box::new(Self { ty: ty.clone() })))
     }
 
     pub fn initialize(&self) -> TokenStream {
@@ -49,13 +42,9 @@ impl IgnoredField {
     }
 }
 
-impl FieldBearer for &IgnoredField {
-    fn where_terms(self, _purpose: WhereFor) -> Vec<TokenStream> {
-        if self.requires_default {
-            let ty = &self.ty;
-            vec![quote!(#ty: ::core::default::Default)]
-        } else {
-            vec![]
-        }
+impl FieldBearer for IgnoredField {
+    fn where_terms(&self, _purpose: WhereFor) -> Vec<TokenStream> {
+        let ty = &self.ty;
+        vec![quote!(#ty: ::core::default::Default)]
     }
 }

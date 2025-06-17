@@ -189,8 +189,8 @@ impl Field {
     }
 }
 
-impl FieldBearer for &Field {
-    fn where_terms(self, purpose: WhereFor) -> Vec<TokenStream> {
+impl FieldBearer for Field {
+    fn where_terms(&self, purpose: WhereFor) -> Vec<TokenStream> {
         match self {
             Field::Value(field) => field.where_terms(purpose),
             Field::Oneof(field) => field.where_terms(purpose),
@@ -199,8 +199,8 @@ impl FieldBearer for &Field {
     }
 }
 
-impl FieldBearer for &(TokenStream, Field) {
-    fn where_terms(self, purpose: WhereFor) -> Vec<TokenStream> {
+impl FieldBearer for (TokenStream, Field) {
+    fn where_terms(&self, purpose: WhereFor) -> Vec<TokenStream> {
         self.1.where_terms(purpose)
     }
 }

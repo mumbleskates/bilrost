@@ -224,19 +224,6 @@ fn preprocess_message(input: &DeriveInput) -> Result<PreprocessedMessage<'_>, Er
         })
         .collect::<Result<Vec<_>, _>>()?;
 
-    // TODO: the field structs really need a lot of refactoring, the fact that there's this
-    //  (TokenStream, Field) opaque tuple nonsense everywhere is such a mess
-    if default_per_field {
-        for ignored_field in &mut ignored_fields {
-            match ignored_field {
-                (_, Field::Ignored(ignored)) => {
-                    ignored.requires_default = true;
-                }
-                _ => panic!("non-ignored field in ignored fields"),
-            }
-        }
-    }
-
     // Index all fields by their tag(s) and check them against the forbidden tag ranges
     let all_tags: BTreeMap<u32, &TokenStream> = unsorted_fields
         .iter()
@@ -412,13 +399,12 @@ fn append_self_where(
 fn append_wheres(
     where_clause: Option<&WhereClause>,
     self_where: Option<TokenStream>,
-    fields: impl IntoIterator<Item = impl FieldBearer>,
+    fields: impl FieldBearer,
     field_purpose: WhereFor,
 ) -> Option<TokenStream> {
     // dedup the where clauses by their String values
     let encoder_wheres: BTreeMap<_, _> = fields
-        .into_iter()
-        .flat_map(|bearer| bearer.where_terms(field_purpose))
+        .where_terms(field_purpose)
         .map(|where_| (where_.to_string(), where_))
         .collect();
     let mut appended_wheres = encoder_wheres.values().peekable();
@@ -476,11 +462,15 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
 
     // if we are defaulting ignored fields per-field, we need to include where-clause bounds for
     // each one of them as well.
-    let where_fields = unsorted_fields.iter().chain(&ignored_fields);
+    let where_fields: &[_] = if default_per_field {
+        &[unsorted_fields.as_slice(), ignored_fields.as_slice()]
+    } else {
+        &[unsorted_fields.as_slice()]
+    };
     let encoder_where_clause = append_wheres(
         where_clause,
         self_where.clone(),
-        where_fields.clone(),
+        where_fields,
         Encode,
     );
     let [owned_decoder_where_clause, borrowed_decoder_where_clause] =
@@ -488,7 +478,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
             append_wheres(
                 where_clause,
                 self_where.clone(),
-                where_fields.clone(),
+                where_fields,
                 Decode(lifetime, Relaxed),
             )
         });
@@ -879,7 +869,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
                 append_wheres(
                     where_clause,
                     Some(quote!(Self: ::core::cmp::Eq)),
-                    where_fields.clone(),
+                    where_fields,
                     Decode(lifetime, Distinguished),
                 )
             });
