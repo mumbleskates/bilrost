@@ -349,11 +349,17 @@ impl OneofVariant {
                 } else {
                     // Return a error message depending on whether the variant is explicitly marked
                     // empty
-                    bail!(if empty {
-                        "empty Oneof variants must not have fields"
+                    if empty {
+                        bail!(
+                            "Oneof variant {} is marked 'empty' but it has fields",
+                            variant.ident
+                        );
                     } else {
-                        "missing tag attribute"
-                    });
+                        bail!(
+                            "missing tag attribute on variant {}",
+                            variant.ident
+                        );
+                    }
                 }
             }
 
