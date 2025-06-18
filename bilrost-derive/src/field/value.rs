@@ -15,7 +15,7 @@ use alloc::vec::Vec;
 use core::slice;
 use eyre::{bail, Error};
 use proc_macro2::{Span, TokenStream};
-use quote::quote;
+use quote::{quote, ToTokens};
 use syn::{parse_str, Fields, Ident, Index, Meta, Type, Variant};
 
 /// A field in a bilrost message or oneof
@@ -416,7 +416,7 @@ impl OneofVariant {
         }
     }
 
-    pub fn encode(&self, type_ident: &Ident) -> TokenStream {
+    pub fn encode(&self, type_ident: impl ToTokens) -> TokenStream {
         let crate_ = crate_name();
         let tag = self.tag;
         let variant_ident = &self.variant_ident;
@@ -443,7 +443,7 @@ impl OneofVariant {
         }
     }
 
-    pub fn prepend(&self, type_ident: &Ident) -> TokenStream {
+    pub fn prepend(&self, type_ident: impl ToTokens) -> TokenStream {
         let crate_ = crate_name();
         let tag = self.tag;
         let variant_ident = &self.variant_ident;
@@ -470,7 +470,7 @@ impl OneofVariant {
         }
     }
 
-    pub fn encoded_len(&self, type_ident: &Ident) -> TokenStream {
+    pub fn encoded_len(&self, type_ident: impl ToTokens) -> TokenStream {
         let crate_ = crate_name();
         let tag = self.tag;
         let variant_ident = &self.variant_ident;
@@ -544,7 +544,7 @@ impl OneofVariant {
         }
     }
 
-    pub fn construct(&self, type_ident: &Ident) -> TokenStream {
+    pub fn construct(&self) -> TokenStream {
         let variant_ident = &self.variant_ident;
         match &self.contents {
             VariantContents::Value(field) => {
@@ -552,7 +552,7 @@ impl OneofVariant {
                     None => quote!((value)),
                     Some(inner_ident) => quote!( { #inner_ident: value } ),
                 };
-                quote!( #type_ident::#variant_ident #value_in_ident )
+                quote!( Self::#variant_ident #value_in_ident )
             }
             VariantContents::Message(..) => todo!(),
         }

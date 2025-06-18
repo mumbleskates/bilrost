@@ -1689,19 +1689,21 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         );
     }
 
+    let self_alias = quote!(Self);
+
     let mut encode: Vec<TokenStream> = fields
         .iter()
-        .map(|variant| variant.encode(&ident))
+        .map(|variant| variant.encode(&self_alias))
         .collect();
 
     let mut prepend: Vec<TokenStream> = fields
         .iter()
-        .map(|variant| variant.prepend(&ident))
+        .map(|variant| variant.prepend(&self_alias))
         .collect();
 
     let mut encoded_len: Vec<TokenStream> = fields
         .iter()
-        .map(|variant| variant.encoded_len(&ident))
+        .map(|variant| variant.encoded_len(&self_alias))
         .collect();
 
     let encoder_trait;
@@ -1728,13 +1730,13 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
             .map(|variant| {
                 let tag = variant.tag;
                 let variant_ident = &variant.variant_ident;
-                quote!(#ident::#variant_ident { .. } => ::core::option::Option::Some(#tag))
+                quote!(Self::#variant_ident { .. } => ::core::option::Option::Some(#tag))
             })
-            .chain([quote!(#ident::#empty_ident => ::core::option::Option::None)])
+            .chain([quote!(Self::#empty_ident => ::core::option::Option::None)])
             .collect();
-        encode.push(quote!(#ident::#empty_ident => {}));
-        prepend.push(quote!(#ident::#empty_ident => {}));
-        encoded_len.push(quote!(#ident::#empty_ident => 0));
+        encode.push(quote!(Self::#empty_ident => {}));
+        prepend.push(quote!(Self::#empty_ident => {}));
+        encoded_len.push(quote!(Self::#empty_ident => 0));
 
         empty_methods_impl = Some(quote! {
             fn empty() -> Self {
@@ -1764,7 +1766,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
             .map(|variant| {
                 let tag = variant.tag;
                 let variant_ident = &variant.variant_ident;
-                quote!(#ident::#variant_ident { .. } => #tag)
+                quote!(Self::#variant_ident { .. } => #tag)
             })
             .collect();
 
@@ -1781,8 +1783,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
 
     let decode_arms = |lifetime, mode| {
         let arms = fields.iter().map(|variant| DecoderForOneof {
-            ident: &ident,
-            variant: &variant,
+            variant,
             lifetime,
             mode,
         });
@@ -1821,7 +1822,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
             // in the oneof when it bubbles back up through this call. For that reason, also
             // mentioned elsewhere, we structure most of this code to be pretty much one big
             // Result-valued expression to serve this match on the very outside.
-            match if let #ident::#empty_ident = value {
+            match if let Self::#empty_ident = value {
                 match #decode {
                     ::core::result::Result::Ok(decoded) => {
                         *value = decoded;
@@ -1852,7 +1853,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
     let impl_owned_decoder = (!borrow_only).then(|| {
         quote! {
             impl #impl_generics #crate_::encoding::#owned_decoder_trait
-            for #ident #ty_generics #owned_decoder_where_clause
+            for __Self #ty_generics #owned_decoder_where_clause
             {
                 fn oneof_decode_field<__B: #crate_::bytes::Buf + ?Sized>(
                     #decode_field_self_arg
@@ -1869,7 +1870,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
 
     let impls = quote! {
         impl #impl_generics #crate_::encoding::#encoder_trait
-        for #ident #ty_generics #encoder_where_clause
+        for __Self #ty_generics #encoder_where_clause
         {
             const FIELD_TAGS: &'static [u32] = &[#(#sorted_tags),*];
 
@@ -1921,7 +1922,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         #impl_owned_decoder
 
         impl #borrow_generics #crate_::encoding::#borrowed_decoder_trait
-        for #ident #ty_generics #borrowed_decoder_where_clause
+        for __Self #ty_generics #borrowed_decoder_where_clause
         {
             fn oneof_borrow_decode_field(
                 #decode_field_self_arg
@@ -1990,7 +1991,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
             .map(|decode| {
                 quote! {
                     // See the note above for details about the colliding field guard.
-                    match if let #ident::#empty_ident = value {
+                    match if let Self::#empty_ident = value {
                         match #decode {
                             ::core::result::Result::Ok((decoded, canon)) => {
                                 *value = decoded;
@@ -2027,7 +2028,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         let impl_owned_decoder = (!borrow_only).then(|| {
             quote! {
                 impl #impl_generics #crate_::encoding::#owned_decoder_trait
-                for #ident #ty_generics #owned_decoder_where_clause
+                for __Self #ty_generics #owned_decoder_where_clause
                 {
                     fn oneof_decode_field_distinguished<__B: #crate_::bytes::Buf + ?Sized>(
                         #decode_field_self_arg
@@ -2046,7 +2047,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
             #impl_owned_decoder
 
             impl #borrow_generics #crate_::encoding::#borrowed_decoder_trait
-            for #ident #ty_generics #borrowed_decoder_where_clause
+            for __Self #ty_generics #borrowed_decoder_where_clause
             {
                 fn oneof_borrow_decode_field_distinguished(
                     #decode_field_self_arg
@@ -2064,11 +2065,15 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
     let aliases = encoder_alias_header();
     Ok(quote! {
         const _: () = {
-            #aliases
+            use #ident as __Self;
 
-            #impls
+            const _: () = {
+                #aliases
 
-            #distinguished_impls
+                #impls
+
+                #distinguished_impls
+            };
         };
     })
 }
@@ -2077,8 +2082,6 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
 /// NonEmptyOneof or Oneof, and either relaxed or distinguished. The code for these should all be
 /// similarly deduplicated.
 struct DecoderForOneof<'a> {
-    /// The ident of the oneof enum itself
-    ident: &'a Ident,
     /// The variant in question
     variant: &'a OneofVariant,
     /// Decoded ownership lifetime
@@ -2092,7 +2095,7 @@ impl ToTokens for DecoderForOneof<'_> {
         let tag = self.variant.tag;
         let for_overwrite = self.variant.for_overwrite();
         let decode = self.variant.decode(self.lifetime, self.mode);
-        let construct = self.variant.construct(self.ident);
+        let construct = self.variant.construct();
 
         // TODO: this is a lot less complex now, maybe we can get rid of this type
 
