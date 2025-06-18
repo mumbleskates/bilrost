@@ -772,6 +772,24 @@ fn field_tag_limits() {
 }
 
 #[test]
+fn fieldless_messages() {
+    #[derive(Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
+    struct Foo;
+    assert::decodes!(owned distinguished, [], Foo);
+
+    #[derive(Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
+    struct Bar {}
+    assert::decodes!(owned distinguished, [], Bar{});
+
+    #[derive(Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
+    struct Baz();
+    assert::decodes!(owned distinguished, [], Baz());
+}
+
+#[test]
 fn message_catting_behavior() {
     // We can show that when messages are catted together, the fields stay ascending
     let first = [
