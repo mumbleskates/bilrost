@@ -24,13 +24,17 @@ use syn::{parse_str, Fields, Ident, Index, Meta, Type, Variant};
 pub struct MessageField {
     pub tag: u32,
     pub value: ValueField,
+    /// In structs, we can create inherent implementations with helper methods for getting and
+    /// setting enumeration values through translated types. This is only possible on messages, and
+    /// even when "variant types" are available those types are unlikely to be allowed to have impls
+    /// of their own.
+    pub enumeration_ty: Option<Type>,
 }
 
 #[derive(Clone)]
 pub struct ValueField {
     pub ty: Type,
     pub encoding: Type,
-    pub enumeration_ty: Option<Type>, // TODO: move out and into the message version
     /// If a field is part of a recursion of messages, currently the chain needs to be broken so
     /// that there is not a cyclic dependency of type constraints on the implementation of message
     /// traits. When a field is marked with the "recurses" attribute, it will not be checked in the
@@ -53,8 +57,8 @@ pub enum VariantContents {
 
 #[derive(Clone)]
 pub struct FieldInVariant {
-    pub value: ValueField,
     pub ident_within_variant: Option<Ident>,
+    pub value: ValueField,
 }
 
 impl MessageField {
@@ -64,11 +68,14 @@ impl MessageField {
         inferred_tag: Option<u32>,
     ) -> Result<Box<MessageField>, Error> {
         let mut tag = None;
+        let mut enumeration_ty = None;
         let mut remaining_attrs = vec![];
 
         for attr in attrs {
             if let Some(t) = tag_attr(&attr)? {
                 set_option(&mut tag, t, "duplicate tag attributes")?;
+            } else if let Some(t) = named_attr(&attr, "enumeration")? {
+                set_option(&mut enumeration_ty, t, "duplicate enumeration attributes")?;
             } else {
                 remaining_attrs.push(attr);
             }
@@ -81,7 +88,11 @@ impl MessageField {
             None => bail!("missing tag attribute"),
         };
 
-        Ok(Box::new(MessageField { tag, value }))
+        Ok(Box::new(MessageField {
+            tag,
+            value,
+            enumeration_ty,
+        }))
     }
 
     /// Returns a statement which encodes the field using buffer `buf` and tag writer `tw`.
@@ -225,7 +236,7 @@ impl MessageField {
     /// message struct.
     pub fn methods(&self, ident: &TokenStream) -> Option<TokenStream> {
         let crate_ = crate_name();
-        let enumeration_ty = self.value.enumeration_ty.as_ref()?;
+        let enumeration_ty = self.enumeration_ty.as_ref()?;
 
         let ident_str = ident.to_string();
         let ident_str = ident_str.as_str().strip_prefix("r#").unwrap_or(&ident_str);
@@ -271,15 +282,12 @@ impl ValueField {
         implicit_default_encoding: &str,
     ) -> Result<ValueField, Error> {
         let mut encoding = None;
-        let mut enumeration_ty = None;
         let mut recurses = false;
         let mut unknown_attrs = Vec::new();
 
         for attr in &attrs {
             if let Some(t) = named_attr(attr, "encoding")? {
                 set_option(&mut encoding, t, "duplicate encoding attributes")?;
-            } else if let Some(t) = named_attr(attr, "enumeration")? {
-                set_option(&mut enumeration_ty, t, "duplicate enumeration attributes")?;
             } else if word_attr(attr, "recurses") {
                 set_bool(&mut recurses, "duplicate recurses attributes")?;
             } else {
@@ -300,7 +308,6 @@ impl ValueField {
         Ok(ValueField {
             ty: ty.clone(),
             encoding,
-            enumeration_ty,
             recurses,
         })
     }
