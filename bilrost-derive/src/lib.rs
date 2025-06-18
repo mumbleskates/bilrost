@@ -975,7 +975,7 @@ fn try_message_via_oneof(input: DeriveInput) -> Result<TokenStream, Error> {
     } = preprocess_oneof(&input)?;
 
     let tag_measurer = if matches!(
-        variants.iter().map(|variant| variant.tag).max(),
+        variants.iter().map(|variant| variant.tag()).max(),
         Some(last_tag) if last_tag >= 32
     ) {
         quote!(#crate_::encoding::RuntimeTagMeasurer)
@@ -1627,7 +1627,7 @@ fn preprocess_oneof(input: &DeriveInput) -> Result<PreprocessedOneof<'_>, Error>
     // Index all fields by their tag(s) and check them against the forbidden tag ranges
     let all_tags: BTreeMap<u32, &Ident> = variants
         .iter()
-        .map(|variant| (variant.tag, &variant.variant_ident))
+        .map(|variant| (variant.tag(), variant.ident()))
         .collect();
     for reserved_range in reserved_tags.unwrap_or_default().iter_tag_ranges() {
         if let Some((forbidden_tag, variant_ident)) = all_tags.range(reserved_range).next() {
@@ -1682,7 +1682,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
 
     let sorted_tags: Vec<u32> = fields
         .iter()
-        .map(|variant| variant.tag)
+        .map(|variant| variant.tag())
         .sorted_unstable()
         .collect();
     if let Some((duplicate_tag, _)) = sorted_tags.iter().tuple_windows().find(|(a, b)| a == b) {
@@ -1732,8 +1732,8 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         current_tag = fields
             .iter()
             .map(|variant| {
-                let tag = variant.tag;
-                let variant_ident = &variant.variant_ident;
+                let tag = variant.tag();
+                let variant_ident = variant.ident();
                 quote!(Self::#variant_ident { .. } => ::core::option::Option::Some(#tag))
             })
             .chain([quote!(Self::#empty_ident => ::core::option::Option::None)])
@@ -1768,8 +1768,8 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         current_tag = fields
             .iter()
             .map(|variant| {
-                let tag = variant.tag;
-                let variant_ident = &variant.variant_ident;
+                let tag = variant.tag();
+                let variant_ident = variant.ident();
                 quote!(Self::#variant_ident { .. } => #tag)
             })
             .collect();
@@ -1778,8 +1778,8 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
     };
 
     let variant_name_arms = fields.iter().map(|variant| {
-        let tag = variant.tag;
-        let variant_ident = &variant.variant_ident;
+        let tag = variant.tag();
+        let variant_ident = variant.ident();
         quote! {
             #tag => (stringify!(#ident), stringify!(#variant_ident)),
         }

@@ -73,7 +73,7 @@ impl Field {
 
     pub fn tags(&self) -> Vec<u32> {
         match &self.content {
-            Value(scalar) => vec![scalar.tag],
+            Value(scalar) => vec![scalar.tag()],
             Oneof(oneof) => oneof.tags.clone(),
             Ignored(..) => panic!("field is ignored"),
         }
@@ -93,6 +93,7 @@ impl Field {
         let crate_ = crate_name();
         match &self.content {
             Oneof(field) => {
+                // TODO: move into oneof.rs and private the fields
                 let mut tags = self.tags();
                 tags.sort();
                 let oneof_ty = &field.ty;

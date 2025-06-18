@@ -22,43 +22,43 @@ use syn::{parse_str, Fields, Ident, Index, Meta, Type, Variant};
 // TODO: message fields should know what the field's ident is
 #[derive(Clone)]
 pub struct MessageField {
-    pub tag: u32,
-    pub value: ValueField,
+    tag: u32,
+    value: ValueField,
     /// In structs, we can create inherent implementations with helper methods for getting and
     /// setting enumeration values through translated types. This is only possible on messages, and
     /// even when "variant types" are available those types are unlikely to be allowed to have impls
     /// of their own.
-    pub enumeration_ty: Option<Type>,
+    enumeration_ty: Option<Type>,
 }
 
 #[derive(Clone)]
-pub struct ValueField {
-    pub ty: Type,
-    pub encoding: Type,
+struct ValueField {
+    ty: Type,
+    encoding: Type,
     /// If a field is part of a recursion of messages, currently the chain needs to be broken so
     /// that there is not a cyclic dependency of type constraints on the implementation of message
     /// traits. When a field is marked with the "recurses" attribute, it will not be checked in the
     /// `where` clause of the implementation, and the type must always be supported by its encoding.
-    pub recurses: bool,
+    recurses: bool,
 }
 
 #[derive(Clone)]
 pub struct OneofVariant {
-    pub tag: u32,
-    pub variant_ident: Ident,
-    pub contents: VariantContents,
+    tag: u32,
+    variant_ident: Ident,
+    contents: VariantContents,
 }
 
 #[derive(Clone)]
-pub enum VariantContents {
+enum VariantContents {
     Value(Box<FieldInVariant>),
     Message(Vec<FieldInVariant>),
 }
 
 #[derive(Clone)]
-pub struct FieldInVariant {
-    pub ident_within_variant: Option<Ident>,
-    pub value: ValueField,
+struct FieldInVariant {
+    ident_within_variant: TokenStream,
+    value: ValueField,
 }
 
 impl MessageField {
@@ -93,6 +93,10 @@ impl MessageField {
             value,
             enumeration_ty,
         }))
+    }
+
+    pub fn tag(&self) -> u32 {
+        self.tag
     }
 
     /// Returns a statement which encodes the field using buffer `buf` and tag writer `tw`.
@@ -409,11 +413,23 @@ impl OneofVariant {
                     variant_ident: variant.ident.clone(),
                     contents: VariantContents::Value(Box::new(FieldInVariant {
                         value: ValueField::new(&field.ty, other_attrs, "general_packed")?,
-                        ident_within_variant: field.ident.clone(),
+                        ident_within_variant: field
+                            .ident
+                            .as_ref()
+                            .map(ToTokens::to_token_stream)
+                            .unwrap_or_else(|| quote!(0)),
                     })),
                 }))
             }
         }
+    }
+
+    pub fn tag(&self) -> u32 {
+        self.tag
+    }
+
+    pub fn ident(&self) -> &Ident {
+        &self.variant_ident
     }
 
     pub fn encode(&self, type_ident: impl ToTokens) -> TokenStream {
@@ -424,12 +440,9 @@ impl OneofVariant {
             VariantContents::Value(field) => {
                 let encoding = &field.value.encoding;
                 let ty = &field.value.ty;
-                let value_in_ident = match &field.ident_within_variant {
-                    None => quote!((value)),
-                    Some(inner_ident) => quote!( { #inner_ident: value } ),
-                };
+                let value_ident = &field.ident_within_variant;
                 quote! {
-                    #type_ident::#variant_ident #value_in_ident => {
+                    #type_ident::#variant_ident { #value_ident: value } => {
                         <() as #crate_::encoding::FieldEncoder<#encoding, #ty>>::encode_field(
                             #tag,
                             &value,
@@ -451,12 +464,9 @@ impl OneofVariant {
             VariantContents::Value(field) => {
                 let encoding = &field.value.encoding;
                 let ty = &field.value.ty;
-                let value_in_ident = match &field.ident_within_variant {
-                    None => quote!((value)),
-                    Some(inner_ident) => quote!( { #inner_ident: value } ),
-                };
+                let value_ident = &field.ident_within_variant;
                 quote! {
-                    #type_ident::#variant_ident #value_in_ident => {
+                    #type_ident::#variant_ident { #value_ident: value } => {
                         <() as #crate_::encoding::FieldEncoder<#encoding, #ty>>::prepend_field(
                             #tag,
                             &value,
@@ -478,12 +488,9 @@ impl OneofVariant {
             VariantContents::Value(field) => {
                 let encoding = &field.value.encoding;
                 let ty = &field.value.ty;
-                let value_in_ident = match &field.ident_within_variant {
-                    None => quote!((value)),
-                    Some(inner_field_ident) => quote!( { #inner_field_ident: value } ),
-                };
+                let value_ident = &field.ident_within_variant;
                 quote! {
-                    #type_ident::#variant_ident #value_in_ident => {
+                    #type_ident::#variant_ident { #value_ident: value } => {
                         <() as #crate_::encoding::FieldEncoder<#encoding, #ty>>::field_encoded_len(
                             #tag,
                             &value,
@@ -579,11 +586,8 @@ impl OneofVariant {
         let variant_ident = &self.variant_ident;
         match &self.contents {
             VariantContents::Value(field) => {
-                let value_in_ident = match &field.ident_within_variant {
-                    None => quote!((value)),
-                    Some(inner_ident) => quote!( { #inner_ident: value } ),
-                };
-                quote!( Self::#variant_ident #value_in_ident )
+                let value_ident = &field.ident_within_variant;
+                quote!( Self::#variant_ident { #value_ident: value } )
             }
             VariantContents::Message(..) => todo!(),
         }
