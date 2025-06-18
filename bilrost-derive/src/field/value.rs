@@ -496,7 +496,49 @@ impl OneofVariant {
         }
     }
 
-    pub fn for_overwrite(&self) -> TokenStream {
+    /// Oneof decoders have four different cases they may be implemented in: implemented for either
+    /// NonEmptyOneof or Oneof, and either relaxed or distinguished. The code for these should all
+    /// be similarly deduplicated.
+    pub fn decode(&self, lifetime: DecodeLifetime, mode: DecodeMode) -> TokenStream {
+        let tag = self.tag;
+        let for_overwrite = self.for_overwrite();
+        let decode = self.decode_fields(lifetime, mode);
+        let construct = self.construct();
+
+        // It's important that we spell the whole expression for the decoder matching for oneofs as
+        // a single Result expression that never early-returns with `?`; that way when we add guards
+        // to the Oneof trait impls (which have natural empty variants, a collision guard, and error
+        // attribution) our clause that traces the error location will see every error that occurs,
+        // including errors that bubble up from the inner decoders, and those error details can
+        // still path down through the oneof variant.
+        match mode {
+            Relaxed => quote! {
+                #tag => {
+                    #for_overwrite
+                    match #decode {
+                        ::core::result::Result::Ok(()) => {
+                            ::core::result::Result::Ok(#construct)
+                        },
+                        ::core::result::Result::Err(error) => ::core::result::Result::Err(error),
+                    }
+                }
+            },
+            Distinguished => quote! {
+                #tag => {
+                    #for_overwrite
+                    match #decode {
+                        ::core::result::Result::Ok(canon) => ::core::result::Result::Ok((
+                            #construct,
+                            canon
+                        )),
+                        ::core::result::Result::Err(error) => ::core::result::Result::Err(error),
+                    }
+                }
+            },
+        }
+    }
+
+    fn for_overwrite(&self) -> TokenStream {
         let crate_ = crate_name();
         match &self.contents {
             VariantContents::Value(field) => {
@@ -511,7 +553,7 @@ impl OneofVariant {
         }
     }
 
-    pub fn decode(&self, lifetime: DecodeLifetime, mode: DecodeMode) -> TokenStream {
+    fn decode_fields(&self, lifetime: DecodeLifetime, mode: DecodeMode) -> TokenStream {
         let crate_ = crate_name();
         match &self.contents {
             VariantContents::Value(field) => {
@@ -544,7 +586,7 @@ impl OneofVariant {
         }
     }
 
-    pub fn construct(&self) -> TokenStream {
+    fn construct(&self) -> TokenStream {
         let variant_ident = &self.variant_ident;
         match &self.contents {
             VariantContents::Value(field) => {
