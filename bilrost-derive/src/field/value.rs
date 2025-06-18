@@ -504,37 +504,26 @@ impl OneofVariant {
         let for_overwrite = self.for_overwrite();
         let decode = self.decode_fields(lifetime, mode);
         let construct = self.construct();
-
+        let (decode_result, output) = match mode {
+            Relaxed => (quote!(()), construct),
+            Distinguished => (quote!(canon), quote!((#construct, canon))),
+        };
         // It's important that we spell the whole expression for the decoder matching for oneofs as
         // a single Result expression that never early-returns with `?`; that way when we add guards
         // to the Oneof trait impls (which have natural empty variants, a collision guard, and error
         // attribution) our clause that traces the error location will see every error that occurs,
         // including errors that bubble up from the inner decoders, and those error details can
         // still path down through the oneof variant.
-        match mode {
-            Relaxed => quote! {
-                #tag => {
-                    #for_overwrite
-                    match #decode {
-                        ::core::result::Result::Ok(()) => {
-                            ::core::result::Result::Ok(#construct)
-                        },
-                        ::core::result::Result::Err(error) => ::core::result::Result::Err(error),
-                    }
+        quote! {
+            #tag => {
+                #for_overwrite
+                match #decode {
+                    ::core::result::Result::Ok(#decode_result) => {
+                        ::core::result::Result::Ok(#output)
+                    },
+                    ::core::result::Result::Err(error) => ::core::result::Result::Err(error),
                 }
-            },
-            Distinguished => quote! {
-                #tag => {
-                    #for_overwrite
-                    match #decode {
-                        ::core::result::Result::Ok(canon) => ::core::result::Result::Ok((
-                            #construct,
-                            canon
-                        )),
-                        ::core::result::Result::Err(error) => ::core::result::Result::Err(error),
-                    }
-                }
-            },
+            }
         }
     }
 
