@@ -16,7 +16,7 @@ use core::slice;
 use eyre::{bail, Error};
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
-use syn::{parse2, parse_str, Fields, Ident, Index, Meta, Type, Variant};
+use syn::{parse_str, Fields, Ident, Index, Meta, Type, Variant};
 
 /// A field in a bilrost message or oneof
 // TODO: message fields should know what the field's ident is
@@ -317,42 +317,26 @@ impl OneofVariant {
     /// Returns `Ok` for data variants, and `Err` with just the ident for an empty variant.
     pub fn new(variant: Variant) -> Result<Option<OneofVariant>, Error> {
         let mut tag = None; // tag number
-        let mut encoding = false; // encoding
-        let mut recurses = false; // marks a value-variant as recursive
         let mut message = false; // whether this variant is marked as a "message" variant
         let mut empty = false; // whether this unit is marked as an "empty" variant
-        let mut unknown_attrs = vec![];
+        let mut other_attrs = vec![];
         let our_attrs = bilrost_attrs(&variant.attrs)?;
 
         for attr in &our_attrs {
             if let Some(t) = tag_attr(attr)? {
                 set_option(&mut tag, t, "duplicate tag attributes")?;
-            } else if let Some(t) = named_attr(attr, "encoding")? {
-                parse2::<Type>(t)?;
-                set_bool(&mut encoding, "duplicate encoding attributes")?;
-            } else if word_attr(attr, "recurses") {
-                set_bool(&mut recurses, "duplicate recurses attributes")?;
             } else if word_attr(attr, "message") {
                 set_bool(&mut message, "duplicate message attributes")?;
             } else if word_attr(attr, "empty") {
                 set_bool(&mut empty, "duplicate empty attributes")?;
             } else {
-                unknown_attrs.push(attr);
+                other_attrs.push(attr);
             }
         }
 
-        if !unknown_attrs.is_empty() {
-            let variant_ident = &variant.ident;
-            bail!(
-                "unknown attribute(s) on variant {}: {}",
-                quote!(#variant_ident),
-                quote!(#(#unknown_attrs),*)
-            )
-        }
-
-        match (tag, encoding, recurses, message, empty) {
+        match (tag, message, empty) {
             // Implicitly or explicitly empty variant
-            (None, false, false, false, _) => {
+            (None, false, _) if other_attrs.is_empty() => {
                 if match variant.fields {
                     Fields::Named(fields) => fields.named.is_empty(),
                     Fields::Unnamed(fields) => fields.unnamed.is_empty(),
@@ -371,32 +355,37 @@ impl OneofVariant {
             }
 
             // Empty attribute plus any other attribute
-            (_, _, _, _, true) => {
-                bail!("the 'empty' attribute cannot be combined with other attributes");
+            (_, _, true) => {
+                bail!(
+                    "the 'empty' attribute is combined with other attributes on variant {}, but it \
+                    must always be alone",
+                    variant.ident
+                );
             }
 
             // Valid message variant
-            (Some(_), false, false, true, false) => {
+            (Some(_), true, false) if other_attrs.is_empty() => {
                 Ok(None) // TODO: this
             }
 
             // Invalid message variant
-            (_, _, _, true, _) => {
+            (_, true, _) => {
                 // TODO: maybe better pattern(s) here
                 bail!("invalid attributes for message variant"); // TODO: better error
             }
 
             // Normal value variant, neither empty nor message
-            (_, _, _, false, false) => {
+            (_, false, false) => {
                 let Some(tag) = tag else {
-                    bail!("missing tag attribute");
+                    bail!("missing tag attribute on variant {}", variant.ident);
                 };
 
                 let fields = match &variant.fields {
                     Fields::Named(fields) => &fields.named,
                     Fields::Unnamed(fields) => &fields.unnamed,
                     Fields::Unit => bail!(
-                        "Oneof variant {} has no fields and cannot have a value",
+                        "Oneof value variants must have exactly one field, but variant {} has no \
+                        fields",
                         variant.ident
                     ),
                 };

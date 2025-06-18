@@ -1613,7 +1613,10 @@ fn preprocess_oneof(input: &DeriveInput) -> Result<PreprocessedOneof<'_>, Error>
                 set_option(
                     &mut empty_variant,
                     variant_ident,
-                    "Oneofs may have at most one empty enum variant",
+                    "Oneofs may have at most one empty enum variant. To use multiple \
+                    variants without fields, the non-empty variants can be marked as values with \
+                    the 'message' attribute and the empty variant can be either left un-marked or \
+                    explicitly marked with the 'empty' attribute.\n\nThe conflicting variants were",
                 )?;
             }
             Some(variant) => {
@@ -2617,7 +2620,10 @@ mod test {
             output
                 .expect_err("conflicting empty variants not detected")
                 .to_string(),
-            "Oneofs may have at most one empty enum variant: Ident(Empty) and Ident(AlsoEmpty)"
+            "Oneofs may have at most one empty enum variant. To use multiple variants without \
+            fields, the non-empty variants can be marked as values with the 'message' attribute \
+            and the empty variant can be either left un-marked or explicitly marked with the \
+            'empty' attribute.\n\nThe conflicting variants were: Ident(Empty) and Ident(AlsoEmpty)"
         );
     }
 
@@ -2625,7 +2631,7 @@ mod test {
     fn test_rejects_meaningless_empty_variant_attrs() {
         let output = try_oneof(quote!(
             enum AB {
-                #[bilrost(tag = 0, encoding(usize), anything_else)]
+                #[bilrost(empty, anything_else)]
                 Empty,
                 #[bilrost(1)]
                 A(bool),
@@ -2637,7 +2643,76 @@ mod test {
             output
                 .expect_err("unknown attrs on empty variant not detected")
                 .to_string(),
-            "unknown attribute(s) on variant Empty: anything_else"
+            "the 'empty' attribute is combined with other attributes on variant Empty, but it must \
+            always be alone"
+        );
+    }
+
+    #[test]
+    fn test_rejects_meaningless_empty_value_variants() {
+        let output = try_oneof(quote!(
+            enum AB {
+                #[bilrost(encoding(X))]
+                Empty,
+                #[bilrost(1)]
+                A(bool),
+                #[bilrost(2)]
+                B(bool),
+            }
+        ));
+        assert_eq!(
+            output
+                .expect_err("tagless unit variant not detected")
+                .to_string(),
+            "missing tag attribute on variant Empty"
+        );
+        let output = try_oneof(quote!(
+            enum AB {
+                #[bilrost(tag(0))]
+                Empty,
+                #[bilrost(1)]
+                A(bool),
+                #[bilrost(2)]
+                B(bool),
+            }
+        ));
+        assert_eq!(
+            output
+                .expect_err("unit variant not detected")
+                .to_string(),
+            "Oneof value variants must have exactly one field, but variant Empty has no fields"
+        );
+        let output = try_oneof(quote!(
+            enum AB {
+                #[bilrost(tag(0))]
+                Empty{},
+                #[bilrost(1)]
+                A(bool),
+                #[bilrost(2)]
+                B(bool),
+            }
+        ));
+        assert_eq!(
+            output
+                .expect_err("brace unit variant not detected")
+                .to_string(),
+            "Oneof value variants must have exactly one field, but variant Empty has 0 fields"
+        );
+        let output = try_oneof(quote!(
+            enum AB {
+                #[bilrost(tag(0))]
+                Empty(),
+                #[bilrost(1)]
+                A(bool),
+                #[bilrost(2)]
+                B(bool),
+            }
+        ));
+        assert_eq!(
+            output
+                .expect_err("tuple unit variant not detected")
+                .to_string(),
+            "Oneof value variants must have exactly one field, but variant Empty has 0 fields"
         );
     }
 
@@ -2655,7 +2730,7 @@ mod test {
             output
                 .expect_err("unnumbered oneof variant not detected")
                 .to_string(),
-            "missing tag attribute"
+            "missing tag attribute on variant B"
         );
     }
 
