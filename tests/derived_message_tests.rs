@@ -790,6 +790,22 @@ fn fieldless_messages() {
 }
 
 #[test]
+fn message_named_after_builtin_encoding_alias() {
+    #[allow(non_camel_case_types)]
+    #[derive(Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
+    struct general {
+        varint: usize,
+    }
+    static_assertions::assert_impl_all!(
+        general:
+            Message,
+            OwnedMessage, BorrowedMessage<'static>,
+            DistinguishedOwnedMessage, DistinguishedBorrowedMessage<'static>,
+    );
+}
+
+#[test]
 fn message_catting_behavior() {
     // We can show that when messages are catted together, the fields stay ascending
     let first = [
