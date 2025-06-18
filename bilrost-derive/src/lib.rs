@@ -686,7 +686,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     } else {
         Some(quote! {
             #[allow(dead_code)]
-            impl #impl_generics #ident #ty_generics #encoder_where_clause {
+            impl #impl_generics __Self #ty_generics #encoder_where_clause {
                 #(#methods)*
             }
         })
@@ -717,7 +717,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     let impl_owned_decoder = (!borrow_only).then(|| {
         quote! {
             impl #impl_generics #crate_::encoding::RawMessageDecoder
-            for #ident #ty_generics #owned_decoder_where_clause {
+            for __Self #ty_generics #owned_decoder_where_clause {
                 #[allow(unused_variables)]
                 #[inline]
                 fn raw_decode_field<__B>(
@@ -751,11 +751,11 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     // actually run.
     let impls = quote! {
         impl #impl_generics #crate_::encoding::RawMessage
-        for #ident #ty_generics #encoder_where_clause {
+        for __Self #ty_generics #encoder_where_clause {
             const __ASSERTIONS: () = { #(#static_guards)* };
 
             fn empty() -> Self {
-                #ident {
+                Self {
                     #(#empties,)*
                     #initialize_ignored
                 }
@@ -801,7 +801,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         #impl_owned_decoder
 
         impl #borrow_generics #crate_::encoding::RawMessageBorrowDecoder<'__a>
-        for #ident #ty_generics #borrowed_decoder_where_clause {
+        for __Self #ty_generics #borrowed_decoder_where_clause {
             #[allow(unused_variables)]
             #[inline]
             fn raw_borrow_decode_field(
@@ -821,21 +821,21 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
             }
         }
 
-        impl #impl_generics #crate_::encoding::ForOverwrite<(), #ident #ty_generics> for ()
+        impl #impl_generics #crate_::encoding::ForOverwrite<(), __Self #ty_generics> for ()
         #encoder_where_clause {
-            fn for_overwrite() -> #ident #ty_generics {
-                <#ident #ty_generics as #crate_::encoding::RawMessage>::empty()
+            fn for_overwrite() -> __Self #ty_generics {
+                <__Self #ty_generics as #crate_::encoding::RawMessage>::empty()
             }
         }
 
-        impl #impl_generics #crate_::encoding::EmptyState<(), #ident #ty_generics> for ()
+        impl #impl_generics #crate_::encoding::EmptyState<(), __Self #ty_generics> for ()
         #encoder_where_clause {
-            fn is_empty(val: &#ident #ty_generics) -> bool {
-                <#ident #ty_generics as #crate_::encoding::RawMessage>::is_empty(val)
+            fn is_empty(val: &__Self #ty_generics) -> bool {
+                <__Self #ty_generics as #crate_::encoding::RawMessage>::is_empty(val)
             }
 
-            fn clear(val: &mut #ident #ty_generics) {
-                <#ident #ty_generics as #crate_::encoding::RawMessage>::clear(val);
+            fn clear(val: &mut __Self #ty_generics) {
+                <__Self #ty_generics as #crate_::encoding::RawMessage>::clear(val);
             }
         }
     };
@@ -884,7 +884,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         let impl_owned_decoder = (!borrow_only).then(|| {
             quote! {
                 impl #impl_generics #crate_::encoding::RawDistinguishedMessageDecoder
-                for #ident #ty_generics #owned_decoder_where_clause {
+                for __Self #ty_generics #owned_decoder_where_clause {
                     #[allow(unused_variables)]
                     #[inline]
                     fn raw_decode_field_distinguished<__B>(
@@ -916,7 +916,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
             #impl_owned_decoder
 
             impl #borrow_generics #crate_::encoding::RawDistinguishedMessageBorrowDecoder<'__a>
-            for #ident #ty_generics #borrowed_decoder_where_clause {
+            for __Self #ty_generics #borrowed_decoder_where_clause {
                 #[allow(unused_variables)]
                 #[inline]
                 fn raw_borrow_decode_field_distinguished(
@@ -944,13 +944,17 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     let aliases = encoder_alias_header();
     let expanded = quote! {
         const _: () = {
-            #aliases
+            use #ident as __Self;
 
-            #impls
+            const _: () = {
+                #aliases
 
-            #distinguished_impls
+                #impls
 
-            #methods
+                #distinguished_impls
+
+                #methods
+            };
         };
     };
 
