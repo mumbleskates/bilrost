@@ -96,18 +96,18 @@ impl MessageField {
     }
 
     /// Returns a statement which encodes the field using buffer `buf` and tag writer `tw`.
-    pub fn encode(&self, ident: TokenStream) -> TokenStream {
+    pub fn encode(&self, target: TokenStream) -> TokenStream {
         let crate_ = crate_name();
         let tag = self.tag;
         let encoding = &self.value.encoding;
         let ty = &self.value.ty;
         quote! {
-            <() as #crate_::encoding::Encoder<#encoding, #ty>>::encode(#tag, &#ident, buf, tw);
+            <() as #crate_::encoding::Encoder<#encoding, #ty>>::encode(#tag, &#target, buf, tw);
         }
     }
 
     /// Returns a statement which encodes the field using buffer `buf` and tag writer `tw`.
-    pub fn prepend(&self, ident: TokenStream) -> TokenStream {
+    pub fn prepend(&self, target: TokenStream) -> TokenStream {
         let crate_ = crate_name();
         let tag = self.tag;
         let encoding = &self.value.encoding;
@@ -115,7 +115,7 @@ impl MessageField {
         quote! {
             <() as #crate_::encoding::Encoder<#encoding, #ty>>::prepend_encode(
                 #tag,
-                &#ident,
+                &#target,
                 buf,
                 tw,
             );
@@ -126,7 +126,7 @@ impl MessageField {
     /// field. The given ident must be an &mut that already refers to the destination.
     pub fn decode(
         &self,
-        ident: TokenStream,
+        target: TokenStream,
         lifetime: DecodeLifetime,
         mode: DecodeMode,
     ) -> TokenStream {
@@ -152,7 +152,7 @@ impl MessageField {
             } else {
                 <() as #crate_::encoding::#decoder_trait<#encoding, #ty>>::#call(
                     wire_type,
-                    #ident,
+                    &mut #target,
                     buf,
                     ctx,
                 )
@@ -162,13 +162,13 @@ impl MessageField {
 
     /// Returns an expression which evaluates to the encoded length of the field. The given ident
     /// must be the location name of the field value, not a reference.
-    pub fn encoded_len(&self, ident: TokenStream) -> TokenStream {
+    pub fn encoded_len(&self, target: TokenStream) -> TokenStream {
         let crate_ = crate_name();
         let tag = self.tag;
         let encoding = &self.value.encoding;
         let ty = &self.value.ty;
         quote! {
-            <() as #crate_::encoding::Encoder<#encoding, #ty>>::encoded_len(#tag, &#ident, tm)
+            <() as #crate_::encoding::Encoder<#encoding, #ty>>::encoded_len(#tag, &#target, tm)
         }
     }
 
@@ -182,20 +182,20 @@ impl MessageField {
     }
 
     /// Returns an expression which returns whether the field is considered empty in the encoding.
-    pub fn is_empty(&self, ident: TokenStream) -> TokenStream {
+    pub fn is_empty(&self, target: TokenStream) -> TokenStream {
         let crate_ = crate_name();
         let encoding = &self.value.encoding;
         let ty = &self.value.ty;
-        quote!(<() as #crate_::encoding::EmptyState<#encoding, #ty>>::is_empty(#ident))
+        quote!(<() as #crate_::encoding::EmptyState<#encoding, #ty>>::is_empty(&#target))
     }
 
     /// Returns an expression which resets the field's value to empty with its encoding.
-    pub fn clear(&self, ident: TokenStream) -> TokenStream {
+    pub fn clear(&self, target: TokenStream) -> TokenStream {
         let crate_ = crate_name();
         let encoding = &self.value.encoding;
         let ty = &self.value.ty;
         quote! {
-            <() as #crate_::encoding::EmptyState<#encoding, #ty>>::clear(#ident);
+            <() as #crate_::encoding::EmptyState<#encoding, #ty>>::clear(&mut #target);
         }
     }
 
@@ -355,10 +355,7 @@ impl OneofVariant {
                             variant.ident
                         );
                     } else {
-                        bail!(
-                            "missing tag attribute on variant {}",
-                            variant.ident
-                        );
+                        bail!("missing tag attribute on variant {}", variant.ident);
                     }
                 }
             }

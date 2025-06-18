@@ -95,16 +95,16 @@ fn encoder_alias_header() -> TokenStream {
 
 enum SortGroupPart {
     // A set of fields that can be sorted by any of their tags, as they are always contiguous
-    Contiguous(Vec<(TokenStream, Field)>),
+    Contiguous(Vec<Field>),
     // A oneof field that needs to be sorted based on its current value's tag
-    Oneof((TokenStream, Field)),
+    Oneof(Field),
 }
 
 use SortGroupPart::*;
 
 enum FieldChunk {
     // A field that does not need to be sorted
-    AlwaysOrdered((TokenStream, Field)),
+    AlwaysOrdered(Field),
     // A set of fields that must be sorted before emitting
     SortGroup(Vec<SortGroupPart>),
 }
@@ -116,8 +116,8 @@ struct PreprocessedMessage<'a> {
     impl_generics: &'a Generics,
     ty_generics: TypeGenerics<'a>,
     where_clause: Option<&'a WhereClause>,
-    unsorted_fields: Vec<(TokenStream, Field)>,
-    ignored_fields: Vec<(TokenStream, Field)>,
+    unsorted_fields: Vec<Field>,
+    ignored_fields: Vec<Field>,
     distinguished: bool,
     borrow_only: bool,
     default_per_field: bool,
@@ -192,7 +192,7 @@ fn preprocess_message(input: &DeriveInput) -> Result<PreprocessedMessage<'_>, Er
         _ => 1,
     });
     let mut ignored_fields = vec![];
-    let unsorted_fields: Vec<(TokenStream, Field)> = fields
+    let unsorted_fields: Vec<Field> = fields
         .into_iter()
         .enumerate()
         .flat_map(|(i, field)| {
@@ -203,15 +203,15 @@ fn preprocess_message(input: &DeriveInput) -> Result<PreprocessedMessage<'_>, Er
                 };
                 quote!(#index)
             });
-            match Field::new(field.ty, &field.attrs, next_tag) {
+            match Field::new(&field_ident, &field.ty, &field.attrs, next_tag) {
                 Ok(field) => {
                     if field.is_ignored() {
                         // Divert ignored fields into the other vec.
-                        ignored_fields.push((field_ident, field));
+                        ignored_fields.push(field);
                         None
                     } else {
                         next_tag = field.last_tag().checked_add(1);
-                        Some(Ok((field_ident, field)))
+                        Some(Ok(field))
                     }
                 }
                 Err(err) => Some(Err(
@@ -222,12 +222,13 @@ fn preprocess_message(input: &DeriveInput) -> Result<PreprocessedMessage<'_>, Er
         .collect::<Result<Vec<_>, _>>()?;
 
     // Index all fields by their tag(s) and check them against the forbidden tag ranges
-    let all_tags: BTreeMap<u32, &TokenStream> = unsorted_fields
+    let all_tags: BTreeMap<u32, &Field> = unsorted_fields
         .iter()
-        .flat_map(|(ident, field)| field.tags().into_iter().zip(repeat(ident)))
+        .flat_map(|field| field.tags().into_iter().zip(repeat(field)))
         .collect();
     for reserved_range in reserved_tags.iter_tag_ranges() {
-        if let Some((forbidden_tag, field_ident)) = all_tags.range(reserved_range).next() {
+        if let Some((forbidden_tag, bad_field)) = all_tags.range(reserved_range).next() {
+            let field_ident = bad_field.ident();
             bail!("message {ident} field {field_ident} has reserved tag {forbidden_tag}");
         }
     }
@@ -238,7 +239,7 @@ fn preprocess_message(input: &DeriveInput) -> Result<PreprocessedMessage<'_>, Er
 
     if let Some((duplicate_tag, _)) = unsorted_fields
         .iter()
-        .flat_map(|(_, field)| field.tags())
+        .flat_map(|field| field.tags())
         .sorted_unstable()
         .tuple_windows()
         .find(|(a, b)| a == b)
@@ -264,14 +265,14 @@ fn preprocess_message(input: &DeriveInput) -> Result<PreprocessedMessage<'_>, Er
 
 /// Sorts a vec of unsorted fields into discrete chunks that may be ordered together at runtime to
 /// ensure that all their fields are encoded in sorted order.
-fn sort_fields(unsorted_fields: Vec<(TokenStream, Field)>) -> Vec<FieldChunk> {
+fn sort_fields(unsorted_fields: Vec<Field>) -> Vec<FieldChunk> {
     let mut chunks = Vec::<FieldChunk>::new();
     let mut fields = unsorted_fields
         .into_iter()
-        .sorted_unstable_by_key(|(_, field)| field.first_tag())
+        .sorted_unstable_by_key(|field| field.first_tag())
         .peekable();
     // Current vecs we are building for FieldChunk::SortGroup and SortGroupPart::Contiguous
-    let mut current_contiguous_group: Vec<(TokenStream, Field)> = vec![];
+    let mut current_contiguous_group: Vec<Field> = vec![];
     let mut current_sort_group: Vec<SortGroupPart> = vec![];
     // Set of oneof tags that are interspersed with other fields, so we know when we're able to
     // put multiple fields into the same ordered group.
@@ -279,13 +280,12 @@ fn sort_fields(unsorted_fields: Vec<(TokenStream, Field)>) -> Vec<FieldChunk> {
     while let (Some(this_field), next_field) = (fields.next(), fields.peek()) {
         // The following logic is a bit involved, so ensure that we can't forget to use the values.
         let this_field = MustMove::new(this_field);
-        let (_, field) = this_field.deref();
+        let field = this_field.deref();
         let first_tag = field.first_tag();
         let last_tag = field.last_tag();
         // Check if this field is a oneof with tags interleaved with other fields' tags. If true,
         // this field must always be emitted into a sort group.
-        let overlaps =
-            matches!(next_field, Some((_, next_field)) if last_tag > next_field.first_tag());
+        let overlaps = matches!(next_field, Some(next_field) if last_tag > next_field.first_tag());
         // Check if this field is already in a range we know requires runtime sorting.
         // MSRV: can't use .last()
         let in_current_sort_group =
@@ -319,7 +319,7 @@ fn sort_fields(unsorted_fields: Vec<(TokenStream, Field)>) -> Vec<FieldChunk> {
             } else {
                 // This field doesn't overlap with anything so we just add it to the current group
                 // of already-ordered fields.
-                if let Some((_, previous_field)) = current_contiguous_group.last() {
+                if let Some(previous_field) = current_contiguous_group.last() {
                     if sort_group_oneof_tags
                         .range(previous_field.last_tag()..=first_tag)
                         .next()
@@ -349,7 +349,7 @@ fn sort_fields(unsorted_fields: Vec<(TokenStream, Field)>) -> Vec<FieldChunk> {
         if let Some(&sort_group_end) = sort_group_oneof_tags.iter().next_back() {
             if !matches!(
                 next_field,
-                Some((_, next_field)) if next_field.first_tag() < sort_group_end
+                Some(next_field) if next_field.first_tag() < sort_group_end
             ) {
                 // We've been building a sort group, but we just reached the end.
                 if !current_contiguous_group.is_empty() {
@@ -487,19 +487,20 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     };
 
     let encoded_len = fields.iter().map(|chunk| match chunk {
-        AlwaysOrdered((field_ident, field)) => field.encoded_len(quote!(self.#field_ident)),
+        AlwaysOrdered(field) => field.encoded_len(quote!(self)),
         SortGroup(parts) => {
             let parts: Vec<TokenStream> = parts
                 .iter()
                 .map(|part| match part {
                     Contiguous(fields) => {
-                        let Some((_, first_field)) = fields.first() else {
+                        let Some(first_field) = fields.first() else {
                             panic!("empty contiguous field group");
                         };
                         let first_tag = first_field.first_tag();
-                        let each_len = fields.iter().cloned().map(|(field_ident, field)| {
-                            field.encoded_len(quote!(instance.#field_ident))
-                        });
+                        let each_len = fields
+                            .iter()
+                            .cloned()
+                            .map(|field| field.encoded_len(quote!(instance)));
                         quote! {
                             parts[nparts] = (#first_tag, Some(|instance, tm| {
                                 0 #(+ #each_len)*
@@ -507,9 +508,9 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
                             nparts += 1;
                         }
                     }
-                    Oneof((field_ident, field)) => {
-                        let current_tag = field.current_tag(quote!(self.#field_ident));
-                        let encoded_len = field.encoded_len(quote!(instance.#field_ident));
+                    Oneof(field) => {
+                        let current_tag = field.current_tag(quote!(self));
+                        let encoded_len = field.encoded_len(quote!(instance));
                         quote! {
                             if let Some(tag) = #current_tag {
                                 parts[nparts] = (tag, Some(|instance, tm| {
@@ -545,19 +546,20 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     });
 
     let encode = fields.iter().map(|chunk| match chunk {
-        AlwaysOrdered((field_ident, field)) => field.encode(quote!(self.#field_ident)),
+        AlwaysOrdered(field) => field.encode(quote!(self)),
         SortGroup(parts) => {
             let parts: Vec<TokenStream> = parts
                 .iter()
                 .map(|part| match part {
                     Contiguous(fields) => {
-                        let Some((_, first_field)) = fields.first() else {
+                        let Some(first_field) = fields.first() else {
                             panic!("empty contiguous field group");
                         };
                         let first_tag = first_field.first_tag();
-                        let each_field = fields.iter().cloned().map(|(field_ident, field)| {
-                            field.encode(quote!(instance.#field_ident))
-                        });
+                        let each_field = fields
+                            .iter()
+                            .cloned()
+                            .map(|field| field.encode(quote!(instance)));
                         quote! {
                             parts[nparts] = (#first_tag, Some(|instance, buf, tw| {
                                 #(#each_field)*
@@ -565,9 +567,9 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
                             nparts += 1;
                         }
                     }
-                    Oneof((field_ident, field)) => {
-                        let current_tag = field.current_tag(quote!(self.#field_ident));
-                        let encode = field.encode(quote!(instance.#field_ident));
+                    Oneof(field) => {
+                        let current_tag = field.current_tag(quote!(self));
+                        let encode = field.encode(quote!(instance));
                         quote! {
                             if let Some(tag) = #current_tag {
                                 parts[nparts] = (tag, Some(|instance, buf, tw| {
@@ -599,21 +601,22 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     });
 
     let prepend = fields.iter().rev().map(|chunk| match chunk {
-        AlwaysOrdered((field_ident, field)) => field.prepend(quote!(self.#field_ident)),
+        AlwaysOrdered(field) => field.prepend(quote!(self)),
         SortGroup(parts) => {
             let parts: Vec<TokenStream> = parts
                 .iter()
                 .rev()
                 .map(|part| match part {
                     Contiguous(fields) => {
-                        let Some((_, first_field)) = fields.first() else {
+                        let Some(first_field) = fields.first() else {
                             panic!("empty contiguous field group");
                         };
                         let first_tag = first_field.first_tag();
-                        let each_field =
-                            fields.iter().rev().cloned().map(|(field_ident, field)| {
-                                field.prepend(quote!(instance.#field_ident))
-                            });
+                        let each_field = fields
+                            .iter()
+                            .rev()
+                            .cloned()
+                            .map(|field| field.prepend(quote!(instance)));
                         quote! {
                             parts[nparts] = (#first_tag, Some(|instance, buf, tw| {
                                 #(#each_field)*
@@ -621,9 +624,9 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
                             nparts += 1;
                         }
                     }
-                    Oneof((field_ident, field)) => {
-                        let current_tag = field.current_tag(quote!(self.#field_ident));
-                        let prepend = field.prepend(quote!(instance.#field_ident));
+                    Oneof(field) => {
+                        let current_tag = field.current_tag(quote!(self));
+                        let prepend = field.prepend(quote!(instance));
                         quote! {
                             if let Some(tag) = #current_tag {
                                 parts[nparts] = (tag, Some(|instance, buf, tw| {
@@ -657,10 +660,11 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
 
     let [decode_owned, decode_borrowed] = [Owned, Borrowed].map(|lifetime| {
         let ident = ident.clone();
-        unsorted_fields.iter().map(move |(field_ident, field)| {
-            let decode = field.decode(quote!(&mut self.#field_ident), lifetime, Relaxed);
+        unsorted_fields.iter().map(move |field| {
+            let decode = field.decode(quote!(self), lifetime, Relaxed);
             let tags = field.tags().into_iter().map(|tag| quote!(#tag));
             let tags = Itertools::intersperse(tags, quote!(|));
+            let field_ident = field.ident();
 
             quote! {
                 #(#tags)* => {
@@ -675,49 +679,39 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
 
     let methods = unsorted_fields
         .iter()
-        .flat_map(|(field_ident, field)| field.methods(field_ident))
+        .flat_map(|field| field.methods())
         .collect::<Vec<_>>();
     let methods = if methods.is_empty() {
-        quote!()
+        None
     } else {
-        quote! {
+        Some(quote! {
             #[allow(dead_code)]
             impl #impl_generics #ident #ty_generics #encoder_where_clause {
                 #(#methods)*
             }
-        }
+        })
     };
 
     let static_guards = unsorted_fields
         .iter()
-        .filter_map(|(field_ident, field)| field.tag_list_guard(field_ident.to_string()));
+        .filter_map(|field| field.tag_list_guard());
 
-    let field_idents: Vec<_> = unsorted_fields
-        .iter()
-        .map(|(field_ident, _)| field_ident)
-        .collect();
-
-    let empties: Vec<_> = unsorted_fields
-        .iter()
-        .map(|(_, field)| field.empty())
-        .collect();
+    let mut empties: Vec<_> = unsorted_fields.iter().map(|field| field.empty()).collect();
     let is_empties: Vec<_> = unsorted_fields
         .iter()
-        .map(|(field_ident, field)| field.is_empty(quote!(&self.#field_ident)))
+        .map(|field| field.is_empty(quote!(self)))
         .collect();
     let clears: Vec<_> = unsorted_fields
         .iter()
-        .map(|(field_ident, field)| field.clear(quote!(&mut self.#field_ident)))
+        .map(|field| field.clear(quote!(self)))
         .collect();
 
-    let ignored_idents: Vec<_> = ignored_fields
-        .iter()
-        .map(|(field_ident, _)| field_ident)
-        .collect();
-    let initialize_ignored = if default_per_field || ignored_idents.is_empty() {
-        quote!(#(#ignored_idents: ::core::default::Default::default(),)*)
+    let initialize_ignored = if default_per_field || ignored_fields.is_empty() {
+        empties.extend(ignored_fields.iter().map(|field| field.empty()));
+        None
     } else {
-        quote!(..::core::default::Default::default())
+        // initialize ignored fields from <Self as Default>
+        Some(quote!(..::core::default::Default::default()))
     };
 
     let impl_owned_decoder = (!borrow_only).then(|| {
@@ -762,7 +756,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
 
             fn empty() -> Self {
                 #ident {
-                    #(#field_idents: #empties,)*
+                    #(#empties,)*
                     #initialize_ignored
                 }
             }
@@ -865,10 +859,11 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
 
         let [decode_owned, decode_borrowed] = [Owned, Borrowed].map(|lifetime| {
             let ident = ident.clone();
-            unsorted_fields.iter().map(move |(field_ident, field)| {
-                let decode = field.decode(quote!(&mut self.#field_ident), lifetime, Distinguished);
+            unsorted_fields.iter().map(move |field| {
+                let decode = field.decode(quote!(self), lifetime, Distinguished);
                 let tags = field.tags().into_iter().map(|tag| quote!(#tag));
                 let tags = Itertools::intersperse(tags, quote!(|));
+                let field_ident = field.ident();
 
                 quote! {
                     #(#tags)* => {

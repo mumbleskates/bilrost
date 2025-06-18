@@ -2,7 +2,7 @@ use crate::crate_name;
 use alloc::boxed::Box;
 use alloc::fmt::Debug;
 use alloc::format;
-use alloc::string::{String, ToString};
+use alloc::string::ToString;
 use alloc::vec;
 use alloc::vec::Vec;
 use eyre::{bail, Error};
@@ -21,7 +21,13 @@ use crate::field::traits::FieldBearer;
 pub use value::OneofVariant;
 
 #[derive(Clone)]
-pub enum Field {
+pub struct Field {
+    ident: TokenStream,
+    content: MessageFieldContent,
+}
+
+#[derive(Clone)]
+enum MessageFieldContent {
     /// A single-value message field.
     Value(Box<value::MessageField>),
     /// A oneof field.
@@ -29,35 +35,47 @@ pub enum Field {
     /// An ignored field.
     Ignored(Box<ignored::IgnoredField>),
 }
+use MessageFieldContent::*;
 
 impl Field {
-    /// Creates a new `Field` from an iterator of field attributes.
+    /// Creates a new `Field` from field attributes
     ///
     /// If the meta items are invalid, an error will be returned.
     /// If the field should be ignored, `None` is returned.
-    pub fn new(ty: Type, attrs: &[Attribute], inferred_tag: Option<u32>) -> Result<Field, Error> {
+    pub fn new(
+        ident: &TokenStream,
+        ty: &Type,
+        attrs: &[Attribute],
+        inferred_tag: Option<u32>,
+    ) -> Result<Field, Error> {
         let attrs = bilrost_attrs(attrs)?;
 
-        Ok(
-            if let Some(field) = ignored::IgnoredField::new(&ty, &attrs)? {
-                Field::Ignored(field)
-            } else if let Some(field) = oneof::OneofInclusion::new(&ty, &attrs)? {
-                Field::Oneof(field)
+        Ok(Field {
+            content: if let Some(field) = ignored::IgnoredField::new(ty, &attrs)? {
+                Ignored(field)
+            } else if let Some(field) = oneof::OneofInclusion::new(ty, &attrs)? {
+                Oneof(field)
             } else {
-                Field::Value(value::MessageField::new(&ty, attrs, inferred_tag)?)
+                Value(value::MessageField::new(ty, attrs, inferred_tag)?)
             },
-        )
+            ident: ident.clone(),
+        })
+    }
+
+    /// Returns the ident of the field within its message.
+    pub fn ident(&self) -> &TokenStream {
+        &self.ident
     }
 
     pub fn is_ignored(&self) -> bool {
-        matches!(self, Field::Ignored(_))
+        matches!(self.content, Ignored(..))
     }
 
     pub fn tags(&self) -> Vec<u32> {
-        match self {
-            Field::Value(scalar) => vec![scalar.tag],
-            Field::Oneof(oneof) => oneof.tags.clone(),
-            Field::Ignored(_) => panic!("field is ignored"),
+        match &self.content {
+            Value(scalar) => vec![scalar.tag],
+            Oneof(oneof) => oneof.tags.clone(),
+            Ignored(..) => panic!("field is ignored"),
         }
     }
 
@@ -71,14 +89,15 @@ impl Field {
         self.tags().into_iter().max().unwrap()
     }
 
-    pub fn tag_list_guard(&self, field_name: String) -> Option<TokenStream> {
+    pub fn tag_list_guard(&self) -> Option<TokenStream> {
         let crate_ = crate_name();
-        match self {
-            Field::Oneof(field) => {
+        match &self.content {
+            Oneof(field) => {
                 let mut tags = self.tags();
                 tags.sort();
                 let oneof_ty = &field.ty;
                 let oneof_ty_name = oneof_ty.to_token_stream().to_string();
+                let field_name = self.ident.to_string();
                 let description = format!(
                     "tags don't match for oneof field {field_name} with type {oneof_ty_name}"
                 );
@@ -97,86 +116,102 @@ impl Field {
     }
 
     /// Returns a statement which encodes the field.
-    pub fn encode(&self, ident: TokenStream) -> TokenStream {
-        match self {
-            Field::Value(scalar) => scalar.encode(ident),
-            Field::Oneof(oneof) => oneof.encode(ident),
-            Field::Ignored(_) => panic!("field is ignored"),
+    pub fn encode(&self, instance: TokenStream) -> TokenStream {
+        let ident = &self.ident;
+        let target = quote!(#instance.#ident);
+        match &self.content {
+            Value(scalar) => scalar.encode(target),
+            Oneof(oneof) => oneof.encode(target),
+            Ignored(..) => panic!("field is ignored"),
         }
     }
 
     /// Returns a statement which prepends the field.
-    pub fn prepend(&self, ident: TokenStream) -> TokenStream {
-        match self {
-            Field::Value(scalar) => scalar.prepend(ident),
-            Field::Oneof(oneof) => oneof.prepend(ident),
-            Field::Ignored(_) => panic!("field is ignored"),
+    pub fn prepend(&self, instance: TokenStream) -> TokenStream {
+        let ident = &self.ident;
+        let target = quote!(#instance.#ident);
+        match &self.content {
+            Value(scalar) => scalar.prepend(target),
+            Oneof(oneof) => oneof.prepend(target),
+            Ignored(..) => panic!("field is ignored"),
         }
     }
 
     /// Returns an expression which evaluates to the result of decoding a value into the field.
     pub fn decode(
         &self,
-        ident: TokenStream,
+        instance: TokenStream,
         lifetime: DecodeLifetime,
         mode: DecodeMode,
     ) -> TokenStream {
-        match self {
-            Field::Value(scalar) => scalar.decode(ident, lifetime, mode),
-            Field::Oneof(oneof) => oneof.decode(ident, lifetime, mode),
-            Field::Ignored(_) => panic!("field is ignored"),
+        let ident = &self.ident;
+        let target = quote!(#instance.#ident);
+        match &self.content {
+            Value(scalar) => scalar.decode(target, lifetime, mode),
+            Oneof(oneof) => oneof.decode(target, lifetime, mode),
+            Ignored(..) => panic!("field is ignored"),
         }
     }
 
     /// Returns an expression which evaluates to the encoded length of the field.
-    pub fn encoded_len(&self, ident: TokenStream) -> TokenStream {
-        match self {
-            Field::Value(scalar) => scalar.encoded_len(ident),
-            Field::Oneof(oneof) => oneof.encoded_len(ident),
-            Field::Ignored(_) => panic!("field is ignored"),
+    pub fn encoded_len(&self, instance: TokenStream) -> TokenStream {
+        let ident = &self.ident;
+        let target = quote!(#instance.#ident);
+        match &self.content {
+            Value(scalar) => scalar.encoded_len(target),
+            Oneof(oneof) => oneof.encoded_len(target),
+            Ignored(..) => panic!("field is ignored"),
         }
     }
 
     /// Returns an expression which initializes the field's type with its encoding with a guaranteed
     /// empty value.
     pub fn empty(&self) -> TokenStream {
-        match self {
-            Field::Value(scalar) => scalar.empty(),
-            Field::Oneof(oneof) => oneof.empty(),
-            Field::Ignored(ignored) => ignored.initialize(),
-        }
+        let ident = &self.ident;
+        let init = match &self.content {
+            Value(scalar) => scalar.empty(),
+            Oneof(oneof) => oneof.empty(),
+            Ignored(ignored) => ignored.initialize(),
+        };
+        quote!(#ident: #init)
     }
 
     /// Returns an expression which returns whether the field is considered empty in the encoding.
-    pub fn is_empty(&self, ident: TokenStream) -> TokenStream {
-        match self {
-            Field::Value(scalar) => scalar.is_empty(ident),
-            Field::Oneof(oneof) => oneof.is_empty(ident),
-            Field::Ignored(_) => panic!("field is ignored"),
+    pub fn is_empty(&self, instance: TokenStream) -> TokenStream {
+        let ident = &self.ident;
+        let target = quote!(#instance.#ident);
+        match &self.content {
+            Value(scalar) => scalar.is_empty(target),
+            Oneof(oneof) => oneof.is_empty(target),
+            Ignored(..) => panic!("field is ignored"),
         }
     }
 
     /// Returns an expression which resets the field's value to empty with its encoding.
-    pub fn clear(&self, ident: TokenStream) -> TokenStream {
-        match self {
-            Field::Value(scalar) => scalar.clear(ident),
-            Field::Oneof(oneof) => oneof.clear(ident),
-            Field::Ignored(_) => panic!("field is ignored"),
+    pub fn clear(&self, instance: TokenStream) -> TokenStream {
+        let ident = &self.ident;
+        let target = quote!(#instance.#ident);
+        match &self.content {
+            Value(scalar) => scalar.clear(target),
+            Oneof(oneof) => oneof.clear(target),
+            Ignored(..) => panic!("field is ignored"),
         }
     }
 
     /// If the field is a oneof, returns an expression which evaluates to an Option<u32> of the tag
     /// of the (maybe) present field in the oneof. Panics if the field is not a oneof.
-    pub fn current_tag(&self, ident: TokenStream) -> TokenStream {
-        let Field::Oneof(field) = self else {
+    pub fn current_tag(&self, instance: TokenStream) -> TokenStream {
+        let Oneof(field) = &self.content else {
             panic!("tried to use a value field as a oneof")
         };
-        field.current_tag(ident)
+        let ident = &self.ident;
+        let target = quote!(#instance.#ident);
+        field.current_tag(target)
     }
 
-    pub fn methods(&self, ident: &TokenStream) -> Option<TokenStream> {
-        match self {
-            Field::Value(scalar) => scalar.methods(ident),
+    pub fn methods(&self) -> Option<TokenStream> {
+        match &self.content {
+            Value(scalar) => scalar.methods(&self.ident),
             _ => None,
         }
     }
@@ -184,10 +219,10 @@ impl Field {
 
 impl FieldBearer for Field {
     fn where_terms(&self, purpose: WhereFor) -> Vec<TokenStream> {
-        match self {
-            Field::Value(field) => field.where_terms(purpose),
-            Field::Oneof(field) => field.where_terms(purpose),
-            Field::Ignored(field) => field.where_terms(purpose),
+        match &self.content {
+            Value(field) => field.where_terms(purpose),
+            Oneof(field) => field.where_terms(purpose),
+            Ignored(field) => field.where_terms(purpose),
         }
     }
 }
