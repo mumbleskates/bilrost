@@ -4,8 +4,8 @@
 
 use bilrost::encoding::opaque::{OpaqueMessage, OpaqueValue as OV};
 use bilrost::encoding::{
-    encode_varint, Collection, DistinguishedOneofDecoder, EmptyState, General, Oneof, OneofDecoder,
-    Varint,
+    encode_varint, Collection, DistinguishedOneofBorrowDecoder, DistinguishedOneofDecoder,
+    EmptyState, General, Oneof, OneofBorrowDecoder, OneofDecoder, Varint,
 };
 use bilrost::Canonicity::{Canonical, HasExtensions, NotCanonical};
 use bilrost::DecodeErrorKind::{
@@ -3636,6 +3636,24 @@ fn distinguished_oneof_with_nonempty_variant() {
         #[bilrost(1)]
         A(NonEmptyTy),
     }
+}
+
+#[test]
+fn oneof_named_after_builtin_encoding_alias() {
+    #[allow(non_camel_case_types)]
+    #[derive(Debug, Oneof)]
+    #[bilrost(distinguished)]
+    enum general {
+        plainbytes,
+        #[bilrost(1)]
+        varint(usize),
+    }
+    static_assertions::assert_impl_all!(
+        general:
+            Oneof,
+            OneofDecoder, OneofBorrowDecoder<'static>,
+            DistinguishedOneofDecoder, DistinguishedOneofBorrowDecoder<'static>,
+    );
 }
 
 // Enumeration tests
