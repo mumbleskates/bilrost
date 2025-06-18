@@ -2677,15 +2677,13 @@ mod test {
             }
         ));
         assert_eq!(
-            output
-                .expect_err("unit variant not detected")
-                .to_string(),
+            output.expect_err("unit variant not detected").to_string(),
             "Oneof value variants must have exactly one field, but variant Empty has no fields"
         );
         let output = try_oneof(quote!(
             enum AB {
                 #[bilrost(tag(0))]
-                Empty{},
+                Empty {},
                 #[bilrost(1)]
                 A(bool),
                 #[bilrost(2)]

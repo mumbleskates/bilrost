@@ -44,12 +44,7 @@ impl Field {
             } else if let Some(field) = oneof::OneofInclusion::new(&ty, &attrs)? {
                 Field::Oneof(field)
             } else {
-                Field::Value(value::MessageField::new(
-                    &ty,
-                    &attrs,
-                    inferred_tag,
-                    "general",
-                )?)
+                Field::Value(value::MessageField::new(&ty, attrs, inferred_tag)?)
             },
         )
     }

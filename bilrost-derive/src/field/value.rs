@@ -23,9 +23,14 @@ use syn::{parse_str, Fields, Ident, Index, Meta, Type, Variant};
 #[derive(Clone)]
 pub struct MessageField {
     pub tag: u32,
+    pub value: ValueField,
+}
+
+#[derive(Clone)]
+pub struct ValueField {
     pub ty: Type,
     pub encoding: Type,
-    pub enumeration_ty: Option<Type>,
+    pub enumeration_ty: Option<Type>, // TODO: move out and into the message version
     /// If a field is part of a recursion of messages, currently the chain needs to be broken so
     /// that there is not a cyclic dependency of type constraints on the implementation of message
     /// traits. When a field is marked with the "recurses" attribute, it will not be checked in the
@@ -33,75 +38,58 @@ pub struct MessageField {
     pub recurses: bool,
 }
 
+#[derive(Clone)]
+pub struct OneofVariant {
+    pub tag: u32,
+    pub variant_ident: Ident,
+    pub contents: VariantContents,
+}
+
+#[derive(Clone)]
+pub enum VariantContents {
+    Value(Box<FieldInVariant>),
+    Message(Vec<FieldInVariant>),
+}
+
+#[derive(Clone)]
+pub struct FieldInVariant {
+    pub value: ValueField,
+    pub ident_within_variant: Option<Ident>,
+}
+
 impl MessageField {
     pub fn new(
         ty: &Type,
-        attrs: &[Meta],
+        attrs: Vec<Meta>,
         inferred_tag: Option<u32>,
-        implicit_default_encoding: &str,
     ) -> Result<Box<MessageField>, Error> {
         let mut tag = None;
-        let mut encoding = None;
-        let mut enumeration_ty = None;
-        let mut recurses = false;
-        let mut unknown_attrs = Vec::new();
+        let mut remaining_attrs = vec![];
 
         for attr in attrs {
-            if let Some(t) = tag_attr(attr)? {
+            if let Some(t) = tag_attr(&attr)? {
                 set_option(&mut tag, t, "duplicate tag attributes")?;
-            } else if let Some(t) = named_attr(attr, "encoding")? {
-                set_option(&mut encoding, t, "duplicate encoding attributes")?;
-            } else if let Some(t) = named_attr(attr, "enumeration")? {
-                set_option(&mut enumeration_ty, t, "duplicate enumeration attributes")?;
-            } else if word_attr(attr, "recurses") {
-                set_bool(&mut recurses, "duplicate recurses attributes")?;
             } else {
-                unknown_attrs.push(attr);
+                remaining_attrs.push(attr);
             }
         }
 
-        if !unknown_attrs.is_empty() {
-            bail!(
-                "unknown attribute(s) for field: {}",
-                quote!(#(#unknown_attrs),*)
-            )
-        }
+        let value = ValueField::new(ty, remaining_attrs, "general")?;
 
         let tag = match tag.or(inferred_tag) {
             Some(tag) => tag,
             None => bail!("missing tag attribute"),
         };
 
-        let encoding = encoding.unwrap_or(parse_str::<Type>(implicit_default_encoding)?);
-
-        Ok(Box::new(MessageField {
-            tag,
-            ty: ty.clone(),
-            encoding,
-            enumeration_ty,
-            recurses,
-        }))
-    }
-
-    fn as_field_in_variant(
-        self: Box<Self>,
-        ident_within_variant: Option<Ident>,
-    ) -> Box<FieldInVariant> {
-        Box::new(FieldInVariant {
-            ty: self.ty,
-            encoding: self.encoding,
-            enumeration_ty: self.enumeration_ty,
-            recurses: self.recurses,
-            ident_within_variant,
-        })
+        Ok(Box::new(MessageField { tag, value }))
     }
 
     /// Returns a statement which encodes the field using buffer `buf` and tag writer `tw`.
     pub fn encode(&self, ident: TokenStream) -> TokenStream {
         let crate_ = crate_name();
         let tag = self.tag;
-        let encoding = &self.encoding;
-        let ty = &self.ty;
+        let encoding = &self.value.encoding;
+        let ty = &self.value.ty;
         quote! {
             <() as #crate_::encoding::Encoder<#encoding, #ty>>::encode(#tag, &#ident, buf, tw);
         }
@@ -111,8 +99,8 @@ impl MessageField {
     pub fn prepend(&self, ident: TokenStream) -> TokenStream {
         let crate_ = crate_name();
         let tag = self.tag;
-        let encoding = &self.encoding;
-        let ty = &self.ty;
+        let encoding = &self.value.encoding;
+        let ty = &self.value.ty;
         quote! {
             <() as #crate_::encoding::Encoder<#encoding, #ty>>::prepend_encode(
                 #tag,
@@ -132,8 +120,8 @@ impl MessageField {
         mode: DecodeMode,
     ) -> TokenStream {
         let crate_ = crate_name();
-        let encoding = &self.encoding;
-        let ty = &self.ty;
+        let encoding = &self.value.encoding;
+        let ty = &self.value.ty;
         let (decoder_trait, call) = match (lifetime, mode) {
             (Owned, Relaxed) => (quote!(Decoder), quote!(decode)),
             (Borrowed, Relaxed) => (quote!(BorrowDecoder), quote!(borrow_decode)),
@@ -166,8 +154,8 @@ impl MessageField {
     pub fn encoded_len(&self, ident: TokenStream) -> TokenStream {
         let crate_ = crate_name();
         let tag = self.tag;
-        let encoding = &self.encoding;
-        let ty = &self.ty;
+        let encoding = &self.value.encoding;
+        let ty = &self.value.ty;
         quote! {
             <() as #crate_::encoding::Encoder<#encoding, #ty>>::encoded_len(#tag, &#ident, tm)
         }
@@ -177,24 +165,24 @@ impl MessageField {
     /// its encoding.
     pub fn empty(&self) -> TokenStream {
         let crate_ = crate_name();
-        let encoding = &self.encoding;
-        let ty = &self.ty;
+        let encoding = &self.value.encoding;
+        let ty = &self.value.ty;
         quote!(<() as #crate_::encoding::EmptyState<#encoding, #ty>>::empty())
     }
 
     /// Returns an expression which returns whether the field is considered empty in the encoding.
     pub fn is_empty(&self, ident: TokenStream) -> TokenStream {
         let crate_ = crate_name();
-        let encoding = &self.encoding;
-        let ty = &self.ty;
+        let encoding = &self.value.encoding;
+        let ty = &self.value.ty;
         quote!(<() as #crate_::encoding::EmptyState<#encoding, #ty>>::is_empty(#ident))
     }
 
     /// Returns an expression which resets the field's value to empty with its encoding.
     pub fn clear(&self, ident: TokenStream) -> TokenStream {
         let crate_ = crate_name();
-        let encoding = &self.encoding;
-        let ty = &self.ty;
+        let encoding = &self.value.encoding;
+        let ty = &self.value.ty;
         quote! {
             <() as #crate_::encoding::EmptyState<#encoding, #ty>>::clear(#ident);
         }
@@ -203,11 +191,11 @@ impl MessageField {
     /// Returns the where clause constraint terms for the field's encoder.
     pub fn where_terms(&self, purpose: WhereFor) -> Vec<TokenStream> {
         let crate_ = crate_name();
-        if self.recurses {
+        if self.value.recurses {
             return vec![];
         }
-        let ty = &self.ty;
-        let encoding = &self.encoding;
+        let ty = &self.value.ty;
+        let encoding = &self.value.encoding;
         vec![
             match purpose {
                 Encode => quote!((): #crate_::encoding::Encoder<#encoding, #ty>),
@@ -237,7 +225,7 @@ impl MessageField {
     /// message struct.
     pub fn methods(&self, ident: &TokenStream) -> Option<TokenStream> {
         let crate_ = crate_name();
-        let enumeration_ty = self.enumeration_ty.as_ref()?;
+        let enumeration_ty = self.value.enumeration_ty.as_ref()?;
 
         let ident_str = ident.to_string();
         let ident_str = ident_str.as_str().strip_prefix("r#").unwrap_or(&ident_str);
@@ -253,7 +241,7 @@ impl MessageField {
 
         let set = Ident::new(&format!("set_{}", ident_str), Span::call_site());
 
-        let field_ty = &self.ty;
+        let field_ty = &self.value.ty;
 
         Some(quote! {
             fn #get(
@@ -276,37 +264,45 @@ impl MessageField {
     }
 }
 
-#[derive(Clone)]
-pub struct OneofVariant {
-    pub tag: u32,
-    pub variant_ident: Ident,
-    pub contents: VariantContents,
-}
+impl ValueField {
+    fn new(
+        ty: &Type,
+        attrs: Vec<Meta>,
+        implicit_default_encoding: &str,
+    ) -> Result<ValueField, Error> {
+        let mut encoding = None;
+        let mut enumeration_ty = None;
+        let mut recurses = false;
+        let mut unknown_attrs = Vec::new();
 
-#[derive(Clone)]
-pub enum VariantContents {
-    Value(Box<FieldInVariant>),
-    Message(Vec<FieldInVariant>),
-}
-
-#[derive(Clone)]
-pub struct FieldInVariant {
-    pub ty: Type,
-    pub encoding: Type,
-    pub enumeration_ty: Option<Type>,
-    pub recurses: bool,
-    pub ident_within_variant: Option<Ident>,
-}
-
-impl From<MessageField> for FieldInVariant {
-    fn from(value: MessageField) -> Self {
-        Self {
-            ty: value.ty,
-            encoding: value.encoding,
-            enumeration_ty: value.enumeration_ty,
-            recurses: value.recurses,
-            ident_within_variant: None,
+        for attr in &attrs {
+            if let Some(t) = named_attr(attr, "encoding")? {
+                set_option(&mut encoding, t, "duplicate encoding attributes")?;
+            } else if let Some(t) = named_attr(attr, "enumeration")? {
+                set_option(&mut enumeration_ty, t, "duplicate enumeration attributes")?;
+            } else if word_attr(attr, "recurses") {
+                set_bool(&mut recurses, "duplicate recurses attributes")?;
+            } else {
+                unknown_attrs.push(attr);
+            }
         }
+
+        if !unknown_attrs.is_empty() {
+            bail!(
+                "unknown attribute(s) for field: {}",
+                quote!(#(#unknown_attrs),*)
+            )
+        }
+
+        let encoding =
+            encoding.unwrap_or_else(|| parse_str::<Type>(implicit_default_encoding).unwrap());
+
+        Ok(ValueField {
+            ty: ty.clone(),
+            encoding,
+            enumeration_ty,
+            recurses,
+        })
     }
 }
 
@@ -322,12 +318,12 @@ impl OneofVariant {
         let mut other_attrs = vec![];
         let our_attrs = bilrost_attrs(&variant.attrs)?;
 
-        for attr in &our_attrs {
-            if let Some(t) = tag_attr(attr)? {
+        for attr in our_attrs {
+            if let Some(t) = tag_attr(&attr)? {
                 set_option(&mut tag, t, "duplicate tag attributes")?;
-            } else if word_attr(attr, "message") {
+            } else if word_attr(&attr, "message") {
                 set_bool(&mut message, "duplicate message attributes")?;
-            } else if word_attr(attr, "empty") {
+            } else if word_attr(&attr, "empty") {
                 set_bool(&mut empty, "duplicate empty attributes")?;
             } else {
                 other_attrs.push(attr);
@@ -401,10 +397,10 @@ impl OneofVariant {
                 Ok(Some(OneofVariant {
                     tag,
                     variant_ident: variant.ident.clone(),
-                    contents: VariantContents::Value(
-                        MessageField::new(&field.ty, &our_attrs, None, "general_packed")?
-                            .as_field_in_variant(field.ident.clone()),
-                    ),
+                    contents: VariantContents::Value(Box::new(FieldInVariant {
+                        value: ValueField::new(&field.ty, other_attrs, "general_packed")?,
+                        ident_within_variant: field.ident.clone(),
+                    })),
                 }))
             }
         }
@@ -416,8 +412,8 @@ impl OneofVariant {
         let variant_ident = &self.variant_ident;
         match &self.contents {
             VariantContents::Value(field) => {
-                let encoding = &field.encoding;
-                let ty = &field.ty;
+                let encoding = &field.value.encoding;
+                let ty = &field.value.ty;
                 let value_in_ident = match &field.ident_within_variant {
                     None => quote!((value)),
                     Some(inner_ident) => quote!( { #inner_ident: value } ),
@@ -443,8 +439,8 @@ impl OneofVariant {
         let variant_ident = &self.variant_ident;
         match &self.contents {
             VariantContents::Value(field) => {
-                let encoding = &field.encoding;
-                let ty = &field.ty;
+                let encoding = &field.value.encoding;
+                let ty = &field.value.ty;
                 let value_in_ident = match &field.ident_within_variant {
                     None => quote!((value)),
                     Some(inner_ident) => quote!( { #inner_ident: value } ),
@@ -470,8 +466,8 @@ impl OneofVariant {
         let variant_ident = &self.variant_ident;
         match &self.contents {
             VariantContents::Value(field) => {
-                let encoding = &field.encoding;
-                let ty = &field.ty;
+                let encoding = &field.value.encoding;
+                let ty = &field.value.ty;
                 let value_in_ident = match &field.ident_within_variant {
                     None => quote!((value)),
                     Some(inner_field_ident) => quote!( { #inner_field_ident: value } ),
@@ -494,8 +490,8 @@ impl OneofVariant {
         let crate_ = crate_name();
         match &self.contents {
             VariantContents::Value(field) => {
-                let encoding = &field.encoding;
-                let ty = &field.ty;
+                let encoding = &field.value.encoding;
+                let ty = &field.value.ty;
                 quote! {
                     let mut value =
                         <() as #crate_::encoding::ForOverwrite<#encoding, #ty>>::for_overwrite();
@@ -509,8 +505,8 @@ impl OneofVariant {
         let crate_ = crate_name();
         match &self.contents {
             VariantContents::Value(field) => {
-                let encoding = &field.encoding;
-                let ty = &field.ty;
+                let encoding = &field.value.encoding;
+                let ty = &field.value.ty;
                 let (decoder_trait, call) = match (lifetime, mode) {
                     (Owned, Relaxed) => (quote!(FieldDecoder), quote!(decode_field)),
                     (Borrowed, Relaxed) => {
@@ -562,11 +558,11 @@ impl FieldBearer for OneofVariant {
         };
         let mut res = vec![];
         for field in fields {
-            if field.recurses {
+            if field.value.recurses {
                 continue; // don't generate constraints for this (sub-)field
             }
-            let ty = &field.ty;
-            let encoding = &field.encoding;
+            let ty = &field.value.ty;
+            let encoding = &field.value.encoding;
             res.push(match purpose {
                 Encode => quote!((): #crate_::encoding::ValueEncoder<#encoding, #ty>),
                 Decode(Owned, Relaxed) => {
