@@ -228,12 +228,6 @@ impl FieldBearer for Field {
     }
 }
 
-impl FieldBearer for (TokenStream, Field) {
-    fn where_terms(&self, purpose: WhereFor) -> Vec<TokenStream> {
-        self.1.where_terms(purpose)
-    }
-}
-
 /// Get the items belonging to the 'bilrost' list attribute, e.g. `#[bilrost(foo, bar="baz")]`.
 pub fn bilrost_attrs(attrs: &[Attribute]) -> Result<Vec<Meta>, Error> {
     let mut result = Vec::new();

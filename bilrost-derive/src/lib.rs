@@ -458,21 +458,20 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
 
     let borrow_generics = prepend_to_generics(impl_generics, quote!('__a));
 
-    let mut field_slices = vec![unsorted_fields.as_slice()];
+    let mut where_fields = vec![unsorted_fields.as_slice()];
     // if we are defaulting ignored fields per-field, we need to include where-clause bounds for
     // each one of them as well.
     if default_per_field {
-        field_slices.push(ignored_fields.as_slice());
+        where_fields.push(ignored_fields.as_slice());
     }
-    let where_fields = field_slices.as_slice();
     let encoder_where_clause =
-        append_wheres_with_fields(where_clause, self_where.clone(), where_fields, Encode);
+        append_wheres_with_fields(where_clause, self_where.clone(), &where_fields, Encode);
     let [owned_decoder_where_clause, borrowed_decoder_where_clause] =
         [Owned, Borrowed].map(|lifetime| {
             append_wheres_with_fields(
                 where_clause,
                 self_where.clone(),
-                where_fields,
+                &where_fields,
                 Decode(lifetime, Relaxed),
             )
         });
@@ -852,7 +851,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
                 append_wheres_with_fields(
                     where_clause,
                     distinguished_self_where.clone(),
-                    where_fields,
+                    &where_fields,
                     Decode(lifetime, Distinguished),
                 )
             });
@@ -1666,7 +1665,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         impl_generics,
         ty_generics,
         where_clause,
-        variants: fields,
+        variants,
         distinguished,
         borrow_only,
         empty_variant,
@@ -1674,13 +1673,13 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
 
     let borrow_generics = prepend_to_generics(impl_generics, quote!('__a));
 
-    let encoder_where_clause = append_wheres_with_fields(where_clause, None, &*fields, Encode);
+    let encoder_where_clause = append_wheres_with_fields(where_clause, None, &variants, Encode);
     let owned_decoder_where_clause =
-        append_wheres_with_fields(where_clause, None, &*fields, Decode(Owned, Relaxed));
+        append_wheres_with_fields(where_clause, None, &variants, Decode(Owned, Relaxed));
     let borrowed_decoder_where_clause =
-        append_wheres_with_fields(where_clause, None, &*fields, Decode(Borrowed, Relaxed));
+        append_wheres_with_fields(where_clause, None, &variants, Decode(Borrowed, Relaxed));
 
-    let sorted_tags: Vec<u32> = fields
+    let sorted_tags: Vec<u32> = variants
         .iter()
         .map(|variant| variant.tag())
         .sorted_unstable()
@@ -1695,17 +1694,17 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
 
     let self_alias = quote!(Self);
 
-    let mut encode: Vec<TokenStream> = fields
+    let mut encode: Vec<TokenStream> = variants
         .iter()
         .map(|variant| variant.encode(&self_alias))
         .collect();
 
-    let mut prepend: Vec<TokenStream> = fields
+    let mut prepend: Vec<TokenStream> = variants
         .iter()
         .map(|variant| variant.prepend(&self_alias))
         .collect();
 
-    let mut encoded_len: Vec<TokenStream> = fields
+    let mut encoded_len: Vec<TokenStream> = variants
         .iter()
         .map(|variant| variant.encoded_len(&self_alias))
         .collect();
@@ -1729,7 +1728,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         some = Some(quote!(::core::option::Option::Some));
 
         current_tag_ty = quote!(::core::option::Option<u32>);
-        current_tag = fields
+        current_tag = variants
             .iter()
             .map(|variant| {
                 let tag = variant.tag();
@@ -1765,7 +1764,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
 
         // The oneof enum has no "empty" unit variant, so we implement the "non-empty" trait.
         current_tag_ty = quote!(u32);
-        current_tag = fields
+        current_tag = variants
             .iter()
             .map(|variant| {
                 let tag = variant.tag();
@@ -1777,7 +1776,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         empty_methods_impl = None;
     };
 
-    let variant_name_arms = fields.iter().map(|variant| {
+    let variant_name_arms = variants.iter().map(|variant| {
         let tag = variant.tag();
         let variant_ident = variant.ident();
         quote! {
@@ -1786,7 +1785,9 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
     });
 
     let decode_arms = |lifetime, mode| {
-        let arms = fields.iter().map(|variant| variant.decode(lifetime, mode));
+        let arms = variants
+            .iter()
+            .map(|variant| variant.decode(lifetime, mode));
         quote! {
             match tag {
                 #(#arms,)*
@@ -1956,7 +1957,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
                     append_wheres_with_fields(
                         where_clause,
                         [quote!(Self: #crate_::encoding::Oneof)],
-                        &*fields,
+                        &variants,
                         Decode(lifetime, Distinguished),
                     )
                 });
@@ -1972,7 +1973,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
                     append_wheres_with_fields(
                         where_clause,
                         None,
-                        &*fields,
+                        &variants,
                         Decode(lifetime, Distinguished),
                     )
                 });
