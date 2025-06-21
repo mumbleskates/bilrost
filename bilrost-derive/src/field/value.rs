@@ -1,4 +1,4 @@
-use crate::attrs::{named_attr, tag_attr, word_attr};
+use crate::attrs::{named_attr, tag_attr, tag_list_attr, word_attr, TagList};
 use crate::crate_name;
 use crate::field::traits::{
     DecodeLifetime::{self, Borrowed, Owned},
@@ -13,7 +13,7 @@ use alloc::string::ToString;
 use alloc::vec;
 use alloc::vec::Vec;
 use core::slice;
-use eyre::{bail, Error};
+use eyre::{bail, eyre as err, Error};
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, ToTokens};
 use syn::{parse_str, Fields, Ident, Index, Meta, Type, Variant};
@@ -373,23 +373,13 @@ impl OneofVariant {
                 );
             }
 
-            // Valid message variant
-            (Some(_), true, false) if other_attrs.is_empty() => {
-                Ok(None) // TODO: this
-            }
-
-            // Invalid message variant
-            (_, true, _) => {
-                // TODO: maybe better pattern(s) here
-                bail!("invalid attributes for message variant"); // TODO: better error
+            // Value variant with missing tag
+            (None, false, false) => {
+                bail!("missing tag attribute on value variant {}", variant.ident);
             }
 
             // Normal value variant, neither empty nor message
-            (_, false, false) => {
-                let Some(tag) = tag else {
-                    bail!("missing tag attribute on variant {}", variant.ident);
-                };
-
+            (Some(tag), false, false) => {
                 let fields = match &variant.fields {
                     Fields::Named(fields) => &fields.named,
                     Fields::Unnamed(fields) => &fields.unnamed,
@@ -419,6 +409,81 @@ impl OneofVariant {
                             .map(ToTokens::to_token_stream)
                             .unwrap_or_else(|| quote!(0)),
                     })),
+                }))
+            }
+
+            // Message variant with missing tag
+            (None, true, false) => {
+                bail!("missing tag attribute on message variant {}", variant.ident);
+            }
+
+            // Message variant
+            (Some(tag), true, false) => {
+                let mut reserved_tags: Option<TagList> = None;
+                let mut unknown_attrs = vec![];
+                for attr in &other_attrs {
+                    if let Some(tags) = tag_list_attr(attr, "reserved_tags", None)? {
+                        set_option(
+                            &mut reserved_tags,
+                            tags,
+                            "duplicate reserved_tags attributes",
+                        )?;
+                    } else {
+                        unknown_attrs.push(attr);
+                    }
+                }
+
+                if !unknown_attrs.is_empty() {
+                    bail!(
+                        "unknown or unsupported attribute(s) for message variant {}: {}",
+                        variant.ident,
+                        quote!(#(#unknown_attrs),*)
+                    );
+                }
+                let reserved_tags = reserved_tags.unwrap_or_default();
+
+                let fields = match variant.fields {
+                    Fields::Named(fields) => fields.named.into_iter().collect(),
+                    Fields::Unnamed(fields) => fields.unnamed.into_iter().collect(),
+                    Fields::Unit => vec![],
+                };
+
+                let mut variant_fields = vec![];
+                for (index, field) in fields.iter().enumerate() {
+                    let mut field_tag = None;
+                    let mut other_attrs = vec![];
+                    let field_attrs = bilrost_attrs(&field.attrs).map_err(|e| {
+                        err!(
+                            "malformed bilrost attributes in message variant {} on field with \
+                            ident {:?}: {e}",
+                            variant.ident,
+                            field.ident
+                        )
+                    })?;
+                    for attr in field_attrs {
+                        if let Some(t) = tag_attr(&attr)? {
+                            set_option(&mut field_tag, t, "duplicate tag attributes")?;
+                        } else {
+                            other_attrs.push(attr);
+                        }
+                    }
+                    variant_fields.push(FieldInVariant {
+                        ident_within_variant: field
+                            .ident
+                            .as_ref()
+                            .map(ToTokens::to_token_stream)
+                            .unwrap_or_else(|| quote!(#index)),
+                        value: ValueField::new(&field.ty, other_attrs, "general")
+                            .map_err(|e| err!("error in message variant {}: {e}", variant.ident))?,
+                    });
+                }
+
+                // TODO: check reserved tags
+
+                Ok(Some(OneofVariant {
+                    tag,
+                    variant_ident: variant.ident,
+                    contents: VariantContents::Message(variant_fields),
                 }))
             }
         }
