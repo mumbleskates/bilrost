@@ -12,13 +12,14 @@
 extern crate alloc;
 
 use crate::attrs::{tag_list_attr, word_attr, TagList};
-use crate::field::{bilrost_attrs, set_bool, set_option, Field, OneofVariant};
+use crate::field::{
+    bilrost_attrs, parse_message_fields, set_bool, set_option, Field, MessageAppearance,
+    OneofVariant,
+};
 use alloc::collections::{BTreeMap, BTreeSet};
-use alloc::format;
 use alloc::string::ToString;
 use alloc::vec;
 use alloc::vec::Vec;
-use core::iter::repeat;
 use core::mem::take;
 use core::ops::{Deref, RangeInclusive};
 use eyre::{bail, eyre as err, Report as Error};
@@ -27,12 +28,12 @@ use field::traits::{
     DecodeMode::{Distinguished, Relaxed},
     WhereFor::{self, Decode, Encode},
 };
-use itertools::Itertools;
-use proc_macro2::{Span, TokenStream};
+use itertools::{Itertools, MinMaxResult};
+use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 use syn::{
-    parse2, Attribute, Data, DataEnum, DeriveInput, Expr, Fields, Generics, Ident, Index, Meta,
-    MetaList, MetaNameValue, Pat, TypeGenerics, Variant, WhereClause,
+    parse2, Attribute, Data, DataEnum, DeriveInput, Expr, Fields, Generics, Ident, Meta, MetaList,
+    MetaNameValue, Pat, TypeGenerics, Variant, WhereClause,
 };
 
 mod attrs;
@@ -51,7 +52,7 @@ impl<T> MustMove<T> {
     }
 
     fn into_inner(mut self) -> T {
-        take(&mut self.0).unwrap()
+        take(&mut self.0).expect("MustMove value was moved out twice")
     }
 }
 
@@ -67,7 +68,9 @@ impl<T> Deref for MustMove<T> {
     type Target = T;
 
     fn deref(&self) -> &T {
-        self.0.as_ref().unwrap()
+        self.0
+            .as_ref()
+            .expect("MustMove dereferenced after the value was moved out")
     }
 }
 
@@ -164,74 +167,30 @@ fn preprocess_message(input: &DeriveInput) -> Result<PreprocessedMessage<'_>, Er
             attrs = quote!(#(#unknown_attrs),*),
         )
     }
-    let reserved_tags = reserved_tags.unwrap_or_default();
 
+    let appearance = match variant_data.fields {
+        Fields::Unnamed(..) => MessageAppearance::Tuple,
+        _ => MessageAppearance::Struct,
+    };
     let fields: Vec<syn::Field> = match &variant_data.fields {
         Fields::Named(fields) => fields.named.iter().cloned().collect(),
         Fields::Unnamed(fields) => fields.unnamed.iter().cloned().collect(),
         Fields::Unit => vec![],
     };
 
-    // Tuple structs with anonymous fields have their field numbering start at zero, and structs
-    // with named fields start at 1.
-    let mut next_tag = Some(match variant_data.fields {
-        Fields::Unnamed(..) => 0,
-        _ => 1,
-    });
-    let mut ignored_fields = vec![];
-    let unsorted_fields: Vec<Field> = fields
-        .into_iter()
-        .enumerate()
-        .flat_map(|(i, field)| {
-            let field_ident = field.ident.map(|x| quote!(#x)).unwrap_or_else(|| {
-                let index = Index {
-                    index: i as u32,
-                    span: Span::call_site(),
-                };
-                quote!(#index)
-            });
-            match Field::new(&field_ident, &field.ty, &field.attrs, next_tag) {
-                Ok(field) => {
-                    if field.is_ignored() {
-                        // Divert ignored fields into the other vec.
-                        ignored_fields.push(field);
-                        None
-                    } else {
-                        next_tag = field.last_tag().checked_add(1);
-                        Some(Ok(field))
-                    }
-                }
-                Err(err) => Some(Err(
-                    err.wrap_err(format!("invalid message field {ident}.{field_ident}"))
-                )),
-            }
-        })
-        .collect::<Result<Vec<_>, _>>()?;
+    let (ignored_fields, unsorted_fields): (Vec<_>, Vec<_>) =
+        parse_message_fields(appearance, fields, reserved_tags)?
+            .into_iter()
+            .partition(Field::is_ignored);
 
-    // Index all fields by their tag(s) and check them against the forbidden tag ranges
-    let all_tags: BTreeMap<u32, &Field> = unsorted_fields
-        .iter()
-        .flat_map(|field| field.tags().into_iter().zip(repeat(field)))
-        .collect();
-    for reserved_range in reserved_tags.iter_tag_ranges() {
-        if let Some((forbidden_tag, bad_field)) = all_tags.range(reserved_range).next() {
-            let field_ident = bad_field.ident();
-            bail!("message {ident} field {field_ident} has reserved tag {forbidden_tag}");
-        }
+    if distinguished && !ignored_fields.is_empty() {
+        bail!("messages with ignored fields cannot be distinguished");
     }
-    let tag_range = all_tags
-        .iter()
-        .next()
-        .map(|(first_tag, _)| *first_tag..=*all_tags.iter().next_back().unwrap().0);
 
-    if let Some((duplicate_tag, _)) = unsorted_fields
-        .iter()
-        .flat_map(|field| field.tags())
-        .sorted_unstable()
-        .tuple_windows()
-        .find(|(a, b)| a == b)
-    {
-        bail!("message {ident} has duplicate tag {duplicate_tag}")
+    let tag_range = match unsorted_fields.iter().flat_map(Field::tags).minmax() {
+        MinMaxResult::NoElements => None,
+        MinMaxResult::OneElement(one_tag) => Some(one_tag..=one_tag),
+        MinMaxResult::MinMax(min, max) => Some(min..=max),
     };
 
     let (_, ty_generics, where_clause) = input.generics.split_for_impl();
@@ -429,10 +388,6 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         default_per_field,
         tag_range,
     } = preprocess_message(&input)?;
-
-    if distinguished && !ignored_fields.is_empty() {
-        bail!("messages with ignored fields cannot be distinguished");
-    }
 
     let fields = sort_fields(unsorted_fields.clone());
     let self_where = if default_per_field || ignored_fields.is_empty() {
@@ -1305,7 +1260,9 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
             }
         }
     } else {
-        let (first_variant, _) = variants.first().unwrap();
+        let Some((first_variant, _)) = variants.first() else {
+            bail!("enumerations with no values are not supported");
+        };
         quote! {
             impl #impl_generics #crate_::encoding::ForOverwrite<(), #ident #ty_generics> for ()
             #where_clause {

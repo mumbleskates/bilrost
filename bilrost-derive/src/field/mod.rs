@@ -1,11 +1,15 @@
+use crate::attrs::TagList;
 use crate::crate_name;
 use alloc::boxed::Box;
+use alloc::collections::BTreeMap;
 use alloc::fmt::Debug;
 use alloc::format;
 use alloc::string::ToString;
 use alloc::vec;
 use alloc::vec::Vec;
-use eyre::{bail, Report as Error};
+use core::iter::repeat;
+use eyre::{bail, eyre as err, Report as Error};
+use itertools::Itertools;
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 use syn::punctuated::Punctuated;
@@ -36,6 +40,70 @@ enum MessageFieldContent {
     Ignored(Box<ignored::IgnoredField>),
 }
 use MessageFieldContent::*;
+
+#[derive(Copy, Clone)]
+pub enum MessageAppearance {
+    /// Tuple structs begin field numbering at zero
+    Tuple = 0,
+    /// Regular structs begin field numbering at one
+    Struct = 1,
+}
+
+/// Processes message fields from a vec of syn::Field, validating their tags against the given
+/// reserved tag list and each other.
+pub fn parse_message_fields(
+    appearance: MessageAppearance,
+    fields: Vec<syn::Field>,
+    reserved: Option<TagList>,
+) -> Result<Vec<Field>, Error> {
+    let mut next_tag = Some(appearance as u32);
+
+    let unsorted_fields = fields
+        .iter()
+        .enumerate()
+        .map(|(index, field)| {
+            let field_ident = field
+                .ident
+                .as_ref()
+                .map(ToTokens::to_token_stream)
+                .unwrap_or_else(|| {
+                    let index = syn::Index::from(index);
+                    quote!(#index)
+                });
+            let field = Field::new(&field_ident, &field.ty, &field.attrs, next_tag)
+                .map_err(|e| err!("invalid field {field_ident}: {e}"))?;
+            if !field.is_ignored() {
+                next_tag = field.last_tag().checked_add(1);
+            }
+            Ok(field)
+        })
+        .collect::<Result<Vec<_>, Error>>()?;
+
+    // Index all fields by their tag(s) and check them against the forbidden tag ranges
+    let all_tags: BTreeMap<u32, &Field> = unsorted_fields
+        .iter()
+        .flat_map(|field| field.tags().into_iter().zip(repeat(field)))
+        .collect();
+    for reserved_range in reserved.unwrap_or_default().iter_tag_ranges() {
+        if let Some((forbidden_tag, bad_field)) = all_tags.range(reserved_range).next() {
+            let field_ident = bad_field.ident();
+            bail!("field {field_ident} has reserved tag {forbidden_tag}");
+        }
+    }
+
+    // Find any duplicates in the full list of tags
+    if let Some((duplicated_tag, _)) = unsorted_fields
+        .iter()
+        .flat_map(|field| field.tags())
+        .sorted_unstable()
+        .tuple_windows()
+        .find(|(a, b)| a == b)
+    {
+        bail!("multiple fields have tag {duplicated_tag}")
+    };
+
+    Ok(unsorted_fields)
+}
 
 impl Field {
     /// Creates a new `Field` from field attributes
@@ -75,18 +143,18 @@ impl Field {
         match &self.content {
             Value(scalar) => vec![scalar.tag()],
             Oneof(oneof) => oneof.tags.clone(),
-            Ignored(..) => panic!("field is ignored"),
+            Ignored(..) => vec![],
         }
     }
 
     /// Returns the tag of this field with the least value
     pub fn first_tag(&self) -> u32 {
-        self.tags().into_iter().min().unwrap()
+        self.tags().into_iter().min().expect("no first tag when there are no tags")
     }
 
     /// Returns the tag of this field with the greatest value
     pub fn last_tag(&self) -> u32 {
-        self.tags().into_iter().max().unwrap()
+        self.tags().into_iter().max().expect("no last tag when there are no tags")
     }
 
     pub fn tag_list_guard(&self) -> Option<TokenStream> {
