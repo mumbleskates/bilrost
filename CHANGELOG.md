@@ -11,6 +11,9 @@
 
 ### Cleanups
 
+* Major cleanups to most parts of the derive macro codegen implementation
+* Various cleanups to string formatting code
+
 ## v0.1013.0
 
 ### Breaking changes
