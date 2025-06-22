@@ -73,6 +73,9 @@ tinyvec = { version = "^1", default-features = false, features = ["alloc", "rust
 # pprof's MSRV was bumped to 1.66 in the v0.14 release, so we should continue to support 0.13.
 pprof = { version = ">=0.13,<0.16", features = ["flamegraph"], optional = true }
 
+[build-dependencies]
+autocfg = "1.5.0"
+
 [dev-dependencies]
 arbitrary = "1.4"
 bilrost = { path = ".", default-features = false, features = ["derive"] } # always enable proc-macro use for integration tests
