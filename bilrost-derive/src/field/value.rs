@@ -6,7 +6,7 @@ use crate::field::traits::{
     FieldBearer,
     WhereFor::{self, Decode, Encode},
 };
-use crate::field::{bilrost_attrs, set_bool, set_option};
+use crate::field::{bilrost_attrs, set_bool, set_option, Field};
 use alloc::boxed::Box;
 use alloc::format;
 use alloc::string::ToString;
@@ -19,7 +19,6 @@ use quote::{quote, ToTokens};
 use syn::{parse_str, Fields, Ident, Index, Meta, Type, Variant};
 
 /// A field in a bilrost message or oneof
-// TODO: message fields should know what the field's ident is
 #[derive(Clone)]
 pub struct MessageField {
     tag: u32,
@@ -52,7 +51,7 @@ pub struct OneofVariant {
 #[derive(Clone)]
 enum VariantContents {
     Value(Box<FieldInVariant>),
-    Message(Vec<FieldInVariant>),
+    Message(Vec<Field>),
 }
 
 #[derive(Clone)]
@@ -458,37 +457,7 @@ impl OneofVariant {
                     Fields::Unit => vec![],
                 };
 
-                let mut variant_fields = vec![];
-                for (index, field) in fields.iter().enumerate() {
-                    let mut field_tag = None;
-                    let mut other_attrs = vec![];
-                    let field_attrs = bilrost_attrs(&field.attrs).map_err(|e| {
-                        err!(
-                            "malformed bilrost attributes in message variant {} on field with \
-                            ident {:?}: {e}",
-                            variant.ident,
-                            field.ident
-                        )
-                    })?;
-                    for attr in field_attrs {
-                        if let Some(t) = tag_attr(&attr)? {
-                            set_option(&mut field_tag, t, "duplicate tag attributes")?;
-                        } else {
-                            other_attrs.push(attr);
-                        }
-                    }
-                    variant_fields.push(FieldInVariant {
-                        ident_within_variant: field
-                            .ident
-                            .as_ref()
-                            .map(ToTokens::to_token_stream)
-                            .unwrap_or_else(|| quote!(#index)),
-                        value: ValueField::new(&field.ty, other_attrs, "general")
-                            .map_err(|e| err!("error in message variant {}: {e}", variant.ident))?,
-                    });
-                }
-
-                // TODO: check reserved tags
+                let variant_fields = todo!("process fields with common code");
 
                 Ok(Some(OneofVariant {
                     tag,
@@ -671,19 +640,26 @@ impl OneofVariant {
 
 impl FieldBearer for OneofVariant {
     fn where_terms(&self, purpose: WhereFor) -> Vec<TokenStream> {
+        match &self.contents {
+            VariantContents::Value(field) => field.where_terms(purpose),
+            VariantContents::Message(fields) => fields.where_terms(purpose), // TODO: need to handle ignore bounds properly here
+        }
+    }
+}
+
+/// Oneof encoding & decoding bounds for value-variants, which have trivial presence
+/// information and must always embed as a single real field and thus need the
+/// "value encoder/decoder" traits.
+impl FieldBearer for FieldInVariant {
+    fn where_terms(&self, purpose: WhereFor) -> Vec<TokenStream> {
         let crate_ = crate_name();
-        let fields: &[FieldInVariant] = match &self.contents {
-            VariantContents::Value(field) => slice::from_ref(field),
-            VariantContents::Message(fields) => fields.as_slice(),
-        };
-        let mut res = vec![];
-        for field in fields {
-            if field.value.recurses {
-                continue; // don't generate constraints for this (sub-)field
-            }
-            let ty = &field.value.ty;
-            let encoding = &field.value.encoding;
-            res.push(match purpose {
+        if self.value.recurses {
+            return vec![]; // don't generate constraints for this (sub-)field
+        }
+        let ty = &self.value.ty;
+        let encoding = &self.value.encoding;
+        vec![
+            match purpose {
                 Encode => quote!((): #crate_::encoding::ValueEncoder<#encoding, #ty>),
                 Decode(Owned, Relaxed) => {
                     quote!((): #crate_::encoding::ValueDecoder<#encoding, #ty>)
@@ -700,12 +676,11 @@ impl FieldBearer for OneofVariant {
                             DistinguishedValueBorrowDecoder<'__a, #encoding, #ty>
                     )
                 }
-            });
+            },
             // Encoding or decoding a oneof field always has trivially externally determined
             // presence, and we never need to know whether or not the value is empty; it never
             // needs to implement the empty state.
-            res.push(quote!((): #crate_::encoding::ForOverwrite<#encoding, #ty>));
-        }
-        res
+            quote!((): #crate_::encoding::ForOverwrite<#encoding, #ty>),
+        ]
     }
 }

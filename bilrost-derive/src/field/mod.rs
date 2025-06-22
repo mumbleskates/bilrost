@@ -99,9 +99,8 @@ impl Field {
         let oneof_ty = &field.ty;
         let oneof_ty_name = oneof_ty.to_token_stream().to_string();
         let field_name = self.ident.to_string();
-        let description = format!(
-            "tags don't match for oneof field {field_name} with type {oneof_ty_name}"
-        );
+        let description =
+            format!("tags don't match for oneof field {field_name} with type {oneof_ty_name}");
         let description = description.as_str();
         // Static assertion pattern borrowed from static_assertions crate.
         Some(quote!(
