@@ -33,8 +33,8 @@ use itertools::Itertools;
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 use syn::{
-    parse2, Attribute, Data, DataEnum, DeriveInput, Expr, Fields, Generics, Ident, Meta, MetaList,
-    MetaNameValue, Pat, TypeGenerics, Variant, WhereClause,
+    parse2, Attribute, Data, DeriveInput, Expr, Fields, Generics, Ident, Meta, Pat, TypeGenerics,
+    Variant, WhereClause,
 };
 
 mod attrs;
@@ -1175,7 +1175,7 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
     let borrow_generics = prepend_to_generics(generics, quote!('__a, const __G: u8));
 
     let punctuated_variants = match input.data {
-        Data::Enum(DataEnum { variants, .. }) => variants,
+        Data::Enum(enum_) => enum_.variants,
         Data::Struct(_) => bail!("Enumeration can not be derived for a struct"),
         Data::Union(..) => bail!("Enumeration can not be derived for a union"),
     };
@@ -1462,8 +1462,8 @@ fn variant_attr(attrs: &Vec<Attribute>) -> Result<Option<Expr>, Error> {
             // will need to be used both as a literal-equivalent u32 value and as the match pattern
             // for the variant's corresponding value.
             let Some(expr) = match &attr.meta {
-                Meta::List(MetaList { tokens, .. }) => parse2::<Expr>(tokens.clone()).ok(),
-                Meta::NameValue(MetaNameValue { value, .. }) => Some(value.clone()),
+                Meta::List(list) => parse2::<Expr>(list.tokens.clone()).ok(),
+                Meta::NameValue(name_value) => Some(name_value.value.clone()),
                 _ => None,
             }
             .filter(|expr| {
@@ -1502,7 +1502,7 @@ fn preprocess_oneof(input: &DeriveInput) -> Result<PreprocessedOneof<'_>, Error>
     let ident = input.ident.clone();
 
     let input_variants = match &input.data {
-        Data::Enum(DataEnum { variants, .. }) => variants.clone(),
+        Data::Enum(enum_) => enum_.variants.clone(),
         Data::Struct(..) => bail!("Oneof can not be derived for a struct"),
         Data::Union(..) => bail!("Oneof can not be derived for a union"),
     };
