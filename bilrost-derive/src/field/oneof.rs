@@ -4,6 +4,7 @@ use crate::field::set_option;
 use crate::field::traits::{
     DecodeLifetime::{self, Borrowed, Owned},
     DecodeMode::{self, Distinguished, Relaxed},
+    Tagged,
     WhereFor::{self, Decode, Encode},
 };
 use alloc::boxed::Box;
@@ -150,5 +151,11 @@ impl OneofInclusion {
                 quote!(#ty: #crate_::encoding::DistinguishedOneofBorrowDecoder<'__a>)
             }
         }]
+    }
+}
+
+impl Tagged for OneofInclusion {
+    fn tags(&self) -> Vec<u32> {
+        self.tags.clone()
     }
 }

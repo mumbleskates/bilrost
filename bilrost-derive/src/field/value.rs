@@ -3,7 +3,7 @@ use crate::crate_name;
 use crate::field::traits::{
     DecodeLifetime::{self, Borrowed, Owned},
     DecodeMode::{self, Distinguished, Relaxed},
-    FieldBearer,
+    FieldBearer, SinglyTagged,
     WhereFor::{self, Decode, Encode},
 };
 use crate::field::{
@@ -93,10 +93,6 @@ impl MessageField {
             value,
             enumeration_ty,
         }))
-    }
-
-    pub fn tag(&self) -> u32 {
-        self.tag
     }
 
     pub fn has_enumeration_type(&self) -> bool {
@@ -280,6 +276,12 @@ impl MessageField {
                 >::help_set(val);
             }
         })
+    }
+}
+
+impl SinglyTagged for MessageField {
+    fn tag(&self) -> u32 {
+        self.tag
     }
 }
 
@@ -494,10 +496,6 @@ impl OneofVariant {
         }
     }
 
-    pub fn tag(&self) -> u32 {
-        self.tag
-    }
-
     pub fn ident(&self) -> &Ident {
         &self.variant_ident
     }
@@ -678,6 +676,12 @@ impl FieldBearer for OneofVariant {
             VariantContents::Value(field) => field.where_terms(purpose),
             VariantContents::Message(fields) => fields.where_terms(purpose), // TODO: need to handle ignore bounds properly here
         }
+    }
+}
+
+impl SinglyTagged for OneofVariant {
+    fn tag(&self) -> u32 {
+        self.tag
     }
 }
 

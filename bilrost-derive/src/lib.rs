@@ -21,14 +21,15 @@ use alloc::string::ToString;
 use alloc::vec;
 use alloc::vec::Vec;
 use core::mem::take;
-use core::ops::{Deref, RangeInclusive};
+use core::ops::Deref;
 use eyre::{bail, eyre as err, Report as Error};
 use field::traits::{
     DecodeLifetime::{Borrowed, Owned},
     DecodeMode::{Distinguished, Relaxed},
+    FieldBearer, SinglyTagged, Tagged,
     WhereFor::{self, Decode, Encode},
 };
-use itertools::{Itertools, MinMaxResult};
+use itertools::Itertools;
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 use syn::{
@@ -95,6 +96,14 @@ fn encoder_alias_header() -> TokenStream {
     }
 }
 
+// If there can never be a tag delta larger than 31, field keys will never be more than 1 byte.
+fn can_use_trivial_tag_measurer(for_these: &[impl Tagged]) -> bool {
+    match for_these.iter().flat_map(Tagged::tags).max() {
+        None => true,
+        Some(max_tag) => max_tag < 32,
+    }
+}
+
 enum SortGroupPart {
     // A set of fields that can be sorted by any of their tags, as they are always contiguous
     Contiguous(Vec<Field>),
@@ -110,7 +119,6 @@ enum FieldChunk {
     // A set of fields that must be sorted before emitting
     SortGroup(Vec<SortGroupPart>),
 }
-use crate::field::traits::FieldBearer;
 use FieldChunk::*;
 
 struct PreprocessedMessage<'a> {
@@ -123,7 +131,6 @@ struct PreprocessedMessage<'a> {
     distinguished: bool,
     borrow_only: bool,
     default_per_field: bool,
-    tag_range: Option<RangeInclusive<u32>>,
 }
 
 fn preprocess_message(input: &DeriveInput) -> Result<PreprocessedMessage<'_>, Error> {
@@ -187,12 +194,6 @@ fn preprocess_message(input: &DeriveInput) -> Result<PreprocessedMessage<'_>, Er
         bail!("messages with ignored fields cannot be distinguished");
     }
 
-    let tag_range = match unsorted_fields.iter().flat_map(Field::tags).minmax() {
-        MinMaxResult::NoElements => None,
-        MinMaxResult::OneElement(one_tag) => Some(one_tag..=one_tag),
-        MinMaxResult::MinMax(min, max) => Some(min..=max),
-    };
-
     let (_, ty_generics, where_clause) = input.generics.split_for_impl();
 
     Ok(PreprocessedMessage {
@@ -205,7 +206,6 @@ fn preprocess_message(input: &DeriveInput) -> Result<PreprocessedMessage<'_>, Er
         distinguished,
         borrow_only,
         default_per_field,
-        tag_range,
     })
 }
 
@@ -386,7 +386,6 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         distinguished,
         borrow_only,
         default_per_field,
-        tag_range,
     } = preprocess_message(&input)?;
 
     let fields = sort_fields(unsorted_fields.clone());
@@ -418,10 +417,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
             )
         });
 
-    // If there can never be a tag delta larger than 31, field keys will never be more than 1 byte.
-    let can_use_trivial_tag_measurer = matches!(tag_range, Some(range) if *range.end() < 32);
-
-    let tag_measurer_ty = if can_use_trivial_tag_measurer {
+    let tag_measurer_ty = if can_use_trivial_tag_measurer(&unsorted_fields) {
         quote!(#crate_::encoding::TrivialTagMeasurer)
     } else {
         quote!(#crate_::encoding::RuntimeTagMeasurer)
@@ -915,13 +911,10 @@ fn try_message_via_oneof(input: DeriveInput) -> Result<TokenStream, Error> {
         empty_variant,
     } = preprocess_oneof(&input)?;
 
-    let tag_measurer = if matches!(
-        variants.iter().map(|variant| variant.tag()).max(),
-        Some(last_tag) if last_tag >= 32
-    ) {
-        quote!(#crate_::encoding::RuntimeTagMeasurer)
-    } else {
+    let tag_measurer = if can_use_trivial_tag_measurer(&variants) {
         quote!(#crate_::encoding::TrivialTagMeasurer)
+    } else {
+        quote!(#crate_::encoding::RuntimeTagMeasurer)
     };
 
     if empty_variant.is_none() {

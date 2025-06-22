@@ -1,5 +1,6 @@
 use crate::attrs::TagList;
 use crate::crate_name;
+use crate::field::traits::{DecodeLifetime, DecodeMode, FieldBearer, Tagged, WhereFor};
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
 use alloc::fmt::Debug;
@@ -14,14 +15,12 @@ use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 use syn::punctuated::Punctuated;
 use syn::{parse2, Attribute, LitInt, Meta, Token, Type};
-use traits::{DecodeLifetime, DecodeMode, WhereFor};
 
 mod ignored;
 mod oneof;
 pub mod traits;
 mod value;
 
-use crate::field::traits::FieldBearer;
 pub use value::OneofVariant;
 
 #[derive(Clone)]
@@ -144,30 +143,6 @@ impl Field {
             return false;
         };
         scalar.has_enumeration_type()
-    }
-
-    pub fn tags(&self) -> Vec<u32> {
-        match &self.content {
-            Value(scalar) => vec![scalar.tag()],
-            Oneof(oneof) => oneof.tags.clone(),
-            Ignored(..) => vec![],
-        }
-    }
-
-    /// Returns the tag of this field with the least value
-    pub fn first_tag(&self) -> u32 {
-        self.tags()
-            .into_iter()
-            .min()
-            .expect("no first tag when there are no tags")
-    }
-
-    /// Returns the tag of this field with the greatest value
-    pub fn last_tag(&self) -> u32 {
-        self.tags()
-            .into_iter()
-            .max()
-            .expect("no last tag when there are no tags")
     }
 
     /// Returns a statement that statically asserts the type of this field has the correct tags in
@@ -303,6 +278,16 @@ impl FieldBearer for Field {
             Value(field) => field.where_terms(purpose),
             Oneof(field) => field.where_terms(purpose),
             Ignored(field) => field.where_terms(purpose),
+        }
+    }
+}
+
+impl Tagged for Field {
+    fn tags(&self) -> Vec<u32> {
+        match &self.content {
+            Value(scalar) => scalar.tags(),
+            Oneof(oneof) => oneof.tags(),
+            Ignored(..) => vec![],
         }
     }
 }
