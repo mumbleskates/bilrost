@@ -149,12 +149,18 @@ impl Field {
 
     /// Returns the tag of this field with the least value
     pub fn first_tag(&self) -> u32 {
-        self.tags().into_iter().min().expect("no first tag when there are no tags")
+        self.tags()
+            .into_iter()
+            .min()
+            .expect("no first tag when there are no tags")
     }
 
     /// Returns the tag of this field with the greatest value
     pub fn last_tag(&self) -> u32 {
-        self.tags().into_iter().max().expect("no last tag when there are no tags")
+        self.tags()
+            .into_iter()
+            .max()
+            .expect("no last tag when there are no tags")
     }
 
     pub fn tag_list_guard(&self) -> Option<TokenStream> {
