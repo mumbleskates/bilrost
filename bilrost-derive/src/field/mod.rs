@@ -130,7 +130,7 @@ impl Field {
         })
     }
 
-    /// Returns the ident of the field within its message.
+    /// Returns the ident of the field within its struct or variant.
     pub fn ident(&self) -> &TokenStream {
         &self.ident
     }
@@ -163,6 +163,8 @@ impl Field {
             .expect("no last tag when there are no tags")
     }
 
+    /// Returns a statement that statically asserts the type of this field has the correct tags in
+    /// its accepted fields, if it is a oneof inclusion.
     pub fn tag_list_guard(&self) -> Option<TokenStream> {
         let Oneof(field) = &self.content else {
             return None; // only oneof inclusions have lists of tags that need assertions
@@ -193,7 +195,7 @@ impl Field {
         match &self.content {
             Value(scalar) => scalar.encode(target),
             Oneof(oneof) => oneof.encode(target),
-            Ignored(..) => panic!("field is ignored"),
+            Ignored(..) => panic!("cannot encode ignored field"),
         }
     }
 
@@ -204,7 +206,7 @@ impl Field {
         match &self.content {
             Value(scalar) => scalar.prepend(target),
             Oneof(oneof) => oneof.prepend(target),
-            Ignored(..) => panic!("field is ignored"),
+            Ignored(..) => panic!("cannot prepend ignored field"),
         }
     }
 
@@ -220,7 +222,7 @@ impl Field {
         match &self.content {
             Value(scalar) => scalar.decode(target, lifetime, mode),
             Oneof(oneof) => oneof.decode(target, lifetime, mode),
-            Ignored(..) => panic!("field is ignored"),
+            Ignored(..) => panic!("canot decode ignored field"),
         }
     }
 
@@ -231,7 +233,7 @@ impl Field {
         match &self.content {
             Value(scalar) => scalar.encoded_len(target),
             Oneof(oneof) => oneof.encoded_len(target),
-            Ignored(..) => panic!("field is ignored"),
+            Ignored(..) => panic!("cannot get encode length of ignored field"),
         }
     }
 
@@ -254,7 +256,7 @@ impl Field {
         match &self.content {
             Value(scalar) => scalar.is_empty(target),
             Oneof(oneof) => oneof.is_empty(target),
-            Ignored(..) => panic!("field is ignored"),
+            Ignored(..) => panic!("cannot detect empty on ignored field"),
         }
     }
 
@@ -265,7 +267,7 @@ impl Field {
         match &self.content {
             Value(scalar) => scalar.clear(target),
             Oneof(oneof) => oneof.clear(target),
-            Ignored(..) => panic!("field is ignored"),
+            Ignored(..) => panic!("cannot clear ignored field"),
         }
     }
 
