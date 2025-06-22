@@ -13,7 +13,7 @@ use alloc::string::ToString;
 use alloc::vec;
 use alloc::vec::Vec;
 use core::slice;
-use eyre::{bail, eyre as err, Error};
+use eyre::{bail, eyre as err, Report as Error};
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, ToTokens};
 use syn::{parse_str, Fields, Ident, Index, Meta, Type, Variant};

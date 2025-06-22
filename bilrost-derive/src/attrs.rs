@@ -2,7 +2,7 @@ use alloc::vec::Vec;
 use core::any::type_name;
 use core::ops::RangeInclusive;
 
-use eyre::{bail, eyre as err, Error};
+use eyre::{bail, eyre as err, Report as Error};
 use itertools::Itertools;
 use quote::quote;
 use syn::parse::ParseStream;

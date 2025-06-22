@@ -21,7 +21,7 @@ use alloc::vec::Vec;
 use core::iter::repeat;
 use core::mem::take;
 use core::ops::{Deref, RangeInclusive};
-use eyre::{bail, eyre as err, Error};
+use eyre::{bail, eyre as err, Report as Error};
 use field::traits::{
     DecodeLifetime::{Borrowed, Owned},
     DecodeMode::{Distinguished, Relaxed},

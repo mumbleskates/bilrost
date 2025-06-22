@@ -4,7 +4,7 @@ use bilrost::{
     DistinguishedOwnedMessage, Message, OwnedMessage,
 };
 use bytes::BufMut;
-use eyre::{eyre as err, Report};
+use eyre::{eyre as err, Report as Error};
 use once_cell::sync::Lazy;
 use regex::Regex;
 use std::fmt::Debug;
@@ -225,7 +225,7 @@ pub fn test_parse_duration(data: &[u8]) {
 
 type RoundtripResult = Result<Vec<u8>, RoundtripError>;
 
-fn fuzz_result(result: RoundtripResult) -> Result<Result<Vec<u8>, DecodeError>, Report> {
+fn fuzz_result(result: RoundtripResult) -> Result<Result<Vec<u8>, DecodeError>, Error> {
     match result {
         Err(RoundtripError::Error(err)) => Err(err),
         Ok(val) => Ok(Ok(val)),
@@ -243,11 +243,11 @@ enum RoundtripError {
     /// or it could indicate that the input was bogus.
     DecodeError(DecodeError),
     /// Re-encoding or validating the data failed.  This indicates a bug in `bilrost`.
-    Error(Report),
+    Error(Error),
 }
 
-impl From<Report> for RoundtripError {
-    fn from(err: Report) -> Self {
+impl From<Error> for RoundtripError {
+    fn from(err: Error) -> Self {
         RoundtripError::Error(err)
     }
 }
