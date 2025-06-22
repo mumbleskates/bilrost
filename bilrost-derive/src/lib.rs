@@ -31,9 +31,8 @@ use itertools::Itertools;
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, ToTokens};
 use syn::{
-    parse2, Attribute, Data, DataEnum, DataStruct, DeriveInput, Expr, Fields, FieldsNamed,
-    FieldsUnnamed, Generics, Ident, Index, Meta, MetaList, MetaNameValue, Pat, TypeGenerics,
-    Variant, WhereClause,
+    parse2, Attribute, Data, DataEnum, DeriveInput, Expr, Fields, Generics, Ident, Index, Meta,
+    MetaList, MetaNameValue, Pat, TypeGenerics, Variant, WhereClause,
 };
 
 mod attrs;
@@ -167,22 +166,10 @@ fn preprocess_message(input: &DeriveInput) -> Result<PreprocessedMessage<'_>, Er
     }
     let reserved_tags = reserved_tags.unwrap_or_default();
 
-    let fields: Vec<syn::Field> = match variant_data {
-        DataStruct {
-            fields: Fields::Named(FieldsNamed { named: fields, .. }),
-            ..
-        }
-        | DataStruct {
-            fields:
-                Fields::Unnamed(FieldsUnnamed {
-                    unnamed: fields, ..
-                }),
-            ..
-        } => fields.into_iter().cloned().collect(),
-        DataStruct {
-            fields: Fields::Unit,
-            ..
-        } => Vec::new(),
+    let fields: Vec<syn::Field> = match &variant_data.fields {
+        Fields::Named(fields) => fields.named.iter().cloned().collect(),
+        Fields::Unnamed(fields) => fields.unnamed.iter().cloned().collect(),
+        Fields::Unit => vec![],
     };
 
     // Tuple structs with anonymous fields have their field numbering start at zero, and structs
