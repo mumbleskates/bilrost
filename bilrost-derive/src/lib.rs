@@ -2607,7 +2607,7 @@ mod test {
             output
                 .expect_err("tagless unit variant not detected")
                 .to_string(),
-            "missing tag attribute on variant Empty"
+            "missing tag attribute on value variant Empty"
         );
         let output = try_oneof(quote!(
             enum AB {
@@ -2671,7 +2671,7 @@ mod test {
             output
                 .expect_err("unnumbered oneof variant not detected")
                 .to_string(),
-            "missing tag attribute on variant B"
+            "missing tag attribute on value variant B"
         );
     }
 
