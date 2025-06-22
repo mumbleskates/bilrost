@@ -1551,6 +1551,9 @@ fn preprocess_oneof(input: &DeriveInput) -> Result<PreprocessedOneof<'_>, Error>
     for variant in input_variants {
         let variant_ident = variant.ident.clone();
         match OneofVariant::new(variant)? {
+            Some(variant) => {
+                variants.push(variant);
+            }
             None => {
                 set_option(
                     &mut empty_variant,
@@ -1561,10 +1564,11 @@ fn preprocess_oneof(input: &DeriveInput) -> Result<PreprocessedOneof<'_>, Error>
                     explicitly marked with the 'empty' attribute.\n\nThe conflicting variants were",
                 )?;
             }
-            Some(variant) => {
-                variants.push(variant);
-            }
         }
+    }
+
+    if distinguished && variants.iter().any(OneofVariant::has_ignored_fields) {
+        bail!("Oneofs with ignored fields cannot be distinguished");
     }
 
     // Index all fields by their tag(s) and check them against the forbidden tag ranges

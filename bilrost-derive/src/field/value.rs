@@ -6,13 +6,15 @@ use crate::field::traits::{
     FieldBearer,
     WhereFor::{self, Decode, Encode},
 };
-use crate::field::{bilrost_attrs, set_bool, set_option, Field};
+use crate::field::{
+    bilrost_attrs, parse_message_fields, set_bool, set_option, Field, MessageAppearance,
+};
 use alloc::boxed::Box;
 use alloc::format;
 use alloc::string::ToString;
 use alloc::vec;
 use alloc::vec::Vec;
-use eyre::{bail, Report as Error};
+use eyre::{bail, eyre as err, Report as Error};
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, ToTokens};
 use syn::{parse_str, Fields, Ident, Index, Meta, Type, Variant};
@@ -95,6 +97,10 @@ impl MessageField {
 
     pub fn tag(&self) -> u32 {
         self.tag
+    }
+
+    pub fn has_enumeration_type(&self) -> bool {
+        self.enumeration_ty.is_some()
     }
 
     /// Returns a statement which encodes the field using buffer `buf` and tag writer `tw`.
@@ -448,15 +454,36 @@ impl OneofVariant {
                         attrs = quote!(#(#unknown_attrs),*),
                     );
                 }
-                let reserved_tags = reserved_tags.unwrap_or_default();
 
+                let appearance = match variant.fields {
+                    Fields::Unnamed(..) => MessageAppearance::Tuple,
+                    _ => MessageAppearance::Struct,
+                };
                 let fields = match variant.fields {
                     Fields::Named(fields) => fields.named.into_iter().collect(),
                     Fields::Unnamed(fields) => fields.unnamed.into_iter().collect(),
                     Fields::Unit => vec![],
                 };
 
-                let variant_fields = todo!("process fields with common code");
+                let variant_fields = parse_message_fields(appearance, fields, reserved_tags)
+                    .map_err(|e| {
+                        err!(
+                            "in message variant {variant_ident}: {e}",
+                            variant_ident = variant.ident
+                        )
+                    })?;
+
+                for field in &variant_fields {
+                    if field.has_enumeration_type() {
+                        bail!(
+                            "in message variant {variant_ident} on field {field_ident}: \
+                            enumeration helpers are not supported on messages embedded inside \
+                            variants since variants can't have their own methods",
+                            variant_ident = variant.ident,
+                            field_ident = field.ident(),
+                        );
+                    }
+                }
 
                 Ok(Some(OneofVariant {
                     tag,
@@ -473,6 +500,14 @@ impl OneofVariant {
 
     pub fn ident(&self) -> &Ident {
         &self.variant_ident
+    }
+
+    pub fn has_ignored_fields(&self) -> bool {
+        matches!(
+            &self.contents,
+            VariantContents::Message(fields)
+            if fields.iter().any(Field::is_ignored)
+        )
     }
 
     pub fn encode(&self, type_ident: impl ToTokens) -> TokenStream {

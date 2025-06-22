@@ -139,6 +139,13 @@ impl Field {
         matches!(self.content, Ignored(..))
     }
 
+    pub fn has_enumeration_type(&self) -> bool {
+        let Value(scalar) = &self.content else {
+            return false;
+        };
+        scalar.has_enumeration_type()
+    }
+
     pub fn tags(&self) -> Vec<u32> {
         match &self.content {
             Value(scalar) => vec![scalar.tag()],
