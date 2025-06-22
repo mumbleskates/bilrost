@@ -6,6 +6,8 @@
 
 * Added support for the `#[bilrost(reserved_tags(..))]` attribute for the
   `Oneof` derive macro as well.
+* The `Enumeration` derive macro now supports `Tuple()` and `Struct { }`
+  variants as long as they have no fields.
 
 ### Fixes
 
