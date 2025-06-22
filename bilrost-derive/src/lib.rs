@@ -1185,7 +1185,7 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
         discriminant_expr: Expr,
     }
 
-    // Parse each variant in the enum
+    // Parse each variant
     let mut variants = vec![];
     for Variant {
         attrs,
@@ -1195,11 +1195,12 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
         ..
     } in punctuated_variants
     {
-        match fields {
-            Fields::Unit => {}
-            Fields::Named(_) | Fields::Unnamed(_) => {
-                bail!("Enumeration variants may not have fields")
-            }
+        if !match fields {
+            Fields::Unit => true,
+            Fields::Named(named) => named.named.is_empty(),
+            Fields::Unnamed(unnamed) => unnamed.unnamed.is_empty(),
+        } {
+            bail!("Enumeration variants may not have fields");
         }
 
         let discriminant_expr = variant_attr(&attrs)?
@@ -1246,7 +1247,7 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
             #where_clause {
                 #[inline]
                 fn for_overwrite() -> #ident #ty_generics {
-                    #ident::#zero
+                    #ident::#zero { }
                 }
             }
 
@@ -1254,12 +1255,12 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
             #where_clause {
                 #[inline]
                 fn is_empty(val: &#ident #ty_generics) -> bool {
-                    matches!(val, #ident::#zero)
+                    matches!(val, #ident::#zero { })
                 }
 
                 #[inline]
                 fn clear(val: &mut #ident #ty_generics) {
-                    *val = #ident::#zero;
+                    *val = #ident::#zero { };
                 }
             }
         }
@@ -1268,7 +1269,7 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
             impl #impl_generics #crate_::encoding::ForOverwrite<(), #ident #ty_generics> for ()
             #where_clause {
                 fn for_overwrite() -> #ident #ty_generics {
-                    #ident::#first_variant
+                    #ident::#first_variant { }
                 }
             }
         }
@@ -1279,7 +1280,7 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
             #[inline]
             fn to_number(&self) -> u32 {
                 match self {
-                    #(#ident::#variant_idents => #discriminant_exprs,)*
+                    #(#ident::#variant_idents { } => #discriminant_exprs,)*
                 }
             }
 
@@ -1287,7 +1288,7 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
             fn try_from_number(value: u32) -> ::core::result::Result<#ident, u32> {
                 #[forbid(unreachable_patterns)]
                 ::core::result::Result::Ok(match value {
-                    #(#discriminant_exprs => #ident::#variant_idents,)*
+                    #(#discriminant_exprs => #ident::#variant_idents { },)*
                     _ => ::core::result::Result::Err(value)?,
                 })
             }

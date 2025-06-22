@@ -1816,9 +1816,9 @@ const FOUR: u32 = 4;
 enum ComplexEnum {
     One = 1,
     #[bilrost = 2]
-    Two,
+    Two(), // Tuple or struct variants are ok, but they must be empty.
     #[bilrost(3)]
-    Three,
+    Three { },
     #[bilrost(FOUR)]
     Four,
     // When both discriminant and attribute exist, bilrost uses the attribute.
