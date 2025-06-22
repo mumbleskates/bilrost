@@ -255,7 +255,7 @@ where
     T: Debug,
 {
     if let Some(existing) = option {
-        bail!("{}: {:?} and {:?}", message, existing, value);
+        bail!("{message}: {existing:?} and {value:?}");
     }
     *option = Some(value);
     Ok(())
@@ -263,7 +263,7 @@ where
 
 pub fn set_bool(b: &mut bool, message: &str) -> Result<(), Error> {
     if *b {
-        bail!("{}", message);
+        bail!("{message}");
     } else {
         *b = true;
         Ok(())

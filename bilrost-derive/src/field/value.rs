@@ -301,8 +301,8 @@ impl ValueField {
 
         if !unknown_attrs.is_empty() {
             bail!(
-                "unknown attribute(s) for field: {}",
-                quote!(#(#unknown_attrs),*)
+                "unknown attribute(s) for field: {attrs}",
+                attrs = quote!(#(#unknown_attrs),*),
             )
         }
 
@@ -355,11 +355,14 @@ impl OneofVariant {
                     // empty
                     if empty {
                         bail!(
-                            "Oneof variant {} is marked 'empty' but it has fields",
-                            variant.ident
+                            "Oneof variant {variant_ident} is marked 'empty' but it has fields",
+                            variant_ident = variant.ident,
                         );
                     } else {
-                        bail!("missing tag attribute on variant {}", variant.ident);
+                        bail!(
+                            "missing tag attribute on variant {variant_ident}",
+                            variant_ident = variant.ident,
+                        );
                     }
                 }
             }
@@ -367,15 +370,18 @@ impl OneofVariant {
             // Empty attribute plus any other attribute
             (_, _, true) => {
                 bail!(
-                    "the 'empty' attribute is combined with other attributes on variant {}, but it \
-                    must always be alone",
-                    variant.ident
+                    "the 'empty' attribute is combined with other attributes on variant \
+                    {variant_ident}, but it must always be alone",
+                    variant_ident = variant.ident,
                 );
             }
 
             // Value variant with missing tag
             (None, false, false) => {
-                bail!("missing tag attribute on value variant {}", variant.ident);
+                bail!(
+                    "missing tag attribute on value variant {variant_ident}",
+                    variant_ident = variant.ident,
+                );
             }
 
             // Normal value variant, neither empty nor message
@@ -384,17 +390,17 @@ impl OneofVariant {
                     Fields::Named(fields) => &fields.named,
                     Fields::Unnamed(fields) => &fields.unnamed,
                     Fields::Unit => bail!(
-                        "Oneof value variants must have exactly one field, but variant {} has no \
-                        fields",
-                        variant.ident
+                        "Oneof value variants must have exactly one field, but variant \
+                        {variant_ident} has no fields",
+                        variant_ident = variant.ident
                     ),
                 };
                 if fields.len() != 1 {
                     bail!(
-                        "Oneof value variants must have exactly one field, but variant {} has {} \
-                        fields",
-                        variant.ident,
-                        fields.len()
+                        "Oneof value variants must have exactly one field, but variant \
+                        {variant_ident} has {num_fields} fields",
+                        variant_ident = variant.ident,
+                        num_fields = fields.len()
                     );
                 }
                 let field = fields.first().unwrap();
@@ -414,7 +420,10 @@ impl OneofVariant {
 
             // Message variant with missing tag
             (None, true, false) => {
-                bail!("missing tag attribute on message variant {}", variant.ident);
+                bail!(
+                    "missing tag attribute on message variant {variant_ident}",
+                    variant_ident = variant.ident,
+                );
             }
 
             // Message variant
@@ -435,9 +444,10 @@ impl OneofVariant {
 
                 if !unknown_attrs.is_empty() {
                     bail!(
-                        "unknown or unsupported attribute(s) for message variant {}: {}",
-                        variant.ident,
-                        quote!(#(#unknown_attrs),*)
+                        "unknown or unsupported attribute(s) for message variant {variant_ident}: \
+                        {attrs}",
+                        variant_ident = variant.ident,
+                        attrs = quote!(#(#unknown_attrs),*),
                     );
                 }
                 let reserved_tags = reserved_tags.unwrap_or_default();

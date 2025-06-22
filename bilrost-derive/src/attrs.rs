@@ -28,9 +28,9 @@ pub fn tag_attr(attr: &Meta) -> Result<Option<u32>, Error> {
             Lit::Str(lit) => lit.value().parse::<u32>().map_err(Error::from).map(Some),
             // tag = 1
             Lit::Int(lit) => Ok(Some(lit.base10_parse()?)),
-            _ => bail!("invalid tag attribute: {}", quote!(#attr)),
+            _ => bail!("invalid tag attribute: {attr}", attr = quote!(#attr)),
         },
-        _ => bail!("invalid tag attribute: {}", quote!(#attr)),
+        _ => bail!("invalid tag attribute: {attr}", attr = quote!(#attr)),
     }
 }
 
@@ -41,7 +41,7 @@ impl TagList {
     fn validate(&mut self, range_size_limit: Option<usize>) -> Result<(), Error> {
         for range in &self.0 {
             if range.is_empty() {
-                bail!("invalid tag range {}-{}", range.start(), range.end());
+                bail!("invalid tag range {start}-{end}", start = range.start(), end = range.end());
             }
             if let Some(limit) = range_size_limit {
                 if usize::try_from(range.end() - range.start())?
@@ -50,9 +50,9 @@ impl TagList {
                     >= limit
                 {
                     bail!(
-                        "too-large tag range {}-{}; use smaller ranges",
-                        range.start(),
-                        range.end()
+                        "too-large tag range {start}-{end}; use smaller ranges",
+                        start = range.start(),
+                        end = range.end()
                     );
                 }
             }
@@ -60,7 +60,7 @@ impl TagList {
         self.0.sort_by_key(|r| (*r.start(), *r.end()));
         for (lower, higher) in self.0.iter().tuple_windows() {
             if lower.end() >= higher.start() {
-                bail!("tag {} is duplicated in tag list", higher.start());
+                bail!("tag {start} is duplicated in tag list", start = higher.start());
             }
         }
         Ok(())
@@ -150,7 +150,7 @@ pub fn tag_list_attr(
             }),
             ..
         }) => parse_str(&lit.value()),
-        _ => bail!("invalid {name} attribute: {}", quote!(#attr)),
+        _ => bail!("invalid {name} attribute: {attr}", attr = quote!(#attr)),
     }?;
     tag_list.validate(range_size_limit)?;
     Ok(Some(tag_list))
@@ -169,16 +169,16 @@ pub fn named_attr<T: parse::Parse>(attr: &Meta, attr_name: &str) -> Result<Optio
             ..
         }) => match &expr.lit {
             Lit::Str(lit) => parse_str::<T>(&lit.value()),
-            _ => bail!("invalid {attr_name} attribute: {}", quote!(#attr)),
+            _ => bail!("invalid {attr_name} attribute: {attr}", attr = quote!(#attr)),
         },
-        _ => bail!("invalid {attr_name} attribute: {}", quote!(#attr)),
+        _ => bail!("invalid {attr_name} attribute: {attr}", attr = quote!(#attr)),
     }
     .map(Some)
     .map_err(|_| {
         err!(
-            "invalid {attr_name} attribute does not look like a(n) {}: {}",
-            type_name::<T>(),
-            quote!(#attr),
+            "invalid {attr_name} attribute does not look like a(n) {ty}: {attr}",
+            ty = type_name::<T>(),
+            attr = quote!(#attr),
         )
     })
 }

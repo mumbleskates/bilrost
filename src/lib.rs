@@ -100,7 +100,7 @@ pub const fn assert_tags_are_equal(failure_description: &str, a: &[u32], b: &[u3
         #[cfg(feature = "extended-diagnostics")]
         concat_panic!({}: failure_description, ": expected ", a, " but got ", b);
         #[cfg(not(feature = "extended-diagnostics"))]
-        panic!("{}", failure_description);
+        panic!("{failure_description}");
     }
     let mut i = 0;
     while i < a.len() {
@@ -108,7 +108,7 @@ pub const fn assert_tags_are_equal(failure_description: &str, a: &[u32], b: &[u3
             #[cfg(feature = "extended-diagnostics")]
             concat_panic!({}: failure_description, ": expected ", a, " but got ", b);
             #[cfg(not(feature = "extended-diagnostics"))]
-            panic!("{}", failure_description);
+            panic!("{failure_description}");
         }
         i += 1;
     }

@@ -161,8 +161,8 @@ fn preprocess_message(input: &DeriveInput) -> Result<PreprocessedMessage<'_>, Er
 
     if !unknown_attrs.is_empty() {
         bail!(
-            "unknown attribute(s) for message: {}",
-            quote!(#(#unknown_attrs),*)
+            "unknown attribute(s) for message: {attrs}",
+            attrs = quote!(#(#unknown_attrs),*),
         )
     }
     let reserved_tags = reserved_tags.unwrap_or_default();

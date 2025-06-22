@@ -24,14 +24,14 @@ impl IgnoredField {
         }
         if ignore_attr_count > 1 {
             bail!(
-                "duplicated ignore attributes for field: {}",
-                quote!(#(#attrs),*)
+                "duplicated ignore attributes for field: {attrs}",
+                attrs = quote!(#(#attrs),*),
             );
         }
         if attrs.len() > 1 {
             bail!(
-                "ignore attribute mixed with other attributes on the same field: {}",
-                quote!(#(#attrs),*)
+                "ignore attribute mixed with other attributes on the same field: {attrs}",
+                attrs = quote!(#(#attrs),*),
             );
         }
         Ok(Some(Box::new(Self { ty: ty.clone() })))

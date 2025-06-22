@@ -162,7 +162,7 @@ impl fmt::Display for DecodeError {
         f.write_str("failed to decode Bilrost message: ")?;
         #[cfg(feature = "detailed-errors")]
         for FieldName { message, field } in self.stack.iter() {
-            write!(f, "{}.{}: ", message, field)?;
+            write!(f, "{message}.{field}: ")?;
         }
         self.kind.fmt(f)
     }

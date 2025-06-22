@@ -39,8 +39,8 @@ impl OneofInclusion {
 
         if !unknown_attrs.is_empty() {
             bail!(
-                "unknown attribute(s) for oneof field: {}",
-                quote!(#(#unknown_attrs),*)
+                "unknown attribute(s) for oneof field: {attrs}",
+                attrs = quote!(#(#unknown_attrs),*),
             );
         }
 
