@@ -2046,7 +2046,7 @@ mod test {
         });
         assert_eq!(
             output.expect_err("duplicate tags not detected").to_string(),
-            "message Invalid has duplicate tag 1"
+            "multiple fields have tag 1"
         );
 
         let output = try_message(quote! {
@@ -2059,7 +2059,7 @@ mod test {
         });
         assert_eq!(
             output.expect_err("duplicate tags not detected").to_string(),
-            "message Invalid has duplicate tag 2"
+            "multiple fields have tag 2"
         );
 
         let output = try_message(quote! {
@@ -2072,7 +2072,7 @@ mod test {
         });
         assert_eq!(
             output.expect_err("duplicate tags not detected").to_string(),
-            "message Invalid has duplicate tag 10"
+            "multiple fields have tag 10"
         );
 
         // Tags that don't collide with ranges are fine
@@ -2100,7 +2100,7 @@ mod test {
         });
         assert_eq!(
             output.expect_err("reserved tags not detected").to_string(),
-            "message Invalid field a has reserved tag 1"
+            "field a has reserved tag 1"
         );
 
         let output = try_message(quote! {
@@ -2114,7 +2114,7 @@ mod test {
         });
         assert_eq!(
             output.expect_err("reserved tags not detected").to_string(),
-            "message Invalid field b has reserved tag 4"
+            "field b has reserved tag 4"
         );
 
         let output = try_message(quote! {
@@ -2128,7 +2128,7 @@ mod test {
         });
         assert_eq!(
             output.expect_err("reserved tags not detected").to_string(),
-            "message Invalid field b has reserved tag 5"
+            "field b has reserved tag 5"
         );
 
         let output = try_message(quote! {
@@ -2142,7 +2142,7 @@ mod test {
         });
         assert_eq!(
             output.expect_err("reserved tags not detected").to_string(),
-            "message Invalid field b has reserved tag 3"
+            "field b has reserved tag 3"
         );
 
         let output = try_message(quote! {
@@ -2156,7 +2156,7 @@ mod test {
         });
         assert_eq!(
             output.expect_err("reserved tags not detected").to_string(),
-            "message Invalid field b has reserved tag 5"
+            "field b has reserved tag 5"
         );
     }
 
@@ -2246,7 +2246,7 @@ mod test {
                 "{:#}",
                 output.expect_err("oversized tag range not detected")
             ),
-            "invalid message field Invalid.a: too-large tag range 1-100; use smaller ranges"
+            "invalid field a: too-large tag range 1-100; use smaller ranges"
         );
     }
 
@@ -2846,7 +2846,7 @@ mod test {
                 .expect_err("field with duplicated ignore attributes not detected")
                 .root_cause()
                 .to_string(),
-            "duplicated ignore attributes for field: ignore , ignore"
+            "invalid field what: duplicated ignore attributes for field: ignore , ignore"
         );
         let output = try_message(quote!(
             struct MixedIgnores {
@@ -2859,7 +2859,8 @@ mod test {
                 .expect_err("field with duplicated ignore attributes not detected")
                 .root_cause()
                 .to_string(),
-            "duplicated ignore attributes for field: tag (123) , ignore , ignore"
+            "invalid field what: duplicated ignore attributes for field: tag (123) , ignore , \
+            ignore"
         );
         let output = try_message(quote!(
             #[bilrost(default_per_field, default_per_field)]
