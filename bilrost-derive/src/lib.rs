@@ -1180,12 +1180,16 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
         Data::Union(..) => bail!("Enumeration can not be derived for a union"),
     };
 
-    // Map the variants into 'fields'.
-    let mut variants: Vec<(Ident, Expr)> = Vec::new();
-    let mut zero_variant_ident = None;
+    struct EnumVariant {
+        variant_ident: Ident,
+        discriminant_expr: Expr,
+    }
+
+    // Parse each variant in the enum
+    let mut variants = vec![];
     for Variant {
         attrs,
-        ident,
+        ident: variant_ident,
         fields,
         discriminant,
         ..
@@ -1198,33 +1202,40 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
             }
         }
 
-        let expr = variant_attr(&attrs)?
+        let discriminant_expr = variant_attr(&attrs)?
             .or(discriminant.map(|(_, expr)| expr))
             .ok_or_else(|| {
                 err!(
-                    "Enumeration variants must have a discriminant or a #[bilrost(..)] \
-                    attribute with a constant value"
+                    "Enumeration variants must have a discriminant or a #[bilrost(..)] attribute \
+                    with a constant value"
                 )
             })?;
-        if is_zero_discriminant(&expr) {
-            zero_variant_ident = Some(ident.clone());
-        }
-        variants.push((ident, expr));
+        variants.push(EnumVariant {
+            variant_ident,
+            discriminant_expr,
+        });
     }
-
-    if variants.is_empty() {
-        bail!("Enumeration must have at least one variant");
-    }
-
-    let is_valid = variants.iter().map(|(_, value)| quote!(#value => true));
-
-    let to_u32 = variants
+    let zero_variant_ident = variants
         .iter()
-        .map(|(variant, value)| quote!(#ident::#variant => #value));
+        .find(|variant| is_zero_discriminant(&variant.discriminant_expr))
+        .map(|variant| &variant.variant_ident);
 
-    let try_from = variants
+    let Some(EnumVariant {
+        variant_ident: first_variant,
+        ..
+    }) = variants.first()
+    else {
+        bail!("Enumerations must have at least one variant");
+    };
+
+    let variant_idents: Vec<_> = variants
         .iter()
-        .map(|(variant, value)| quote!(#value => #ident::#variant));
+        .map(|variant| &variant.variant_ident)
+        .collect();
+    let discriminant_exprs: Vec<_> = variants
+        .iter()
+        .map(|variant| &variant.discriminant_expr)
+        .collect();
 
     // When the type has a zero-valued variant, we implement `EmptyState`. When it doesn't, we
     // need at least some way to create a value to be overwritten, so we impl `ForOverwrite`
@@ -1253,9 +1264,6 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
             }
         }
     } else {
-        let Some((first_variant, _)) = variants.first() else {
-            bail!("enumerations with no values are not supported");
-        };
         quote! {
             impl #impl_generics #crate_::encoding::ForOverwrite<(), #ident #ty_generics> for ()
             #where_clause {
@@ -1271,7 +1279,7 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
             #[inline]
             fn to_number(&self) -> u32 {
                 match self {
-                    #(#to_u32,)*
+                    #(#ident::#variant_idents => #discriminant_exprs,)*
                 }
             }
 
@@ -1279,7 +1287,7 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
             fn try_from_number(value: u32) -> ::core::result::Result<#ident, u32> {
                 #[forbid(unreachable_patterns)]
                 ::core::result::Result::Ok(match value {
-                    #(#try_from,)*
+                    #(#discriminant_exprs => #ident::#variant_idents,)*
                     _ => ::core::result::Result::Err(value)?,
                 })
             }
@@ -1288,7 +1296,7 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
             fn is_valid(__n: u32) -> bool {
                 #[forbid(unreachable_patterns)]
                 match __n {
-                    #(#is_valid,)*
+                    #(#discriminant_exprs => true,)*
                     _ => false,
                 }
             }
@@ -2707,7 +2715,7 @@ mod test {
             output
                 .expect_err("enumeration without variants not detected")
                 .to_string(),
-            "Enumeration must have at least one variant"
+            "Enumerations must have at least one variant"
         );
     }
 
