@@ -1816,14 +1816,25 @@ const FOUR: u32 = 4;
 enum ComplexEnum {
     One = 1,
     #[bilrost = 2]
-    Two(), // Tuple or struct variants are ok, but they must be empty.
+    Two,
     #[bilrost(3)]
-    Three { },
+    Three,
     #[bilrost(FOUR)]
     Four,
     // When both discriminant and attribute exist, bilrost uses the attribute.
     #[bilrost(5)]
     Five = 8,
+}
+
+// Enumerations can also have non-unit variants as long as they have no fields.
+#[derive(Clone, PartialEq, Eq, bilrost::Enumeration)]
+enum EnumWithNonUnitVariants {
+    #[bilrost(1)]
+    Unit,
+    #[bilrost(2)]
+    Tuple(),
+    #[bilrost(3)]
+    Struct { },
 }
 ```
 
