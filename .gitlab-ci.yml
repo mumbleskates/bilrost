@@ -9,6 +9,7 @@ default:
       - .cargo/registry/cache
       - target/debug/deps
       - target/debug/build
+      - .cache-info
     policy: pull-push
 
 variables:
@@ -20,6 +21,7 @@ stages:
 lint:
   stage: test
   script:
+    - ./.gitlab-cargo-cache-expire.sh
     - rustup component add clippy rustfmt
     - cargo clippy --workspace --all-targets --features full-test-suite
     - cargo clippy --workspace --all-targets --features full-test-suite --no-default-features
@@ -29,6 +31,7 @@ lint:
 test:
   stage: test
   script:
+    - ./.gitlab-cargo-cache-expire.sh
     - cargo test --workspace --all-targets --features full-test-suite
     - cargo test --workspace --doc         --features full-test-suite
     - cargo test --workspace --all-targets --features full-test-suite --no-default-features
@@ -44,6 +47,7 @@ test-msrv:
   before_script:
     - ./downgrade-for-msrv.sh
   script:
+    - ./.gitlab-cargo-cache-expire.sh
     - cargo test --workspace --all-targets --features full-test-suite
     - cargo test --workspace --doc         --features full-test-suite
     - cargo test --workspace --all-targets --features full-test-suite --no-default-features
