@@ -6,9 +6,7 @@ use crate::field::traits::{
     FieldBearer, SinglyTagged,
     WhereFor::{self, Decode, Encode},
 };
-use crate::field::{
-    bilrost_attrs, parse_message_fields, set_bool, set_option, Field, MessageAppearance,
-};
+use crate::field::{bilrost_attrs, parse_message_fields, set_bool, set_option, Field};
 use alloc::boxed::Box;
 use alloc::format;
 use alloc::string::ToString;
@@ -457,18 +455,8 @@ impl OneofVariant {
                     );
                 }
 
-                let appearance = match variant.fields {
-                    Fields::Unnamed(..) => MessageAppearance::Tuple,
-                    _ => MessageAppearance::Struct,
-                };
-                let fields = match variant.fields {
-                    Fields::Named(fields) => fields.named.into_iter().collect(),
-                    Fields::Unnamed(fields) => fields.unnamed.into_iter().collect(),
-                    Fields::Unit => vec![],
-                };
-
-                let variant_fields = parse_message_fields(appearance, fields, reserved_tags)
-                    .map_err(|e| {
+                let variant_fields =
+                    parse_message_fields(variant.fields, reserved_tags).map_err(|e| {
                         err!(
                             "in message variant {variant_ident}: {e}",
                             variant_ident = variant.ident

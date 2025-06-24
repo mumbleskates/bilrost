@@ -40,22 +40,16 @@ enum MessageFieldContent {
 }
 use MessageFieldContent::*;
 
-#[derive(Copy, Clone)]
-pub enum MessageAppearance {
-    /// Tuple structs begin field numbering at zero
-    Tuple = 0,
-    /// Regular structs begin field numbering at one
-    Struct = 1,
-}
-
 /// Processes message fields from a vec of syn::Field, validating their tags against the given
 /// reserved tag list and each other.
 pub fn parse_message_fields(
-    appearance: MessageAppearance,
-    fields: Vec<syn::Field>,
+    fields: syn::Fields,
     reserved: Option<TagList>,
 ) -> Result<Vec<Field>, Error> {
-    let mut next_tag = Some(appearance as u32);
+    let mut next_tag = Some(match fields {
+        syn::Fields::Unnamed(..) => 0,
+        _ => 1,
+    });
 
     let unsorted_fields = fields
         .iter()

@@ -13,8 +13,7 @@ extern crate alloc;
 
 use crate::attrs::{tag_list_attr, word_attr, TagList};
 use crate::field::{
-    bilrost_attrs, parse_message_fields, set_bool, set_option, Field, MessageAppearance,
-    OneofVariant,
+    bilrost_attrs, parse_message_fields, set_bool, set_option, Field, OneofVariant,
 };
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::string::ToString;
@@ -120,94 +119,6 @@ enum FieldChunk {
     SortGroup(Vec<SortGroupPart>),
 }
 use FieldChunk::*;
-
-struct PreprocessedMessage<'a> {
-    ident: Ident,
-    impl_generics: &'a Generics,
-    ty_generics: TypeGenerics<'a>,
-    where_clause: Option<&'a WhereClause>,
-    unsorted_fields: Vec<Field>,
-    ignored_fields: Vec<Field>,
-    distinguished: bool,
-    borrow_only: bool,
-    default_per_field: bool,
-}
-
-fn preprocess_message(input: &DeriveInput) -> Result<PreprocessedMessage<'_>, Error> {
-    let ident = input.ident.clone();
-
-    let variant_data = match &input.data {
-        Data::Struct(variant_data) => variant_data,
-        Data::Enum(..) => panic!("should be unreachable, Message for enums depends on oneof"),
-        Data::Union(..) => bail!("Message can not be derived for a union"),
-    };
-
-    let mut reserved_tags: Option<TagList> = None;
-    let mut distinguished = false;
-    let mut borrow_only = false;
-    let mut default_per_field = false;
-    let mut unknown_attrs = Vec::new();
-    for attr in bilrost_attrs(&input.attrs)? {
-        if let Some(tags) = tag_list_attr(&attr, "reserved_tags", None)? {
-            set_option(
-                &mut reserved_tags,
-                tags,
-                "duplicate reserved_tags attributes",
-            )?;
-        } else if word_attr(&attr, "distinguished") {
-            set_bool(&mut distinguished, "duplicated distinguished attributes")?;
-        } else if word_attr(&attr, "borrowed_only") {
-            set_bool(&mut borrow_only, "duplicated borrowed_only attributes")?;
-        } else if word_attr(&attr, "default_per_field") {
-            set_bool(
-                &mut default_per_field,
-                "duplicated default_per_field attributes",
-            )?;
-        } else {
-            unknown_attrs.push(attr);
-        }
-    }
-
-    if !unknown_attrs.is_empty() {
-        bail!(
-            "unknown attribute(s) for message: {attrs}",
-            attrs = quote!(#(#unknown_attrs),*),
-        )
-    }
-
-    let appearance = match variant_data.fields {
-        Fields::Unnamed(..) => MessageAppearance::Tuple,
-        _ => MessageAppearance::Struct,
-    };
-    let fields: Vec<syn::Field> = match &variant_data.fields {
-        Fields::Named(fields) => fields.named.iter().cloned().collect(),
-        Fields::Unnamed(fields) => fields.unnamed.iter().cloned().collect(),
-        Fields::Unit => vec![],
-    };
-
-    let (ignored_fields, unsorted_fields): (Vec<_>, Vec<_>) =
-        parse_message_fields(appearance, fields, reserved_tags)?
-            .into_iter()
-            .partition(Field::is_ignored);
-
-    if distinguished && !ignored_fields.is_empty() {
-        bail!("messages with ignored fields cannot be distinguished");
-    }
-
-    let (_, ty_generics, where_clause) = input.generics.split_for_impl();
-
-    Ok(PreprocessedMessage {
-        ident,
-        impl_generics: &input.generics,
-        ty_generics,
-        where_clause,
-        unsorted_fields,
-        ignored_fields,
-        distinguished,
-        borrow_only,
-        default_per_field,
-    })
-}
 
 /// Sorts a vec of unsorted fields into discrete chunks that may be ordered together at runtime to
 /// ensure that all their fields are encoded in sorted order.
@@ -372,21 +283,67 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     let crate_ = crate_name();
     let input: DeriveInput = parse2(input)?;
 
-    if let Data::Enum(..) = input.data {
-        return try_message_via_oneof(input);
+    let DeriveInput {
+        ident,
+        attrs: input_attrs,
+        generics: impl_generics,
+        data: Data::Struct(data_struct),
+        ..
+    } = input
+    else {
+        // `enum` types are only derived as `Message` in terms of their `Oneof` implementation
+        if matches!(input.data, Data::Enum(..)) {
+            return try_message_via_oneof(input);
+        } else {
+            bail!("Message can only be derived for a struct or an enum");
+        }
+    };
+
+    // Process attributes
+    let mut reserved_tags: Option<TagList> = None;
+    let mut distinguished = false;
+    let mut borrow_only = false;
+    let mut default_per_field = false;
+    let mut unknown_attrs = Vec::new();
+    for attr in bilrost_attrs(&input_attrs)? {
+        if let Some(tags) = tag_list_attr(&attr, "reserved_tags", None)? {
+            set_option(
+                &mut reserved_tags,
+                tags,
+                "duplicate reserved_tags attributes",
+            )?;
+        } else if word_attr(&attr, "distinguished") {
+            set_bool(&mut distinguished, "duplicated distinguished attributes")?;
+        } else if word_attr(&attr, "borrowed_only") {
+            set_bool(&mut borrow_only, "duplicated borrowed_only attributes")?;
+        } else if word_attr(&attr, "default_per_field") {
+            set_bool(
+                &mut default_per_field,
+                "duplicated default_per_field attributes",
+            )?;
+        } else {
+            unknown_attrs.push(attr);
+        }
     }
 
-    let PreprocessedMessage {
-        ident,
-        impl_generics,
-        ty_generics,
-        where_clause,
-        unsorted_fields,
-        ignored_fields,
-        distinguished,
-        borrow_only,
-        default_per_field,
-    } = preprocess_message(&input)?;
+    if !unknown_attrs.is_empty() {
+        bail!(
+            "unknown attribute(s) for message: {attrs}",
+            attrs = quote!(#(#unknown_attrs),*),
+        )
+    }
+
+    // Parse field data
+    let (ignored_fields, unsorted_fields): (Vec<_>, Vec<_>) =
+        parse_message_fields(data_struct.fields, reserved_tags)?
+            .into_iter()
+            .partition(Field::is_ignored);
+
+    if distinguished && !ignored_fields.is_empty() {
+        bail!("messages with ignored fields cannot be distinguished");
+    }
+
+    let (_, ty_generics, where_clause) = impl_generics.split_for_impl();
 
     let fields = sort_fields(unsorted_fields.clone());
     let self_where = if default_per_field || ignored_fields.is_empty() {
@@ -397,7 +354,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         Some(quote!(Self: ::core::default::Default))
     };
 
-    let borrow_generics = prepend_to_generics(impl_generics, quote!('__a));
+    let borrow_generics = prepend_to_generics(&impl_generics, quote!('__a));
 
     let mut where_fields = vec![unsorted_fields.as_slice()];
     // if we are defaulting ignored fields per-field, we need to include where-clause bounds for
@@ -1754,7 +1711,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
             decode_arms(Owned, Relaxed),
             decode_arms(Borrowed, Relaxed),
         ]
-        .map(|decode| quote! {
+            .map(|decode| quote! {
             // Guards against colliding oneof field decoding are only evaluated by the Oneof trait,
             // when `oneof_decode_field` is called and the oneof value is already populated.
             // Whichever implementer is responsible for the oneof having an empty state is also
