@@ -47,7 +47,9 @@ pub fn parse_message_fields(
     reserved: Option<TagList>,
 ) -> Result<Vec<Field>, Error> {
     let mut next_tag = Some(match fields {
+        // tuple structs begin field numbering at zero
         syn::Fields::Unnamed(..) => 0,
+        // regular structs begin field numbering at one
         _ => 1,
     });
 
