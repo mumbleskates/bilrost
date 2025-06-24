@@ -20,8 +20,9 @@ stages:
 
 lint:
   stage: test
-  script:
+  before_script:
     - ./.gitlab-cargo-cache-expire.sh
+  script:
     - rustup component add clippy rustfmt
     - cargo clippy --workspace --all-targets --features full-test-suite
     - cargo clippy --workspace --all-targets --features full-test-suite --no-default-features
@@ -30,8 +31,9 @@ lint:
 
 test:
   stage: test
-  script:
+  before_script:
     - ./.gitlab-cargo-cache-expire.sh
+  script:
     - cargo test --workspace --all-targets --features full-test-suite
     - cargo test --workspace --doc         --features full-test-suite
     - cargo test --workspace --all-targets --features full-test-suite --no-default-features
@@ -45,9 +47,9 @@ test-msrv:
   image: rust:1.65
   stage: test
   before_script:
+    - ./.gitlab-cargo-cache-expire.sh
     - ./downgrade-for-msrv.sh
   script:
-    - ./.gitlab-cargo-cache-expire.sh
     - cargo test --workspace --all-targets --features full-test-suite
     - cargo test --workspace --doc         --features full-test-suite
     - cargo test --workspace --all-targets --features full-test-suite --no-default-features
