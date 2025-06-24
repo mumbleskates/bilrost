@@ -1,6 +1,5 @@
-use crate::attrs::tag_list_attr;
+use crate::attrs::{set_option, tag_list_attr};
 use crate::crate_name;
-use crate::field::set_option;
 use crate::field::traits::{
     DecodeLifetime::{self, Borrowed, Owned},
     DecodeMode::{self, Distinguished, Relaxed},

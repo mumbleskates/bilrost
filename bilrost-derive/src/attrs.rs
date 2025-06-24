@@ -1,7 +1,7 @@
 use alloc::vec::Vec;
 use core::any::type_name;
+use core::fmt::Debug;
 use core::ops::RangeInclusive;
-
 use eyre::{bail, eyre as err, Report as Error};
 use itertools::Itertools;
 use quote::quote;
@@ -9,9 +9,31 @@ use syn::parse::ParseStream;
 use syn::punctuated::Punctuated;
 use syn::token::Comma;
 use syn::{
-    parse, parse2, parse_str, BinOp, Expr, ExprBinary, ExprLit, ExprRange, Lit, LitInt, Meta,
-    MetaList, MetaNameValue, RangeLimits,
+    parse, parse2, parse_str, Attribute, BinOp, Expr, ExprBinary, ExprLit, ExprRange, Lit, LitInt,
+    Meta, MetaList, MetaNameValue, RangeLimits, Token,
 };
+
+/// Get the items belonging to the 'bilrost' list attribute, e.g. `#[bilrost(foo, bar="baz")]`.
+pub fn bilrost_attrs(attrs: &[Attribute]) -> Result<Vec<Meta>, Error> {
+    let mut result = Vec::new();
+    for attr in attrs {
+        if let Meta::List(meta_list) = &attr.meta {
+            if meta_list.path.is_ident("bilrost") {
+                // `bilrost(1)` is transformed into `bilrost(tag = 1)` as a shorthand
+                if let Ok(short_tag) = parse2::<LitInt>(meta_list.tokens.clone()) {
+                    result.push(parse2::<Meta>(quote!(tag = #short_tag)).unwrap());
+                } else {
+                    result.extend(
+                        meta_list
+                            .parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)?
+                            .into_iter(),
+                    );
+                }
+            }
+        }
+    }
+    Ok(result)
+}
 
 pub fn tag_attr(attr: &Meta) -> Result<Option<u32>, Error> {
     if !attr.path().is_ident("tag") {
@@ -202,5 +224,25 @@ pub fn word_attr(attr: &Meta, key: &str) -> bool {
         path.is_ident(key)
     } else {
         false
+    }
+}
+
+pub fn set_option<T>(option: &mut Option<T>, value: T, message: &str) -> Result<(), Error>
+where
+    T: Debug,
+{
+    if let Some(existing) = option {
+        bail!("{message}: {existing:?} and {value:?}");
+    }
+    *option = Some(value);
+    Ok(())
+}
+
+pub fn set_bool(b: &mut bool, message: &str) -> Result<(), Error> {
+    if *b {
+        bail!("{message}");
+    } else {
+        *b = true;
+        Ok(())
     }
 }

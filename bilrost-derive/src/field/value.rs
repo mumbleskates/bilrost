@@ -1,4 +1,6 @@
-use crate::attrs::{named_attr, tag_attr, tag_list_attr, word_attr, TagList};
+use crate::attrs::{
+    bilrost_attrs, named_attr, set_bool, set_option, tag_attr, tag_list_attr, word_attr, TagList,
+};
 use crate::crate_name;
 use crate::field::traits::{
     DecodeLifetime::{self, Borrowed, Owned},
@@ -6,7 +8,7 @@ use crate::field::traits::{
     FieldBearer, SinglyTagged,
     WhereFor::{self, Decode, Encode},
 };
-use crate::field::{bilrost_attrs, parse_message_fields, set_bool, set_option, Field};
+use crate::field::{parse_message_fields, Field};
 use alloc::boxed::Box;
 use alloc::format;
 use alloc::string::ToString;

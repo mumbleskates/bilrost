@@ -1,9 +1,8 @@
-use crate::attrs::TagList;
+use crate::attrs::{bilrost_attrs, TagList};
 use crate::crate_name;
 use crate::field::traits::{DecodeLifetime, DecodeMode, FieldBearer, Tagged, WhereFor};
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
-use alloc::fmt::Debug;
 use alloc::format;
 use alloc::string::ToString;
 use alloc::vec;
@@ -13,8 +12,7 @@ use eyre::{bail, eyre as err, Report as Error};
 use itertools::Itertools;
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
-use syn::punctuated::Punctuated;
-use syn::{parse2, Attribute, LitInt, Meta, Token, Type};
+use syn::{Attribute, Type};
 
 mod ignored;
 mod oneof;
@@ -285,47 +283,5 @@ impl Tagged for Field {
             Oneof(oneof) => oneof.tags(),
             Ignored(..) => vec![],
         }
-    }
-}
-
-/// Get the items belonging to the 'bilrost' list attribute, e.g. `#[bilrost(foo, bar="baz")]`.
-pub fn bilrost_attrs(attrs: &[Attribute]) -> Result<Vec<Meta>, Error> {
-    let mut result = Vec::new();
-    for attr in attrs {
-        if let Meta::List(meta_list) = &attr.meta {
-            if meta_list.path.is_ident("bilrost") {
-                // `bilrost(1)` is transformed into `bilrost(tag = 1)` as a shorthand
-                if let Ok(short_tag) = parse2::<LitInt>(meta_list.tokens.clone()) {
-                    result.push(parse2::<Meta>(quote!(tag = #short_tag)).unwrap());
-                } else {
-                    result.extend(
-                        meta_list
-                            .parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)?
-                            .into_iter(),
-                    );
-                }
-            }
-        }
-    }
-    Ok(result)
-}
-
-pub fn set_option<T>(option: &mut Option<T>, value: T, message: &str) -> Result<(), Error>
-where
-    T: Debug,
-{
-    if let Some(existing) = option {
-        bail!("{message}: {existing:?} and {value:?}");
-    }
-    *option = Some(value);
-    Ok(())
-}
-
-pub fn set_bool(b: &mut bool, message: &str) -> Result<(), Error> {
-    if *b {
-        bail!("{message}");
-    } else {
-        *b = true;
-        Ok(())
     }
 }

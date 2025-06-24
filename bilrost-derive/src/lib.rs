@@ -11,10 +11,14 @@
 
 extern crate alloc;
 
-use crate::attrs::{tag_list_attr, word_attr, TagList};
-use crate::field::{
-    bilrost_attrs, parse_message_fields, set_bool, set_option, Field, OneofVariant,
+use crate::attrs::{bilrost_attrs, set_bool, set_option, tag_list_attr, word_attr, TagList};
+use crate::field::traits::{
+    DecodeLifetime::{Borrowed, Owned},
+    DecodeMode::{Distinguished, Relaxed},
+    FieldBearer, SinglyTagged, Tagged,
+    WhereFor::{self, Decode, Encode},
 };
+use crate::field::{parse_message_fields, Field, OneofVariant};
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::string::ToString;
 use alloc::vec;
@@ -22,12 +26,6 @@ use alloc::vec::Vec;
 use core::mem::take;
 use core::ops::Deref;
 use eyre::{bail, eyre as err, Report as Error};
-use field::traits::{
-    DecodeLifetime::{Borrowed, Owned},
-    DecodeMode::{Distinguished, Relaxed},
-    FieldBearer, SinglyTagged, Tagged,
-    WhereFor::{self, Decode, Encode},
-};
 use itertools::Itertools;
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
