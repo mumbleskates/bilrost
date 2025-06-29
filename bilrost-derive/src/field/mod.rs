@@ -477,6 +477,11 @@ impl<'a> MessageFieldsSorted<'a> {
         let chunks = self.chunks.iter().map(|chunk| match chunk {
             AlwaysOrdered(field) => field.encoded_len(&target),
             SortGroup(parts) => {
+                // TODO: consider altering these to unconditionally populate the start of the array
+                //  with guaranteed fields on initialization, then only conditionally appending the
+                //  oneof fields to the end. leaning on the sort while cheapening the initialization
+                //  may be faster overall when there are a lot of fields interleaved in between the
+                //  gaps in oneof numbering.
                 let parts: Vec<TokenStream> = parts
                     .iter()
                     .map(|part| match part {
