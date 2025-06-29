@@ -409,6 +409,8 @@ where
         part_fn_ty,
         invoke_parts,
     } = config;
+    // `guaranteed_parts` will initialize the array slots for all the fields that we will definitely
+    // try to encode
     let guaranteed_parts: Vec<_> = direction
         .align(parts)
         .flat_map(|part| match part {
@@ -423,6 +425,8 @@ where
             _ => None,
         })
         .collect();
+    // `populate_oneof_parts` conditionally populates the trailing end of the array with oneof
+    // fields and their actual tag so they can be sorted into the correct order
     let populate_oneof_parts: Vec<_> = direction
         .align(parts)
         .flat_map(|part| match part {
@@ -439,6 +443,8 @@ where
             _ => None,
         })
         .collect();
+    // we need to fill in the empty slots at the end of the array for each oneof item that may or
+    // may not be included
     let filler_none = quote!((0u32, ::core::option::Option::None));
     let non_guaranteed_filler = repeat_n(&filler_none, populate_oneof_parts.len());
     let num_guaranteed_parts = guaranteed_parts.len();
