@@ -358,13 +358,13 @@ struct SortGroupConfig<FC, FO> {
     direction: Direction,
     /// Accepts an iterator of fields and outputs the generated code for a contiguous group of
     /// guaranteed fields
-    contiguous_fn: FC,
+    contiguous_part_fn: FC,
     /// Accepts one field and outputs the generated code for a oneof field
     oneof_part_fn: FO,
     /// The type name of the extra data attached to the tags
-    extra_data_ty: TokenStream,
+    part_fn_ty: TokenStream,
     /// Pasted at the end of the block, after everything. `parts` will be a sorted slice of
-    /// `(u32, #extra_data_ty)` containing all the fields that were initialized via the contiguous
+    /// `(u32, #part_fn_ty)` containing all the fields that were initialized via the contiguous
     /// and oneof code generation
     invoke_parts: TokenStream,
 }
@@ -404,9 +404,9 @@ where
 {
     let SortGroupConfig {
         direction,
-        contiguous_fn,
+        contiguous_part_fn,
         oneof_part_fn,
-        extra_data_ty,
+        part_fn_ty,
         invoke_parts,
     } = config;
     let guaranteed_parts: Vec<_> = direction
@@ -417,7 +417,7 @@ where
                     panic!("empty contiguous field group");
                 };
                 let first_tag = first_field.first_tag();
-                let closure = contiguous_fn(direction.align(fields));
+                let closure = contiguous_part_fn(direction.align(fields));
                 Some(quote! { (#first_tag, ::core::option::Option::Some(#closure)) })
             }
             _ => None,
@@ -449,7 +449,7 @@ where
     };
     quote! {
         {
-            let mut parts: [(u32, ::core::option::Option<#extra_data_ty>); #max_parts] = [
+            let mut parts: [(u32, ::core::option::Option<#part_fn_ty>); #max_parts] = [
                 #(#guaranteed_parts,)*
                 #(#non_guaranteed_filler,)*
             ];
@@ -591,7 +591,7 @@ impl<'a> MessageFieldsSorted<'a> {
             SortGroup(parts) => {
                 process_sort_groups(parts, &target, SortGroupConfig{
                     direction: Direction::Forward,
-                    contiguous_fn: |fields: ReversibleFields| {
+                    contiguous_part_fn: |fields: ReversibleFields| {
                         let each_len = fields.map(|field| field.encoded_len(quote!(instance)));
                         quote! {
                             |instance, tm| { 0 #(+ #each_len)* }
@@ -603,7 +603,7 @@ impl<'a> MessageFieldsSorted<'a> {
                             |instance, tm| { #encoded_len }
                         }
                     },
-                    extra_data_ty: quote!(fn(&Self, &mut #tag_measurer_ty) -> usize),
+                    part_fn_ty: quote!(fn(&Self, &mut #tag_measurer_ty) -> usize),
                     invoke_parts: quote! {
                         let mut total_len = 0usize;
                         for (_, len_func_option) in parts {
@@ -631,7 +631,7 @@ impl<'a> MessageFieldsSorted<'a> {
                 &target,
                 SortGroupConfig {
                     direction: Direction::Forward,
-                    contiguous_fn: |fields: ReversibleFields| {
+                    contiguous_part_fn: |fields: ReversibleFields| {
                         let each_field = fields.map(|field| field.encode(quote!(instance)));
                         quote! {
                             |instance, buf, tw| { #(#each_field)* }
@@ -643,7 +643,7 @@ impl<'a> MessageFieldsSorted<'a> {
                             |instance, buf, tw| { #encode }
                         }
                     },
-                    extra_data_ty: quote!(fn(&Self, &mut __B, &mut #crate_::encoding::TagWriter)),
+                    part_fn_ty: quote!(fn(&Self, &mut __B, &mut #crate_::encoding::TagWriter)),
                     invoke_parts: quote! {
                         for (_, encode_func) in parts {
                             (encode_func.unwrap())(#target, buf, tw);
@@ -669,7 +669,7 @@ impl<'a> MessageFieldsSorted<'a> {
                 &target,
                 SortGroupConfig {
                     direction: Direction::Reverse,
-                    contiguous_fn: |fields: ReversibleFields| {
+                    contiguous_part_fn: |fields: ReversibleFields| {
                         let each_field = fields.map(|field| field.prepend(quote!(instance)));
                         quote! {
                             |instance, buf, tw| { #(#each_field)* }
@@ -681,7 +681,7 @@ impl<'a> MessageFieldsSorted<'a> {
                             |instance, buf, tw| { #prepend }
                         }
                     },
-                    extra_data_ty: quote!(fn(&Self, &mut __B, &mut #crate_::encoding::TagRevWriter)),
+                    part_fn_ty: quote!(fn(&Self, &mut __B, &mut #crate_::encoding::TagRevWriter)),
                     invoke_parts: quote! {
                         for (_, prepend_func) in parts {
                             (prepend_func.unwrap())(#target, buf, tw);
