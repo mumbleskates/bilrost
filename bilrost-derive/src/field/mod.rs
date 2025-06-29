@@ -10,8 +10,9 @@ use alloc::vec::Vec;
 use core::iter::repeat;
 use core::mem::take;
 use core::ops::Deref;
+use core::{iter, slice};
 use eyre::{bail, eyre as err, Report as Error};
-use itertools::Itertools;
+use itertools::{repeat_n, Either, Itertools};
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 use syn::{Attribute, Type};
@@ -352,6 +353,111 @@ enum SortGroupPart<'a> {
 }
 use SortGroupPart::*;
 
+struct SortGroupConfig<FC, FO> {
+    /// Sort direction: ascending or descending tag numbers
+    direction: Direction,
+    /// Accepts an iterator of fields and outputs the generated code for
+    contiguous_fn: FC,
+    /// Accepts one field and outputs the generated code for a oneof field
+    oneof_part_fn: FO,
+    /// The type name of the extra data attached to the tags
+    extra_data_ty: TokenStream,
+    /// Pasted at the end of the block, after everything. `parts` will be a sorted slice of
+    /// `(u32, #extra_data_ty)` containing all the fields that were initialized via the contiguous
+    /// and oneof code generation
+    invoke_parts: TokenStream,
+}
+
+/// Helper that can conditionally reverse iterators.
+#[derive(Copy, Clone)]
+enum Direction {
+    Forward,
+    Reverse,
+}
+
+impl Direction {
+    fn align<T, I>(self, iterable: T) -> Either<I, iter::Rev<I>>
+    where
+        T: IntoIterator<IntoIter = I>,
+        I: DoubleEndedIterator,
+    {
+        match self {
+            Direction::Forward => Either::Left(iterable.into_iter()),
+            Direction::Reverse => Either::Right(iterable.into_iter().rev()),
+        }
+    }
+}
+
+/// Implements guaranteed field ordering
+fn process_sort_groups<FC, FO>(
+    parts: &[SortGroupPart],
+    target: impl ToTokens,
+    config: SortGroupConfig<FC, FO>,
+) -> TokenStream
+where
+    FC: Fn(Either<slice::Iter<&Field>, iter::Rev<slice::Iter<&Field>>>) -> TokenStream,
+    FO: Fn(&Field) -> TokenStream,
+{
+    let SortGroupConfig {
+        direction,
+        contiguous_fn,
+        oneof_part_fn,
+        extra_data_ty,
+        invoke_parts,
+    } = config;
+    let guaranteed_parts: Vec<_> = direction
+        .align(parts)
+        .flat_map(|part| match part {
+            Contiguous(fields) => {
+                let Some(first_field) = fields.first() else {
+                    panic!("empty contiguous field group");
+                };
+                let first_tag = first_field.first_tag();
+                let closure = contiguous_fn(direction.align(fields));
+                Some(quote! { (#first_tag, ::core::option::Option::Some(#closure)) })
+            }
+            _ => None,
+        })
+        .collect();
+    let populate_oneof_parts: Vec<_> = direction
+        .align(parts)
+        .flat_map(|part| match part {
+            OneofPart(field) => {
+                let current_tag = field.current_tag(&target);
+                let closure = oneof_part_fn(field);
+                Some(quote! {
+                    if let ::core::option::Option::Some(tag) = #current_tag {
+                        parts[nparts] = (tag, ::core::option::Option::Some(#closure));
+                        nparts += 1;
+                    }
+                })
+            }
+            _ => None,
+        })
+        .collect();
+    let filler_none = quote!((0u32, ::core::option::Option::None));
+    let non_guaranteed_filler = repeat_n(&filler_none, populate_oneof_parts.len());
+    let num_guaranteed_parts = guaranteed_parts.len();
+    let max_parts = parts.len();
+    let sort_tag_expr = match direction {
+        Direction::Forward => quote!(*tag),
+        Direction::Reverse => quote!(::core::cmp::Reverse(*tag)),
+    };
+    quote! {
+        {
+            let mut parts: [(u32, ::core::option::Option<#extra_data_ty>); #max_parts] = [
+                #(#guaranteed_parts,)*
+                #(#non_guaranteed_filler,)*
+            ];
+            let mut nparts = #num_guaranteed_parts;
+            #(#populate_oneof_parts)*
+            let parts = &mut parts[..nparts];
+            <[_]>::sort_unstable_by_key(parts, |(tag, _)| #sort_tag_expr);
+            #invoke_parts
+        }
+    }
+}
+
 impl<'a> MessageFieldsSorted<'a> {
     /// Sorts a vec of unsorted fields into discrete chunks that may be ordered together at runtime to
     /// ensure that all their fields are encoded in sorted order.
@@ -473,73 +579,35 @@ impl<'a> MessageFieldsSorted<'a> {
     }
 
     pub fn encoded_len(&self, target: impl ToTokens) -> TokenStream {
+        // TODO: this function in particular ONLY needs to reorder the measurement of tag lengths,
+        //  not the measurement of the field values themselves
         let tag_measurer_ty = &self.tag_measurer_ty;
         let chunks = self.chunks.iter().map(|chunk| match chunk {
             AlwaysOrdered(field) => field.encoded_len(&target),
             SortGroup(parts) => {
-                // TODO: consider altering these to unconditionally populate the start of the array
-                //  with guaranteed fields on initialization, then only conditionally appending the
-                //  oneof fields to the end. leaning on the sort while cheapening the initialization
-                //  may be faster overall when there are a lot of fields interleaved in between the
-                //  gaps in oneof numbering.
-                let parts: Vec<TokenStream> = parts
-                    .iter()
-                    .map(|part| match part {
-                        Contiguous(fields) => {
-                            let Some(first_field) = fields.first() else {
-                                panic!("empty contiguous field group");
-                            };
-                            let first_tag = first_field.first_tag();
-                            let each_len = fields
-                                .iter()
-                                .map(|field| field.encoded_len(quote!(instance)));
-                            quote! {
-                                parts[nparts] = (
-                                    #first_tag,
-                                    ::core::option::Option::Some(|instance, tm| {
-                                        0 #(+ #each_len)*
-                                    }),
-                                );
-                                nparts += 1;
-                            }
+                process_sort_groups(parts, &target, SortGroupConfig{
+                    direction: Direction::Forward,
+                    contiguous_fn: |fields: Either<slice::Iter<&Field>, iter::Rev<slice::Iter<&Field>>>| {
+                        let each_len = fields.map(|field| field.encoded_len(quote!(instance)));
+                        quote! {
+                            |instance, tm| { 0 #(+ #each_len)* }
                         }
-                        OneofPart(field) => {
-                            let current_tag = field.current_tag(&target);
-                            let encoded_len = field.encoded_len(quote!(instance));
-                            quote! {
-                                if let ::core::option::Option::Some(tag) = #current_tag {
-                                    parts[nparts] = (
-                                        tag,
-                                        ::core::option::Option::Some(|instance, tm| {
-                                            #encoded_len
-                                        }),
-                                    );
-                                    nparts += 1;
-                                }
-                            }
+                    },
+                    oneof_part_fn: |field: &Field| {
+                        let encoded_len = field.encoded_len(quote!(instance));
+                        quote! {
+                            |instance, tm| { #encoded_len }
                         }
-                    })
-                    .collect();
-                let max_parts = parts.len();
-                quote! {
-                    {
-                        let mut parts = [
-                            (0u32, ::core::option::Option::None::<
-                                       fn(&Self, &mut #tag_measurer_ty) -> usize
-                                   >);
-                            #max_parts
-                        ];
-                        let mut nparts = 0usize;
-                        #(#parts)*
-                        let parts = &mut parts[..nparts];
-                        <[_]>::sort_unstable_by_key(parts, |(tag, _)| *tag);
+                    },
+                    extra_data_ty: quote!(fn(&Self, &mut #tag_measurer_ty) -> usize),
+                    invoke_parts: quote! {
                         let mut total_len = 0usize;
                         for (_, len_func_option) in parts {
                             total_len += ::core::option::Option::unwrap(*len_func_option)(#target, tm)
                         }
                         total_len
-                    }
-                }
+                    },
+                })
             }
         });
         quote! {
@@ -554,63 +622,34 @@ impl<'a> MessageFieldsSorted<'a> {
         let crate_ = crate_name();
         let chunks = self.chunks.iter().map(|chunk| match chunk {
             AlwaysOrdered(field) => field.encode(&target),
-            SortGroup(parts) => {
-                let parts: Vec<TokenStream> = parts
-                    .iter()
-                    .map(|part| match part {
-                        Contiguous(fields) => {
-                            let Some(first_field) = fields.first() else {
-                                panic!("empty contiguous field group");
-                            };
-                            let first_tag = first_field.first_tag();
-                            let each_field =
-                                fields.iter().map(|field| field.encode(quote!(instance)));
-                            quote! {
-                                parts[nparts] = (
-                                    #first_tag,
-                                    ::core::option::Option::Some(|instance, buf, tw| {
-                                        #(#each_field)*
-                                    }),
-                                );
-                                nparts += 1;
-                            }
+            SortGroup(parts) => process_sort_groups(
+                parts,
+                &target,
+                SortGroupConfig {
+                    direction: Direction::Forward,
+                    contiguous_fn: |fields: Either<
+                        slice::Iter<&Field>,
+                        iter::Rev<slice::Iter<&Field>>,
+                    >| {
+                        let each_field = fields.map(|field| field.encode(quote!(instance)));
+                        quote! {
+                            |instance, buf, tw| { #(#each_field)* }
                         }
-                        OneofPart(field) => {
-                            let current_tag = field.current_tag(&target);
-                            let encode = field.encode(quote!(instance));
-                            quote! {
-                                if let ::core::option::Option::Some(tag) = #current_tag {
-                                    parts[nparts] = (
-                                        tag,
-                                        ::core::option::Option::Some(|instance, buf, tw| {
-                                            #encode
-                                        }),
-                                    );
-                                    nparts += 1;
-                                }
-                            }
+                    },
+                    oneof_part_fn: |field: &Field| {
+                        let encode = field.encode(quote!(instance));
+                        quote! {
+                            |instance, buf, tw| { #encode }
                         }
-                    })
-                    .collect();
-                let max_parts = parts.len();
-                quote! {
-                    {
-                        let mut parts = [
-                            (0u32, ::core::option::Option::None::<
-                                       fn(&Self, &mut __B, &mut #crate_::encoding::TagWriter)
-                                   >);
-                            #max_parts
-                        ];
-                        let mut nparts = 0usize;
-                        #(#parts)*
-                        let parts = &mut parts[..nparts];
-                        parts.sort_unstable_by_key(|(tag, _)| *tag);
+                    },
+                    extra_data_ty: quote!(fn(&Self, &mut __B, &mut #crate_::encoding::TagWriter)),
+                    invoke_parts: quote! {
                         for (_, encode_func) in parts {
                             (encode_func.unwrap())(#target, buf, tw);
                         }
-                    }
-                }
-            }
+                    },
+                },
+            ),
         });
         quote! {
             {
@@ -624,66 +663,34 @@ impl<'a> MessageFieldsSorted<'a> {
         let crate_ = crate_name();
         let chunks = self.chunks.iter().rev().map(|chunk| match chunk {
             AlwaysOrdered(field) => field.prepend(&target),
-            SortGroup(parts) => {
-                let parts: Vec<TokenStream> = parts
-                    .iter()
-                    .rev()
-                    .map(|part| match part {
-                        Contiguous(fields) => {
-                            let Some(first_field) = fields.first() else {
-                                panic!("empty contiguous field group");
-                            };
-                            let first_tag = first_field.first_tag();
-                            let each_field = fields
-                                .iter()
-                                .rev()
-                                .map(|field| field.prepend(quote!(instance)));
-                            quote! {
-                                parts[nparts] = (
-                                    #first_tag,
-                                    ::core::option::Option::Some(|instance, buf, tw| {
-                                        #(#each_field)*
-                                    }),
-                                );
-                                nparts += 1;
-                            }
+            SortGroup(parts) => process_sort_groups(
+                parts,
+                &target,
+                SortGroupConfig {
+                    direction: Direction::Reverse,
+                    contiguous_fn: |fields: Either<
+                        slice::Iter<&Field>,
+                        iter::Rev<slice::Iter<&Field>>,
+                    >| {
+                        let each_field = fields.map(|field| field.prepend(quote!(instance)));
+                        quote! {
+                            |instance, buf, tw| { #(#each_field)* }
                         }
-                        OneofPart(field) => {
-                            let current_tag = field.current_tag(&target);
-                            let prepend = field.prepend(quote!(instance));
-                            quote! {
-                                if let ::core::option::Option::Some(tag) = #current_tag {
-                                    parts[nparts] = (
-                                        tag,
-                                        ::core::option::Option::Some(|instance, buf, tw| {
-                                            #prepend
-                                        }),
-                                    );
-                                    nparts += 1;
-                                }
-                            }
+                    },
+                    oneof_part_fn: |field: &Field| {
+                        let prepend = field.prepend(quote!(instance));
+                        quote! {
+                            |instance, buf, tw| { #prepend }
                         }
-                    })
-                    .collect();
-                let max_parts = parts.len();
-                quote! {
-                    {
-                        let mut parts = [
-                            (0u32, ::core::option::Option::None::<
-                                       fn(&Self, &mut __B, &mut #crate_::encoding::TagRevWriter)
-                                   >);
-                            #max_parts
-                        ];
-                        let mut nparts = 0usize;
-                        #(#parts)*
-                        let parts = &mut parts[..nparts];
-                        parts.sort_unstable_by_key(|(tag, _)| ::core::cmp::Reverse(*tag));
+                    },
+                    extra_data_ty: quote!(fn(&Self, &mut __B, &mut #crate_::encoding::TagRevWriter)),
+                    invoke_parts: quote! {
                         for (_, prepend_func) in parts {
                             (prepend_func.unwrap())(#target, buf, tw);
                         }
-                    }
-                }
-            }
+                    },
+                },
+            ),
         });
         quote! {
             {
