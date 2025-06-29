@@ -3652,6 +3652,9 @@ fn distinguished_oneof_with_nonempty_variant() {
         #[bilrost(1)]
         A(NonEmptyTy),
     }
+    static_assertions::assert_impl_all!(
+        DistinguishedEnum: bilrost::encoding::NonEmptyDistinguishedOneofDecoder,
+    );
 }
 
 #[test]
@@ -4552,6 +4555,9 @@ fn implicit_encoding_ergonomics() {
             #[bilrost(3)]
             C(BTreeSet<u32>),
         }
+        static_assertions::assert_impl_all!(
+            OneofWithRepeatedVariants<'static>: bilrost::encoding::NonEmptyOneof,
+        );
         #[derive(Message)]
         struct MessageWithNestedRepeateds<'a> {
             #[bilrost(encoding(packed))]
@@ -4567,6 +4573,9 @@ fn implicit_encoding_ergonomics() {
             c2: Vec<BTreeSet<u32>>,
             c3: BTreeMap<BTreeSet<u32>, BTreeSet<u32>>,
         }
+        static_assertions::assert_impl_all!(
+            MessageWithNestedRepeateds<'static>: Message,
+        );
     }
     #[cfg(feature = "std")]
     {
@@ -4575,6 +4584,9 @@ fn implicit_encoding_ergonomics() {
             #[bilrost(1)]
             A(std::collections::HashSet<u32>),
         }
+        static_assertions::assert_impl_all!(
+            OneofWithRepeatedVariants: bilrost::encoding::NonEmptyOneof,
+        );
         #[derive(Message)]
         struct MessageWithNestedRepeateds {
             #[bilrost(encoding(packed))]
@@ -4582,6 +4594,9 @@ fn implicit_encoding_ergonomics() {
             a2: Vec<std::collections::HashSet<u32>>,
             a3: BTreeMap<u32, std::collections::HashSet<u32>>,
         }
+        static_assertions::assert_impl_all!(
+            MessageWithNestedRepeateds: Message,
+        );
     }
     #[cfg(feature = "arrayvec")]
     {
@@ -4590,6 +4605,9 @@ fn implicit_encoding_ergonomics() {
             #[bilrost(1)]
             A(arrayvec::ArrayVec<u32, 10>),
         }
+        static_assertions::assert_impl_all!(
+            OneofWithRepeatedVariants: bilrost::encoding::NonEmptyOneof,
+        );
         #[derive(Message)]
         struct MessageWithNestedRepeateds {
             #[bilrost(encoding(packed))]
@@ -4597,6 +4615,9 @@ fn implicit_encoding_ergonomics() {
             a2: Vec<arrayvec::ArrayVec<u32, 10>>,
             a3: BTreeMap<arrayvec::ArrayVec<u32, 10>, arrayvec::ArrayVec<u32, 10>>,
         }
+        static_assertions::assert_impl_all!(
+            MessageWithNestedRepeateds: Message,
+        );
     }
     #[cfg(feature = "hashbrown")]
     {
@@ -4605,6 +4626,9 @@ fn implicit_encoding_ergonomics() {
             #[bilrost(1)]
             A(hashbrown::HashSet<u32>),
         }
+        static_assertions::assert_impl_all!(
+            OneofWithRepeatedVariants: bilrost::encoding::NonEmptyOneof,
+        );
         #[derive(Message)]
         struct MessageWithNestedRepeateds {
             #[bilrost(encoding(packed))]
@@ -4612,6 +4636,9 @@ fn implicit_encoding_ergonomics() {
             a2: Vec<hashbrown::HashSet<u32>>,
             a3: BTreeMap<u32, hashbrown::HashSet<u32>>,
         }
+        static_assertions::assert_impl_all!(
+            MessageWithNestedRepeateds: Message,
+        );
     }
     #[cfg(feature = "smallvec")]
     {
@@ -4620,6 +4647,9 @@ fn implicit_encoding_ergonomics() {
             #[bilrost(1)]
             A(smallvec::SmallVec<[u32; 10]>),
         }
+        static_assertions::assert_impl_all!(
+            OneofWithRepeatedVariants: bilrost::encoding::NonEmptyOneof,
+        );
         #[derive(Message)]
         struct MessageWithNestedRepeateds {
             #[bilrost(encoding(packed))]
@@ -4627,6 +4657,9 @@ fn implicit_encoding_ergonomics() {
             a2: Vec<smallvec::SmallVec<[u32; 10]>>,
             a3: BTreeMap<smallvec::SmallVec<[u32; 10]>, smallvec::SmallVec<[u32; 10]>>,
         }
+        static_assertions::assert_impl_all!(
+            MessageWithNestedRepeateds: Message,
+        );
     }
     #[cfg(feature = "thin-vec")]
     {
@@ -4635,6 +4668,9 @@ fn implicit_encoding_ergonomics() {
             #[bilrost(1)]
             A(thin_vec::ThinVec<u32>),
         }
+        static_assertions::assert_impl_all!(
+            OneofWithRepeatedVariants: bilrost::encoding::NonEmptyOneof,
+        );
         #[derive(Message)]
         struct MessageWithNestedRepeateds {
             #[bilrost(encoding(packed))]
@@ -4642,6 +4678,9 @@ fn implicit_encoding_ergonomics() {
             a2: Vec<thin_vec::ThinVec<u32>>,
             a3: BTreeMap<thin_vec::ThinVec<u32>, thin_vec::ThinVec<u32>>,
         }
+        static_assertions::assert_impl_all!(
+            MessageWithNestedRepeateds: Message,
+        );
     }
     #[cfg(feature = "tinyvec")]
     {
@@ -4652,6 +4691,9 @@ fn implicit_encoding_ergonomics() {
             #[bilrost(2)]
             B(tinyvec::TinyVec<[u32; 10]>),
         }
+        static_assertions::assert_impl_all!(
+            OneofWithRepeatedVariants: bilrost::encoding::NonEmptyOneof,
+        );
         #[derive(Message)]
         struct MessageWithNestedRepeateds {
             #[bilrost(encoding(packed))]
@@ -4663,5 +4705,8 @@ fn implicit_encoding_ergonomics() {
             b2: Vec<tinyvec::TinyVec<[u32; 10]>>,
             b3: BTreeMap<tinyvec::TinyVec<[u32; 10]>, tinyvec::TinyVec<[u32; 10]>>,
         }
+        static_assertions::assert_impl_all!(
+            MessageWithNestedRepeateds: Message,
+        );
     }
 }
