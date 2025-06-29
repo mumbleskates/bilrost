@@ -101,7 +101,7 @@ pub fn parse_message_fields(
 }
 
 /// If there can never be a tag delta larger than 31, field keys will never be more than 1 byte.
-fn tag_measurer(for_these: &[impl Tagged]) -> TokenStream {
+pub fn tag_measurer(for_these: &[impl Tagged]) -> TokenStream {
     let crate_ = crate_name();
     if matches!(for_these.iter().flat_map(Tagged::tags).max(), Some(max_tag) if max_tag < 32) {
         quote!(#crate_::encoding::TrivialTagMeasurer)

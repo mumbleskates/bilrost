@@ -18,7 +18,7 @@ use crate::field::traits::{
     FieldBearer, SinglyTagged, Tagged,
     WhereFor::{self, Decode, Encode},
 };
-use crate::field::{parse_message_fields, Field, MessageFieldsSorted, OneofVariant};
+use crate::field::{parse_message_fields, tag_measurer, Field, MessageFieldsSorted, OneofVariant};
 use alloc::collections::BTreeMap;
 use alloc::string::ToString;
 use alloc::vec;
@@ -57,14 +57,6 @@ fn encoder_alias_header() -> TokenStream {
             Unpacked as unpacked,
             Varint as varint,
         };
-    }
-}
-
-// If there can never be a tag delta larger than 31, field keys will never be more than 1 byte.
-fn can_use_trivial_tag_measurer(for_these: &[impl Tagged]) -> bool {
-    match for_these.iter().flat_map(Tagged::tags).max() {
-        None => true,
-        Some(max_tag) => max_tag < 32,
     }
 }
 
@@ -524,11 +516,7 @@ fn try_message_via_oneof(input: DeriveInput) -> Result<TokenStream, Error> {
         empty_variant,
     } = preprocess_oneof(&input)?;
 
-    let tag_measurer = if can_use_trivial_tag_measurer(&variants) {
-        quote!(#crate_::encoding::TrivialTagMeasurer)
-    } else {
-        quote!(#crate_::encoding::RuntimeTagMeasurer)
-    };
+    let tag_measurer_ty = tag_measurer(&variants);
 
     if empty_variant.is_none() {
         bail!("Message can only be derived for Oneof enums that have an empty variant.")
@@ -627,7 +615,7 @@ fn try_message_via_oneof(input: DeriveInput) -> Result<TokenStream, Error> {
             fn raw_encoded_len(&self) -> usize {
                 <Self as #crate_::encoding::Oneof>::oneof_encoded_len(
                     self,
-                    &mut #tag_measurer::new(),
+                    &mut #tag_measurer_ty::new(),
                 )
             }
         }
