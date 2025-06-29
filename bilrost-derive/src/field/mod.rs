@@ -489,9 +489,12 @@ impl<'a> MessageFieldsSorted<'a> {
                                 .iter()
                                 .map(|field| field.encoded_len(quote!(instance)));
                             quote! {
-                                parts[nparts] = (#first_tag, Some(|instance, tm| {
-                                    0 #(+ #each_len)*
-                                }));
+                                parts[nparts] = (
+                                    #first_tag,
+                                    ::core::option::Option::Some(|instance, tm| {
+                                        0 #(+ #each_len)*
+                                    }),
+                                );
                                 nparts += 1;
                             }
                         }
@@ -499,10 +502,13 @@ impl<'a> MessageFieldsSorted<'a> {
                             let current_tag = field.current_tag(&target);
                             let encoded_len = field.encoded_len(quote!(instance));
                             quote! {
-                                if let Some(tag) = #current_tag {
-                                    parts[nparts] = (tag, Some(|instance, tm| {
-                                        #encoded_len
-                                    }));
+                                if let ::core::option::Option::Some(tag) = #current_tag {
+                                    parts[nparts] = (
+                                        tag,
+                                        ::core::option::Option::Some(|instance, tm| {
+                                            #encoded_len
+                                        }),
+                                    );
                                     nparts += 1;
                                 }
                             }
@@ -555,9 +561,12 @@ impl<'a> MessageFieldsSorted<'a> {
                             let each_field =
                                 fields.iter().map(|field| field.encode(quote!(instance)));
                             quote! {
-                                parts[nparts] = (#first_tag, Some(|instance, buf, tw| {
-                                    #(#each_field)*
-                                }));
+                                parts[nparts] = (
+                                    #first_tag,
+                                    ::core::option::Option::Some(|instance, buf, tw| {
+                                        #(#each_field)*
+                                    }),
+                                );
                                 nparts += 1;
                             }
                         }
@@ -565,10 +574,13 @@ impl<'a> MessageFieldsSorted<'a> {
                             let current_tag = field.current_tag(&target);
                             let encode = field.encode(quote!(instance));
                             quote! {
-                                if let Some(tag) = #current_tag {
-                                    parts[nparts] = (tag, Some(|instance, buf, tw| {
-                                        #encode
-                                    }));
+                                if let ::core::option::Option::Some(tag) = #current_tag {
+                                    parts[nparts] = (
+                                        tag,
+                                        ::core::option::Option::Some(|instance, buf, tw| {
+                                            #encode
+                                        }),
+                                    );
                                     nparts += 1;
                                 }
                             }
@@ -621,9 +633,12 @@ impl<'a> MessageFieldsSorted<'a> {
                                 .rev()
                                 .map(|field| field.prepend(quote!(instance)));
                             quote! {
-                                parts[nparts] = (#first_tag, Some(|instance, buf, tw| {
-                                    #(#each_field)*
-                                }));
+                                parts[nparts] = (
+                                    #first_tag,
+                                    ::core::option::Option::Some(|instance, buf, tw| {
+                                        #(#each_field)*
+                                    }),
+                                );
                                 nparts += 1;
                             }
                         }
@@ -631,10 +646,13 @@ impl<'a> MessageFieldsSorted<'a> {
                             let current_tag = field.current_tag(&target);
                             let prepend = field.prepend(quote!(instance));
                             quote! {
-                                if let Some(tag) = #current_tag {
-                                    parts[nparts] = (tag, Some(|instance, buf, tw| {
-                                        #prepend
-                                    }));
+                                if let ::core::option::Option::Some(tag) = #current_tag {
+                                    parts[nparts] = (
+                                        tag,
+                                        ::core::option::Option::Some(|instance, buf, tw| {
+                                            #prepend
+                                        }),
+                                    );
                                     nparts += 1;
                                 }
                             }
