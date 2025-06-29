@@ -101,33 +101,32 @@ fn can_use_trivial_tag_measurer(for_these: &[impl Tagged]) -> bool {
     }
 }
 
-enum SortGroupPart {
+enum SortGroupPart<'a> {
     // A set of fields that can be sorted by any of their tags, as they are always contiguous
-    Contiguous(Vec<Field>),
+    Contiguous(Vec<&'a Field>),
     // A oneof field that needs to be sorted based on its current value's tag
-    Oneof(Field),
+    Oneof(&'a Field),
 }
-
 use SortGroupPart::*;
 
-enum FieldChunk {
+enum FieldChunk<'a> {
     // A field that does not need to be sorted
-    AlwaysOrdered(Field),
+    AlwaysOrdered(&'a Field),
     // A set of fields that must be sorted before emitting
-    SortGroup(Vec<SortGroupPart>),
+    SortGroup(Vec<SortGroupPart<'a>>),
 }
 use FieldChunk::*;
 
 /// Sorts a vec of unsorted fields into discrete chunks that may be ordered together at runtime to
 /// ensure that all their fields are encoded in sorted order.
-fn sort_fields(unsorted_fields: Vec<Field>) -> Vec<FieldChunk> {
+fn sort_fields(unsorted_fields: &[Field]) -> Vec<FieldChunk<'_>> {
     let mut chunks: Vec<FieldChunk> = vec![];
     let mut fields = unsorted_fields
-        .into_iter()
+        .iter()
         .sorted_unstable_by_key(|field| field.first_tag())
         .peekable();
     // Current vecs we are building for FieldChunk::SortGroup and SortGroupPart::Contiguous
-    let mut current_contiguous_group: Vec<Field> = vec![];
+    let mut current_contiguous_group: Vec<&Field> = vec![];
     let mut current_sort_group: Vec<SortGroupPart> = vec![];
     // Set of oneof tags that are interspersed with other fields, so we know when we're able to
     // put multiple fields into the same ordered group.
@@ -343,7 +342,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
 
     let (_, ty_generics, where_clause) = impl_generics.split_for_impl();
 
-    let fields = sort_fields(unsorted_fields.clone());
+    let fields = sort_fields(&unsorted_fields);
     let self_where = if default_per_field || ignored_fields.is_empty() {
         None
     } else {
