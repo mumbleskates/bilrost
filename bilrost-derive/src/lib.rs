@@ -18,13 +18,11 @@ use crate::field::traits::{
     FieldBearer, SinglyTagged, Tagged,
     WhereFor::{self, Decode, Encode},
 };
-use crate::field::{parse_message_fields, Field, OneofVariant};
-use alloc::collections::{BTreeMap, BTreeSet};
+use crate::field::{parse_message_fields, Field, MessageFieldsSorted, OneofVariant};
+use alloc::collections::BTreeMap;
 use alloc::string::ToString;
 use alloc::vec;
 use alloc::vec::Vec;
-use core::mem::take;
-use core::ops::Deref;
 use eyre::{bail, eyre as err, Report as Error};
 use itertools::Itertools;
 use proc_macro2::TokenStream;
@@ -39,37 +37,6 @@ mod field;
 
 fn crate_name() -> TokenStream {
     quote!(::bilrost)
-}
-
-/// Helper type to ensure a value is used at runtime.
-struct MustMove<T>(Option<T>);
-
-impl<T> MustMove<T> {
-    fn new(t: T) -> Self {
-        Self(Some(t))
-    }
-
-    fn into_inner(mut self) -> T {
-        take(&mut self.0).expect("MustMove value was moved out twice")
-    }
-}
-
-impl<T> Drop for MustMove<T> {
-    fn drop(&mut self) {
-        if self.0.is_some() {
-            panic!("a must-use value was dropped!");
-        }
-    }
-}
-
-impl<T> Deref for MustMove<T> {
-    type Target = T;
-
-    fn deref(&self) -> &T {
-        self.0
-            .as_ref()
-            .expect("MustMove dereferenced after the value was moved out")
-    }
 }
 
 /// Defines the common aliases for encoder types available to every bilrost derive.
@@ -99,136 +66,6 @@ fn can_use_trivial_tag_measurer(for_these: &[impl Tagged]) -> bool {
         None => true,
         Some(max_tag) => max_tag < 32,
     }
-}
-
-enum SortGroupPart<'a> {
-    // A set of fields that can be sorted by any of their tags, as they are always contiguous
-    Contiguous(Vec<&'a Field>),
-    // A oneof field that needs to be sorted based on its current value's tag
-    Oneof(&'a Field),
-}
-use SortGroupPart::*;
-
-enum FieldChunk<'a> {
-    // A field that does not need to be sorted
-    AlwaysOrdered(&'a Field),
-    // A set of fields that must be sorted before emitting
-    SortGroup(Vec<SortGroupPart<'a>>),
-}
-use FieldChunk::*;
-
-/// Sorts a vec of unsorted fields into discrete chunks that may be ordered together at runtime to
-/// ensure that all their fields are encoded in sorted order.
-fn sort_fields(unsorted_fields: &[Field]) -> Vec<FieldChunk<'_>> {
-    let mut chunks: Vec<FieldChunk> = vec![];
-    let mut fields = unsorted_fields
-        .iter()
-        .sorted_unstable_by_key(|field| field.first_tag())
-        .peekable();
-    // Current vecs we are building for FieldChunk::SortGroup and SortGroupPart::Contiguous
-    let mut current_contiguous_group: Vec<&Field> = vec![];
-    let mut current_sort_group: Vec<SortGroupPart> = vec![];
-    // Set of oneof tags that are interspersed with other fields, so we know when we're able to
-    // put multiple fields into the same ordered group.
-    let mut sort_group_oneof_tags = BTreeSet::<u32>::new();
-    while let (Some(this_field), next_field) = (fields.next(), fields.peek()) {
-        // The following logic is a bit involved, so ensure that we can't forget to use the values.
-        let this_field = MustMove::new(this_field);
-        let field = this_field.deref();
-        let first_tag = field.first_tag();
-        let last_tag = field.last_tag();
-        // Check if this field is a oneof with tags interleaved with other fields' tags. If true,
-        // this field must always be emitted into a sort group.
-        let overlaps = matches!(next_field, Some(next_field) if last_tag > next_field.first_tag());
-        // Check if this field is already in a range we know requires runtime sorting.
-        // MSRV: can't use .last()
-        let in_current_sort_group =
-            matches!(sort_group_oneof_tags.iter().next_back(), Some(&end) if end > first_tag);
-
-        if in_current_sort_group {
-            // We're still building a sort group.
-            if overlaps {
-                // This field overlaps others and must always be emitted independently.
-                // Emit any current ordered group, then emit this field as another part on its own.
-                if !current_contiguous_group.is_empty() {
-                    current_sort_group.push(Contiguous(take(&mut current_contiguous_group)));
-                }
-                sort_group_oneof_tags.extend(field.tags());
-                current_sort_group.push(Oneof(this_field.into_inner()));
-            } else if sort_group_oneof_tags
-                .range(first_tag..=last_tag)
-                .next()
-                .is_some()
-            {
-                // This field is a oneof that is itself interleaved by other oneofs and must always
-                // be emitted independently. Emit any current ordered group, then emit this field as
-                // another part on its own.
-                if !current_contiguous_group.is_empty() {
-                    current_sort_group.push(Contiguous(take(&mut current_contiguous_group)));
-                }
-                // In this case we don't need to add this field's tags to `sort_group_oneof_tags`,
-                // because it doesn't itself overlap (we know that every field after this has a tag
-                // greater than this field's last tag).
-                current_sort_group.push(Oneof(this_field.into_inner()));
-            } else {
-                // This field doesn't overlap with anything so we just add it to the current group
-                // of already-ordered fields.
-                if let Some(previous_field) = current_contiguous_group.last() {
-                    if sort_group_oneof_tags
-                        .range(previous_field.last_tag()..=first_tag)
-                        .next()
-                        .is_some()
-                    {
-                        // One of the overlapping oneofs in this sort group may emit a tag between
-                        // the previous field in the ordered group and this one, so split the
-                        // ordered group here.
-                        current_sort_group.push(Contiguous(take(&mut current_contiguous_group)));
-                    }
-                }
-                current_contiguous_group.push(this_field.into_inner());
-            }
-        } else {
-            // We are not already in a sort group.
-            if overlaps {
-                // This field requires sorting with others. Begin a new sort group.
-                sort_group_oneof_tags.clear();
-                sort_group_oneof_tags.extend(field.tags());
-                current_sort_group.push(Oneof(this_field.into_inner()));
-            } else {
-                // This field doesn't need to be sorted.
-                chunks.push(AlwaysOrdered(this_field.into_inner()));
-            }
-        }
-
-        // MSRV: can't use .last()
-        if let Some(&sort_group_end) = sort_group_oneof_tags.iter().next_back() {
-            if !matches!(
-                next_field,
-                Some(next_field) if next_field.first_tag() < sort_group_end
-            ) {
-                // We've been building a sort group, but we just reached the end.
-                if !current_contiguous_group.is_empty() {
-                    current_sort_group.push(Contiguous(take(&mut current_contiguous_group)));
-                }
-                assert!(
-                    !current_sort_group.is_empty(),
-                    "emitting a sort group but there are no fields"
-                );
-                chunks.push(SortGroup(take(&mut current_sort_group)));
-                sort_group_oneof_tags.clear();
-            }
-        }
-    }
-    assert!(
-        current_sort_group.into_iter().next().is_none(),
-        "fields left over after chunking"
-    );
-    assert!(
-        current_contiguous_group.into_iter().next().is_none(),
-        "fields left over after chunking"
-    );
-
-    chunks
 }
 
 /// Combines an optional WhereClause and any number of additional provided where term(s) into a
@@ -342,7 +179,6 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
 
     let (_, ty_generics, where_clause) = impl_generics.split_for_impl();
 
-    let fields = sort_fields(&unsorted_fields);
     let self_where = if default_per_field || ignored_fields.is_empty() {
         None
     } else {
@@ -371,183 +207,10 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
             )
         });
 
-    let tag_measurer_ty = if can_use_trivial_tag_measurer(&unsorted_fields) {
-        quote!(#crate_::encoding::TrivialTagMeasurer)
-    } else {
-        quote!(#crate_::encoding::RuntimeTagMeasurer)
-    };
-
-    let encoded_len = fields.iter().map(|chunk| match chunk {
-        AlwaysOrdered(field) => field.encoded_len(quote!(self)),
-        SortGroup(parts) => {
-            let parts: Vec<TokenStream> = parts
-                .iter()
-                .map(|part| match part {
-                    Contiguous(fields) => {
-                        let Some(first_field) = fields.first() else {
-                            panic!("empty contiguous field group");
-                        };
-                        let first_tag = first_field.first_tag();
-                        let each_len = fields
-                            .iter()
-                            .cloned()
-                            .map(|field| field.encoded_len(quote!(instance)));
-                        quote! {
-                            parts[nparts] = (#first_tag, Some(|instance, tm| {
-                                0 #(+ #each_len)*
-                            }));
-                            nparts += 1;
-                        }
-                    }
-                    Oneof(field) => {
-                        let current_tag = field.current_tag(quote!(self));
-                        let encoded_len = field.encoded_len(quote!(instance));
-                        quote! {
-                            if let Some(tag) = #current_tag {
-                                parts[nparts] = (tag, Some(|instance, tm| {
-                                    #encoded_len
-                                }));
-                                nparts += 1;
-                            }
-                        }
-                    }
-                })
-                .collect();
-            let max_parts = parts.len();
-            quote! {
-                {
-                    let mut parts = [
-                        (0u32, ::core::option::Option::None::<
-                                   fn(&Self, &mut #tag_measurer_ty) -> usize
-                               >);
-                        #max_parts
-                    ];
-                    let mut nparts = 0usize;
-                    #(#parts)*
-                    let parts = &mut parts[..nparts];
-                    <[_]>::sort_unstable_by_key(parts, |(tag, _)| *tag);
-                    let mut total_len = 0usize;
-                    for (_, len_func_option) in parts {
-                        total_len += ::core::option::Option::unwrap(*len_func_option)(self, tm)
-                    }
-                    total_len
-                }
-            }
-        }
-    });
-
-    let encode = fields.iter().map(|chunk| match chunk {
-        AlwaysOrdered(field) => field.encode(quote!(self)),
-        SortGroup(parts) => {
-            let parts: Vec<TokenStream> = parts
-                .iter()
-                .map(|part| match part {
-                    Contiguous(fields) => {
-                        let Some(first_field) = fields.first() else {
-                            panic!("empty contiguous field group");
-                        };
-                        let first_tag = first_field.first_tag();
-                        let each_field = fields
-                            .iter()
-                            .cloned()
-                            .map(|field| field.encode(quote!(instance)));
-                        quote! {
-                            parts[nparts] = (#first_tag, Some(|instance, buf, tw| {
-                                #(#each_field)*
-                            }));
-                            nparts += 1;
-                        }
-                    }
-                    Oneof(field) => {
-                        let current_tag = field.current_tag(quote!(self));
-                        let encode = field.encode(quote!(instance));
-                        quote! {
-                            if let Some(tag) = #current_tag {
-                                parts[nparts] = (tag, Some(|instance, buf, tw| {
-                                    #encode
-                                }));
-                                nparts += 1;
-                            }
-                        }
-                    }
-                })
-                .collect();
-            let max_parts = parts.len();
-            quote! {
-                {
-                    let mut parts = [
-                        (0u32, ::core::option::Option::None::<
-                                   fn(&Self, &mut __B, &mut #crate_::encoding::TagWriter)
-                               >);
-                        #max_parts
-                    ];
-                    let mut nparts = 0usize;
-                    #(#parts)*
-                    let parts = &mut parts[..nparts];
-                    parts.sort_unstable_by_key(|(tag, _)| *tag);
-                    parts.iter().for_each(|(_, encode_func)| (encode_func.unwrap())(self, buf, tw));
-                }
-            }
-        }
-    });
-
-    let prepend = fields.iter().rev().map(|chunk| match chunk {
-        AlwaysOrdered(field) => field.prepend(quote!(self)),
-        SortGroup(parts) => {
-            let parts: Vec<TokenStream> = parts
-                .iter()
-                .rev()
-                .map(|part| match part {
-                    Contiguous(fields) => {
-                        let Some(first_field) = fields.first() else {
-                            panic!("empty contiguous field group");
-                        };
-                        let first_tag = first_field.first_tag();
-                        let each_field = fields
-                            .iter()
-                            .rev()
-                            .cloned()
-                            .map(|field| field.prepend(quote!(instance)));
-                        quote! {
-                            parts[nparts] = (#first_tag, Some(|instance, buf, tw| {
-                                #(#each_field)*
-                            }));
-                            nparts += 1;
-                        }
-                    }
-                    Oneof(field) => {
-                        let current_tag = field.current_tag(quote!(self));
-                        let prepend = field.prepend(quote!(instance));
-                        quote! {
-                            if let Some(tag) = #current_tag {
-                                parts[nparts] = (tag, Some(|instance, buf, tw| {
-                                    #prepend
-                                }));
-                                nparts += 1;
-                            }
-                        }
-                    }
-                })
-                .collect();
-            let max_parts = parts.len();
-            quote! {
-                {
-                    let mut parts = [
-                        (0u32, ::core::option::Option::None::<
-                                   fn(&Self, &mut __B, &mut #crate_::encoding::TagRevWriter)
-                               >);
-                        #max_parts
-                    ];
-                    let mut nparts = 0usize;
-                    #(#parts)*
-                    let parts = &mut parts[..nparts];
-                    parts.sort_unstable_by_key(|(tag, _)| ::core::cmp::Reverse(*tag));
-                    parts.iter()
-                        .for_each(|(_, prepend_func)| (prepend_func.unwrap())(self, buf, tw));
-                }
-            }
-        }
-    });
+    let fields = MessageFieldsSorted::new(&unsorted_fields);
+    let encoded_len = fields.encoded_len(quote!(self));
+    let encode = fields.encode(quote!(self));
+    let prepend = fields.prepend(quote!(self));
 
     let [decode_owned, decode_borrowed] = [Owned, Borrowed].map(|lifetime| {
         let ident = ident.clone();
@@ -666,8 +329,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
                 __B: #crate_::bytes::BufMut + ?Sized,
             {
                 let _ = <Self as #crate_::encoding::RawMessage>::__ASSERTIONS;
-                let tw = &mut #crate_::encoding::TagWriter::new();
-                #(#encode)*
+                #encode
             }
 
             #[allow(unused_variables)]
@@ -676,16 +338,13 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
                 __B: #crate_::buf::ReverseBuf + ?Sized,
             {
                 let _ = <Self as #crate_::encoding::RawMessage>::__ASSERTIONS;
-                let tw = &mut #crate_::encoding::TagRevWriter::new();
-                #(#prepend)*
-                tw.finalize(buf);
+                #prepend
             }
 
             #[inline]
             fn raw_encoded_len(&self) -> usize {
                 let _ = <Self as #crate_::encoding::RawMessage>::__ASSERTIONS;
-                let tm = &mut #tag_measurer_ty::new();
-                0 #(+ #encoded_len)*
+                #encoded_len
             }
         }
 

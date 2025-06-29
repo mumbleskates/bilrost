@@ -11,7 +11,7 @@ use alloc::vec;
 use alloc::vec::Vec;
 use eyre::{bail, Report as Error};
 use proc_macro2::TokenStream;
-use quote::quote;
+use quote::{quote, ToTokens};
 use syn::{Meta, Type};
 
 #[derive(Clone)]
@@ -126,7 +126,7 @@ impl OneofInclusion {
 
     /// Returns an expression which evaluates to an Option<u32> of the tag of the (maybe) present
     /// field in the oneof.
-    pub fn current_tag(&self, target: TokenStream) -> TokenStream {
+    pub fn current_tag(&self, target: impl ToTokens) -> TokenStream {
         let crate_ = crate_name();
         quote!(#crate_::encoding::Oneof::oneof_current_tag(&#target))
     }
