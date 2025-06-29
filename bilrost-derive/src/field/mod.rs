@@ -605,8 +605,9 @@ impl<'a> MessageFieldsSorted<'a> {
                         #(#parts)*
                         let parts = &mut parts[..nparts];
                         parts.sort_unstable_by_key(|(tag, _)| *tag);
-                        parts.iter()
-                            .for_each(|(_, encode_func)| (encode_func.unwrap())(#target, buf, tw));
+                        for (_, encode_func) in parts {
+                            (encode_func.unwrap())(#target, buf, tw);
+                        }
                     }
                 }
             }
@@ -677,8 +678,9 @@ impl<'a> MessageFieldsSorted<'a> {
                         #(#parts)*
                         let parts = &mut parts[..nparts];
                         parts.sort_unstable_by_key(|(tag, _)| ::core::cmp::Reverse(*tag));
-                        parts.iter()
-                            .for_each(|(_, prepend_func)| (prepend_func.unwrap())(#target, buf, tw));
+                        for (_, prepend_func) in parts {
+                            (prepend_func.unwrap())(#target, buf, tw);
+                        }
                     }
                 }
             }
