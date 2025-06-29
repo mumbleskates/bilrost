@@ -487,7 +487,6 @@ impl<'a> MessageFieldsSorted<'a> {
                             let first_tag = first_field.first_tag();
                             let each_len = fields
                                 .iter()
-                                .cloned()
                                 .map(|field| field.encoded_len(quote!(instance)));
                             quote! {
                                 parts[nparts] = (#first_tag, Some(|instance, tm| {
@@ -553,10 +552,8 @@ impl<'a> MessageFieldsSorted<'a> {
                                 panic!("empty contiguous field group");
                             };
                             let first_tag = first_field.first_tag();
-                            let each_field = fields
-                                .iter()
-                                .cloned()
-                                .map(|field| field.encode(quote!(instance)));
+                            let each_field =
+                                fields.iter().map(|field| field.encode(quote!(instance)));
                             quote! {
                                 parts[nparts] = (#first_tag, Some(|instance, buf, tw| {
                                     #(#each_field)*
@@ -622,7 +619,6 @@ impl<'a> MessageFieldsSorted<'a> {
                             let each_field = fields
                                 .iter()
                                 .rev()
-                                .cloned()
                                 .map(|field| field.prepend(quote!(instance)));
                             quote! {
                                 parts[nparts] = (#first_tag, Some(|instance, buf, tw| {
