@@ -121,7 +121,7 @@ use FieldChunk::*;
 /// Sorts a vec of unsorted fields into discrete chunks that may be ordered together at runtime to
 /// ensure that all their fields are encoded in sorted order.
 fn sort_fields(unsorted_fields: Vec<Field>) -> Vec<FieldChunk> {
-    let mut chunks = Vec::<FieldChunk>::new();
+    let mut chunks: Vec<FieldChunk> = vec![];
     let mut fields = unsorted_fields
         .into_iter()
         .sorted_unstable_by_key(|field| field.first_tag())
@@ -192,7 +192,8 @@ fn sort_fields(unsorted_fields: Vec<Field>) -> Vec<FieldChunk> {
             // We are not already in a sort group.
             if overlaps {
                 // This field requires sorting with others. Begin a new sort group.
-                sort_group_oneof_tags = field.tags().into_iter().collect();
+                sort_group_oneof_tags.clear();
+                sort_group_oneof_tags.extend(field.tags());
                 current_sort_group.push(Oneof(this_field.into_inner()));
             } else {
                 // This field doesn't need to be sorted.
@@ -227,7 +228,6 @@ fn sort_fields(unsorted_fields: Vec<Field>) -> Vec<FieldChunk> {
         current_contiguous_group.into_iter().next().is_none(),
         "fields left over after chunking"
     );
-    drop(sort_group_oneof_tags);
 
     chunks
 }
