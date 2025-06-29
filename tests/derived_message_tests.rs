@@ -791,6 +791,7 @@ fn fieldless_messages() {
 
 #[test]
 fn message_named_after_builtin_encoding_alias() {
+    // TODO: re-alias where-clause types to avoid the aliases as well
     #[allow(non_camel_case_types)]
     #[derive(Debug, PartialEq, Eq, Message)]
     #[bilrost(distinguished)]
