@@ -356,7 +356,8 @@ use SortGroupPart::*;
 struct SortGroupConfig<FC, FO> {
     /// Sort direction: ascending or descending tag numbers
     direction: Direction,
-    /// Accepts an iterator of fields and outputs the generated code for
+    /// Accepts an iterator of fields and outputs the generated code for a contiguous group of
+    /// guaranteed fields
     contiguous_fn: FC,
     /// Accepts one field and outputs the generated code for a oneof field
     oneof_part_fn: FO,
@@ -367,6 +368,9 @@ struct SortGroupConfig<FC, FO> {
     /// and oneof code generation
     invoke_parts: TokenStream,
 }
+
+type ReversibleFields<'a> =
+    Either<slice::Iter<'a, &'a Field>, iter::Rev<slice::Iter<'a, &'a Field>>>;
 
 /// Helper that can conditionally reverse iterators.
 #[derive(Copy, Clone)]
@@ -395,7 +399,7 @@ fn process_sort_groups<FC, FO>(
     config: SortGroupConfig<FC, FO>,
 ) -> TokenStream
 where
-    FC: Fn(Either<slice::Iter<&Field>, iter::Rev<slice::Iter<&Field>>>) -> TokenStream,
+    FC: Fn(ReversibleFields) -> TokenStream,
     FO: Fn(&Field) -> TokenStream,
 {
     let SortGroupConfig {
@@ -587,7 +591,7 @@ impl<'a> MessageFieldsSorted<'a> {
             SortGroup(parts) => {
                 process_sort_groups(parts, &target, SortGroupConfig{
                     direction: Direction::Forward,
-                    contiguous_fn: |fields: Either<slice::Iter<&Field>, iter::Rev<slice::Iter<&Field>>>| {
+                    contiguous_fn: |fields: ReversibleFields| {
                         let each_len = fields.map(|field| field.encoded_len(quote!(instance)));
                         quote! {
                             |instance, tm| { 0 #(+ #each_len)* }
@@ -627,10 +631,7 @@ impl<'a> MessageFieldsSorted<'a> {
                 &target,
                 SortGroupConfig {
                     direction: Direction::Forward,
-                    contiguous_fn: |fields: Either<
-                        slice::Iter<&Field>,
-                        iter::Rev<slice::Iter<&Field>>,
-                    >| {
+                    contiguous_fn: |fields: ReversibleFields| {
                         let each_field = fields.map(|field| field.encode(quote!(instance)));
                         quote! {
                             |instance, buf, tw| { #(#each_field)* }
@@ -668,10 +669,7 @@ impl<'a> MessageFieldsSorted<'a> {
                 &target,
                 SortGroupConfig {
                     direction: Direction::Reverse,
-                    contiguous_fn: |fields: Either<
-                        slice::Iter<&Field>,
-                        iter::Rev<slice::Iter<&Field>>,
-                    >| {
+                    contiguous_fn: |fields: ReversibleFields| {
                         let each_field = fields.map(|field| field.prepend(quote!(instance)));
                         quote! {
                             |instance, buf, tw| { #(#each_field)* }
