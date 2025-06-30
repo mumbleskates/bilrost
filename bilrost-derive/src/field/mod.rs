@@ -589,8 +589,6 @@ impl<'a> MessageFieldsSorted<'a> {
     }
 
     pub fn encoded_len(&self, target: impl ToTokens) -> TokenStream {
-        // TODO: this function in particular ONLY needs to reorder the measurement of tag lengths,
-        //  not the measurement of the field values themselves
         let tag_measurer_ty = &self.tag_measurer_ty;
         let chunks = self.chunks.iter().map(|chunk| match chunk {
             AlwaysOrdered(field) => field.encoded_len(&target),
