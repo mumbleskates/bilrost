@@ -2,6 +2,7 @@ use alloc::vec;
 use alloc::vec::Vec;
 use core::ops::Deref;
 use proc_macro2::TokenStream;
+use quote::{quote, ToTokens};
 
 #[derive(Copy, Clone)]
 pub enum DecodeMode {
@@ -77,5 +78,60 @@ pub trait Tagged {
 impl<T: SinglyTagged> Tagged for T {
     fn tags(&self) -> Vec<u32> {
         vec![self.tag()]
+    }
+}
+
+pub trait FieldTarget {
+    type Renamed: FieldTarget;
+
+    fn self_expr(&self) -> TokenStream;
+    fn const_field_ref(&self, field_ident: &TokenStream) -> TokenStream;
+    fn mut_field_ref(&self, field_ident: &TokenStream) -> TokenStream;
+    fn rename(&self, new_instance_ident: TokenStream) -> Self::Renamed;
+}
+
+impl<T: FieldTarget> FieldTarget for &T {
+    type Renamed = T::Renamed;
+
+    fn self_expr(&self) -> TokenStream {
+        (**self).self_expr()
+    }
+
+    fn const_field_ref(&self, field_ident: &TokenStream) -> TokenStream {
+        (**self).const_field_ref(field_ident)
+    }
+
+    fn mut_field_ref(&self, field_ident: &TokenStream) -> TokenStream {
+        (**self).mut_field_ref(field_ident)
+    }
+
+    fn rename(&self, new_instance_ident: TokenStream) -> T::Renamed {
+        (**self).rename(new_instance_ident)
+    }
+}
+
+/// Represents a plain addressable instance of a message struct
+#[derive(Copy, Clone)]
+pub struct MessageInstance<T: ToTokens>(pub T);
+
+impl<T: ToTokens> FieldTarget for MessageInstance<T> {
+    type Renamed = MessageInstance<TokenStream>;
+
+    fn self_expr(&self) -> TokenStream {
+        self.0.to_token_stream()
+    }
+
+    fn const_field_ref(&self, field_ident: &TokenStream) -> TokenStream {
+        let instance = &self.0;
+        quote!(&#instance.#field_ident)
+    }
+
+    fn mut_field_ref(&self, field_ident: &TokenStream) -> TokenStream {
+        let instance = &self.0;
+        quote!(&mut #instance.#field_ident)
+    }
+
+    fn rename(&self, new_instance_ident: TokenStream) -> Self::Renamed {
+        MessageInstance(new_instance_ident)
     }
 }

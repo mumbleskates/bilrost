@@ -50,23 +50,26 @@ impl OneofInclusion {
         })))
     }
 
-    /// Returns a statement which encodes the oneof field.
+    /// Returns a statement which encodes the oneof field. `target` should be a reference to the
+    /// field value.
     pub fn encode(&self, target: TokenStream) -> TokenStream {
         let crate_ = crate_name();
         quote! {
-            #crate_::encoding::Oneof::oneof_encode(&#target, buf, tw);
+            #crate_::encoding::Oneof::oneof_encode(#target, buf, tw);
         }
     }
 
-    /// Returns a statement which prepends the oneof field.
+    /// Returns a statement which prepends the oneof field. `target` should be a reference to the
+    /// field value.
     pub fn prepend(&self, target: TokenStream) -> TokenStream {
         let crate_ = crate_name();
         quote! {
-            #crate_::encoding::Oneof::oneof_prepend(&#target, buf, tw);
+            #crate_::encoding::Oneof::oneof_prepend(#target, buf, tw);
         }
     }
 
-    /// Returns an expression which evaluates to the result of decoding the oneof field.
+    /// Returns an expression which evaluates to the result of decoding the oneof field. `target`
+    /// should be a mutable reference to the field value.
     pub fn decode(
         &self,
         target: TokenStream,
@@ -89,13 +92,14 @@ impl OneofInclusion {
                 quote!(oneof_borrow_decode_field_distinguished),
             ),
         };
-        quote!(#crate_::encoding::#trait_name::#call(&mut #target, tag, wire_type, buf, ctx))
+        quote!(#crate_::encoding::#trait_name::#call(#target, tag, wire_type, buf, ctx))
     }
 
-    /// Returns an expression which evaluates to the encoded length of the oneof field.
+    /// Returns an expression which evaluates to the encoded length of the oneof field. `target`
+    /// should be a reference to the field value.
     pub fn encoded_len(&self, target: TokenStream) -> TokenStream {
         let crate_ = crate_name();
-        quote!(#crate_::encoding::Oneof::oneof_encoded_len(&#target, tm))
+        quote!(#crate_::encoding::Oneof::oneof_encoded_len(#target, tm))
     }
 
     /// Returns an expression which initializes the field's type as a guaranteed empty value with
@@ -107,28 +111,30 @@ impl OneofInclusion {
     }
 
     /// Returns an expression which returns whether the field is considered empty in the encoding.
+    /// `target` should be a reference to the field value.
     pub fn is_empty(&self, target: TokenStream) -> TokenStream {
         let crate_ = crate_name();
         let ty = &self.ty;
         quote!(
-            <#ty as #crate_::encoding::Oneof>::is_empty(&#target)
+            <#ty as #crate_::encoding::Oneof>::is_empty(#target)
         )
     }
 
-    /// Returns an expression which resets the field's value to empty with its encoding.
+    /// Returns an expression which resets the field's value to empty with its encoding. `target`
+    /// should be a reference to the field value.
     pub fn clear(&self, target: TokenStream) -> TokenStream {
         let crate_ = crate_name();
         let ty = &self.ty;
         quote! {
-            <#ty as #crate_::encoding::Oneof>::clear(&mut #target);
+            <#ty as #crate_::encoding::Oneof>::clear(#target);
         }
     }
 
     /// Returns an expression which evaluates to an Option<u32> of the tag of the (maybe) present
-    /// field in the oneof.
+    /// field in the oneof. `target` should be a reference to the field value.
     pub fn current_tag(&self, target: impl ToTokens) -> TokenStream {
         let crate_ = crate_name();
-        quote!(#crate_::encoding::Oneof::oneof_current_tag(&#target))
+        quote!(#crate_::encoding::Oneof::oneof_current_tag(#target))
     }
 
     /// Returns the where clause constraint term for the field really implementing the oneof trait.

@@ -15,7 +15,7 @@ use crate::attrs::{bilrost_attrs, set_bool, set_option, tag_list_attr, word_attr
 use crate::field::traits::{
     DecodeLifetime::{Borrowed, Owned},
     DecodeMode::{Distinguished, Relaxed},
-    FieldBearer, SinglyTagged, Tagged,
+    FieldBearer, MessageInstance, SinglyTagged, Tagged,
     WhereFor::{self, Decode, Encode},
 };
 use crate::field::{parse_message_fields, tag_measurer, Field, MessageFieldsSorted, OneofVariant};
@@ -199,15 +199,17 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
             )
         });
 
+    let self_instance = MessageInstance(quote!(self));
     let fields = MessageFieldsSorted::new(&unsorted_fields);
-    let encoded_len = fields.encoded_len(quote!(self));
-    let encode = fields.encode(quote!(self));
-    let prepend = fields.prepend(quote!(self));
+    let encoded_len = fields.encoded_len(&self_instance);
+    let encode = fields.encode(&self_instance);
+    let prepend = fields.prepend(&self_instance);
 
     let [decode_owned, decode_borrowed] = [Owned, Borrowed].map(|lifetime| {
         let ident = ident.clone();
+        let self_instance = self_instance.clone();
         unsorted_fields.iter().map(move |field| {
-            let decode = field.decode(quote!(self), lifetime, Relaxed);
+            let decode = field.decode(&self_instance, lifetime, Relaxed);
             let tags = field.tags().into_iter().map(|tag| quote!(#tag));
             let tags = Itertools::intersperse(tags, quote!(|));
             let field_ident = field.ident();
@@ -245,11 +247,11 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     let mut empties: Vec<_> = unsorted_fields.iter().map(|field| field.empty()).collect();
     let is_empties: Vec<_> = unsorted_fields
         .iter()
-        .map(|field| field.is_empty(quote!(self)))
+        .map(|field| field.is_empty(&self_instance))
         .collect();
     let clears: Vec<_> = unsorted_fields
         .iter()
-        .map(|field| field.clear(quote!(self)))
+        .map(|field| field.clear(&self_instance))
         .collect();
 
     let initialize_ignored = if default_per_field || ignored_fields.is_empty() {
@@ -401,8 +403,9 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
 
         let [decode_owned, decode_borrowed] = [Owned, Borrowed].map(|lifetime| {
             let ident = ident.clone();
+            let self_instance = self_instance.clone();
             unsorted_fields.iter().map(move |field| {
-                let decode = field.decode(quote!(self), lifetime, Distinguished);
+                let decode = field.decode(&self_instance, lifetime, Distinguished);
                 let tags = field.tags().into_iter().map(|tag| quote!(#tag));
                 let tags = Itertools::intersperse(tags, quote!(|));
                 let field_ident = field.ident();

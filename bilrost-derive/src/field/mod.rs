@@ -1,6 +1,8 @@
 use crate::attrs::{bilrost_attrs, TagList};
 use crate::crate_name;
-use crate::field::traits::{DecodeLifetime, DecodeMode, FieldBearer, Tagged, WhereFor};
+use crate::field::traits::{
+    DecodeLifetime, DecodeMode, FieldBearer, FieldTarget, Tagged, WhereFor,
+};
 use alloc::boxed::Box;
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::format;
@@ -178,9 +180,8 @@ impl Field {
     }
 
     /// Returns a statement which encodes the field.
-    pub fn encode(&self, instance: impl ToTokens) -> TokenStream {
-        let ident = &self.ident;
-        let target = quote!(#instance.#ident);
+    pub fn encode(&self, instance: impl FieldTarget) -> TokenStream {
+        let target = instance.const_field_ref(&self.ident);
         match &self.content {
             Value(scalar) => scalar.encode(target),
             Oneof(oneof) => oneof.encode(target),
@@ -189,9 +190,8 @@ impl Field {
     }
 
     /// Returns a statement which prepends the field.
-    pub fn prepend(&self, instance: impl ToTokens) -> TokenStream {
-        let ident = &self.ident;
-        let target = quote!(#instance.#ident);
+    pub fn prepend(&self, instance: impl FieldTarget) -> TokenStream {
+        let target = instance.const_field_ref(&self.ident);
         match &self.content {
             Value(scalar) => scalar.prepend(target),
             Oneof(oneof) => oneof.prepend(target),
@@ -202,12 +202,11 @@ impl Field {
     /// Returns an expression which evaluates to the result of decoding a value into the field.
     pub fn decode(
         &self,
-        instance: TokenStream,
+        instance: impl FieldTarget,
         lifetime: DecodeLifetime,
         mode: DecodeMode,
     ) -> TokenStream {
-        let ident = &self.ident;
-        let target = quote!(#instance.#ident);
+        let target = instance.mut_field_ref(&self.ident);
         match &self.content {
             Value(scalar) => scalar.decode(target, lifetime, mode),
             Oneof(oneof) => oneof.decode(target, lifetime, mode),
@@ -216,9 +215,8 @@ impl Field {
     }
 
     /// Returns an expression which evaluates to the encoded length of the field.
-    pub fn encoded_len(&self, instance: impl ToTokens) -> TokenStream {
-        let ident = &self.ident;
-        let target = quote!(#instance.#ident);
+    pub fn encoded_len(&self, instance: impl FieldTarget) -> TokenStream {
+        let target = instance.const_field_ref(&self.ident);
         match &self.content {
             Value(scalar) => scalar.encoded_len(target),
             Oneof(oneof) => oneof.encoded_len(target),
@@ -239,9 +237,8 @@ impl Field {
     }
 
     /// Returns an expression which returns whether the field is considered empty in the encoding.
-    pub fn is_empty(&self, instance: TokenStream) -> TokenStream {
-        let ident = &self.ident;
-        let target = quote!(#instance.#ident);
+    pub fn is_empty(&self, instance: impl FieldTarget) -> TokenStream {
+        let target = instance.const_field_ref(&self.ident);
         match &self.content {
             Value(scalar) => scalar.is_empty(target),
             Oneof(oneof) => oneof.is_empty(target),
@@ -250,9 +247,8 @@ impl Field {
     }
 
     /// Returns an expression which resets the field's value to empty with its encoding.
-    pub fn clear(&self, instance: TokenStream) -> TokenStream {
-        let ident = &self.ident;
-        let target = quote!(#instance.#ident);
+    pub fn clear(&self, instance: impl FieldTarget) -> TokenStream {
+        let target = instance.mut_field_ref(&self.ident);
         match &self.content {
             Value(scalar) => scalar.clear(target),
             Oneof(oneof) => oneof.clear(target),
@@ -262,12 +258,11 @@ impl Field {
 
     /// If the field is a oneof, returns an expression which evaluates to an Option<u32> of the tag
     /// of the (maybe) present field in the oneof. Panics if the field is not a oneof.
-    pub fn current_tag(&self, instance: impl ToTokens) -> TokenStream {
+    pub fn current_tag(&self, instance: impl FieldTarget) -> TokenStream {
         let Oneof(field) = &self.content else {
             panic!("tried to use a value field as a oneof")
         };
-        let ident = &self.ident;
-        let target = quote!(#instance.#ident);
+        let target = instance.const_field_ref(&self.ident);
         field.current_tag(target)
     }
 
@@ -395,7 +390,7 @@ impl Direction {
 /// Implements guaranteed field ordering
 fn process_sort_groups<FC, FO>(
     parts: &[SortGroupPart],
-    target: impl ToTokens,
+    instance: impl FieldTarget,
     config: SortGroupConfig<FC, FO>,
 ) -> TokenStream
 where
@@ -431,7 +426,7 @@ where
         .align(parts)
         .flat_map(|part| match part {
             OneofPart(field) => {
-                let current_tag = field.current_tag(&target);
+                let current_tag = field.current_tag(&instance);
                 let closure = oneof_part_fn(field);
                 Some(quote! {
                     if let ::core::option::Option::Some(tag) = #current_tag {
@@ -588,21 +583,25 @@ impl<'a> MessageFieldsSorted<'a> {
         }
     }
 
-    pub fn encoded_len(&self, target: impl ToTokens) -> TokenStream {
+    pub fn encoded_len(&self, instance: impl FieldTarget) -> TokenStream {
         let tag_measurer_ty = &self.tag_measurer_ty;
+        let instance_self = instance.self_expr();
+        let renamed = instance.rename(quote!(instance));
         let chunks = self.chunks.iter().map(|chunk| match chunk {
-            AlwaysOrdered(field) => field.encoded_len(&target),
-            SortGroup(parts) => {
-                process_sort_groups(parts, &target, SortGroupConfig{
+            AlwaysOrdered(field) => field.encoded_len(&instance),
+            SortGroup(parts) => process_sort_groups(
+                parts,
+                &instance,
+                SortGroupConfig {
                     direction: Direction::Forward,
                     contiguous_part_fn: |fields: ReversibleFields| {
-                        let each_len = fields.map(|field| field.encoded_len(quote!(instance)));
+                        let each_len = fields.map(|field| field.encoded_len(&renamed));
                         quote! {
                             |instance, tm| { 0 #(+ #each_len)* }
                         }
                     },
                     oneof_part_fn: |field: &Field| {
-                        let encoded_len = field.encoded_len(quote!(instance));
+                        let encoded_len = field.encoded_len(&renamed);
                         quote! {
                             |instance, tm| { #encoded_len }
                         }
@@ -610,13 +609,13 @@ impl<'a> MessageFieldsSorted<'a> {
                     part_fn_ty: quote!(fn(&Self, &mut #tag_measurer_ty) -> usize),
                     invoke_parts: quote! {
                         let mut total_len = 0usize;
-                        for (_, len_func_option) in parts {
-                            total_len += ::core::option::Option::unwrap(*len_func_option)(#target, tm)
+                        for (_, len_func) in parts {
+                            total_len += (len_func.unwrap())(#instance_self, tm)
                         }
                         total_len
                     },
-                })
-            }
+                },
+            ),
         });
         quote! {
             {
@@ -626,23 +625,25 @@ impl<'a> MessageFieldsSorted<'a> {
         }
     }
 
-    pub fn encode(&self, target: impl ToTokens) -> TokenStream {
+    pub fn encode(&self, instance: impl FieldTarget) -> TokenStream {
         let crate_ = crate_name();
+        let instance_self = instance.self_expr();
+        let renamed = instance.rename(quote!(instance));
         let chunks = self.chunks.iter().map(|chunk| match chunk {
-            AlwaysOrdered(field) => field.encode(&target),
+            AlwaysOrdered(field) => field.encode(&instance),
             SortGroup(parts) => process_sort_groups(
                 parts,
-                &target,
+                &instance,
                 SortGroupConfig {
                     direction: Direction::Forward,
                     contiguous_part_fn: |fields: ReversibleFields| {
-                        let each_field = fields.map(|field| field.encode(quote!(instance)));
+                        let each_field = fields.map(|field| field.encode(&renamed));
                         quote! {
                             |instance, buf, tw| { #(#each_field)* }
                         }
                     },
                     oneof_part_fn: |field: &Field| {
-                        let encode = field.encode(quote!(instance));
+                        let encode = field.encode(&renamed);
                         quote! {
                             |instance, buf, tw| { #encode }
                         }
@@ -650,7 +651,7 @@ impl<'a> MessageFieldsSorted<'a> {
                     part_fn_ty: quote!(fn(&Self, &mut __B, &mut #crate_::encoding::TagWriter)),
                     invoke_parts: quote! {
                         for (_, encode_func) in parts {
-                            (encode_func.unwrap())(#target, buf, tw);
+                            (encode_func.unwrap())(#instance_self, buf, tw);
                         }
                     },
                 },
@@ -664,23 +665,25 @@ impl<'a> MessageFieldsSorted<'a> {
         }
     }
 
-    pub fn prepend(&self, target: impl ToTokens) -> TokenStream {
+    pub fn prepend(&self, instance: impl FieldTarget) -> TokenStream {
         let crate_ = crate_name();
+        let original_instance = instance.self_expr();
+        let renamed = instance.rename(quote!(instance));
         let chunks = self.chunks.iter().rev().map(|chunk| match chunk {
-            AlwaysOrdered(field) => field.prepend(&target),
+            AlwaysOrdered(field) => field.prepend(&instance),
             SortGroup(parts) => process_sort_groups(
                 parts,
-                &target,
+                &instance,
                 SortGroupConfig {
                     direction: Direction::Reverse,
                     contiguous_part_fn: |fields: ReversibleFields| {
-                        let each_field = fields.map(|field| field.prepend(quote!(instance)));
+                        let each_field = fields.map(|field| field.prepend(&renamed));
                         quote! {
                             |instance, buf, tw| { #(#each_field)* }
                         }
                     },
                     oneof_part_fn: |field: &Field| {
-                        let prepend = field.prepend(quote!(instance));
+                        let prepend = field.prepend(&renamed);
                         quote! {
                             |instance, buf, tw| { #prepend }
                         }
@@ -688,7 +691,7 @@ impl<'a> MessageFieldsSorted<'a> {
                     part_fn_ty: quote!(fn(&Self, &mut __B, &mut #crate_::encoding::TagRevWriter)),
                     invoke_parts: quote! {
                         for (_, prepend_func) in parts {
-                            (prepend_func.unwrap())(#target, buf, tw);
+                            (prepend_func.unwrap())(#original_instance, buf, tw);
                         }
                     },
                 },
