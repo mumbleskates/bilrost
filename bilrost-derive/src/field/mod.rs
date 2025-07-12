@@ -181,7 +181,7 @@ impl Field {
 
     /// Returns a statement which encodes the field.
     pub fn encode(&self, instance: impl FieldTarget) -> TokenStream {
-        let target = instance.const_field_ref(&self.ident);
+        let target = instance.const_field_ref(self);
         match &self.content {
             Value(scalar) => scalar.encode(target),
             Oneof(oneof) => oneof.encode(target),
@@ -191,7 +191,7 @@ impl Field {
 
     /// Returns a statement which prepends the field.
     pub fn prepend(&self, instance: impl FieldTarget) -> TokenStream {
-        let target = instance.const_field_ref(&self.ident);
+        let target = instance.const_field_ref(self);
         match &self.content {
             Value(scalar) => scalar.prepend(target),
             Oneof(oneof) => oneof.prepend(target),
@@ -206,7 +206,7 @@ impl Field {
         lifetime: DecodeLifetime,
         mode: DecodeMode,
     ) -> TokenStream {
-        let target = instance.mut_field_ref(&self.ident);
+        let target = instance.mut_field_ref(self);
         match &self.content {
             Value(scalar) => scalar.decode(target, lifetime, mode),
             Oneof(oneof) => oneof.decode(target, lifetime, mode),
@@ -216,7 +216,7 @@ impl Field {
 
     /// Returns an expression which evaluates to the encoded length of the field.
     pub fn encoded_len(&self, instance: impl FieldTarget) -> TokenStream {
-        let target = instance.const_field_ref(&self.ident);
+        let target = instance.const_field_ref(self);
         match &self.content {
             Value(scalar) => scalar.encoded_len(target),
             Oneof(oneof) => oneof.encoded_len(target),
@@ -238,7 +238,7 @@ impl Field {
 
     /// Returns an expression which returns whether the field is considered empty in the encoding.
     pub fn is_empty(&self, instance: impl FieldTarget) -> TokenStream {
-        let target = instance.const_field_ref(&self.ident);
+        let target = instance.const_field_ref(self);
         match &self.content {
             Value(scalar) => scalar.is_empty(target),
             Oneof(oneof) => oneof.is_empty(target),
@@ -248,7 +248,7 @@ impl Field {
 
     /// Returns an expression which resets the field's value to empty with its encoding.
     pub fn clear(&self, instance: impl FieldTarget) -> TokenStream {
-        let target = instance.mut_field_ref(&self.ident);
+        let target = instance.mut_field_ref(self);
         match &self.content {
             Value(scalar) => scalar.clear(target),
             Oneof(oneof) => oneof.clear(target),
@@ -262,7 +262,7 @@ impl Field {
         let Oneof(field) = &self.content else {
             panic!("tried to use a value field as a oneof")
         };
-        let target = instance.const_field_ref(&self.ident);
+        let target = instance.const_field_ref(self);
         field.current_tag(target)
     }
 

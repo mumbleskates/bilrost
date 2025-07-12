@@ -1,3 +1,4 @@
+use crate::field::Field;
 use alloc::vec;
 use alloc::vec::Vec;
 use core::ops::Deref;
@@ -85,8 +86,8 @@ pub trait FieldTarget {
     type Renamed: FieldTarget;
 
     fn self_expr(&self) -> TokenStream;
-    fn const_field_ref(&self, field_ident: &TokenStream) -> TokenStream;
-    fn mut_field_ref(&self, field_ident: &TokenStream) -> TokenStream;
+    fn const_field_ref(&self, field: &Field) -> TokenStream;
+    fn mut_field_ref(&self, field: &Field) -> TokenStream;
     fn rename(&self, new_instance_ident: TokenStream) -> Self::Renamed;
 }
 
@@ -97,12 +98,12 @@ impl<T: FieldTarget> FieldTarget for &T {
         (**self).self_expr()
     }
 
-    fn const_field_ref(&self, field_ident: &TokenStream) -> TokenStream {
-        (**self).const_field_ref(field_ident)
+    fn const_field_ref(&self, field: &Field) -> TokenStream {
+        (**self).const_field_ref(field)
     }
 
-    fn mut_field_ref(&self, field_ident: &TokenStream) -> TokenStream {
-        (**self).mut_field_ref(field_ident)
+    fn mut_field_ref(&self, field: &Field) -> TokenStream {
+        (**self).mut_field_ref(field)
     }
 
     fn rename(&self, new_instance_ident: TokenStream) -> T::Renamed {
@@ -121,13 +122,15 @@ impl<T: ToTokens> FieldTarget for MessageInstance<T> {
         self.0.to_token_stream()
     }
 
-    fn const_field_ref(&self, field_ident: &TokenStream) -> TokenStream {
+    fn const_field_ref(&self, field: &Field) -> TokenStream {
         let instance = &self.0;
+        let field_ident = field.ident();
         quote!(&#instance.#field_ident)
     }
 
-    fn mut_field_ref(&self, field_ident: &TokenStream) -> TokenStream {
+    fn mut_field_ref(&self, field: &Field) -> TokenStream {
         let instance = &self.0;
+        let field_ident = field.ident();
         quote!(&mut #instance.#field_ident)
     }
 
