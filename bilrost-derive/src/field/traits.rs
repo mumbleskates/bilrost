@@ -3,7 +3,6 @@ use alloc::vec;
 use alloc::vec::Vec;
 use core::ops::Deref;
 use proc_macro2::TokenStream;
-use quote::{quote, ToTokens};
 
 #[derive(Copy, Clone)]
 pub enum DecodeMode {
@@ -108,33 +107,5 @@ impl<T: FieldTarget> FieldTarget for &T {
 
     fn rename(&self, new_instance_ident: TokenStream) -> T::Renamed {
         (**self).rename(new_instance_ident)
-    }
-}
-
-/// Represents a plain addressable instance of a message struct
-#[derive(Copy, Clone)]
-pub struct MessageInstance<T: ToTokens>(pub T);
-
-impl<T: ToTokens> FieldTarget for MessageInstance<T> {
-    type Renamed = MessageInstance<TokenStream>;
-
-    fn self_expr(&self) -> TokenStream {
-        self.0.to_token_stream()
-    }
-
-    fn const_field_ref(&self, field: &Field) -> TokenStream {
-        let instance = &self.0;
-        let field_ident = field.ident();
-        quote!(&#instance.#field_ident)
-    }
-
-    fn mut_field_ref(&self, field: &Field) -> TokenStream {
-        let instance = &self.0;
-        let field_ident = field.ident();
-        quote!(&mut #instance.#field_ident)
-    }
-
-    fn rename(&self, new_instance_ident: TokenStream) -> Self::Renamed {
-        MessageInstance(new_instance_ident)
     }
 }

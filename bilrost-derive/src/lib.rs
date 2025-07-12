@@ -15,10 +15,12 @@ use crate::attrs::{bilrost_attrs, set_bool, set_option, tag_list_attr, word_attr
 use crate::field::traits::{
     DecodeLifetime::{Borrowed, Owned},
     DecodeMode::{Distinguished, Relaxed},
-    FieldBearer, MessageInstance, SinglyTagged, Tagged,
+    FieldBearer, SinglyTagged, Tagged,
     WhereFor::{self, Decode, Encode},
 };
-use crate::field::{parse_message_fields, tag_measurer, Field, MessageFieldsSorted, OneofVariant};
+use crate::field::{
+    parse_message_fields, tag_measurer, Field, MessageFieldsSorted, MessageInstance, OneofVariant,
+};
 use alloc::collections::BTreeMap;
 use alloc::string::ToString;
 use alloc::vec;

@@ -15,9 +15,9 @@ use core::ops::Deref;
 use core::{iter, slice};
 use eyre::{bail, eyre as err, Report as Error};
 use itertools::{repeat_n, Either, Itertools};
-use proc_macro2::TokenStream;
+use proc_macro2::{Ident, TokenStream};
 use quote::{quote, ToTokens};
-use syn::{Attribute, Type};
+use syn::{parse_str, Attribute, Type};
 
 mod ignored;
 mod oneof;
@@ -704,5 +704,87 @@ impl<'a> MessageFieldsSorted<'a> {
                 tw.finalize(buf);
             }
         }
+    }
+}
+
+/// Represents a plain addressable instance of a message struct.
+#[derive(Copy, Clone)]
+pub struct MessageInstance<T: ToTokens>(pub T);
+
+impl<T: ToTokens> FieldTarget for MessageInstance<T> {
+    type Renamed = MessageInstance<TokenStream>;
+
+    fn self_expr(&self) -> TokenStream {
+        self.0.to_token_stream()
+    }
+
+    fn const_field_ref(&self, field: &Field) -> TokenStream {
+        let instance = &self.0;
+        let field_ident = field.ident();
+        quote!(&#instance.#field_ident)
+    }
+
+    fn mut_field_ref(&self, field: &Field) -> TokenStream {
+        let instance = &self.0;
+        let field_ident = field.ident();
+        quote!(&mut #instance.#field_ident)
+    }
+
+    fn rename(&self, new_instance_ident: TokenStream) -> Self::Renamed {
+        MessageInstance(new_instance_ident)
+    }
+}
+
+/// Represents free-floating reference bindings to the fields of a message, named after their tags.
+#[derive(Copy, Clone)]
+pub struct BoundVariantFields;
+
+impl FieldTarget for BoundVariantFields {
+    type Renamed = Self;
+
+    fn self_expr(&self) -> TokenStream {
+        panic!("free bound variant fields have no instance to name");
+    }
+
+    fn const_field_ref(&self, field: &Field) -> TokenStream {
+        parse_str::<Ident>(&format!("field_{tag}", tag = field.first_tag()))
+            .expect("bound field name didn't parse as an ident")
+            .to_token_stream()
+    }
+
+    fn mut_field_ref(&self, field: &Field) -> TokenStream {
+        self.const_field_ref(field) // we assume the mutability of the refs is already correct
+    }
+
+    fn rename(&self, _: TokenStream) -> Self::Renamed {
+        panic!("free bound variant fields have no instance to rename");
+    }
+}
+
+/// Represents an addressable instance constructed out of refs to bound message fields.
+#[derive(Copy, Clone)]
+pub struct RefsInstance<T: ToTokens>(pub T);
+
+impl<T: ToTokens> FieldTarget for RefsInstance<T> {
+    type Renamed = RefsInstance<TokenStream>;
+
+    fn self_expr(&self) -> TokenStream {
+        self.0.to_token_stream()
+    }
+
+    fn const_field_ref(&self, field: &Field) -> TokenStream {
+        let instance = &self.0;
+        let field_ident = parse_str::<Ident>(&format!("field_{tag}", tag = field.first_tag()))
+            .expect("bound field name didn't parse as an ident");
+        // The fields of this struct are already refs, so we will name them directly
+        quote!(#instance.#field_ident)
+    }
+
+    fn mut_field_ref(&self, field: &Field) -> TokenStream {
+        self.const_field_ref(field) // we assume the mutability of the refs is already correct
+    }
+
+    fn rename(&self, new_instance_ident: TokenStream) -> Self::Renamed {
+        RefsInstance(new_instance_ident)
     }
 }

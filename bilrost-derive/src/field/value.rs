@@ -5,10 +5,10 @@ use crate::crate_name;
 use crate::field::traits::{
     DecodeLifetime::{self, Borrowed, Owned},
     DecodeMode::{self, Distinguished, Relaxed},
-    FieldBearer, SinglyTagged, Tagged,
+    FieldBearer, FieldTarget, SinglyTagged,
     WhereFor::{self, Decode, Encode},
 };
-use crate::field::{parse_message_fields, Field};
+use crate::field::{parse_message_fields, BoundVariantFields, Field};
 use alloc::boxed::Box;
 use alloc::format;
 use alloc::string::ToString;
@@ -531,11 +531,7 @@ impl OneofVariant {
                     unsorted_fields.iter().map(|field| &field.ident).collect();
                 let field_bound_names: Vec<_> = unsorted_fields
                     .iter()
-                    .map(|field| {
-                        let tag = field.first_tag();
-                        parse_str::<Ident>(&format!("field_{tag}"))
-                            .expect("intermediate field name didn't parse as an ident")
-                    })
+                    .map(|field| BoundVariantFields.const_field_ref(field))
                     .collect();
                 // TODO: field target type and capability to generate this field_N name from the tag
                 // TODO: capability to declare from field target that it only provides bare refs and
