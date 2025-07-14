@@ -50,6 +50,10 @@ impl OneofInclusion {
         })))
     }
 
+    pub fn ty(&self) -> &Type {
+        &self.ty
+    }
+
     /// Returns a statement which encodes the oneof field. `target` should be a reference to the
     /// field value.
     pub fn encode(&self, target: TokenStream) -> TokenStream {

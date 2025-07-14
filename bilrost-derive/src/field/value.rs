@@ -5,10 +5,10 @@ use crate::crate_name;
 use crate::field::traits::{
     DecodeLifetime::{self, Borrowed, Owned},
     DecodeMode::{self, Distinguished, Relaxed},
-    FieldBearer, FieldTarget, SinglyTagged,
+    FieldBearer, SinglyTagged,
     WhereFor::{self, Decode, Encode},
 };
-use crate::field::{parse_message_fields, BoundVariantFields, Field};
+use crate::field::{parse_message_fields, Field, FieldTarget, MessageFieldsSorted};
 use alloc::boxed::Box;
 use alloc::format;
 use alloc::string::ToString;
@@ -93,6 +93,10 @@ impl MessageField {
             value,
             enumeration_ty,
         }))
+    }
+
+    pub fn ty(&self) -> &Type {
+        &self.value.ty
     }
 
     pub fn has_enumeration_type(&self) -> bool {
@@ -504,6 +508,19 @@ impl OneofVariant {
         )
     }
 
+    /// Generates bindings to a message variant's non-ignored fields.
+    fn binding(fields: &[Field]) -> TokenStream {
+        let bindings = fields
+            .iter()
+            .filter(|field| !field.is_ignored())
+            .map(|field| {
+                let field_ident = field.ident();
+                let binding_ident = FieldTarget::binding_ident_for(field);
+                quote!(#field_ident: #binding_ident)
+            });
+        quote! { #(#bindings,)* .. }
+    }
+
     pub fn encode(&self, type_ident: impl ToTokens) -> TokenStream {
         let crate_ = crate_name();
         let tag = self.tag;
@@ -525,21 +542,12 @@ impl OneofVariant {
                 }
             }
             VariantContents::Message(fields) => {
-                let unsorted_fields: Vec<_> =
-                    fields.iter().filter(|field| !field.is_ignored()).collect();
-                let field_idents: Vec<_> =
-                    unsorted_fields.iter().map(|field| &field.ident).collect();
-                let field_bound_names: Vec<_> = unsorted_fields
-                    .iter()
-                    .map(|field| BoundVariantFields.const_field_ref(field))
-                    .collect();
-                // TODO: field target type and capability to generate this field_N name from the tag
-                // TODO: capability to declare from field target that it only provides bare refs and
-                //  they must be assembled into a referrable whole if we want to pass only one ref
-                //  to the fn
+                let binding = OneofVariant::binding(fields);
+                let encode = MessageFieldsSorted::new_filtering_ignored(fields)
+                    .encode(&FieldTarget::BoundVariantFields);
                 quote! {
-                    #type_ident::#variant_ident { #(#field_idents: #field_bound_names,)* .. } => {
-
+                    #type_ident::#variant_ident { #binding } => {
+                        #encode
                     }
                 }
             }
@@ -566,7 +574,16 @@ impl OneofVariant {
                     }
                 }
             }
-            VariantContents::Message(..) => todo!(),
+            VariantContents::Message(fields) => {
+                let binding = OneofVariant::binding(fields);
+                let prepend = MessageFieldsSorted::new_filtering_ignored(fields)
+                    .prepend(&FieldTarget::BoundVariantFields);
+                quote! {
+                    #type_ident::#variant_ident { #binding } => {
+                        #prepend
+                    }
+                }
+            }
         }
     }
 
@@ -589,7 +606,16 @@ impl OneofVariant {
                     }
                 }
             }
-            VariantContents::Message(..) => todo!(),
+            VariantContents::Message(fields) => {
+                let binding = OneofVariant::binding(fields);
+                let encoded_len = MessageFieldsSorted::new_filtering_ignored(fields)
+                    .encoded_len(&FieldTarget::BoundVariantFields);
+                quote! {
+                    #type_ident::#variant_ident { #binding } => {
+                        #encoded_len
+                    }
+                }
+            }
         }
     }
 

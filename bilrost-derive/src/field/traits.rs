@@ -1,4 +1,3 @@
-use crate::field::Field;
 use alloc::vec;
 use alloc::vec::Vec;
 use core::ops::Deref;
@@ -55,6 +54,12 @@ pub trait SinglyTagged {
     fn tag(&self) -> u32;
 }
 
+impl<T: SinglyTagged> SinglyTagged for &T {
+    fn tag(&self) -> u32 {
+        (**self).tag()
+    }
+}
+
 pub trait Tagged {
     fn tags(&self) -> Vec<u32>;
 
@@ -78,34 +83,5 @@ pub trait Tagged {
 impl<T: SinglyTagged> Tagged for T {
     fn tags(&self) -> Vec<u32> {
         vec![self.tag()]
-    }
-}
-
-pub trait FieldTarget {
-    type Renamed: FieldTarget;
-
-    fn self_expr(&self) -> TokenStream;
-    fn const_field_ref(&self, field: &Field) -> TokenStream;
-    fn mut_field_ref(&self, field: &Field) -> TokenStream;
-    fn rename(&self, new_instance_ident: TokenStream) -> Self::Renamed;
-}
-
-impl<T: FieldTarget> FieldTarget for &T {
-    type Renamed = T::Renamed;
-
-    fn self_expr(&self) -> TokenStream {
-        (**self).self_expr()
-    }
-
-    fn const_field_ref(&self, field: &Field) -> TokenStream {
-        (**self).const_field_ref(field)
-    }
-
-    fn mut_field_ref(&self, field: &Field) -> TokenStream {
-        (**self).mut_field_ref(field)
-    }
-
-    fn rename(&self, new_instance_ident: TokenStream) -> T::Renamed {
-        (**self).rename(new_instance_ident)
     }
 }

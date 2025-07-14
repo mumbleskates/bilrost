@@ -19,7 +19,7 @@ use crate::field::traits::{
     WhereFor::{self, Decode, Encode},
 };
 use crate::field::{
-    parse_message_fields, tag_measurer, Field, MessageFieldsSorted, MessageInstance, OneofVariant,
+    parse_message_fields, tag_measurer, Field, FieldTarget, MessageFieldsSorted, OneofVariant,
 };
 use alloc::collections::BTreeMap;
 use alloc::string::ToString;
@@ -201,7 +201,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
             )
         });
 
-    let self_instance = MessageInstance(quote!(self));
+    let self_instance = FieldTarget::MessageInstance(quote!(self));
     let fields = MessageFieldsSorted::new(&unsorted_fields);
     let encoded_len = fields.encoded_len(&self_instance);
     let encode = fields.encode(&self_instance);

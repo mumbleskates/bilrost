@@ -1,8 +1,6 @@
 use crate::attrs::{bilrost_attrs, TagList};
 use crate::crate_name;
-use crate::field::traits::{
-    DecodeLifetime, DecodeMode, FieldBearer, FieldTarget, Tagged, WhereFor,
-};
+use crate::field::traits::{DecodeLifetime, DecodeMode, FieldBearer, Tagged, WhereFor};
 use alloc::boxed::Box;
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::format;
@@ -104,9 +102,9 @@ pub fn parse_message_fields(
 }
 
 /// If there can never be a tag delta larger than 31, field keys will never be more than 1 byte.
-pub fn tag_measurer(for_these: &[impl Tagged]) -> TokenStream {
+pub fn tag_measurer<T: Tagged>(for_these: impl IntoIterator<Item = T>) -> TokenStream {
     let crate_ = crate_name();
-    if matches!(for_these.iter().flat_map(Tagged::tags).max(), Some(max_tag) if max_tag < 32) {
+    if matches!(for_these.into_iter().flat_map(|t| t.tags()).max(), Some(max_tag) if max_tag < 32) {
         quote!(#crate_::encoding::TrivialTagMeasurer)
     } else {
         quote!(#crate_::encoding::RuntimeTagMeasurer)
@@ -141,6 +139,14 @@ impl Field {
     /// Returns the ident of the field within its struct or variant.
     pub fn ident(&self) -> &TokenStream {
         &self.ident
+    }
+
+    pub fn ty(&self) -> &Type {
+        match &self.content {
+            Value(value) => value.ty(),
+            Oneof(oneof) => oneof.ty(),
+            Ignored(_) => panic!("ignored fields have no type"),
+        }
     }
 
     pub fn is_ignored(&self) -> bool {
@@ -180,7 +186,7 @@ impl Field {
     }
 
     /// Returns a statement which encodes the field.
-    pub fn encode(&self, instance: impl FieldTarget) -> TokenStream {
+    pub fn encode(&self, instance: &FieldTarget) -> TokenStream {
         let target = instance.const_field_ref(self);
         match &self.content {
             Value(scalar) => scalar.encode(target),
@@ -190,7 +196,7 @@ impl Field {
     }
 
     /// Returns a statement which prepends the field.
-    pub fn prepend(&self, instance: impl FieldTarget) -> TokenStream {
+    pub fn prepend(&self, instance: &FieldTarget) -> TokenStream {
         let target = instance.const_field_ref(self);
         match &self.content {
             Value(scalar) => scalar.prepend(target),
@@ -202,7 +208,7 @@ impl Field {
     /// Returns an expression which evaluates to the result of decoding a value into the field.
     pub fn decode(
         &self,
-        instance: impl FieldTarget,
+        instance: &FieldTarget,
         lifetime: DecodeLifetime,
         mode: DecodeMode,
     ) -> TokenStream {
@@ -215,7 +221,7 @@ impl Field {
     }
 
     /// Returns an expression which evaluates to the encoded length of the field.
-    pub fn encoded_len(&self, instance: impl FieldTarget) -> TokenStream {
+    pub fn encoded_len(&self, instance: &FieldTarget) -> TokenStream {
         let target = instance.const_field_ref(self);
         match &self.content {
             Value(scalar) => scalar.encoded_len(target),
@@ -237,7 +243,7 @@ impl Field {
     }
 
     /// Returns an expression which returns whether the field is considered empty in the encoding.
-    pub fn is_empty(&self, instance: impl FieldTarget) -> TokenStream {
+    pub fn is_empty(&self, instance: &FieldTarget) -> TokenStream {
         let target = instance.const_field_ref(self);
         match &self.content {
             Value(scalar) => scalar.is_empty(target),
@@ -247,7 +253,7 @@ impl Field {
     }
 
     /// Returns an expression which resets the field's value to empty with its encoding.
-    pub fn clear(&self, instance: impl FieldTarget) -> TokenStream {
+    pub fn clear(&self, instance: &FieldTarget) -> TokenStream {
         let target = instance.mut_field_ref(self);
         match &self.content {
             Value(scalar) => scalar.clear(target),
@@ -258,7 +264,7 @@ impl Field {
 
     /// If the field is a oneof, returns an expression which evaluates to an Option<u32> of the tag
     /// of the (maybe) present field in the oneof. Panics if the field is not a oneof.
-    pub fn current_tag(&self, instance: impl FieldTarget) -> TokenStream {
+    pub fn current_tag(&self, instance: &FieldTarget) -> TokenStream {
         let Oneof(field) = &self.content else {
             panic!("tried to use a value field as a oneof")
         };
@@ -291,6 +297,12 @@ impl Tagged for Field {
             Oneof(oneof) => oneof.tags(),
             Ignored(..) => vec![],
         }
+    }
+}
+
+impl Tagged for &Field {
+    fn tags(&self) -> Vec<u32> {
+        (**self).tags()
     }
 }
 
@@ -390,7 +402,7 @@ impl Direction {
 /// Implements guaranteed field ordering
 fn process_sort_groups<FC, FO>(
     parts: &[SortGroupPart],
-    instance: impl FieldTarget,
+    instance: &FieldTarget,
     config: SortGroupConfig<FC, FO>,
 ) -> TokenStream
 where
@@ -426,7 +438,7 @@ where
         .align(parts)
         .flat_map(|part| match part {
             OneofPart(field) => {
-                let current_tag = field.current_tag(&instance);
+                let current_tag = field.current_tag(instance);
                 let closure = oneof_part_fn(field);
                 Some(quote! {
                     if let ::core::option::Option::Some(tag) = #current_tag {
@@ -448,8 +460,20 @@ where
         Direction::Forward => quote!(*tag),
         Direction::Reverse => quote!(::core::cmp::Reverse(*tag)),
     };
+    // give the field target an iterator of all fields in this sort group in case it needs to
+    // assemble a temporary struct with references to them for the function type
+    let prelude = instance.prelude_for(
+        parts
+            .iter()
+            .flat_map(|part| match part {
+                Contiguous(fields) => fields.as_slice(),
+                OneofPart(field) => slice::from_ref(field),
+            })
+            .cloned(),
+    );
     quote! {
         {
+            #prelude
             let mut parts: [(u32, ::core::option::Option<#part_fn_ty>); #max_parts] = [
                 #(#guaranteed_parts,)*
                 #(#non_guaranteed_filler,)*
@@ -464,12 +488,12 @@ where
 }
 
 impl<'a> MessageFieldsSorted<'a> {
-    /// Sorts a vec of unsorted fields into discrete chunks that may be ordered together at runtime to
-    /// ensure that all their fields are encoded in sorted order.
-    pub fn new(unsorted_fields: &'a [Field]) -> Self {
+    /// Sorts a vec of unsorted fields into discrete chunks that may be ordered together at runtime
+    /// to ensure that all their fields are encoded in sorted order.
+    pub fn new(unsorted_fields: impl IntoIterator<Item = &'a Field>) -> Self {
         let mut chunks: Vec<FieldChunk> = vec![];
         let mut fields = unsorted_fields
-            .iter()
+            .into_iter()
             .sorted_unstable_by_key(|field| field.first_tag())
             .peekable();
         // Current vecs we are building for FieldChunk::SortGroup and SortGroupPart::Contiguous
@@ -579,19 +603,36 @@ impl<'a> MessageFieldsSorted<'a> {
 
         Self {
             chunks,
-            tag_measurer_ty: tag_measurer(unsorted_fields),
+            tag_measurer_ty: tag_measurer(fields),
         }
     }
 
-    pub fn encoded_len(&self, instance: impl FieldTarget) -> TokenStream {
+    pub fn new_filtering_ignored(unsorted_fields: impl IntoIterator<Item = &'a Field>) -> Self {
+        Self::new(
+            unsorted_fields
+                .into_iter()
+                .filter(|field| !field.is_ignored()),
+        )
+    }
+
+    pub fn encoded_len(&self, instance: &FieldTarget) -> TokenStream {
         let tag_measurer_ty = &self.tag_measurer_ty;
-        let instance_self = instance.self_expr();
-        let renamed = instance.rename(quote!(instance));
+        let sort_group_instance;
+        let part_fn_instance_ty;
+        if instance.has_instance() {
+            sort_group_instance = instance.clone();
+            part_fn_instance_ty = quote!(Self);
+        } else {
+            sort_group_instance = FieldTarget::RefsInstance(quote!(refs));
+            part_fn_instance_ty = quote!(__BilrostRefs);
+        }
+        let sort_group_self = sort_group_instance.self_expr();
+        let renamed = sort_group_instance.rename(quote!(instance));
         let chunks = self.chunks.iter().map(|chunk| match chunk {
-            AlwaysOrdered(field) => field.encoded_len(&instance),
+            AlwaysOrdered(field) => field.encoded_len(instance),
             SortGroup(parts) => process_sort_groups(
                 parts,
-                &instance,
+                &sort_group_instance,
                 SortGroupConfig {
                     direction: Direction::Forward,
                     contiguous_part_fn: |fields: ReversibleFields| {
@@ -606,11 +647,11 @@ impl<'a> MessageFieldsSorted<'a> {
                             |instance, tm| { #encoded_len }
                         }
                     },
-                    part_fn_ty: quote!(fn(&Self, &mut #tag_measurer_ty) -> usize),
+                    part_fn_ty: quote!(fn(&#part_fn_instance_ty, &mut #tag_measurer_ty) -> usize),
                     invoke_parts: quote! {
                         let mut total_len = 0usize;
                         for (_, len_func) in parts {
-                            total_len += (len_func.unwrap())(#instance_self, tm)
+                            total_len += (len_func.unwrap())(#sort_group_self, tm)
                         }
                         total_len
                     },
@@ -625,15 +666,24 @@ impl<'a> MessageFieldsSorted<'a> {
         }
     }
 
-    pub fn encode(&self, instance: impl FieldTarget) -> TokenStream {
+    pub fn encode(&self, instance: &FieldTarget) -> TokenStream {
         let crate_ = crate_name();
-        let instance_self = instance.self_expr();
-        let renamed = instance.rename(quote!(instance));
+        let sort_group_instance;
+        let part_fn_instance_ty;
+        if instance.has_instance() {
+            sort_group_instance = instance.clone();
+            part_fn_instance_ty = quote!(Self);
+        } else {
+            sort_group_instance = FieldTarget::RefsInstance(quote!(refs));
+            part_fn_instance_ty = quote!(__BilrostRefs);
+        }
+        let sort_group_self = sort_group_instance.self_expr();
+        let renamed = sort_group_instance.rename(quote!(instance));
         let chunks = self.chunks.iter().map(|chunk| match chunk {
-            AlwaysOrdered(field) => field.encode(&instance),
+            AlwaysOrdered(field) => field.encode(instance),
             SortGroup(parts) => process_sort_groups(
                 parts,
-                &instance,
+                &sort_group_instance,
                 SortGroupConfig {
                     direction: Direction::Forward,
                     contiguous_part_fn: |fields: ReversibleFields| {
@@ -648,10 +698,12 @@ impl<'a> MessageFieldsSorted<'a> {
                             |instance, buf, tw| { #encode }
                         }
                     },
-                    part_fn_ty: quote!(fn(&Self, &mut __B, &mut #crate_::encoding::TagWriter)),
+                    part_fn_ty: quote!(
+                        fn(&#part_fn_instance_ty, &mut __B, &mut #crate_::encoding::TagWriter)
+                    ),
                     invoke_parts: quote! {
                         for (_, encode_func) in parts {
-                            (encode_func.unwrap())(#instance_self, buf, tw);
+                            (encode_func.unwrap())(#sort_group_self, buf, tw);
                         }
                     },
                 },
@@ -665,15 +717,24 @@ impl<'a> MessageFieldsSorted<'a> {
         }
     }
 
-    pub fn prepend(&self, instance: impl FieldTarget) -> TokenStream {
+    pub fn prepend(&self, instance: &FieldTarget) -> TokenStream {
         let crate_ = crate_name();
-        let original_instance = instance.self_expr();
-        let renamed = instance.rename(quote!(instance));
+        let sort_group_instance;
+        let part_fn_instance_ty;
+        if instance.has_instance() {
+            sort_group_instance = instance.clone();
+            part_fn_instance_ty = quote!(Self);
+        } else {
+            sort_group_instance = FieldTarget::RefsInstance(quote!(refs));
+            part_fn_instance_ty = quote!(__BilrostRefs);
+        }
+        let sort_group_self = sort_group_instance.self_expr();
+        let renamed = sort_group_instance.rename(quote!(instance));
         let chunks = self.chunks.iter().rev().map(|chunk| match chunk {
-            AlwaysOrdered(field) => field.prepend(&instance),
+            AlwaysOrdered(field) => field.prepend(instance),
             SortGroup(parts) => process_sort_groups(
                 parts,
-                &instance,
+                &sort_group_instance,
                 SortGroupConfig {
                     direction: Direction::Reverse,
                     contiguous_part_fn: |fields: ReversibleFields| {
@@ -688,10 +749,10 @@ impl<'a> MessageFieldsSorted<'a> {
                             |instance, buf, tw| { #prepend }
                         }
                     },
-                    part_fn_ty: quote!(fn(&Self, &mut __B, &mut #crate_::encoding::TagRevWriter)),
+                    part_fn_ty: quote!(fn(&#part_fn_instance_ty, &mut __B, &mut #crate_::encoding::TagRevWriter)),
                     invoke_parts: quote! {
                         for (_, prepend_func) in parts {
-                            (prepend_func.unwrap())(#original_instance, buf, tw);
+                            (prepend_func.unwrap())(#sort_group_self, buf, tw);
                         }
                     },
                 },
@@ -707,84 +768,103 @@ impl<'a> MessageFieldsSorted<'a> {
     }
 }
 
-/// Represents a plain addressable instance of a message struct.
-#[derive(Copy, Clone)]
-pub struct MessageInstance<T: ToTokens>(pub T);
-
-impl<T: ToTokens> FieldTarget for MessageInstance<T> {
-    type Renamed = MessageInstance<TokenStream>;
-
-    fn self_expr(&self) -> TokenStream {
-        self.0.to_token_stream()
-    }
-
-    fn const_field_ref(&self, field: &Field) -> TokenStream {
-        let instance = &self.0;
-        let field_ident = field.ident();
-        quote!(&#instance.#field_ident)
-    }
-
-    fn mut_field_ref(&self, field: &Field) -> TokenStream {
-        let instance = &self.0;
-        let field_ident = field.ident();
-        quote!(&mut #instance.#field_ident)
-    }
-
-    fn rename(&self, new_instance_ident: TokenStream) -> Self::Renamed {
-        MessageInstance(new_instance_ident)
-    }
+#[derive(Clone)]
+pub enum FieldTarget {
+    /// Represents a plain addressable instance of a message struct.
+    MessageInstance(TokenStream),
+    /// Represents free-floating reference bindings to the fields of a message, named after their
+    /// tags.
+    BoundVariantFields,
+    /// Represents an addressable instance constructed out of refs to bound message fields.
+    RefsInstance(TokenStream),
 }
 
-/// Represents free-floating reference bindings to the fields of a message, named after their tags.
-#[derive(Copy, Clone)]
-pub struct BoundVariantFields;
-
-impl FieldTarget for BoundVariantFields {
-    type Renamed = Self;
-
-    fn self_expr(&self) -> TokenStream {
-        panic!("free bound variant fields have no instance to name");
-    }
-
-    fn const_field_ref(&self, field: &Field) -> TokenStream {
+impl FieldTarget {
+    pub fn binding_ident_for(field: &Field) -> Ident {
         parse_str::<Ident>(&format!("field_{tag}", tag = field.first_tag()))
             .expect("bound field name didn't parse as an ident")
-            .to_token_stream()
     }
 
-    fn mut_field_ref(&self, field: &Field) -> TokenStream {
-        self.const_field_ref(field) // we assume the mutability of the refs is already correct
+    /// Returns true if this target has a single name/reference that fields are found through,
+    /// rather than dispatched to loose names.
+    pub fn has_instance(&self) -> bool {
+        !matches!(self, FieldTarget::BoundVariantFields)
     }
 
-    fn rename(&self, _: TokenStream) -> Self::Renamed {
-        panic!("free bound variant fields have no instance to rename");
-    }
-}
-
-/// Represents an addressable instance constructed out of refs to bound message fields.
-#[derive(Copy, Clone)]
-pub struct RefsInstance<T: ToTokens>(pub T);
-
-impl<T: ToTokens> FieldTarget for RefsInstance<T> {
-    type Renamed = RefsInstance<TokenStream>;
-
-    fn self_expr(&self) -> TokenStream {
-        self.0.to_token_stream()
+    /// Returns an expression naming this item's instance, if it is nameable.
+    pub fn self_expr(&self) -> Option<TokenStream> {
+        match self {
+            FieldTarget::MessageInstance(instance) | FieldTarget::RefsInstance(instance) => {
+                Some(instance.clone())
+            }
+            FieldTarget::BoundVariantFields => None,
+        }
     }
 
-    fn const_field_ref(&self, field: &Field) -> TokenStream {
-        let instance = &self.0;
-        let field_ident = parse_str::<Ident>(&format!("field_{tag}", tag = field.first_tag()))
-            .expect("bound field name didn't parse as an ident");
-        // The fields of this struct are already refs, so we will name them directly
-        quote!(#instance.#field_ident)
+    /// Returns an expression for a constant reference to the given field in the target.
+    pub fn const_field_ref(&self, field: &Field) -> TokenStream {
+        match self {
+            FieldTarget::MessageInstance(instance) => {
+                let field_ident = field.ident();
+                quote!(&#instance.#field_ident)
+            }
+            FieldTarget::BoundVariantFields => Self::binding_ident_for(field).to_token_stream(),
+            FieldTarget::RefsInstance(instance) => {
+                let field_ident = Self::binding_ident_for(field);
+                // Reference-bearing instances are assumed to already have the correct type of
+                // reference inside them.
+                quote!(#instance.#field_ident)
+            }
+        }
     }
 
-    fn mut_field_ref(&self, field: &Field) -> TokenStream {
-        self.const_field_ref(field) // we assume the mutability of the refs is already correct
+    pub fn mut_field_ref(&self, field: &Field) -> TokenStream {
+        match self {
+            FieldTarget::MessageInstance(instance) => {
+                let field_ident = field.ident();
+                quote!(&mut #instance.#field_ident)
+            }
+            FieldTarget::BoundVariantFields => Self::binding_ident_for(field).to_token_stream(),
+            FieldTarget::RefsInstance(instance) => {
+                let field_ident = Self::binding_ident_for(field);
+                quote!(#instance.#field_ident)
+            }
+        }
     }
 
-    fn rename(&self, new_instance_ident: TokenStream) -> Self::Renamed {
-        RefsInstance(new_instance_ident)
+    pub fn rename(&self, new_instance_ident: TokenStream) -> Self {
+        match self {
+            FieldTarget::MessageInstance(_) => FieldTarget::MessageInstance(new_instance_ident),
+            FieldTarget::BoundVariantFields => {
+                panic!("free bound variant fields have no instance to rename")
+            }
+            FieldTarget::RefsInstance(_) => FieldTarget::RefsInstance(new_instance_ident),
+        }
+    }
+
+    /// Generates the prelude for a target, if necessary. For a reference-bearing-instance target,
+    /// this defines a new type with references to the given fields and then instantiates it; this
+    /// gives us a single reference we can pass to the `fn` values that we'll be sorting, rather
+    /// than being at risk of needing to have function signatures that take a ref to each field
+    /// because enum variants cannot be named.
+    pub fn prelude_for<'a>(
+        &self,
+        fields: impl IntoIterator<Item = &'a Field>,
+    ) -> Option<TokenStream> {
+        let FieldTarget::RefsInstance(instance_ident) = self else {
+            return None;
+        };
+        let fields: Vec<_> = fields.into_iter().collect();
+        let field_idents: Vec<_> = fields
+            .iter()
+            .map(|field| Self::binding_ident_for(field))
+            .collect();
+        let field_types: Vec<_> = fields.iter().map(|field| field.ty()).collect();
+        Some(quote! {
+            struct __BilrostRefs<'__r> {
+                #(#field_idents: &'__r #field_types,)*
+            }
+            let #instance_ident = __BilrostRefs { #(#field_idents),* }
+        })
     }
 }
