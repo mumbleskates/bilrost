@@ -515,7 +515,7 @@ impl OneofVariant {
             .filter(|field| !field.is_ignored())
             .map(|field| {
                 let field_ident = field.ident();
-                let binding_ident = FieldTarget::binding_ident_for(field);
+                let binding_ident = FieldTarget::free_field_ident(field);
                 quote!(#field_ident: #binding_ident)
             });
         quote! { #(#bindings,)* .. }
@@ -651,9 +651,10 @@ impl OneofVariant {
     }
 
     fn for_overwrite(&self) -> TokenStream {
-        let crate_ = crate_name();
+        // TODO: can we clear the variant's field(s) instead if it's already known to be present?
         match &self.contents {
             VariantContents::Value(field) => {
+                let crate_ = crate_name();
                 let encoding = &field.value.encoding;
                 let ty = &field.value.ty;
                 quote! {
@@ -661,7 +662,14 @@ impl OneofVariant {
                         <() as #crate_::encoding::ForOverwrite<#encoding, #ty>>::for_overwrite();
                 }
             }
-            VariantContents::Message(..) => todo!(),
+            VariantContents::Message(fields) => {
+                let empties = fields.iter().map(|field| {
+                    let field_ident = FieldTarget::free_field_ident(field);
+                    let empty = field.empty();
+                    quote! { let mut #field_ident = #empty; }
+                });
+                quote! { #(#empties)* }
+            }
         }
     }
 

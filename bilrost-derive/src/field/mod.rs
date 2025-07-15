@@ -772,6 +772,8 @@ impl<'a> MessageFieldsSorted<'a> {
 pub enum FieldTarget {
     /// Represents a plain addressable instance of a message struct.
     MessageInstance(TokenStream),
+    /// Represents free-floating variables for the fields of a message, named after their tags.
+    FreeVariantFields,
     /// Represents free-floating reference bindings to the fields of a message, named after their
     /// tags.
     BoundVariantFields,
@@ -780,7 +782,7 @@ pub enum FieldTarget {
 }
 
 impl FieldTarget {
-    pub fn binding_ident_for(field: &Field) -> Ident {
+    pub fn free_field_ident(field: &Field) -> Ident {
         parse_str::<Ident>(&format!("field_{tag}", tag = field.first_tag()))
             .expect("bound field name didn't parse as an ident")
     }
@@ -788,7 +790,10 @@ impl FieldTarget {
     /// Returns true if this target has a single name/reference that fields are found through,
     /// rather than dispatched to loose names.
     pub fn has_instance(&self) -> bool {
-        !matches!(self, FieldTarget::BoundVariantFields)
+        match self {
+            FieldTarget::MessageInstance(..) | FieldTarget::RefsInstance(..) => true,
+            FieldTarget::FreeVariantFields | FieldTarget::BoundVariantFields => false,
+        }
     }
 
     /// Returns an expression naming this item's instance, if it is nameable.
@@ -797,7 +802,7 @@ impl FieldTarget {
             FieldTarget::MessageInstance(instance) | FieldTarget::RefsInstance(instance) => {
                 Some(instance.clone())
             }
-            FieldTarget::BoundVariantFields => None,
+            FieldTarget::FreeVariantFields | FieldTarget::BoundVariantFields => None,
         }
     }
 
@@ -808,9 +813,13 @@ impl FieldTarget {
                 let field_ident = field.ident();
                 quote!(&#instance.#field_ident)
             }
-            FieldTarget::BoundVariantFields => Self::binding_ident_for(field).to_token_stream(),
+            FieldTarget::FreeVariantFields => {
+                let field_ident = Self::free_field_ident(field);
+                quote!(&#field_ident)
+            }
+            FieldTarget::BoundVariantFields => Self::free_field_ident(field).to_token_stream(),
             FieldTarget::RefsInstance(instance) => {
-                let field_ident = Self::binding_ident_for(field);
+                let field_ident = Self::free_field_ident(field);
                 // Reference-bearing instances are assumed to already have the correct type of
                 // reference inside them.
                 quote!(#instance.#field_ident)
@@ -824,9 +833,13 @@ impl FieldTarget {
                 let field_ident = field.ident();
                 quote!(&mut #instance.#field_ident)
             }
-            FieldTarget::BoundVariantFields => Self::binding_ident_for(field).to_token_stream(),
+            FieldTarget::FreeVariantFields => {
+                let field_ident = Self::free_field_ident(field);
+                quote!(&mut #field_ident)
+            }
+            FieldTarget::BoundVariantFields => Self::free_field_ident(field).to_token_stream(),
             FieldTarget::RefsInstance(instance) => {
-                let field_ident = Self::binding_ident_for(field);
+                let field_ident = Self::free_field_ident(field);
                 quote!(#instance.#field_ident)
             }
         }
@@ -835,8 +848,8 @@ impl FieldTarget {
     pub fn rename(&self, new_instance_ident: TokenStream) -> Self {
         match self {
             FieldTarget::MessageInstance(_) => FieldTarget::MessageInstance(new_instance_ident),
-            FieldTarget::BoundVariantFields => {
-                panic!("free bound variant fields have no instance to rename")
+            FieldTarget::FreeVariantFields | FieldTarget::BoundVariantFields => {
+                panic!("free variant fields have no instance to rename")
             }
             FieldTarget::RefsInstance(_) => FieldTarget::RefsInstance(new_instance_ident),
         }
@@ -857,7 +870,7 @@ impl FieldTarget {
         let fields: Vec<_> = fields.into_iter().collect();
         let field_idents: Vec<_> = fields
             .iter()
-            .map(|field| Self::binding_ident_for(field))
+            .map(|field| Self::free_field_ident(field))
             .collect();
         let field_types: Vec<_> = fields.iter().map(|field| field.ty()).collect();
         Some(quote! {
