@@ -622,11 +622,16 @@ impl OneofVariant {
     /// Oneof decoders have four different cases they may be implemented in: implemented for either
     /// NonEmptyOneof or Oneof, and either relaxed or distinguished. The code for these should all
     /// be similarly deduplicated.
-    pub fn decode(&self, lifetime: DecodeLifetime, mode: DecodeMode) -> TokenStream {
+    pub fn decode(
+        &self,
+        type_ident: impl ToTokens,
+        lifetime: DecodeLifetime,
+        mode: DecodeMode,
+    ) -> TokenStream {
         let tag = self.tag;
         let for_overwrite = self.for_overwrite();
         let decode = self.decode_fields(lifetime, mode);
-        let construct = self.construct();
+        let construct = self.construct(type_ident);
         let (decode_result, output) = match mode {
             Relaxed => (quote!(()), construct),
             Distinguished => (quote!(canon), quote!((#construct, canon))),
@@ -706,14 +711,29 @@ impl OneofVariant {
         }
     }
 
-    fn construct(&self) -> TokenStream {
+    fn construct(&self, type_ident: impl ToTokens) -> TokenStream {
         let variant_ident = &self.variant_ident;
         match &self.contents {
             VariantContents::Value(field) => {
                 let value_ident = &field.ident_within_variant;
-                quote!( Self::#variant_ident { #value_ident: value } )
+                quote!( #type_ident::#variant_ident { #value_ident: value } )
             }
-            VariantContents::Message(..) => todo!(),
+            VariantContents::Message(fields) => {
+                let field_inits = fields
+                    .iter()
+                    .filter(|field| !field.is_ignored())
+                    .map(FieldTarget::free_field_ident);
+                // currently, oneof enums never have default-per-field
+                let has_ignored_fields = fields.iter().any(Field::is_ignored);
+                let maybe_fill_default =
+                    has_ignored_fields.then(|| quote!(..::core::default::Default::default()));
+                quote! {
+                    #type_ident::#variant_ident {
+                        #(#field_inits,)*
+                        #maybe_fill_default
+                    }
+                }
+            }
         }
     }
 }

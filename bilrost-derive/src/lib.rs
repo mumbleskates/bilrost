@@ -1342,7 +1342,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
     let decode_arms = |lifetime, mode| {
         let arms = variants
             .iter()
-            .map(|variant| variant.decode(lifetime, mode));
+            .map(|variant| variant.decode(&self_alias, lifetime, mode));
         quote! {
             match tag {
                 #(#arms,)*
