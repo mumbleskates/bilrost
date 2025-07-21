@@ -45,6 +45,7 @@ use MessageFieldContent::*;
 /// reserved tag list and each other.
 pub fn parse_message_fields(
     fields: syn::Fields,
+    fallback_ignored_init_expression: Option<&TokenStream>,
     reserved: Option<TagList>,
 ) -> Result<Vec<Field>, Error> {
     let mut next_tag = Some(match fields {
@@ -66,8 +67,14 @@ pub fn parse_message_fields(
                     let index = syn::Index::from(index);
                     quote!(#index)
                 });
-            let field = Field::new(&field_ident, &field.ty, &field.attrs, next_tag)
-                .map_err(|e| err!("invalid field {field_ident}: {e}"))?;
+            let field = Field::new(
+                &field_ident,
+                &field.ty,
+                &field.attrs,
+                next_tag,
+                fallback_ignored_init_expression,
+            )
+            .map_err(|e| err!("invalid field {field_ident}: {e}"))?;
             if !field.is_ignored() {
                 next_tag = field.last_tag().checked_add(1);
             }
@@ -121,11 +128,14 @@ impl Field {
         ty: &Type,
         attrs: &[Attribute],
         inferred_tag: Option<u32>,
+        fallback_ignored_init_expression: Option<&TokenStream>,
     ) -> Result<Field, Error> {
         let attrs = bilrost_attrs(attrs)?;
 
         Ok(Field {
-            content: if let Some(field) = ignored::IgnoredField::new(ty, &attrs)? {
+            content: if let Some(field) =
+                ignored::IgnoredField::new(ty, &attrs, fallback_ignored_init_expression)?
+            {
                 Ignored(field)
             } else if let Some(field) = oneof::OneofInclusion::new(ty, &attrs)? {
                 Oneof(field)
@@ -232,14 +242,14 @@ impl Field {
 
     /// Returns an expression which initializes the field's type with its encoding with a guaranteed
     /// empty value.
-    pub fn empty(&self) -> TokenStream {
+    pub fn empty(&self) -> Option<TokenStream> {
         let ident = &self.ident;
         let init = match &self.content {
-            Value(scalar) => scalar.empty(),
-            Oneof(oneof) => oneof.empty(),
-            Ignored(ignored) => ignored.initialize(),
+            Value(scalar) => Some(scalar.empty()),
+            Oneof(oneof) => Some(oneof.empty()),
+            Ignored(ignored) => ignored.initialize().clone(),
         };
-        quote!(#ident: #init)
+        init.map(|init| quote!(#ident: #init))
     }
 
     /// Returns an expression which returns whether the field is considered empty in the encoding.

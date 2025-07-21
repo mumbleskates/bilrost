@@ -161,11 +161,17 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         )
     }
 
+    let fallback_ignored_init_expression =
+        default_per_field.then(|| quote!(::core::default::Default::default()));
+
     // Parse field data
-    let (ignored_fields, unsorted_fields): (Vec<_>, Vec<_>) =
-        parse_message_fields(data_struct.fields, reserved_tags)?
-            .into_iter()
-            .partition(Field::is_ignored);
+    let (ignored_fields, unsorted_fields): (Vec<_>, Vec<_>) = parse_message_fields(
+        data_struct.fields,
+        fallback_ignored_init_expression.as_ref(),
+        reserved_tags,
+    )?
+    .into_iter()
+    .partition(Field::is_ignored);
 
     if distinguished && !ignored_fields.is_empty() {
         bail!("messages with ignored fields cannot be distinguished");

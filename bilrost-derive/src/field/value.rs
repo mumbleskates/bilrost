@@ -467,8 +467,8 @@ impl OneofVariant {
                     );
                 }
 
-                let variant_fields =
-                    parse_message_fields(variant.fields, reserved_tags).map_err(|e| {
+                let variant_fields = parse_message_fields(variant.fields, None, reserved_tags)
+                    .map_err(|e| {
                         err!(
                             "in message variant {variant_ident}: {e}",
                             variant_ident = variant.ident
