@@ -11,10 +11,15 @@ use syn::{Meta, Type};
 #[derive(Clone)]
 pub struct IgnoredField {
     ty: Type,
+    init_expression: Option<TokenStream>,
 }
 
 impl IgnoredField {
-    pub fn new(ty: &Type, attrs: &[Meta]) -> Result<Option<Box<Self>>, Error> {
+    pub fn new(
+        ty: &Type,
+        attrs: &[Meta],
+        init_expression: Option<&TokenStream>,
+    ) -> Result<Option<Box<Self>>, Error> {
         let ignore_attr_count = attrs
             .iter()
             .filter(|attr| word_attr(attr, "ignore"))
@@ -34,11 +39,14 @@ impl IgnoredField {
                 attrs = quote!(#(#attrs),*),
             );
         }
-        Ok(Some(Box::new(Self { ty: ty.clone() })))
+        Ok(Some(Box::new(Self {
+            ty: ty.clone(),
+            init_expression: init_expression.cloned(),
+        })))
     }
 
-    pub fn initialize(&self) -> TokenStream {
-        quote!(::core::default::Default::default())
+    pub fn initialize(&self) -> &Option<TokenStream> {
+        &self.init_expression
     }
 }
 
