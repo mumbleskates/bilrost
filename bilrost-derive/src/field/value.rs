@@ -743,7 +743,7 @@ impl FieldBearer for OneofVariant {
     fn where_terms(&self, purpose: WhereFor) -> Vec<TokenStream> {
         match &self.contents {
             VariantContents::Value(field) => field.where_terms(purpose),
-            VariantContents::Message(fields) => fields.where_terms(purpose), // TODO: need to handle ignore bounds properly here
+            VariantContents::Message(fields) => fields.where_terms(purpose),
         }
     }
 }
