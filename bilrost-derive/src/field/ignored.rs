@@ -11,15 +11,17 @@ use syn::{Meta, Type};
 #[derive(Clone)]
 pub struct IgnoredField {
     ty: Type,
-    init_expression: Option<TokenStream>,
+    init_mode: InitMode,
+}
+
+#[derive(Clone)]
+pub enum InitMode {
+    ParentDefault,
+    DefaultPerField,
 }
 
 impl IgnoredField {
-    pub fn new(
-        ty: &Type,
-        attrs: &[Meta],
-        init_expression: Option<&TokenStream>,
-    ) -> Result<Option<Box<Self>>, Error> {
+    pub fn new(ty: &Type, attrs: &[Meta], init_mode: InitMode) -> Result<Option<Box<Self>>, Error> {
         let ignore_attr_count = attrs
             .iter()
             .filter(|attr| word_attr(attr, "ignore"))
@@ -41,18 +43,26 @@ impl IgnoredField {
         }
         Ok(Some(Box::new(Self {
             ty: ty.clone(),
-            init_expression: init_expression.cloned(),
+            init_mode,
         })))
     }
 
-    pub fn initialize(&self) -> &Option<TokenStream> {
-        &self.init_expression
+    pub fn initialize(&self) -> Option<TokenStream> {
+        match self.init_mode {
+            InitMode::ParentDefault => None,
+            InitMode::DefaultPerField => Some(quote!(::core::default::Default::default())),
+        }
     }
 }
 
 impl FieldBearer for IgnoredField {
     fn where_terms(&self, _purpose: WhereFor) -> Vec<TokenStream> {
-        let ty = &self.ty;
-        vec![quote!(#ty: ::core::default::Default)]
+        match self.init_mode {
+            InitMode::ParentDefault => vec![],
+            InitMode::DefaultPerField => {
+                let ty = &self.ty;
+                vec![quote!(#ty: ::core::default::Default)]
+            }
+        }
     }
 }

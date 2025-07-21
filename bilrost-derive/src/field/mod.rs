@@ -22,6 +22,7 @@ mod oneof;
 pub mod traits;
 mod value;
 
+pub use ignored::InitMode;
 pub use value::OneofVariant;
 
 #[derive(Clone)]
@@ -45,7 +46,7 @@ use MessageFieldContent::*;
 /// reserved tag list and each other.
 pub fn parse_message_fields(
     fields: syn::Fields,
-    fallback_ignored_init_expression: Option<&TokenStream>,
+    init_mode: InitMode,
     reserved: Option<TagList>,
 ) -> Result<Vec<Field>, Error> {
     let mut next_tag = Some(match fields {
@@ -72,7 +73,7 @@ pub fn parse_message_fields(
                 &field.ty,
                 &field.attrs,
                 next_tag,
-                fallback_ignored_init_expression,
+                init_mode.clone(),
             )
             .map_err(|e| err!("invalid field {field_ident}: {e}"))?;
             if !field.is_ignored() {
@@ -128,14 +129,12 @@ impl Field {
         ty: &Type,
         attrs: &[Attribute],
         inferred_tag: Option<u32>,
-        fallback_ignored_init_expression: Option<&TokenStream>,
+        init_mode: InitMode,
     ) -> Result<Field, Error> {
         let attrs = bilrost_attrs(attrs)?;
 
         Ok(Field {
-            content: if let Some(field) =
-                ignored::IgnoredField::new(ty, &attrs, fallback_ignored_init_expression)?
-            {
+            content: if let Some(field) = ignored::IgnoredField::new(ty, &attrs, init_mode)? {
                 Ignored(field)
             } else if let Some(field) = oneof::OneofInclusion::new(ty, &attrs)? {
                 Oneof(field)

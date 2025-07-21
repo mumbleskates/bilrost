@@ -19,7 +19,8 @@ use crate::field::traits::{
     WhereFor::{self, Decode, Encode},
 };
 use crate::field::{
-    parse_message_fields, tag_measurer, Field, FieldTarget, MessageFieldsSorted, OneofVariant,
+    parse_message_fields, tag_measurer, Field, FieldTarget, InitMode, MessageFieldsSorted,
+    OneofVariant,
 };
 use alloc::collections::BTreeMap;
 use alloc::string::ToString;
@@ -161,17 +162,16 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         )
     }
 
-    let fallback_ignored_init_expression =
-        default_per_field.then(|| quote!(::core::default::Default::default()));
+    let init_mode = match default_per_field {
+        true => InitMode::DefaultPerField,
+        false => InitMode::ParentDefault,
+    };
 
     // Parse field data
-    let (ignored_fields, unsorted_fields): (Vec<_>, Vec<_>) = parse_message_fields(
-        data_struct.fields,
-        fallback_ignored_init_expression.as_ref(),
-        reserved_tags,
-    )?
-    .into_iter()
-    .partition(Field::is_ignored);
+    let (ignored_fields, unsorted_fields): (Vec<_>, Vec<_>) =
+        parse_message_fields(data_struct.fields, init_mode, reserved_tags)?
+            .into_iter()
+            .partition(Field::is_ignored);
 
     if distinguished && !ignored_fields.is_empty() {
         bail!("messages with ignored fields cannot be distinguished");
@@ -189,12 +189,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
 
     let borrow_generics = prepend_to_generics(&impl_generics, quote!('__a));
 
-    let mut where_fields = vec![unsorted_fields.as_slice()];
-    // if we are defaulting ignored fields per-field, we need to include where-clause bounds for
-    // each one of them as well.
-    if default_per_field {
-        where_fields.push(ignored_fields.as_slice());
-    }
+    let where_fields = vec![unsorted_fields.as_slice(), ignored_fields.as_slice()];
     let encoder_where_clause =
         append_wheres_with_fields(where_clause, self_where.clone(), &where_fields, Encode);
     let [owned_decoder_where_clause, borrowed_decoder_where_clause] =
@@ -252,7 +247,11 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         .iter()
         .filter_map(|field| field.tag_list_guard());
 
-    let mut empties: Vec<_> = unsorted_fields.iter().map(|field| field.empty()).collect();
+    let empties: Vec<_> = unsorted_fields
+        .iter()
+        .chain(ignored_fields.iter())
+        .flat_map(|field| field.empty())
+        .collect();
     let is_empties: Vec<_> = unsorted_fields
         .iter()
         .map(|field| field.is_empty(&self_instance))
@@ -262,8 +261,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         .map(|field| field.clear(&self_instance))
         .collect();
 
-    let initialize_ignored = if default_per_field || ignored_fields.is_empty() {
-        empties.extend(ignored_fields.iter().map(|field| field.empty()));
+    let maybe_fill_default = if default_per_field || ignored_fields.is_empty() {
         None
     } else {
         // initialize ignored fields from <Self as Default>
@@ -313,7 +311,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
             fn empty() -> Self {
                 Self {
                     #(#empties,)*
-                    #initialize_ignored
+                    #maybe_fill_default
                 }
             }
 

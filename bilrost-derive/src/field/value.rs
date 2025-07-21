@@ -8,7 +8,7 @@ use crate::field::traits::{
     FieldBearer, SinglyTagged,
     WhereFor::{self, Decode, Encode},
 };
-use crate::field::{parse_message_fields, Field, FieldTarget, MessageFieldsSorted};
+use crate::field::{parse_message_fields, Field, FieldTarget, InitMode, MessageFieldsSorted};
 use alloc::boxed::Box;
 use alloc::format;
 use alloc::string::ToString;
@@ -467,13 +467,14 @@ impl OneofVariant {
                     );
                 }
 
-                let variant_fields = parse_message_fields(variant.fields, None, reserved_tags)
-                    .map_err(|e| {
-                        err!(
-                            "in message variant {variant_ident}: {e}",
-                            variant_ident = variant.ident
-                        )
-                    })?;
+                let variant_fields =
+                    parse_message_fields(variant.fields, InitMode::ParentDefault, reserved_tags)
+                        .map_err(|e| {
+                            err!(
+                                "in message variant {variant_ident}: {e}",
+                                variant_ident = variant.ident
+                            )
+                        })?;
 
                 for field in &variant_fields {
                     if field.has_enumeration_type() {
