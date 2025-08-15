@@ -708,7 +708,23 @@ impl OneofVariant {
                     )
                 )
             }
-            VariantContents::Message(..) => todo!(),
+            VariantContents::Message(fields) => {
+                quote! {
+                    { // TODO: wrap this so we can use the try operator
+                        let buf = buf.take_length_delimited()?;
+                        let tr = &mut #crate_::encoding::TagReader::new();
+                        let mut last_tag = ::core::option::Option::None::<u32>;
+                        while buf.has_remaining()? {
+                            let (tag, wire_type) = tr.decode_key(buf.lend())?;
+                            let duplicated = last_tag == ::core::option::Option::Some(tag);
+                            last_tag = ::core::option::Option::Some(tag);
+                            match tag {
+                                // TODO: this
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 
