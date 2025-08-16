@@ -242,13 +242,11 @@ impl Field {
     /// Returns an expression which initializes the field's type with its encoding with a guaranteed
     /// empty value.
     pub fn empty(&self) -> Option<TokenStream> {
-        let ident = &self.ident;
-        let init = match &self.content {
+        match &self.content {
             Value(scalar) => Some(scalar.empty()),
             Oneof(oneof) => Some(oneof.empty()),
             Ignored(ignored) => ignored.initialize().clone(),
-        };
-        init.map(|init| quote!(#ident: #init))
+        }
     }
 
     /// Returns an expression which returns whether the field is considered empty in the encoding.

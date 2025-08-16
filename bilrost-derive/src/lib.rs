@@ -250,7 +250,11 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     let empties: Vec<_> = unsorted_fields
         .iter()
         .chain(ignored_fields.iter())
-        .flat_map(|field| field.empty())
+        .flat_map(|field| {
+            let empty = field.empty()?;
+            let ident = field.ident();
+            Some(quote!(#ident: #empty))
+        })
         .collect();
     let is_empties: Vec<_> = unsorted_fields
         .iter()
