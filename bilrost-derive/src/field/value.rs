@@ -739,7 +739,11 @@ impl OneofVariant {
                 let field_inits = fields
                     .iter()
                     .filter(|field| !field.is_ignored())
-                    .map(FieldTarget::free_field_ident);
+                    .map(|field| {
+                        let free_ident = FieldTarget::free_field_ident(field);
+                        let ident = field.ident();
+                        quote!(#ident: #free_ident)
+                    });
                 // currently, oneof enums never have default-per-field
                 let has_ignored_fields = fields.iter().any(Field::is_ignored);
                 let maybe_fill_default =
