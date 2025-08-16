@@ -5,7 +5,7 @@ use crate::crate_name;
 use crate::field::traits::{
     DecodeLifetime::{self, Borrowed, Owned},
     DecodeMode::{self, Distinguished, Relaxed},
-    FieldBearer, SinglyTagged,
+    FieldBearer, SinglyTagged, Tagged,
     WhereFor::{self, Decode, Encode},
 };
 use crate::field::{parse_message_fields, Field, FieldTarget, InitMode, MessageFieldsSorted};
@@ -15,6 +15,7 @@ use alloc::string::ToString;
 use alloc::vec;
 use alloc::vec::Vec;
 use eyre::{bail, eyre as err, Report as Error};
+use itertools::Itertools;
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, ToTokens};
 use syn::{parse_str, Fields, Ident, Index, Meta, Type, Variant};
@@ -709,20 +710,52 @@ impl OneofVariant {
                 )
             }
             VariantContents::Message(fields) => {
+                let field_arms: Vec<_> = fields
+                    .iter()
+                    .map(|field| {
+                        let tags = field.tags().into_iter().map(|tag| quote!(#tag));
+                        let tags = Itertools::intersperse(tags, quote!(|));
+                        let decode = field.decode(&FieldTarget::FreeVariantFields, lifetime, mode);
+                        quote!(#(#tags)* => { #decode })
+                    })
+                    .collect();
+                let (result_init, result_update, result_value) = match mode {
+                    Relaxed => (None, None, quote!(())),
+                    Distinguished => (
+                        Some(quote!(let mut canon = #crate_::Canonicity::Canonical;)),
+                        Some(quote!(canon.update(ctx.check($crate_::Canonicity::HasExtensions)?);)),
+                        quote!(canon),
+                    ),
+                };
                 quote! {
-                    { // TODO: wrap this so we can use the try operator
-                        let buf = buf.take_length_delimited()?;
+                    // The decoder is wrapped in an IIFE so that we can use the try operator inside.
+                    // If we get try blocks in a later edition of rust we can use those
+                    // conditionally instead.
+                    (|| {
+                        let mut outer_buf = buf;
+                        // msg_buf is the delimited range of this sub-message
+                        let mut msg_buf = outer_buf.take_length_delimited()?;
                         let tr = &mut #crate_::encoding::TagReader::new();
                         let mut last_tag = ::core::option::Option::None::<u32>;
-                        while buf.has_remaining()? {
-                            let (tag, wire_type) = tr.decode_key(buf.lend())?;
+                        #result_init
+                        while msg_buf.has_remaining()? {
+                            let (tag, wire_type) = tr.decode_key(msg_buf.lend())?;
                             let duplicated = last_tag == ::core::option::Option::Some(tag);
                             last_tag = ::core::option::Option::Some(tag);
+                            // individual field decodes will move and consume `buf` and `ctx`,
+                            // so we (cheaply) create copies of those values here
+                            let buf = msg_buf.lend();
+                            let ctx = ctx.clone();
                             match tag {
-                                // TODO: this
-                            }
+                                #(#field_arms)*
+                                _ => {
+                                    #result_update
+                                    #crate_::encoding::skip_field(wire_type, buf)
+                                },
+                            }?;
                         }
-                    }
+                        ::core::result::Result::Ok(#result_value)
+                    })()
                 }
             }
         }

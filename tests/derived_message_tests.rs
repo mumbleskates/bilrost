@@ -3676,6 +3676,42 @@ fn oneof_named_after_builtin_encoding_alias() {
     );
 }
 
+#[test]
+fn embedded_messages() {
+    #[derive(Debug, PartialEq, Oneof, Message)]
+    enum Foo {
+        #[bilrost(tag(1), message)]
+        A {
+            bar: u32,
+            baz: String,
+            #[bilrost(tag(5), encoding(fixed))]
+            bear: u64,
+        },
+        #[bilrost(2)]
+        B(String),
+        #[bilrost(empty)]
+        Empty,
+    }
+
+    assert::decodes!(
+        owned relaxed,
+        [
+            (1, OV::message(&[
+                (1, OV::Varint(5)),
+                (2, OV::str("hello")),
+                (5, OV::fixed_u64(345)),
+            ].into_opaque_message())),
+        ],
+        Foo::A{
+            bar: 5,
+            baz: "hello".to_owned(),
+            bear: 345,
+        },
+    )
+
+    // TODO: expand this testing
+}
+
 // Enumeration tests
 
 #[test]
