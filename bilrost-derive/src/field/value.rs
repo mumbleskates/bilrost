@@ -545,10 +545,15 @@ impl OneofVariant {
             }
             VariantContents::Message(fields) => {
                 let binding = OneofVariant::binding(fields);
-                let encode = MessageFieldsSorted::new_filtering_ignored(fields)
-                    .encode(&FieldTarget::BoundVariantFields);
+                let sorted_fields = MessageFieldsSorted::new_filtering_ignored(fields);
+                let encoded_len = sorted_fields.encoded_len(&FieldTarget::BoundVariantFields);
+                let encode = sorted_fields.encode(&FieldTarget::BoundVariantFields);
                 quote! {
                     #type_ident::#variant_ident { #binding } => {
+                        tw.encode_key(#tag, #crate_::encoding::WireType::LengthDelimited, buf);
+                        // TODO: encoded_len here sorts the fields again; can we extract this as a
+                        //  common function call? or sort the fields only once and scan twice?
+                        #crate_::encoding::encode_varint(#encoded_len as u64, buf);
                         #encode
                     }
                 }
@@ -582,7 +587,11 @@ impl OneofVariant {
                     .prepend(&FieldTarget::BoundVariantFields);
                 quote! {
                     #type_ident::#variant_ident { #binding } => {
+                        tw.begin_field(#tag, #crate_::encoding::WireType::LengthDelimited, buf);
+                        let end = buf.remaining();
                         #prepend
+                        #crate_::encoding::prepend_varint((buf.remaining() - end) as u64, buf);
+                        tw.finalize(buf);
                     }
                 }
             }
@@ -614,7 +623,10 @@ impl OneofVariant {
                     .encoded_len(&FieldTarget::BoundVariantFields);
                 quote! {
                     #type_ident::#variant_ident { #binding } => {
-                        #encoded_len
+                        let total = #encoded_len;
+                        total
+                            + #crate_::encoding::encoded_len_varint(total as u64)
+                            + tm.key_len(#tag)
                     }
                 }
             }
