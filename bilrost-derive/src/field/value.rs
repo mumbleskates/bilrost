@@ -740,6 +740,8 @@ impl OneofVariant {
                     // If we get try blocks in a later edition of rust we can use those
                     // conditionally instead.
                     (|| {
+                        #crate_::encoding::check_wire_type(
+                            #crate_::encoding::WireType::LengthDelimited, wire_type)?;
                         let mut outer_buf = buf;
                         // msg_buf is the delimited range of this sub-message
                         let mut msg_buf = outer_buf.take_length_delimited()?;
