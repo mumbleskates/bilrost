@@ -209,18 +209,18 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     let prepend = fields.prepend(&self_instance);
 
     let [decode_owned, decode_borrowed] = [Owned, Borrowed].map(|lifetime| {
-        let ident = ident.clone();
+        let ident_str = ident.to_string();
         let self_instance = self_instance.clone();
         unsorted_fields.iter().map(move |field| {
             let decode = field.decode(&self_instance, lifetime, Relaxed);
             let tags = field.tags().into_iter().map(|tag| quote!(#tag));
             let tags = Itertools::intersperse(tags, quote!(|));
-            let field_ident = field.ident();
+            let field_ident_str = field.ident().to_string();
 
             quote! {
                 #(#tags)* => {
                     if let ::core::result::Result::Err(mut error) = #decode {
-                        error.push(stringify!(#ident), stringify!(#field_ident));
+                        error.push(#ident_str, #field_ident_str);
                         return ::core::result::Result::Err(error);
                     }
                 }
@@ -412,13 +412,13 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
             });
 
         let [decode_owned, decode_borrowed] = [Owned, Borrowed].map(|lifetime| {
-            let ident = ident.clone();
+            let ident_str = ident.to_string();
             let self_instance = self_instance.clone();
             unsorted_fields.iter().map(move |field| {
                 let decode = field.decode(&self_instance, lifetime, Distinguished);
                 let tags = field.tags().into_iter().map(|tag| quote!(#tag));
                 let tags = Itertools::intersperse(tags, quote!(|));
-                let field_ident = field.ident();
+                let field_ident_str = field.ident().to_string();
 
                 quote! {
                     #(#tags)* => {
@@ -427,7 +427,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
                                 canon.update(new_canon);
                             }
                             ::core::result::Result::Err(mut error) => {
-                                error.push(stringify!(#ident), stringify!(#field_ident));
+                                error.push(#ident_str, #field_ident_str);
                                 return ::core::result::Result::Err(error);
                             }
                         }
@@ -1335,13 +1335,15 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
 
     let variant_name_arms = variants.iter().map(|variant| {
         let tag = variant.tag();
-        let variant_ident = variant.ident();
+        let ident_str = ident.to_string();
+        let variant_ident_str = variant.ident().to_string();
         quote! {
-            #tag => (stringify!(#ident), stringify!(#variant_ident)),
+            #tag => (#ident_str, #variant_ident_str),
         }
     });
 
     let decode_arms = |lifetime, mode| {
+        let ident_str = ident.to_string();
         let arms = variants
             .iter()
             .map(|variant| variant.decode(&self_alias, lifetime, mode));
@@ -1349,7 +1351,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
             match tag {
                 #(#arms,)*
                 _ => unreachable!(
-                    concat!("invalid ", stringify!(#ident), " tag: {}"), tag,
+                    concat!("invalid ", #ident_str, " tag: {}"), tag,
                 ),
             }
         }
