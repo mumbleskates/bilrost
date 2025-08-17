@@ -3707,7 +3707,17 @@ fn embedded_messages() {
             baz: "hello".to_owned(),
             bear: 345,
         },
-    )
+    );
+    assert::decodes!(
+        owned relaxed errs for Foo,
+        [
+            (1, OV::message(&[
+                (5, OV::u64(345)),
+            ].into_opaque_message())),
+        ],
+        WrongWireType,
+        "Foo.A/A.bear",
+    );
 
     // TODO: expand this testing
 }
