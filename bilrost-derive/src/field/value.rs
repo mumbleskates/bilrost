@@ -731,7 +731,7 @@ impl OneofVariant {
                     Relaxed => (None, None, quote!(())),
                     Distinguished => (
                         Some(quote!(let mut canon = #crate_::Canonicity::Canonical;)),
-                        Some(quote!(canon.update(ctx.check($crate_::Canonicity::HasExtensions)?);)),
+                        Some(quote!(canon.update(ctx.check(#crate_::Canonicity::HasExtensions)?);)),
                         quote!(canon),
                     ),
                 };
