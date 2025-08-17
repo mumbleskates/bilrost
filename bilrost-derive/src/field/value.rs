@@ -710,13 +710,21 @@ impl OneofVariant {
                 )
             }
             VariantContents::Message(fields) => {
+                let variant_ident_str = self.variant_ident.to_string();
                 let field_arms: Vec<_> = fields
                     .iter()
                     .map(|field| {
                         let tags = field.tags().into_iter().map(|tag| quote!(#tag));
                         let tags = Itertools::intersperse(tags, quote!(|));
                         let decode = field.decode(&FieldTarget::FreeVariantFields, lifetime, mode);
-                        quote!(#(#tags)* => { #decode })
+                        let field_ident_str = field.ident.to_string();
+                        quote!(#(#tags)* => match #decode {
+                            ::core::result::Result::Ok(res) => ::core::result::Result::Ok(res),
+                            ::core::result::Result::Err(mut error) => {
+                                error.push(#variant_ident_str, #field_ident_str);
+                                ::core::result::Result::Err(error)
+                            }
+                        })
                     })
                     .collect();
                 let (result_init, result_update, result_value) = match mode {
