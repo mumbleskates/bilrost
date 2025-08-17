@@ -884,7 +884,7 @@ impl FieldTarget {
             struct __BilrostRefs<'__r> {
                 #(#field_idents: &'__r #field_types,)*
             }
-            let #instance_ident = __BilrostRefs { #(#field_idents),* }
+            let #instance_ident = __BilrostRefs { #(#field_idents),* };
         })
     }
 }
