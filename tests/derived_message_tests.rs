@@ -739,26 +739,6 @@ fn derived_message_field_ordering() {
         },
     }
 
-    assert::decodes!(
-        owned distinguished,
-        [(1, OV::bytes([]))],
-        EmbeddedStruct::Embedded {
-            zero: false,
-            a: None,
-            four: false,
-            five: false,
-            b: None,
-            twelve: false,
-            c: None,
-            fourteen: false,
-            fifteen: false,
-            seventeen: false,
-            d: None,
-            twentyone: false,
-            fifty: false,
-        },
-    );
-
     impl From<Struct> for EmbeddedStruct {
         fn from(value: Struct) -> Self {
             let Struct {
@@ -3777,7 +3757,8 @@ fn oneof_named_after_builtin_encoding_alias() {
 
 #[test]
 fn embedded_messages() {
-    #[derive(Debug, PartialEq, Oneof, Message)]
+    #[derive(Debug, PartialEq, Eq, Oneof, Message)]
+    #[bilrost(distinguished)]
     enum Foo {
         #[bilrost(tag(1), message)]
         A {
@@ -3796,7 +3777,7 @@ fn embedded_messages() {
         owned relaxed,
         [
             (1, OV::message(&[
-                (1, OV::Varint(5)),
+                (1, OV::u32(5)),
                 (2, OV::str("hello")),
                 (5, OV::fixed_u64(345)),
             ].into_opaque_message())),
@@ -3807,8 +3788,9 @@ fn embedded_messages() {
             bear: 345,
         },
     );
+    // error with inner field propagates its inner field name
     assert::decodes!(
-        owned relaxed errs for Foo,
+        owned never decodes Foo,
         [
             (1, OV::message(&[
                 (5, OV::u64(345)),
@@ -3817,8 +3799,59 @@ fn embedded_messages() {
         WrongWireType,
         "Foo.A/A.bear",
     );
-
-    // TODO: expand this testing
+    // the embedded message itself must be the right wire type
+    assert::decodes!(
+        owned never decodes Foo,
+        [
+            (1, OV::u64(1)),
+        ],
+        WrongWireType,
+        "Foo.A",
+    );
+    // with extension fields
+    assert::decodes!(
+        owned non-canonically,
+        [
+            (1, OV::message(&[
+                (2, OV::str("known")),
+                (3, OV::str("unknown")),
+            ].into_opaque_message())),
+        ],
+        Foo::A{
+            bar: 0,
+            baz: "known".to_owned(),
+            bear: 0,
+        },
+        HasExtensions,
+        "Foo.A",
+    );
+    // with non-canonical field values
+    assert::decodes!(
+        owned non-canonically,
+        [
+            (1, OV::message(&[
+                (1, OV::u32(0)),
+                (2, OV::str("known")),
+            ].into_opaque_message())),
+        ],
+        Foo::A{
+            bar: 0,
+            baz: "known".to_owned(),
+            bear: 0,
+        },
+        NotCanonical,
+        "Foo.A/A.bar",
+    );
+    // last byte truncated from the inner message
+    let message_bytes = OpaqueMessage::from_opaque([(2, OV::str("truncated"))]).encode_to_vec();
+    assert::decodes!(
+        owned never decodes Foo,
+        [
+            (1, OV::bytes(&message_bytes[..message_bytes.len() - 1])),
+        ],
+        Truncated,
+        "Foo.A/A.baz",
+    );
 }
 
 // Enumeration tests
