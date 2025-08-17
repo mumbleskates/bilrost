@@ -703,6 +703,97 @@ fn derived_message_field_ordering() {
         fifty: bool,
     }
 
+    #[derive(Clone, Debug, PartialEq, Eq, Oneof, Message)]
+    #[bilrost(distinguished)]
+    enum EmbeddedStruct {
+        #[bilrost(empty)]
+        Empty,
+        #[bilrost(tag(1), message)]
+        Embedded {
+            #[bilrost(0)]
+            zero: bool,
+            #[bilrost(oneof = "1, 10, 20")]
+            a: Option<A>,
+            #[bilrost(4)]
+            four: bool,
+            #[bilrost(5)]
+            five: bool,
+            #[bilrost(oneof = "9, 11")]
+            b: Option<B>,
+            // implicitly tagged 12
+            twelve: bool,
+            #[bilrost(oneof = "13, 16, 22")]
+            c: Option<C>,
+            #[bilrost(14)]
+            fourteen: bool,
+            // implicitly tagged 15
+            fifteen: bool,
+            #[bilrost(17)]
+            seventeen: bool,
+            #[bilrost(oneof = "18, 19")]
+            d: Option<D>,
+            #[bilrost(21)]
+            twentyone: bool,
+            #[bilrost(50)]
+            fifty: bool,
+        },
+    }
+
+    assert::decodes!(
+        owned distinguished,
+        [(1, OV::bytes([]))],
+        EmbeddedStruct::Embedded {
+            zero: false,
+            a: None,
+            four: false,
+            five: false,
+            b: None,
+            twelve: false,
+            c: None,
+            fourteen: false,
+            fifteen: false,
+            seventeen: false,
+            d: None,
+            twentyone: false,
+            fifty: false,
+        },
+    );
+
+    impl From<Struct> for EmbeddedStruct {
+        fn from(value: Struct) -> Self {
+            let Struct {
+                zero,
+                a,
+                four,
+                five,
+                b,
+                twelve,
+                c,
+                fourteen,
+                fifteen,
+                seventeen,
+                d,
+                twentyone,
+                fifty,
+            } = value;
+            Self::Embedded {
+                zero,
+                a,
+                four,
+                five,
+                b,
+                twelve,
+                c,
+                fourteen,
+                fifteen,
+                seventeen,
+                d,
+                twentyone,
+                fifty,
+            }
+        }
+    }
+
     let bools = repeat_n([false, true], 9).multi_cartesian_product();
     let abcd = [None, Some(1), Some(10), Some(20)]
         .into_iter()
@@ -721,7 +812,15 @@ fn derived_message_field_ordering() {
                 .chain([a, b, c, d].into_iter().flatten())
                 .map(|tag| (tag, OV::bool(true))),
         );
-        assert::decodes!(owned distinguished, &opaque_message, Struct::from_opaque(&opaque_message));
+        let struct_val = Struct::from_opaque(&opaque_message);
+        assert::decodes!(owned distinguished, &opaque_message, struct_val.clone());
+        let opaque_embedded_message =
+            OpaqueMessage::from_opaque([(1, OV::message(&opaque_message))]);
+        assert::decodes!(
+            owned distinguished,
+            &opaque_embedded_message,
+            EmbeddedStruct::from(struct_val.clone()),
+        );
     }
 }
 

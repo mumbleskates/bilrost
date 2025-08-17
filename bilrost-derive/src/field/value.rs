@@ -727,12 +727,20 @@ impl OneofVariant {
                         })
                     })
                     .collect();
-                let (result_init, result_update, result_value) = match mode {
-                    Relaxed => (None, None, quote!(())),
+                let (
+                    result_value,
+                    result_init,
+                    assign_result,
+                    update_result,
+                    update_result_unknown_field,
+                ) = match mode {
+                    Relaxed => (quote!(()), None, None, None, None),
                     Distinguished => (
-                        Some(quote!(let mut canon = #crate_::Canonicity::Canonical;)),
-                        Some(quote!(canon.update(ctx.check(#crate_::Canonicity::HasExtensions)?);)),
                         quote!(canon),
+                        Some(quote!(let mut canon = #crate_::Canonicity::Canonical;)),
+                        Some(quote!(let new_canon = )),
+                        Some(quote!(canon.update(new_canon);)),
+                        Some(quote!(canon.update(ctx.check(#crate_::Canonicity::HasExtensions)?);)),
                     ),
                 };
                 quote! {
@@ -756,13 +764,15 @@ impl OneofVariant {
                             // so we (cheaply) create copies of those values here
                             let buf = msg_buf.lend();
                             let ctx = ctx.clone();
-                            match tag {
+                            #assign_result match tag {
                                 #(#field_arms)*
                                 _ => {
-                                    #result_update
-                                    #crate_::encoding::skip_field(wire_type, buf)
+                                    #update_result_unknown_field
+                                    #crate_::encoding::skip_field(wire_type, buf)?;
+                                    ::core::result::Result::Ok(#result_value)
                                 },
                             }?;
+                            #update_result
                         }
                         ::core::result::Result::Ok(#result_value)
                     })()

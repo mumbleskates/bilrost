@@ -806,9 +806,8 @@ impl FieldTarget {
     /// Returns an expression naming this item's instance, if it is nameable.
     pub fn self_expr(&self) -> Option<TokenStream> {
         match self {
-            FieldTarget::MessageInstance(instance) | FieldTarget::RefsInstance(instance) => {
-                Some(instance.clone())
-            }
+            FieldTarget::MessageInstance(instance) => Some(instance.clone()),
+            FieldTarget::RefsInstance(instance) => Some(quote!(&#instance)),
             FieldTarget::FreeVariantFields | FieldTarget::BoundVariantFields => None,
         }
     }
@@ -884,7 +883,7 @@ impl FieldTarget {
             struct __BilrostRefs<'__r> {
                 #(#field_idents: &'__r #field_types,)*
             }
-            let #instance_ident = __BilrostRefs { #(#field_idents),* };
+            let #instance_ident = &mut __BilrostRefs { #(#field_idents),* };
         })
     }
 }
