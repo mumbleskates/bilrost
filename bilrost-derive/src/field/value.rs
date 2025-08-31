@@ -781,7 +781,8 @@ impl OneofVariant {
                                 _ => {
                                     #update_result_unknown_field
                                     #crate_::encoding::skip_field(wire_type, buf)?;
-                                    ::core::result::Result::Ok(#result_value)
+                                    ::core::result::Result::
+                                        Ok::<_, #crate_::DecodeError>(#result_value)
                                 },
                             }?;
                             #update_result
