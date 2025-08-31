@@ -3761,20 +3761,25 @@ fn embedded_messages() {
     #[bilrost(distinguished)]
     enum Foo {
         #[bilrost(tag(1), message)]
-        A {
+        Braced {
             bar: u32,
             baz: String,
             #[bilrost(tag(5), encoding(fixed))]
             bear: u64,
         },
-        #[bilrost(2)]
+        #[bilrost(tag(2), message)]
+        Tuple(u32, String),
+        #[bilrost(tag(3), message)]
+        Unit,
+        #[bilrost(4)]
         B(String),
         #[bilrost(empty)]
         Empty,
     }
 
+    // canonical encoding of braced variant
     assert::decodes!(
-        owned relaxed,
+        owned distinguished,
         [
             (1, OV::message(&[
                 (1, OV::u32(5)),
@@ -3782,12 +3787,32 @@ fn embedded_messages() {
                 (5, OV::fixed_u64(345)),
             ].into_opaque_message())),
         ],
-        Foo::A{
+        Foo::Braced{
             bar: 5,
             baz: "hello".to_owned(),
             bear: 345,
         },
     );
+    // canonical encoding of tuple variant
+    assert::decodes!(
+        owned distinguished,
+        [
+            (2, OV::message(&[
+                (0, OV::u32(5)),
+                (1, OV::str("hello")),
+            ].into_opaque_message())),
+        ],
+        Foo::Tuple(5, "hello".to_owned()),
+    );
+    // canonical encoding of unit variant
+    assert::decodes!(
+        owned distinguished,
+        [
+            (3, OV::bytes([])),
+        ],
+        Foo::Unit,
+    );
+
     // error with inner field propagates its inner field name
     assert::decodes!(
         owned never decodes Foo,
@@ -3797,7 +3822,7 @@ fn embedded_messages() {
             ].into_opaque_message())),
         ],
         WrongWireType,
-        "Foo.A/A.bear",
+        "Foo.Braced/Braced.bear",
     );
     // the embedded message itself must be the right wire type
     assert::decodes!(
@@ -3806,7 +3831,7 @@ fn embedded_messages() {
             (1, OV::u64(1)),
         ],
         WrongWireType,
-        "Foo.A",
+        "Foo.Braced",
     );
     // with extension fields
     assert::decodes!(
@@ -3817,14 +3842,27 @@ fn embedded_messages() {
                 (3, OV::str("unknown")),
             ].into_opaque_message())),
         ],
-        Foo::A{
+        Foo::Braced{
             bar: 0,
             baz: "known".to_owned(),
             bear: 0,
         },
         HasExtensions,
-        "Foo.A",
+        "Foo.Braced",
     );
+    // with extension fields in the unit message
+    assert::decodes!(
+        owned non-canonically,
+        [
+            (3, OV::message(&[
+                (1, OV::str("absolutely any message field really")),
+            ].into_opaque_message())),
+        ],
+        Foo::Unit,
+        HasExtensions,
+        "Foo.Unit",
+    );
+
     // with non-canonical field values
     assert::decodes!(
         owned non-canonically,
@@ -3834,13 +3872,13 @@ fn embedded_messages() {
                 (2, OV::str("known")),
             ].into_opaque_message())),
         ],
-        Foo::A{
+        Foo::Braced{
             bar: 0,
             baz: "known".to_owned(),
             bear: 0,
         },
         NotCanonical,
-        "Foo.A/A.bar",
+        "Foo.Braced/Braced.bar",
     );
     // last byte truncated from the inner message
     let message_bytes = OpaqueMessage::from_opaque([(2, OV::str("truncated"))]).encode_to_vec();
@@ -3850,7 +3888,7 @@ fn embedded_messages() {
             (1, OV::bytes(&message_bytes[..message_bytes.len() - 1])),
         ],
         Truncated,
-        "Foo.A/A.baz",
+        "Foo.Braced/Braced.baz",
     );
 }
 
