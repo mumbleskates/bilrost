@@ -469,7 +469,7 @@ impl OneofVariant {
                 }
 
                 let variant_fields =
-                    parse_message_fields(variant.fields, InitMode::ParentDefault, reserved_tags)
+                    parse_message_fields(variant.fields, InitMode::DefaultPerField, reserved_tags)
                         .map_err(|e| {
                             err!(
                                 "in message variant {variant_ident}: {e}",
@@ -682,10 +682,13 @@ impl OneofVariant {
                 }
             }
             VariantContents::Message(fields) => {
-                let empties = fields.iter().map(|field| {
+                let empties = fields.iter().filter_map(|field| {
+                    if field.is_ignored() {
+                        return None; // we don't need mutable variables to parse ignored fields into
+                    }
                     let field_ident = FieldTarget::free_field_ident(field);
                     let empty = field.empty();
-                    quote! { let mut #field_ident = #empty; }
+                    Some(quote! { let mut #field_ident = #empty; })
                 });
                 quote! { #(#empties)* }
             }
@@ -725,18 +728,21 @@ impl OneofVariant {
                 let variant_ident_str = self.variant_ident.to_string();
                 let field_arms: Vec<_> = fields
                     .iter()
-                    .map(|field| {
+                    .filter_map(|field| {
+                        if field.is_ignored() {
+                            return None;
+                        }
                         let tags = field.tags().into_iter().map(|tag| quote!(#tag));
                         let tags = Itertools::intersperse(tags, quote!(|));
                         let decode = field.decode(&FieldTarget::FreeVariantFields, lifetime, mode);
                         let field_ident_str = field.ident.to_string();
-                        quote!(#(#tags)* => match #decode {
+                        Some(quote!(#(#tags)* => match #decode {
                             ::core::result::Result::Ok(res) => ::core::result::Result::Ok(res),
                             ::core::result::Result::Err(mut error) => {
                                 error.push(#variant_ident_str, #field_ident_str);
                                 ::core::result::Result::Err(error)
                             }
-                        })
+                        }))
                     })
                     .collect();
                 let (
@@ -804,21 +810,23 @@ impl OneofVariant {
             VariantContents::Message(fields) => {
                 let field_inits = fields
                     .iter()
-                    .filter(|field| !field.is_ignored())
                     .map(|field| {
-                        let free_ident = FieldTarget::free_field_ident(field);
                         let ident = field.ident();
-                        quote!(#ident: #free_ident)
+                        // currently, oneof enums can only act as if they have default-per-field;
+                        // there's no kind of trait behavior that can fill all the fields of the
+                        // variant like `..Default::default()`, since that would require an impl on
+                        // the variant itself. so, we will only ever initialize them on a per-field
+                        // basis like this.
+                        if field.is_ignored() {
+                            let empty = field.empty();
+                            quote!(#ident: #empty)
+                        } else {
+                            let free_ident = FieldTarget::free_field_ident(field);
+                            quote!(#ident: #free_ident)
+                        }
                     });
-                // currently, oneof enums never have default-per-field
-                let has_ignored_fields = fields.iter().any(Field::is_ignored);
-                let maybe_fill_default =
-                    has_ignored_fields.then(|| quote!(..::core::default::Default::default()));
                 quote! {
-                    #type_ident::#variant_ident {
-                        #(#field_inits,)*
-                        #maybe_fill_default
-                    }
+                    #type_ident::#variant_ident { #(#field_inits,)* }
                 }
             }
         }
