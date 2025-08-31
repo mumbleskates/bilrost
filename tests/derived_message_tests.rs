@@ -3833,6 +3833,15 @@ fn embedded_messages() {
         WrongWireType,
         "Foo.Braced",
     );
+    // unit messages can't be different wire types either; they're not different
+    assert::decodes!(
+        owned never decodes Foo,
+        [
+            (3, OV::bool(false)),
+        ],
+        WrongWireType,
+        "Foo.Unit",
+    );
     // with extension fields
     assert::decodes!(
         owned non-canonically,
@@ -3889,6 +3898,135 @@ fn embedded_messages() {
         ],
         Truncated,
         "Foo.Braced/Braced.baz",
+    );
+}
+
+#[test]
+fn embedded_messages_with_ignored_fields() {
+    #[derive(Debug, PartialEq, Eq, Oneof, Message)]
+    enum Foo {
+        #[bilrost(tag(1), message)]
+        Braced {
+            #[bilrost(ignore)]
+            bar_ignored: u32,
+            baz: String,
+            #[bilrost(tag(5), encoding(fixed))]
+            bear: u64,
+        },
+        #[bilrost(tag(2), message)]
+        Tuple(u32, #[bilrost(ignore)] String),
+        #[bilrost(tag(3), message)]
+        Unit,
+        #[bilrost(tag(4), message)]
+        AllIgnored {
+            #[bilrost(ignore)]
+            a: u32,
+            #[bilrost(ignore)]
+            b: u16,
+            #[bilrost(ignore)]
+            c: u8,
+        },
+        #[bilrost(empty)]
+        Empty,
+    }
+
+    // canonical encoding of braced variant
+    assert::decodes!(
+        owned relaxed,
+        [
+            (1, OV::message(&[
+                (1, OV::str("hello")),
+                (5, OV::fixed_u64(345)),
+            ].into_opaque_message())),
+        ],
+        Foo::Braced{
+            bar_ignored: 0,
+            baz: "hello".to_owned(),
+            bear: 345,
+        },
+    );
+    assert::encodes(
+        Foo::Braced {
+            bar_ignored: 12345,
+            baz: "howdy".to_owned(),
+            bear: 999
+        },
+        [
+            (1, OV::message(&[
+                (1, OV::str("howdy")),
+                (5, OV::fixed_u64(999)),
+            ].into_opaque_message())),
+        ],
+    );
+    // canonical encoding of tuple variant
+    assert::decodes!(
+        owned relaxed,
+        [
+            (2, OV::message(&[
+                (0, OV::u32(123)),
+            ].into_opaque_message())),
+        ],
+        Foo::Tuple(123, String::new()),
+    );
+    assert::encodes(
+        Foo::Tuple(23456, "welcome".to_owned()),
+        [
+            (2, OV::message(&[
+                (0, OV::u32(23456)),
+            ].into_opaque_message())),
+        ],
+    );
+    // encoding of variant with all ignored fields
+    assert::decodes!(
+        owned relaxed,
+        [
+            (4, OV::bytes([])),
+        ],
+        Foo::AllIgnored {a: 0, b: 0, c: 0},
+    );
+    assert::encodes(
+        Foo::AllIgnored {a: 9876, b: 543, c: 210},
+        [(4, OV::bytes([]))],
+    );
+
+    // error with inner field propagates its inner field name
+    assert::decodes!(
+        owned relaxed errs for Foo,
+        [
+            (1, OV::message(&[
+                (5, OV::u64(345)),
+            ].into_opaque_message())),
+        ],
+        WrongWireType,
+        "Foo.Braced/Braced.bear",
+    );
+    // the embedded message itself must be the right wire type
+    assert::decodes!(
+        owned relaxed errs for Foo,
+        [
+            (1, OV::u64(1)),
+        ],
+        WrongWireType,
+        "Foo.Braced",
+    );
+    // last byte truncated from the inner message
+    let message_bytes = OpaqueMessage::from_opaque([(2, OV::str("truncated"))]).encode_to_vec();
+    assert::decodes!(
+        owned relaxed errs for Foo,
+        [
+            (1, OV::bytes(&message_bytes[..message_bytes.len() - 1])),
+        ],
+        Truncated,
+        "Foo.Braced", // this message has an unknown field truncated
+    );
+    let message_bytes = OpaqueMessage::from_opaque([(1, OV::str("truncated"))]).encode_to_vec();
+    assert::decodes!(
+        owned relaxed errs for Foo,
+        [
+            (1, OV::bytes(&message_bytes[..message_bytes.len() - 1])),
+        ],
+        Truncated,
+        "Foo.Braced/Braced.baz", // this message has an KNOWN field truncated, so we see its name
     );
 }
 
