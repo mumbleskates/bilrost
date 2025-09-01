@@ -4028,6 +4028,28 @@ fn embedded_messages_with_ignored_fields() {
     );
 }
 
+// TODO: this is not supported yet
+// #[test]
+// fn oneof_with_empty_variant_having_fields() {
+//     #[derive(Debug, PartialEq, Oneof, Message)]
+//     enum Foo {
+//         #[bilrost(1)]
+//         Value(u64),
+//         #[bilrost(empty)]
+//         Empty(#[bilrost(ignore)] String, #[bilrost(ignore)] u64),
+//     }
+//
+//     assert::decodes!(
+//         owned relaxed,
+//         [],
+//         Foo::Empty(String::new(), 0),
+//     );
+//     assert::encodes(
+//         Foo::Empty("something".to_owned(), 9345787),
+//         [],
+//     );
+// }
+
 // Enumeration tests
 
 #[test]
