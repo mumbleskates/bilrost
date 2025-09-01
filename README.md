@@ -512,11 +512,19 @@ We can now import and use its traits and derive macros. The main three are:
   value that will represent it in the encoding.
 * [`Oneof`](#oneof-fields): This is a trait and derive macro for enumerations
   representing mutually exclusive fields within a message struct. Each variant
-  must have one field, and each variant must have a unique field tag assigned to
-  it, *both* within the oneof and within the message of which it is a part.
-  Types with `Oneof` derived do not have `bilrost` APIs useful to library users
-  except when they are included in a `Message` struct (or [have `Message`
-  derived themselves](#deriving-message-for-enums)).
+  will be represented by one field, and each variant must have a unique field
+  tag assigned to it, *both* within the oneof and within the message of which it
+  is a part. By default oneof variants may only have exactly one field, which
+  will be encoded to represent the oneof when it is present. Variants that have
+  zero fields or more than one field can also be represented by encoding the
+  variant as a sub-message (see the [example section](
+  #variants-with-multiple-fields) and the [documentation](
+  #embedding-messages-in-oneofs) about the "message" attribute).
+
+  Types with
+  `Oneof` derived do not have `bilrost` APIs useful to library users except when
+  they are included in a `Message` struct (or [have `Message` derived
+  themselves](#deriving-message-for-enums)).
 
 And then there are the five traits for the different [message encoding and
 decoding](#encoding-and-decoding-messages) capabilities:
@@ -552,11 +560,7 @@ When defining message types for interoperation -- or when fields are likely to
 be added, removed, or shuffled -- it may be good practice to explicitly specify
 the tags of all fields in a struct instead, but this is not mandatory.
 
-<details><summary>
-
-Example of a struct with a derived `Message` impl
-
-</summary>
+<details><summary>Example of a struct with a derived `Message` impl</summary>
 
 ```rust,
 use bilrost::{Enumeration, Message};
@@ -674,9 +678,9 @@ from minimum to maximum separated with a dash (like `1-5`). For both
 ranges, spelled like `10..` and `..=10`.
 
 The field tags in the oneof must be unique, both within the oneof itself and
-within any message containing it. On the wire, a oneof works exactly the same as
-if there were an `Option<T>` field for each of its variants, except at most one
-of them can be `Some`.
+within any message containing it. On the wire, a oneof works as if there were an
+`Option<T>` field for each of its variants, except at most one of them can be
+`Some`.
 
 In the example above, the `NameOrUUID` oneof must be nested in an `Option` to
 enable it to represent the empty state where none of its fields are present. It
@@ -753,6 +757,103 @@ struct Tiny {
 }
 ```
 
+#### Variants with multiple fields
+
+Using the "message" attribute, enum variants work as if they held a message
+struct that looked like the variant.
+
+<details><summary>Example of a oneof derive using embedded messages</summary>
+
+```rust
+use bilrost::{Enumeration, Message, Oneof};
+
+#[derive(PartialEq, Eq, Enumeration)]
+enum PhoneKind {
+  Home = 1,
+  Work = 2,
+  Cell = 3,
+}
+
+#[derive(Oneof)]
+enum RolodexInfo {
+    #[bilrost(2)]
+    Nickname(String),
+    #[bilrost(tag(3), message)]
+    Address {
+        street: Option<String>,
+        apt_etc: Option<u64>,
+        city: Option<String>,
+        state_province: Option<String>,
+        postcode: Option<u32>,
+    },
+    #[bilrost(tag(4), message)]
+    Phone(u64, Option<PhoneKind>),
+    #[bilrost(tag(5), message)]
+    Favorite,
+    #[bilrost(empty)]
+    Empty,
+}
+
+#[derive(Message)]
+struct RolodexEntry {
+    #[bilrost(1)]
+    name: String,
+    #[bilrost(oneof(2-5))]
+    info: RolodexInfo,
+}
+```
+</details>
+
+Fundamentally, this encodes and decodes data exactly the same as the following
+example except with fewer types, allowing the data to be represented
+directly in the oneof `enum` if that's desirable.
+
+<details><summary>Example showing an equivalent oneof to the above example, this
+time without any embedded messages</summary>
+
+```rust
+use bilrost::{Message, Oneof};
+
+#[derive(PartialEq, Eq, Enumeration)]
+enum PhoneKind {
+  Home = 1,
+  Work = 2,
+  Cell = 3,
+}
+
+#[derive(Message)]
+struct Address {
+    street: Option<String>,
+    apt_etc: Option<u64>,
+    city: Option<String>,
+    state_province: Option<String>,
+    postcode: Option<u32>,
+}
+
+#[derive(Oneof)]
+enum RolodexInfo {
+    #[bilrost(2)]
+    Nickname(String),
+    #[bilrost(3)]
+    Address(Address),
+    #[bilrost(4)]
+    Phone((u64, Option<PhoneKind>)),
+    #[bilrost(5)]
+    Favorite(()),
+    #[bilrost(empty)]
+    Empty,
+}
+
+#[derive(Message)]
+struct RolodexEntry {
+    #[bilrost(1)]
+    name: String,
+    #[bilrost(oneof(2-5))]
+    info: RolodexInfo,
+}
+```
+</details>
+
 #### Deriving `Message` for enums
 
 `Message` can also be derived for enums that have a corresponding oneof
@@ -760,11 +861,7 @@ implementation derived. They encode and decode as messages that only have up to
 one field, as if the type was a message that only contains the enum with an
 appropriate `#[bilrost(oneof(..))]` attribute.
 
-<details><summary>
-
-Example of `Message` derived for a `Oneof` enum
-
-</summary>
+<details><summary>Example of `Message` derived for a `Oneof` enum</summary>
 
 ```rust
 use bilrost::{Message, Oneof};
@@ -949,6 +1046,27 @@ struct Foo {
   attribute to the message itself removes the requirement that the *whole
   message* needs to implement `Default`; instead, only the types of each ignored
   field need to do so.
+
+##### Marking a oneof variant as explicitly the empty variant
+
+* **"empty"**: While a oneof unit variant will become the empty-state variant of
+  the oneof by default, it can also be explicitly marked. This attribute cannot
+  be mixed with any other attributes.
+
+##### Embedding messages in oneofs
+
+* **"message"**: When used only with a `tag`, any kind of `enum` variant can be
+  represented. Rather than being encoded as if it were a single field bearing
+  the inner value, the variant value will be encoded and decoded exactly as if
+  it were a message with its own fields.
+
+  Most attributes that apply to fields in a `Message` derive will work on fields
+  in a `message` variant. Helper methods (described below) are not available as
+  enum variants cannot have their own methods, and ignored fields are always
+  initialized per-field. A unit variant (one with no braces or parentheses, and
+  thus no fields) can also be encoded as a message, and will always encode and
+  decode the same as the `()` empty message type. Such variants have no fields
+  and can always be widened by adding some in the future.
 
 ##### Helper methods
 
