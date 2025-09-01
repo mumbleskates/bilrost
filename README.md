@@ -830,6 +830,16 @@ struct Address {
     postcode: Option<u32>,
 }
 
+// This message encodes the same as the regular tuple `(u64, Option<PhoneKind>)`
+// but we have the opportunity to annotate the fields with more attributes,
+// changing their tags and encoding etc.
+#[derive(Message)]
+struct Phone(u64, Option<PhoneKind>);
+
+// This message encodes the same as the empty message type `()`.
+#[derive(Message)]
+struct Favorite;
+
 #[derive(Oneof)]
 enum RolodexInfo {
     #[bilrost(2)]
@@ -837,9 +847,9 @@ enum RolodexInfo {
     #[bilrost(3)]
     Address(Address),
     #[bilrost(4)]
-    Phone((u64, Option<PhoneKind>)),
+    Phone(Phone),
     #[bilrost(5)]
-    Favorite(()),
+    Favorite(Favorite),
     #[bilrost(empty)]
     Empty,
 }
