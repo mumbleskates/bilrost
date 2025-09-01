@@ -4,10 +4,15 @@
 
 ### New features
 
+* Headline feature: Added the "message" attribute for oneof variants which
+  enables oneof variants with any number of fields, encoding a sub-message as
+  the variant's value without a second struct type to nest as a value.
 * Added support for the `#[bilrost(reserved_tags(..))]` attribute for the
   `Oneof` derive macro as well.
 * The `Enumeration` derive macro now supports `Tuple()` and `Struct { }`
   variants as long as they have no fields.
+* Added the "empty" attribute for oneof variants which allows explicitly marking
+  empty variants.
 
 ### Fixes
 
