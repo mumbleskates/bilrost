@@ -11,7 +11,7 @@ use tinyvec::ArrayVec;
 /// could trigger bugs that occur in any message type in this file.  We verify
 /// this stays true in a unit test.
 #[derive(Clone, Debug, PartialEq, Message)]
-#[bilrost(reserved_tags(117-299, 320-1000, 1010-1999, 2010..))]
+#[bilrost(reserved_tags(117-299, 320-1000, 1013-1999, 2013..))]
 pub struct TestAllTypes {
     /// Singular
     #[bilrost(1)]
@@ -293,9 +293,9 @@ pub struct TestAllTypes {
     /// Oneofs
     #[bilrost(319)]
     pub oneof_as_submessage: test_message::OneofField,
-    #[bilrost(oneof(1001-1009))]
+    #[bilrost(oneof(1001-1012))]
     pub nonempty_oneof_field: Option<test_message::NonEmptyOneofField>,
-    #[bilrost(oneof(2001-2009))]
+    #[bilrost(oneof(2001-2012))]
     pub oneof_field: test_message::OneofField,
 }
 
@@ -339,6 +339,19 @@ pub mod test_message {
         OneofDouble(f64),
         #[bilrost(tag = 1009)]
         OneofEnum(NestedEnum),
+        #[bilrost(tag = 1010, message)]
+        OneofBracedMessage{
+            #[bilrost(1)]
+            x: u64,
+            #[bilrost(2)]
+            y: u64,
+            #[bilrost(3)]
+            z: u64,
+        },
+        #[bilrost(tag = 1011, message)]
+        OneofTupleMessage(u64, u64, u64),
+        #[bilrost(tag = 1012, message)]
+        OneofUnit,
     }
 
     #[derive(Clone, Debug, PartialEq, Oneof, Message)]
@@ -362,11 +375,24 @@ pub mod test_message {
         OneofDouble(f64),
         #[bilrost(tag = 2009)]
         OneofEnum(NestedEnum),
+        #[bilrost(tag = 2010, message)]
+        OneofBracedMessage{
+            #[bilrost(1)]
+            x: u64,
+            #[bilrost(2)]
+            y: u64,
+            #[bilrost(3)]
+            z: u64,
+        },
+        #[bilrost(tag = 2011, message)]
+        OneofTupleMessage(u64, u64, u64),
+        #[bilrost(tag = 2012, message)]
+        OneofUnit,
     }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Message)]
-#[bilrost(distinguished, reserved_tags(67-100, 107-199, 207..))]
+#[bilrost(distinguished, reserved_tags(67-100, 110-199, 210..))]
 pub struct TestDistinguished {
     /// Singular
     #[bilrost(tag(1), encoding(varint))]
@@ -508,9 +534,9 @@ pub struct TestDistinguished {
     /// Oneofs
     #[bilrost(63)]
     pub oneof_as_submessage: test_distinguished::OneofField,
-    #[bilrost(oneof(101-106))]
+    #[bilrost(oneof(101-109))]
     pub nonempty_oneof_field: Option<test_distinguished::NonEmptyOneofField>,
-    #[bilrost(oneof(201-206))]
+    #[bilrost(oneof(201-209))]
     pub oneof_field: test_distinguished::OneofField,
 }
 
@@ -524,7 +550,7 @@ pub mod test_distinguished {
         pub a: u64,
         #[bilrost(tag(2), recurses)]
         pub corecursive: Option<Box<TestDistinguished>>,
-        #[bilrost(oneof(201-206))]
+        #[bilrost(oneof(201-209))]
         pub oneof_field: OneofField,
     }
 
@@ -545,6 +571,19 @@ pub mod test_distinguished {
         OneofUint64(u64),
         #[bilrost(tag = 106)]
         OneofEnum(NestedEnum),
+        #[bilrost(tag = 107, message)]
+        OneofBracedMessage{
+            #[bilrost(1)]
+            x: u64,
+            #[bilrost(2)]
+            y: u64,
+            #[bilrost(3)]
+            z: u64,
+        },
+        #[bilrost(tag = 108, message)]
+        OneofTupleMessage(u64, u64, u64),
+        #[bilrost(tag = 109, message)]
+        OneofUnit,
     }
 
     #[derive(Clone, Debug, PartialEq, Eq, Oneof, Message)]
@@ -563,6 +602,19 @@ pub mod test_distinguished {
         OneofUint64(u64),
         #[bilrost(tag = 206)]
         OneofEnum(NestedEnum),
+        #[bilrost(tag = 207, message)]
+        OneofBracedMessage{
+            #[bilrost(1)]
+            x: u64,
+            #[bilrost(2)]
+            y: u64,
+            #[bilrost(3)]
+            z: u64,
+        },
+        #[bilrost(tag = 208, message)]
+        OneofTupleMessage(u64, u64, u64),
+        #[bilrost(tag = 209, message)]
+        OneofUnit,
     }
 }
 
