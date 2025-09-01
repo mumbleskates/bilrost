@@ -812,7 +812,7 @@ directly in the oneof `enum` if that's desirable.
 time without any embedded messages</summary>
 
 ```rust
-use bilrost::{Message, Oneof};
+use bilrost::{Enumeration, Message, Oneof};
 
 #[derive(PartialEq, Eq, Enumeration)]
 enum PhoneKind {
