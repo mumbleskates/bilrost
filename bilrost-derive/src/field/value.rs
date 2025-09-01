@@ -591,7 +591,6 @@ impl OneofVariant {
                         let end = buf.remaining();
                         #prepend
                         #crate_::encoding::prepend_varint((buf.remaining() - end) as u64, buf);
-                        tw.finalize(buf);
                     }
                 }
             }
