@@ -340,7 +340,7 @@ pub mod test_message {
         #[bilrost(tag = 1009)]
         OneofEnum(NestedEnum),
         #[bilrost(tag = 1010, message)]
-        OneofBracedMessage{
+        OneofBracedMessage {
             #[bilrost(1)]
             x: u64,
             #[bilrost(2)]
@@ -376,7 +376,7 @@ pub mod test_message {
         #[bilrost(tag = 2009)]
         OneofEnum(NestedEnum),
         #[bilrost(tag = 2010, message)]
-        OneofBracedMessage{
+        OneofBracedMessage {
             #[bilrost(1)]
             x: u64,
             #[bilrost(2)]
@@ -572,7 +572,7 @@ pub mod test_distinguished {
         #[bilrost(tag = 106)]
         OneofEnum(NestedEnum),
         #[bilrost(tag = 107, message)]
-        OneofBracedMessage{
+        OneofBracedMessage {
             #[bilrost(1)]
             x: u64,
             #[bilrost(2)]
@@ -603,7 +603,7 @@ pub mod test_distinguished {
         #[bilrost(tag = 206)]
         OneofEnum(NestedEnum),
         #[bilrost(tag = 207, message)]
-        OneofBracedMessage{
+        OneofBracedMessage {
             #[bilrost(1)]
             x: u64,
             #[bilrost(2)]

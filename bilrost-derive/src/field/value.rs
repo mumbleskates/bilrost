@@ -808,23 +808,21 @@ impl OneofVariant {
                 quote!( #type_ident::#variant_ident { #value_ident: value } )
             }
             VariantContents::Message(fields) => {
-                let field_inits = fields
-                    .iter()
-                    .map(|field| {
-                        let ident = field.ident();
-                        // currently, oneof enums can only act as if they have default-per-field;
-                        // there's no kind of trait behavior that can fill all the fields of the
-                        // variant like `..Default::default()`, since that would require an impl on
-                        // the variant itself. so, we will only ever initialize them on a per-field
-                        // basis like this.
-                        if field.is_ignored() {
-                            let empty = field.empty();
-                            quote!(#ident: #empty)
-                        } else {
-                            let free_ident = FieldTarget::free_field_ident(field);
-                            quote!(#ident: #free_ident)
-                        }
-                    });
+                let field_inits = fields.iter().map(|field| {
+                    let ident = field.ident();
+                    // currently, oneof enums can only act as if they have default-per-field;
+                    // there's no kind of trait behavior that can fill all the fields of the
+                    // variant like `..Default::default()`, since that would require an impl on
+                    // the variant itself. so, we will only ever initialize them on a per-field
+                    // basis like this.
+                    if field.is_ignored() {
+                        let empty = field.empty();
+                        quote!(#ident: #empty)
+                    } else {
+                        let free_ident = FieldTarget::free_field_ident(field);
+                        quote!(#ident: #free_ident)
+                    }
+                });
                 quote! {
                     #type_ident::#variant_ident { #(#field_inits,)* }
                 }

@@ -3949,14 +3949,12 @@ fn embedded_messages_with_ignored_fields() {
         Foo::Braced {
             bar_ignored: 12345,
             baz: "howdy".to_owned(),
-            bear: 999
+            bear: 999,
         },
-        [
-            (1, OV::message(&[
-                (1, OV::str("howdy")),
-                (5, OV::fixed_u64(999)),
-            ].into_opaque_message())),
-        ],
+        [(
+            1,
+            OV::message(&[(1, OV::str("howdy")), (5, OV::fixed_u64(999))].into_opaque_message()),
+        )],
     );
     // canonical encoding of tuple variant
     assert::decodes!(
@@ -3970,11 +3968,7 @@ fn embedded_messages_with_ignored_fields() {
     );
     assert::encodes(
         Foo::Tuple(23456, "welcome".to_owned()),
-        [
-            (2, OV::message(&[
-                (0, OV::u32(23456)),
-            ].into_opaque_message())),
-        ],
+        [(2, OV::message(&[(0, OV::u32(23456))].into_opaque_message()))],
     );
     // encoding of variant with all ignored fields
     assert::decodes!(
@@ -3985,7 +3979,11 @@ fn embedded_messages_with_ignored_fields() {
         Foo::AllIgnored {a: 0, b: 0, c: 0},
     );
     assert::encodes(
-        Foo::AllIgnored {a: 9876, b: 543, c: 210},
+        Foo::AllIgnored {
+            a: 9876,
+            b: 543,
+            c: 210,
+        },
         [(4, OV::bytes([]))],
     );
 
