@@ -4028,6 +4028,93 @@ fn embedded_messages_with_ignored_fields() {
     );
 }
 
+#[test]
+fn embedded_message_variants_mid_message() {
+    #[derive(Debug, PartialEq, Eq, Oneof)]
+    #[bilrost(distinguished)]
+    enum Foo {
+        #[bilrost(tag(2), message)]
+        Braced {
+            bar: u32,
+            baz: String,
+            #[bilrost(tag(5), encoding(fixed))]
+            bear: u64,
+        },
+        #[bilrost(tag(3), message)]
+        Tuple(u32, String),
+        #[bilrost(tag(4), message)]
+        Unit,
+        #[bilrost(empty)]
+        Empty,
+    }
+
+    #[derive(Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
+    struct Msg {
+        #[bilrost(1)]
+        before: u64,
+        #[bilrost(oneof(2-4))]
+        oneof: Foo,
+        #[bilrost(5)]
+        after: u64,
+    }
+
+    // We test with embedded-message oneof fields in a message, with or without leading & trailing
+    // fields in the message representation, for each appearance of a variant.
+    for (before, after) in itertools::iproduct!([0, 1], [0, 5]) {
+        let mut message_braced = [
+            (1, OV::u64(before)),
+            (
+                2,
+                OV::message(
+                    &[(1, OV::u32(2)), (2, OV::str("hi")), (5, OV::fixed_u64(3))]
+                        .into_opaque_message(),
+                ),
+            ),
+            (5, OV::u64(after)),
+        ];
+
+        assert::decodes!(
+            owned distinguished,
+            &message_braced[(if before == 0 { 1 } else { 0 })..(if after == 0 { 2 } else { 3 })],
+            Msg{
+                before,
+                oneof: Foo::Braced {
+                    bar: 2,
+                    baz: "hi".to_owned(),
+                    bear: 3,
+                },
+                after,
+            },
+        );
+
+        message_braced[1] = (
+            3,
+            OV::message(&[(0, OV::u32(2)), (1, OV::str("hi"))].into_opaque_message()),
+        );
+        assert::decodes!(
+            owned distinguished,
+            &mut message_braced[(if before == 0 { 1 } else { 0 })..(if after == 0 { 2 } else { 3 })],
+            Msg{
+                before,
+                oneof: Foo::Tuple(2, "hi".to_owned()),
+                after,
+            },
+        );
+
+        message_braced[1] = (4, OV::message(&[].into_opaque_message()));
+        assert::decodes!(
+            owned distinguished,
+            &message_braced[(if before == 0 { 1 } else { 0 })..(if after == 0 { 2 } else { 3 })],
+            Msg{
+                before,
+                oneof: Foo::Unit,
+                after,
+            },
+        );
+    }
+}
+
 // TODO: this is not supported yet
 // #[test]
 // fn oneof_with_empty_variant_having_fields() {
