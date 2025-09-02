@@ -235,21 +235,21 @@ where
     (): Encoder<E, T>,
 {
     fn encode_value<B: BufMut + ?Sized>(value: &RangeInclusive<T>, buf: &mut B) {
-        underived_encode!(Range {
+        underived_encode!(RangeInclusive {
             0: E => start: value.start(),
             1: E => end: value.end(),
         }, buf);
     }
 
     fn prepend_value<B: ReverseBuf + ?Sized>(value: &RangeInclusive<T>, buf: &mut B) {
-        underived_prepend!(Range {
+        underived_prepend!(RangeInclusive {
             1: E => end: value.end(),
             0: E => start: value.start(),
         }, buf);
     }
 
     fn value_encoded_len(value: &RangeInclusive<T>) -> usize {
-        underived_encoded_len!(Range {
+        underived_encoded_len!(RangeInclusive {
             0: E => start: value.start(),
             1: E => end: value.end(),
         })
@@ -272,7 +272,7 @@ where
         )
         .into_inner();
 
-        underived_decode!(Range {
+        underived_decode!(RangeInclusive {
             0: E => start: &mut start,
             1: E => end: &mut end,
         }, owned, buf, ctx)?;
@@ -300,7 +300,7 @@ where
         )
         .into_inner();
 
-        let canon = underived_decode_distinguished!(Range {
+        let canon = underived_decode_distinguished!(RangeInclusive {
             0: E => start: &mut start,
             1: E => end: &mut end,
         }, owned, buf, ctx)?;
@@ -326,7 +326,7 @@ where
         )
         .into_inner();
 
-        underived_decode!(Range {
+        underived_decode!(RangeInclusive {
             0: E => start: &mut start,
             1: E => end: &mut end,
         }, borrowed, buf, ctx)?;
@@ -354,7 +354,7 @@ where
         )
         .into_inner();
 
-        let canon = underived_decode_distinguished!(Range {
+        let canon = underived_decode_distinguished!(RangeInclusive {
             0: E => start: &mut start,
             1: E => end: &mut end,
         }, borrowed, buf, ctx)?;
