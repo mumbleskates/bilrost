@@ -58,7 +58,7 @@ pub(crate) mod time_proxies {
             underived_decode!(TimeDelta {
                 1: General => secs: &mut value.secs,
                 2: Fixed => nanos: &mut value.nanos,
-            }, buf, ctx)?;
+            }, owned, buf, ctx)?;
             if value.secs.signum() as i32 * value.nanos.signum() == -1 {
                 Err(DecodeError::new(InvalidValue))
             } else {
@@ -78,7 +78,7 @@ pub(crate) mod time_proxies {
             underived_decode_distinguished!(TimeDelta {
                 1: General => secs: &mut value.secs,
                 2: Fixed => nanos: &mut value.nanos,
-            }, buf, ctx)
+            }, owned, buf, ctx)
         }
     }
 

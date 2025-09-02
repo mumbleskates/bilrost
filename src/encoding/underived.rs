@@ -79,13 +79,14 @@ macro_rules! underived_decode {
         $name:ident {
             $($tag:literal: $encoding:ty => $field_name:ident: $target:expr),* $(,)?
         },
+        $decode_trait:ident::$decode_method:ident,
         $buf:ident,
         $ctx:ident
     ) => {
         {
             use crate::DecodeError;
             use crate::DecodeErrorKind::UnexpectedlyRepeated;
-            use crate::encoding::{skip_field, Decoder, TagReader};
+            use crate::encoding::{skip_field, $decode_trait, TagReader};
             let mut buf = $buf.take_length_delimited()?;
             let ctx = $ctx;
             ctx.limit_reached()?;
@@ -101,7 +102,7 @@ macro_rules! underived_decode {
                         if duplicated {
                             Err(DecodeError::new(UnexpectedlyRepeated))
                         } else {
-                            <() as Decoder<$encoding, _>>::decode(
+                            <() as $decode_trait<$encoding, _>>::$decode_method(
                                 wire_type,
                                 $target,
                                 buf.lend(),
@@ -119,6 +120,36 @@ macro_rules! underived_decode {
             Result::<(), crate::DecodeError>::Ok(())
         }
     };
+    (
+        $name:ident {
+            $($tag:literal: $encoding:ty => $field_name:ident: $target:expr),* $(,)?
+        },
+        owned,
+        $buf:ident,
+        $ctx:ident
+    ) => {
+        $crate::encoding::underived::underived_decode!(
+            $name { $($tag: $encoding => $field_name: $target),* },
+            Decoder::decode,
+            $buf,
+            $ctx
+        )
+    };
+    (
+        $name:ident {
+            $($tag:literal: $encoding:ty => $field_name:ident: $target:expr),* $(,)?
+        },
+        borrowed,
+        $buf:ident,
+        $ctx:ident
+    ) => {
+        $crate::encoding::underived::underived_decode!(
+            $name { $($tag: $encoding => $field_name: $target),* },
+            BorrowDecoder::borrow_decode,
+            $buf,
+            $ctx
+        )
+    };
 }
 #[allow(unused_imports)]
 pub(crate) use underived_decode;
@@ -130,13 +161,14 @@ macro_rules! underived_decode_distinguished {
         $name:ident {
             $($tag:literal: $encoding:ty => $field_name:ident: $target:expr),* $(,)?
         },
+        $decode_trait:ident::$decode_method:ident,
         $buf:ident,
         $ctx:ident
     ) => {
         {
             use crate::DecodeError;
             use crate::DecodeErrorKind::UnexpectedlyRepeated;
-            use crate::encoding::{skip_field, Canonicity, DistinguishedDecoder, TagReader};
+            use crate::encoding::{skip_field, Canonicity, $decode_trait, TagReader};
             let mut buf = $buf.take_length_delimited()?;
             let ctx = $ctx;
             if !ALLOW_EMPTY && buf.remaining_before_cap() == 0 {
@@ -157,9 +189,7 @@ macro_rules! underived_decode_distinguished {
                                 if duplicated {
                                     Err(DecodeError::new(UnexpectedlyRepeated))
                                 } else {
-                                    <() as DistinguishedDecoder<$encoding, _>>::
-                                        decode_distinguished
-                                    (
+                                    <() as $decode_trait<$encoding, _>>::$decode_method(
                                         wire_type,
                                         $target,
                                         buf.lend(),
@@ -181,6 +211,36 @@ macro_rules! underived_decode_distinguished {
                 Result::<_, crate::DecodeError>::Ok(canon)
             }
         }
+    };
+    (
+        $name:ident {
+            $($tag:literal: $encoding:ty => $field_name:ident: $target:expr),* $(,)?
+        },
+        owned,
+        $buf:ident,
+        $ctx:ident
+    ) => {
+        $crate::encoding::underived::underived_decode_distinguished!(
+            $name { $($tag: $encoding => $field_name: $target),* },
+            DistinguishedDecoder::decode_distinguished,
+            $buf,
+            $ctx
+        )
+    };
+    (
+        $name:ident {
+            $($tag:literal: $encoding:ty => $field_name:ident: $target:expr),* $(,)?
+        },
+        borrowed,
+        $buf:ident,
+        $ctx:ident
+    ) => {
+        $crate::encoding::underived::underived_decode_distinguished!(
+            $name { $($tag: $encoding => $field_name: $target),* },
+            DistinguishedBorrowDecoder::borrow_decode_distinguished,
+            $buf,
+            $ctx
+        )
     };
 }
 #[allow(unused_imports)]
