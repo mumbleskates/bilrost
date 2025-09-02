@@ -6,7 +6,7 @@ use crate::encoding::{
     encoding_implemented_via_value_encoding, encoding_uses_base_empty_state,
     impl_cow_value_encoding, Canonicity, Capped, DecodeContext, DecodeError,
     DistinguishedProxiable, DistinguishedValueBorrowDecoder, DistinguishedValueDecoder, EmptyState,
-    Fixed, Map, MessageEncoding, Packed, PlainBytes, Proxiable, RangeAsTuple,
+    Fixed, Map, MessageEncoding, Packed, PlainBytes, Proxiable,
     RawDistinguishedMessageBorrowDecoder, RawMessageBorrowDecoder, RawMessageDecoder,
     RestrictedDecodeContext, Unpacked, ValueBorrowDecoder, ValueDecoder, ValueEncoder, Varint,
     WireType, Wiretyped,
@@ -88,14 +88,14 @@ delegate_value_encoding!(
 );
 
 // General encodings encode Range and RangeInclusive with the General encoding; to use a different
-// encoding for the T value, use RangeAsTuple directly
+// encoding for the T value, encode ranges as tuples directly
 delegate_value_encoding!(
-    delegate from (GeneralGeneric<P>) to (RangeAsTuple)
+    delegate from (GeneralGeneric<P>) to ((General,))
     for type (core::ops::Range<T>) including distinguished
     with generics (const P: u8, T)
 );
 delegate_value_encoding!(
-    delegate from (GeneralGeneric<P>) to (RangeAsTuple)
+    delegate from (GeneralGeneric<P>) to ((General,))
     for type (core::ops::RangeInclusive<T>) including distinguished
     with generics (const P: u8, T)
 );

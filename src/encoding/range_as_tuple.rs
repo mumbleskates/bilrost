@@ -14,7 +14,8 @@ use bytes::{Buf, BufMut};
 use core::mem;
 use core::ops::{Range, RangeInclusive};
 
-pub struct RangeAsTuple<E = General>(E);
+/// Encoding that encodes ranges as (start, end) tuples.
+pub type RangeAsTuple<E = General> = (E,);
 
 impl<T, E> Wiretyped<RangeAsTuple<E>, Range<T>> for () {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
