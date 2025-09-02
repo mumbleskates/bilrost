@@ -5,9 +5,9 @@ use crate::encoding::underived::{
 };
 use crate::encoding::{
     BorrowDecoder, Capped, DecodeContext, Decoder, DistinguishedBorrowDecoder,
-    DistinguishedDecoder, DistinguishedValueBorrowDecoder, DistinguishedValueDecoder, Encoder,
-    ForOverwrite, General, RestrictedDecodeContext, ValueBorrowDecoder, ValueDecoder, ValueEncoder,
-    WireType, Wiretyped,
+    DistinguishedDecoder, DistinguishedValueBorrowDecoder, DistinguishedValueDecoder, EmptyState,
+    Encoder, ForOverwrite, General, RestrictedDecodeContext, ValueBorrowDecoder, ValueDecoder,
+    ValueEncoder, WireType, Wiretyped,
 };
 use crate::{Canonicity, DecodeError};
 use bytes::{Buf, BufMut};
@@ -18,6 +18,38 @@ pub struct RangeAsTuple<E = General>(E);
 
 impl<T, E> Wiretyped<RangeAsTuple<E>, Range<T>> for () {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
+}
+
+impl<T, E> ForOverwrite<RangeAsTuple<E>, Range<T>> for ()
+where
+    (): ForOverwrite<E, T>,
+{
+    #[inline]
+    fn for_overwrite() -> Range<T> {
+        <() as ForOverwrite<E, T>>::for_overwrite()..<() as ForOverwrite<E, T>>::for_overwrite()
+    }
+}
+
+impl<T, E> EmptyState<RangeAsTuple<E>, Range<T>> for ()
+where
+    (): EmptyState<E, T>,
+{
+    #[inline]
+    fn empty() -> Range<T> {
+        <() as EmptyState<E, T>>::empty()..<() as EmptyState<E, T>>::empty()
+    }
+
+    #[inline]
+    fn is_empty(val: &Range<T>) -> bool {
+        <() as EmptyState<E, T>>::is_empty(&val.start)
+            && <() as EmptyState<E, T>>::is_empty(&val.end)
+    }
+
+    #[inline]
+    fn clear(val: &mut Range<T>) {
+        <() as EmptyState<E, T>>::clear(&mut val.start);
+        <() as EmptyState<E, T>>::clear(&mut val.end);
+    }
 }
 
 impl<T, E> ValueEncoder<RangeAsTuple<E>, Range<T>> for ()
@@ -114,8 +146,53 @@ where
     }
 }
 
+// When decoding or otherwise modifying `RangeInclusive`, we have to do a little dance. The type
+// doesn't provide &mut access to its entries until it is decomposed so we swap it, decompose it,
+// modify, and then re-compose and swap it back.
+
 impl<T, E> Wiretyped<RangeAsTuple<E>, RangeInclusive<T>> for () {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
+}
+
+impl<T, E> ForOverwrite<RangeAsTuple<E>, RangeInclusive<T>> for ()
+where
+    (): ForOverwrite<E, T>,
+{
+    #[inline]
+    fn for_overwrite() -> RangeInclusive<T> {
+        <() as ForOverwrite<E, T>>::for_overwrite()..=<() as ForOverwrite<E, T>>::for_overwrite()
+    }
+}
+
+impl<T, E> EmptyState<RangeAsTuple<E>, RangeInclusive<T>> for ()
+where
+    (): EmptyState<E, T>,
+{
+    #[inline]
+    fn empty() -> RangeInclusive<T> {
+        <() as EmptyState<E, T>>::empty()..=<() as EmptyState<E, T>>::empty()
+    }
+
+    #[inline]
+    fn is_empty(val: &RangeInclusive<T>) -> bool {
+        <() as EmptyState<E, T>>::is_empty(val.start())
+            && <() as EmptyState<E, T>>::is_empty(val.end())
+    }
+
+    #[inline]
+    fn clear(val: &mut RangeInclusive<T>) {
+        let (mut start, mut end) = mem::replace(
+            val,
+            <() as ForOverwrite<E, T>>::for_overwrite()
+                ..=<() as ForOverwrite<E, T>>::for_overwrite(),
+        )
+        .into_inner();
+
+        <() as EmptyState<E, T>>::clear(&mut start);
+        <() as EmptyState<E, T>>::clear(&mut end);
+
+        drop(mem::replace(val, start..=end));
+    }
 }
 
 impl<T, E> ValueEncoder<RangeAsTuple<E>, RangeInclusive<T>> for ()
@@ -143,10 +220,6 @@ where
         })
     }
 }
-
-// When decoding `RangeInclusive`, we have to do a little dance. The type doesn't provide &mut
-// access to its entries until it is decomposed so we swap it, decompose it, decode, and then
-// re-compose and swap it back.
 
 impl<T, E> ValueDecoder<RangeAsTuple<E>, RangeInclusive<T>> for ()
 where

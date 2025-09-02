@@ -12,6 +12,7 @@ use alloc::collections::{btree_map, btree_set, BTreeMap, BTreeSet};
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::cmp::Ordering::{Equal, Greater, Less};
+use core::ops::{Range, RangeInclusive};
 
 for_overwrite_via_default!(String);
 
@@ -357,5 +358,25 @@ where
                 Ok(Canonicity::Canonical)
             }
         }
+    }
+}
+
+impl<T> ForOverwrite<(), Range<T>> for ()
+where
+    (): ForOverwrite<(), T>,
+{
+    #[inline]
+    fn for_overwrite() -> Range<T> {
+        <() as ForOverwrite<(), T>>::for_overwrite()..<() as ForOverwrite<(), T>>::for_overwrite()
+    }
+}
+
+impl<T> ForOverwrite<(), RangeInclusive<T>> for ()
+where
+    (): ForOverwrite<(), T>,
+{
+    #[inline]
+    fn for_overwrite() -> RangeInclusive<T> {
+        <() as ForOverwrite<(), T>>::for_overwrite()..=<() as ForOverwrite<(), T>>::for_overwrite()
     }
 }
