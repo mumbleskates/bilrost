@@ -13,6 +13,7 @@ use alloc::string::String;
 use alloc::vec::Vec;
 use core::cmp::Ordering::{Equal, Greater, Less};
 use core::ops::{Range, RangeInclusive};
+use std::mem;
 
 for_overwrite_via_default!(String);
 
@@ -371,6 +372,28 @@ where
     }
 }
 
+impl<T> EmptyState<(), Range<T>> for ()
+where
+    (): EmptyState<(), T>,
+{
+    #[inline]
+    fn empty() -> Range<T> {
+        <() as EmptyState<(), T>>::empty()..<() as EmptyState<(), T>>::empty()
+    }
+
+    #[inline]
+    fn is_empty(val: &Range<T>) -> bool {
+        <() as EmptyState<(), T>>::is_empty(&val.start)
+            && <() as EmptyState<(), T>>::is_empty(&val.end)
+    }
+
+    #[inline]
+    fn clear(val: &mut Range<T>) {
+        <() as EmptyState<(), T>>::clear(&mut val.start);
+        <() as EmptyState<(), T>>::clear(&mut val.end);
+    }
+}
+
 impl<T> ForOverwrite<(), RangeInclusive<T>> for ()
 where
     (): ForOverwrite<(), T>,
@@ -378,5 +401,36 @@ where
     #[inline]
     fn for_overwrite() -> RangeInclusive<T> {
         <() as ForOverwrite<(), T>>::for_overwrite()..=<() as ForOverwrite<(), T>>::for_overwrite()
+    }
+}
+
+impl<T> EmptyState<(), RangeInclusive<T>> for ()
+where
+    (): EmptyState<(), T>,
+{
+    #[inline]
+    fn empty() -> RangeInclusive<T> {
+        <() as EmptyState<(), T>>::empty()..=<() as EmptyState<(), T>>::empty()
+    }
+
+    #[inline]
+    fn is_empty(val: &RangeInclusive<T>) -> bool {
+        <() as EmptyState<(), T>>::is_empty(val.start())
+            && <() as EmptyState<(), T>>::is_empty(val.end())
+    }
+
+    #[inline]
+    fn clear(val: &mut RangeInclusive<T>) {
+        let (mut start, mut end) = mem::replace(
+            val,
+            <() as ForOverwrite<(), T>>::for_overwrite()
+                ..=<() as ForOverwrite<(), T>>::for_overwrite(),
+        )
+        .into_inner();
+
+        <() as EmptyState<(), T>>::clear(&mut start);
+        <() as EmptyState<(), T>>::clear(&mut end);
+
+        drop(mem::replace(val, start..=end));
     }
 }
