@@ -119,6 +119,7 @@ pub mod opaque;
 mod packed;
 mod plain_bytes;
 mod proxy;
+mod range_as_tuple;
 #[cfg(test)]
 mod test;
 mod tuple;
@@ -174,6 +175,8 @@ pub use packed::Packed;
 /// Encoder that decodes bytes data directly into `Vec<u8>`, rather than requiring it to be wrapped
 /// in `Blob`.
 pub use plain_bytes::PlainBytes;
+/// Encoder that encodes ranges as `(start, end)` tuples.
+pub use range_as_tuple::RangeAsTuple;
 /// Unpacked encoder. Encodes repeated types in unpacked format, writing repeated fields.
 pub use unpacked::Unpacked;
 /// Varint encoder. Encodes integer types as varints.

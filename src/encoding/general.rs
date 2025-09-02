@@ -6,7 +6,7 @@ use crate::encoding::{
     encoding_implemented_via_value_encoding, encoding_uses_base_empty_state,
     impl_cow_value_encoding, Canonicity, Capped, DecodeContext, DecodeError,
     DistinguishedProxiable, DistinguishedValueBorrowDecoder, DistinguishedValueDecoder, EmptyState,
-    Fixed, Map, MessageEncoding, Packed, PlainBytes, Proxiable,
+    Fixed, Map, MessageEncoding, Packed, PlainBytes, Proxiable, RangeAsTuple,
     RawDistinguishedMessageBorrowDecoder, RawMessageBorrowDecoder, RawMessageDecoder,
     RestrictedDecodeContext, Unpacked, ValueBorrowDecoder, ValueDecoder, ValueEncoder, Varint,
     WireType, Wiretyped,
@@ -85,6 +85,19 @@ delegate_value_encoding!(
     with where clause for relaxed (K: Ord)
     with where clause for distinguished (V: Eq)
     with generics (const P: u8, K, V)
+);
+
+// General encodings encode Range and RangeInclusive with the General encoding; to use a different
+// encoding for the T value, use RangeAsTuple directly
+delegate_value_encoding!(
+    delegate from (GeneralGeneric<P>) to (RangeAsTuple)
+    for type (core::ops::Range<T>) including distinguished
+    with generics (const P: u8, T)
+);
+delegate_value_encoding!(
+    delegate from (GeneralGeneric<P>) to (RangeAsTuple)
+    for type (core::ops::RangeInclusive<T>) including distinguished
+    with generics (const P: u8, T)
 );
 
 // General encodes bool and integers as varints.
