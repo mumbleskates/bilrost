@@ -147,6 +147,40 @@ where
     }
 }
 
+#[cfg(test)]
+mod range {
+    mod general {
+        use crate::encoding::General;
+        crate::encoding::test::check_type_test!(
+            General,
+            relaxed,
+            core::ops::Range<u16>,
+            WireType::LengthDelimited
+        );
+        crate::encoding::test::check_type_test!(
+            General,
+            distinguished,
+            core::ops::Range<u16>,
+            WireType::LengthDelimited
+        );
+    }
+    mod fixed {
+        use crate::encoding::Fixed;
+        crate::encoding::test::check_type_test!(
+            (Fixed,),
+            relaxed,
+            core::ops::Range<u32>,
+            WireType::LengthDelimited
+        );
+        crate::encoding::test::check_type_test!(
+            (Fixed,),
+            distinguished,
+            core::ops::Range<u32>,
+            WireType::LengthDelimited
+        );
+    }
+}
+
 // When decoding or otherwise modifying `RangeInclusive`, we have to do a little dance. The type
 // doesn't provide &mut access to its entries until it is decomposed so we swap it, decompose it,
 // modify, and then re-compose and swap it back.
@@ -327,5 +361,39 @@ where
 
         drop(mem::replace(value, start..=end));
         Ok(canon)
+    }
+}
+
+#[cfg(test)]
+mod range_inclusive {
+    mod general {
+        use crate::encoding::General;
+        crate::encoding::test::check_type_test!(
+            General,
+            relaxed,
+            core::ops::RangeInclusive<u16>,
+            WireType::LengthDelimited
+        );
+        crate::encoding::test::check_type_test!(
+            General,
+            distinguished,
+            core::ops::RangeInclusive<u16>,
+            WireType::LengthDelimited
+        );
+    }
+    mod fixed {
+        use crate::encoding::Fixed;
+        crate::encoding::test::check_type_test!(
+            (Fixed,),
+            relaxed,
+            core::ops::RangeInclusive<u32>,
+            WireType::LengthDelimited
+        );
+        crate::encoding::test::check_type_test!(
+            (Fixed,),
+            distinguished,
+            core::ops::RangeInclusive<u32>,
+            WireType::LengthDelimited
+        );
     }
 }
