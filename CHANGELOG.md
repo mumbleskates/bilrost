@@ -13,6 +13,11 @@
   variants as long as they have no fields.
 * Added the "empty" attribute for oneof variants which allows explicitly marking
   empty variants.
+* Added support for `Range<T>` and `RangeInclusive<T>`, which encode and decode
+  the same as `(start, end)` tuples.
+* Added support for the `NonZero` integer types, which are considered non-empty.
+  These types must be wrapped in an `Option` or another container to appear in
+  a message field.
 
 ### Fixes
 
