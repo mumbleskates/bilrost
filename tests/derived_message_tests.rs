@@ -4820,7 +4820,7 @@ fn ranges() {
         owned never decodes Foo<Range<String>>,
         [
             (0, OV::message(&[
-                (0, OV::bytes(b"\xff")),
+                (0, OV::bytes(*b"\xff")),
             ].into_opaque_message())),
         ],
         InvalidValue,
@@ -4830,7 +4830,7 @@ fn ranges() {
         owned never decodes Foo<RangeInclusive<String>>,
         [
             (0, OV::message(&[
-                (0, OV::bytes(b"\xff")),
+                (0, OV::bytes(*b"\xff")),
             ].into_opaque_message())),
         ],
         InvalidValue,
@@ -4841,7 +4841,7 @@ fn ranges() {
         [
             (0, OV::message(&[
                 (0, OV::str("aardvark")),
-                (1, OV::bytes(b"\xff")),
+                (1, OV::bytes(*b"\xff")),
             ].into_opaque_message())),
         ],
         InvalidValue,
@@ -4852,7 +4852,7 @@ fn ranges() {
         [
             (0, OV::message(&[
                 (0, OV::str("aardvark")),
-                (1, OV::bytes(b"\xff")),
+                (1, OV::bytes(*b"\xff")),
             ].into_opaque_message())),
         ],
         InvalidValue,
