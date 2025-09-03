@@ -7,7 +7,7 @@ use crate::encoding::{
     RestrictedDecodeContext, ValueDecoder, ValueEncoder, WireType, Wiretyped,
 };
 use crate::DecodeError;
-use crate::DecodeErrorKind::Truncated;
+use crate::DecodeErrorKind::{InvalidValue, Truncated};
 
 pub struct Fixed;
 
@@ -21,7 +21,9 @@ macro_rules! fixed_width_common {
         $wire_type:ident,
         $put:ident,
         $prepend:ident,
-        $get:ident
+        $get:ident,
+        get_value($value:ident) { $value_expr:expr },
+        set_value($gotten_value:ident) $set_value_body:block
     ) => {
         impl Wiretyped<Fixed, $ty> for () {
             const WIRE_TYPE: WireType = WireType::$wire_type;
@@ -29,13 +31,13 @@ macro_rules! fixed_width_common {
 
         impl ValueEncoder<Fixed, $ty> for () {
             #[inline(always)]
-            fn encode_value<B: BufMut + ?Sized>(value: &$ty, buf: &mut B) {
-                buf.$put(*value);
+            fn encode_value<B: BufMut + ?Sized>($value: &$ty, buf: &mut B) {
+                buf.$put($value_expr);
             }
 
             #[inline(always)]
-            fn prepend_value<B: ReverseBuf + ?Sized>(value: &$ty, buf: &mut B) {
-                buf.$prepend(*value);
+            fn prepend_value<B: ReverseBuf + ?Sized>($value: &$ty, buf: &mut B) {
+                buf.$prepend($value_expr);
             }
 
             #[inline(always)]
@@ -47,14 +49,15 @@ macro_rules! fixed_width_common {
         impl ValueDecoder<Fixed, $ty> for () {
             #[inline(always)]
             fn decode_value<B: Buf + ?Sized>(
-                value: &mut $ty,
+                $value: &mut $ty,
                 mut buf: Capped<B>,
                 _ctx: DecodeContext,
             ) -> Result<(), DecodeError> {
                 if buf.remaining_before_cap() < WireType::$wire_type.fixed_size().unwrap() {
                     return Err(DecodeError::new(Truncated));
                 }
-                *value = buf.$get();
+                let $gotten_value = buf.$get();
+                $set_value_body
                 Ok(())
             }
         }
@@ -68,9 +71,20 @@ macro_rules! fixed_width_int {
         $wire_type:ident,
         $put:ident,
         $prepend:ident,
-        $get:ident
+        $get:ident,
+        get_value($value:ident) { $value_expr:expr },
+        set_value($gotten_value:ident) $set_value_body:block
+        $(, $($avoid_no_empty_state:tt)*)?
     ) => {
-        fixed_width_common!($ty, $wire_type, $put, $prepend, $get);
+        fixed_width_common!(
+            $ty,
+            $wire_type,
+            $put,
+            $prepend,
+            $get,
+            get_value($value) { $value_expr },
+            set_value($gotten_value) $set_value_body
+        );
         delegate_value_encoding!(
             encoding (Fixed) borrows type ($ty) as owned including distinguished
         );
@@ -93,14 +107,40 @@ macro_rules! fixed_width_int {
         mod $test_name {
             use crate::encoding::Fixed;
 
-            crate::encoding::test::check_type_test!(Fixed, relaxed, $ty, WireType::$wire_type);
+            crate::encoding::test::check_type_test!(
+                Fixed,
+                relaxed,
+                $ty,
+                WireType::$wire_type
+                $(, $($avoid_no_empty_state)*)?
+            );
             crate::encoding::test::check_type_test!(
                 Fixed,
                 distinguished,
                 $ty,
                 WireType::$wire_type
+                $(, $($avoid_no_empty_state)*)?
             );
         }
+    };
+    (
+        $test_name:ident,
+        $ty:ty,
+        $wire_type:ident,
+        $put:ident,
+        $prepend:ident,
+        $get:ident
+    ) => {
+        fixed_width_int!(
+            $test_name,
+            $ty,
+            $wire_type,
+            $put,
+            $prepend,
+            $get,
+            get_value(value) { *value },
+            set_value(gotten_value) { *value = gotten_value; }
+        );
     };
 }
 
@@ -113,7 +153,15 @@ macro_rules! fixed_width_float {
         $prepend:ident,
         $get:ident
     ) => {
-        fixed_width_common!($ty, $wire_type, $put, $prepend, $get);
+        fixed_width_common!(
+            $ty,
+            $wire_type,
+            $put,
+            $prepend,
+            $get,
+            get_value(value) { *value },
+            set_value(gotten_value) { *value = gotten_value; }
+        );
         delegate_value_encoding!(encoding (Fixed) borrows type ($ty) as owned);
 
         #[cfg(test)]
@@ -229,12 +277,40 @@ fixed_width_int!(
     get_u32_le
 );
 fixed_width_int!(
+    fixed_nonzerou32,
+    core::num::NonZeroU32,
+    ThirtyTwoBit,
+    put_u32_le,
+    prepend_u32_le,
+    get_u32_le,
+    get_value(value) { value.get() },
+    set_value(gotten_value) {
+        *value = core::num::NonZeroU32::new(gotten_value)
+            .ok_or_else(|| DecodeError::new(InvalidValue))?;
+    },
+    has no empty state
+);
+fixed_width_int!(
     fixed_u64,
     u64,
     SixtyFourBit,
     put_u64_le,
     prepend_u64_le,
     get_u64_le
+);
+fixed_width_int!(
+    fixed_nonzerou64,
+    core::num::NonZeroU64,
+    SixtyFourBit,
+    put_u64_le,
+    prepend_u64_le,
+    get_u64_le,
+    get_value(value) { value.get() },
+    set_value(gotten_value) {
+        *value = core::num::NonZeroU64::new(gotten_value)
+            .ok_or_else(|| DecodeError::new(InvalidValue))?;
+    },
+    has no empty state
 );
 fixed_width_int!(
     fixed_i32,
@@ -245,12 +321,40 @@ fixed_width_int!(
     get_i32_le
 );
 fixed_width_int!(
+    fixed_nonzeroi32,
+    core::num::NonZeroI32,
+    ThirtyTwoBit,
+    put_i32_le,
+    prepend_i32_le,
+    get_i32_le,
+    get_value(value) { value.get() },
+    set_value(gotten_value) {
+        *value = core::num::NonZeroI32::new(gotten_value)
+            .ok_or_else(|| DecodeError::new(InvalidValue))?;
+    },
+    has no empty state
+);
+fixed_width_int!(
     fixed_i64,
     i64,
     SixtyFourBit,
     put_i64_le,
     prepend_i64_le,
     get_i64_le
+);
+fixed_width_int!(
+    fixed_nonzeroi64,
+    core::num::NonZeroI64,
+    SixtyFourBit,
+    put_i64_le,
+    prepend_i64_le,
+    get_i64_le,
+    get_value(value) { value.get() },
+    set_value(gotten_value) {
+        *value = core::num::NonZeroI64::new(gotten_value)
+            .ok_or_else(|| DecodeError::new(InvalidValue))?;
+    },
+    has no empty state
 );
 fixed_width_array!(u8_4, 4, ThirtyTwoBit);
 fixed_width_array!(u8_8, 8, SixtyFourBit);
