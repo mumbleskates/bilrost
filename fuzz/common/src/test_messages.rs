@@ -11,7 +11,7 @@ use tinyvec::ArrayVec;
 /// could trigger bugs that occur in any message type in this file.  We verify
 /// this stays true in a unit test.
 #[derive(Clone, Debug, PartialEq, Message)]
-#[bilrost(reserved_tags(117-299, 320-1000, 1013-1999, 2013..))]
+#[bilrost(reserved_tags(129-299, 320-1000, 1013-1999, 2013..))]
 pub struct TestAllTypes {
     /// Singular
     #[bilrost(1)]
@@ -52,6 +52,18 @@ pub struct TestAllTypes {
     pub core_duration: core::time::Duration,
     #[bilrost(17)]
     pub core_systemtime: std::time::SystemTime,
+    #[bilrost(117)]
+    pub range_varint: std::ops::Range<u64>,
+    #[bilrost(118)]
+    pub range_string: std::ops::Range<String>,
+    #[bilrost(tag(119), encoding((fixed, fixed)))]
+    pub range_fixed: std::ops::Range<u32>,
+    #[bilrost(120)]
+    pub range_inclusive_varint: std::ops::RangeInclusive<u64>,
+    #[bilrost(121)]
+    pub range_inclusive_string: std::ops::RangeInclusive<String>,
+    #[bilrost(tag(122), encoding((fixed, fixed)))]
+    pub range_inclusive_fixed: std::ops::RangeInclusive<u32>,
     #[bilrost(18)]
     pub direct_message: test_message::NestedMessage,
     #[bilrost(19)]
@@ -109,6 +121,18 @@ pub struct TestAllTypes {
     pub optional_bytes: Option<Vec<u8>>,
     #[bilrost(45)]
     pub optional_blob: Option<Blob>,
+    #[bilrost(123)]
+    pub optional_range_varint: Option<std::ops::Range<u64>>,
+    #[bilrost(124)]
+    pub optional_range_string: Option<std::ops::Range<String>>,
+    #[bilrost(tag(125), encoding((fixed, fixed)))]
+    pub optional_range_fixed: Option<std::ops::Range<u32>>,
+    #[bilrost(126)]
+    pub optional_range_inclusive_varint: Option<std::ops::RangeInclusive<u64>>,
+    #[bilrost(127)]
+    pub optional_range_inclusive_string: Option<std::ops::RangeInclusive<String>>,
+    #[bilrost(tag(128), encoding((fixed, fixed)))]
+    pub optional_range_inclusive_fixed: Option<std::ops::RangeInclusive<u32>>,
     #[bilrost(46)]
     pub optional_message: Option<test_message::NestedMessage>,
     #[bilrost(47)]
@@ -392,7 +416,7 @@ pub mod test_message {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Message)]
-#[bilrost(distinguished, reserved_tags(67-100, 110-199, 210..))]
+#[bilrost(distinguished, reserved_tags(79-100, 110-199, 210..))]
 pub struct TestDistinguished {
     /// Singular
     #[bilrost(tag(1), encoding(varint))]
@@ -423,6 +447,18 @@ pub struct TestDistinguished {
     pub tuple: (u64, String, u32),
     #[bilrost(11)]
     pub core_duration: core::time::Duration,
+    #[bilrost(67)]
+    pub range_varint: std::ops::Range<u64>,
+    #[bilrost(68)]
+    pub range_string: std::ops::Range<String>,
+    #[bilrost(tag(69), encoding((fixed, fixed)))]
+    pub range_fixed: std::ops::Range<u32>,
+    #[bilrost(70)]
+    pub range_inclusive_varint: std::ops::RangeInclusive<u64>,
+    #[bilrost(71)]
+    pub range_inclusive_string: std::ops::RangeInclusive<String>,
+    #[bilrost(tag(72), encoding((fixed, fixed)))]
+    pub range_inclusive_fixed: std::ops::RangeInclusive<u32>,
     #[bilrost(12)]
     pub direct_message: test_distinguished::NestedMessage,
     #[bilrost(13)]
@@ -448,6 +484,18 @@ pub struct TestDistinguished {
     pub optional_bytes: Option<Vec<u8>>,
     #[bilrost(tag(23), encoding((general, general, fixed)))]
     pub optional_tuple: Option<(u64, String, u32)>,
+    #[bilrost(73)]
+    pub optional_range_varint: Option<std::ops::Range<u64>>,
+    #[bilrost(74)]
+    pub optional_range_string: Option<std::ops::Range<String>>,
+    #[bilrost(tag(75), encoding((fixed, fixed)))]
+    pub optional_range_fixed: Option<std::ops::Range<u32>>,
+    #[bilrost(76)]
+    pub optional_range_inclusive_varint: Option<std::ops::RangeInclusive<u64>>,
+    #[bilrost(77)]
+    pub optional_range_inclusive_string: Option<std::ops::RangeInclusive<String>>,
+    #[bilrost(tag(78), encoding((fixed, fixed)))]
+    pub optional_range_inclusive_fixed: Option<std::ops::RangeInclusive<u32>>,
     #[bilrost(24)]
     pub optional_message: Option<test_distinguished::NestedMessage>,
     #[bilrost(25)]
