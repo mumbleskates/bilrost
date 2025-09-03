@@ -434,3 +434,24 @@ where
         drop(mem::replace(val, start..=end));
     }
 }
+
+macro_rules! impl_nonzero_foroverwrite {
+    ($ty:ident) => {
+        impl ForOverwrite<(), core::num::$ty> for () {
+            fn for_overwrite() -> core::num::$ty {
+                // SAFETY: 1 is not zero and probably never will be
+                unsafe { core::num::$ty::new_unchecked(1) }
+            }
+        }
+    };
+}
+impl_nonzero_foroverwrite!(NonZeroU8);
+impl_nonzero_foroverwrite!(NonZeroU16);
+impl_nonzero_foroverwrite!(NonZeroU32);
+impl_nonzero_foroverwrite!(NonZeroU64);
+impl_nonzero_foroverwrite!(NonZeroUsize);
+impl_nonzero_foroverwrite!(NonZeroI8);
+impl_nonzero_foroverwrite!(NonZeroI16);
+impl_nonzero_foroverwrite!(NonZeroI32);
+impl_nonzero_foroverwrite!(NonZeroI64);
+impl_nonzero_foroverwrite!(NonZeroIsize);

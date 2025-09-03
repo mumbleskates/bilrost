@@ -21,9 +21,24 @@ use proptest::{prelude::*, test_runner::TestCaseResult};
 macro_rules! check_type_test {
     ($encoder:ty, $kind:ident, $ty:ty, $wire_type:expr) => {
         crate::encoding::test::check_type_test!($encoder, $kind, from $ty, into $ty,
-        converter(value) { value }, $wire_type);
+        converter(value) { value }, $wire_type, check empty state);
     };
     ($encoder:ty, $kind:ident, from $from_ty:ty, into $into_ty:ty, $wire_type:expr) => {
+        crate::encoding::test::check_type_test!($encoder, $kind, from $from_ty, into $into_ty,
+            converter(value) { <$into_ty>::from(value) }, $wire_type, check empty state);
+    };
+    ($encoder:ty, $kind:ident, $ty:ty, $wire_type:expr, has no empty state) => {
+        crate::encoding::test::check_type_test!($encoder, $kind, from $ty, into $ty,
+        converter(value) { value }, $wire_type);
+    };
+    (
+        $encoder:ty,
+        $kind:ident,
+        from $from_ty:ty,
+        into $into_ty:ty,
+        $wire_type:expr,
+        has no empty state
+    ) => {
         crate::encoding::test::check_type_test!($encoder, $kind, from $from_ty, into $into_ty,
             converter(value) { <$into_ty>::from(value) }, $wire_type);
     };
@@ -34,6 +49,7 @@ macro_rules! check_type_test {
         into $into_ty:ty,
         converter($from_value:ident) $convert:expr,
         $wire_type:expr
+        $(, $check_fn_name:ident empty state)?
     ) => {
         #[cfg(test)]
         mod $kind {
@@ -46,10 +62,10 @@ macro_rules! check_type_test {
             use super::*;
 
             proptest! {
-                #[test]
-                fn check($from_value: $from_ty, tag: u32) {
+                $(#[test]
+                fn $check_fn_name($from_value: $from_ty, tag: u32) {
                     check_type::<$into_ty, $encoder>($convert, tag, $wire_type)?;
-                }
+                })?
                 #[test]
                 fn check_optional(opt_value: Option<$from_ty>, tag: u32) {
                     check_type::<Option<$into_ty>, $encoder>(

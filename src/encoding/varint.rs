@@ -6,7 +6,7 @@ use crate::encoding::{
     Wiretyped,
 };
 use crate::DecodeError;
-use crate::DecodeErrorKind::OutOfDomainValue;
+use crate::DecodeErrorKind::{InvalidValue, OutOfDomainValue};
 
 pub struct Varint;
 
@@ -62,6 +62,7 @@ macro_rules! varint {
         $ty:ty,
         to_uint64($to_uint64_value:ident) $to_uint64:expr,
         from_uint64($from_uint64_value:ident) $from_uint64:expr
+        $(, $($avoid_no_empty_state:tt)*)?
     ) => {
         impl Wiretyped<Varint, $ty> for () {
             const WIRE_TYPE: WireType = WireType::Varint;
@@ -118,8 +119,20 @@ macro_rules! varint {
         #[cfg(test)]
         mod $name {
             use crate::encoding::Varint;
-            crate::encoding::test::check_type_test!(Varint, relaxed, $ty, WireType::Varint);
-            crate::encoding::test::check_type_test!(Varint, distinguished, $ty, WireType::Varint);
+            crate::encoding::test::check_type_test!(
+                Varint,
+                relaxed,
+                $ty,
+                WireType::Varint
+                $(, $($avoid_no_empty_state)*)?
+            );
+            crate::encoding::test::check_type_test!(
+                Varint,
+                distinguished,
+                $ty,
+                WireType::Varint
+                $(, $($avoid_no_empty_state)*)?
+            );
         }
     };
 }
@@ -144,6 +157,16 @@ from_uint64(value) {
     u8::try_from(value).map_err(|_| DecodeError::new(OutOfDomainValue))?
 });
 
+varint!(varint_nonzerou8, core::num::NonZeroU8,
+to_uint64(value) {
+    value.get() as u64
+},
+from_uint64(value) {
+    core::num::NonZeroU8::new(
+        u8::try_from(value).map_err(|_| DecodeError::new(OutOfDomainValue))?
+    ).ok_or_else(|| DecodeError::new(InvalidValue))?
+}, has no empty state);
+
 varint!(varint_u16, u16,
 to_uint64(value) {
     *value as u64
@@ -151,6 +174,16 @@ to_uint64(value) {
 from_uint64(value) {
     u16::try_from(value).map_err(|_| DecodeError::new(OutOfDomainValue))?
 });
+
+varint!(varint_nonzerou16, core::num::NonZeroU16,
+to_uint64(value) {
+    value.get() as u64
+},
+from_uint64(value) {
+    core::num::NonZeroU16::new(
+        u16::try_from(value).map_err(|_| DecodeError::new(OutOfDomainValue))?
+    ).ok_or_else(|| DecodeError::new(InvalidValue))?
+}, has no empty state);
 
 varint!(varint_u32, u32,
 to_uint64(value) {
@@ -160,6 +193,16 @@ from_uint64(value) {
     u32::try_from(value).map_err(|_| DecodeError::new(OutOfDomainValue))?
 });
 
+varint!(varint_nonzerou32, core::num::NonZeroU32,
+to_uint64(value) {
+    value.get() as u64
+},
+from_uint64(value) {
+    core::num::NonZeroU32::new(
+        u32::try_from(value).map_err(|_| DecodeError::new(OutOfDomainValue))?
+    ).ok_or_else(|| DecodeError::new(InvalidValue))?
+}, has no empty state);
+
 varint!(varint_u64, u64,
 to_uint64(value) {
     *value
@@ -168,6 +211,14 @@ from_uint64(value) {
     value
 });
 
+varint!(varint_nonzerou64, core::num::NonZeroU64,
+to_uint64(value) {
+    value.get()
+},
+from_uint64(value) {
+    core::num::NonZeroU64::new(value).ok_or_else(|| DecodeError::new(InvalidValue))?
+}, has no empty state);
+
 varint!(varint_usize, usize,
 to_uint64(value) {
     *value as u64
@@ -175,6 +226,16 @@ to_uint64(value) {
 from_uint64(value) {
     usize::try_from(value).map_err(|_| DecodeError::new(OutOfDomainValue))?
 });
+
+varint!(varint_nonzerousize, core::num::NonZeroUsize,
+to_uint64(value) {
+    value.get() as u64
+},
+from_uint64(value) {
+    core::num::NonZeroUsize::new(
+        usize::try_from(value).map_err(|_| DecodeError::new(OutOfDomainValue))?
+    ).ok_or_else(|| DecodeError::new(InvalidValue))?
+}, has no empty state);
 
 varint!(varint_i8, i8,
 to_uint64(value) {
@@ -186,6 +247,17 @@ from_uint64(value) {
     u8_to_signed(value)
 });
 
+varint!(varint_nonzeroi8, core::num::NonZeroI8,
+to_uint64(value) {
+    i8_to_unsigned(value.get()) as u64
+},
+from_uint64(value) {
+    let value = u8::try_from(value)
+        .map_err(|_| DecodeError::new(OutOfDomainValue))?;
+    core::num::NonZeroI8::new(u8_to_signed(value))
+        .ok_or_else(|| DecodeError::new(InvalidValue))?
+}, has no empty state);
+
 varint!(varint_i16, i16,
 to_uint64(value) {
     i16_to_unsigned(*value) as u64
@@ -195,6 +267,17 @@ from_uint64(value) {
         .map_err(|_| DecodeError::new(OutOfDomainValue))?;
     u16_to_signed(value)
 });
+
+varint!(varint_nonzeroi16, core::num::NonZeroI16,
+to_uint64(value) {
+    i16_to_unsigned(value.get()) as u64
+},
+from_uint64(value) {
+    let value = u16::try_from(value)
+        .map_err(|_| DecodeError::new(OutOfDomainValue))?;
+    core::num::NonZeroI16::new(u16_to_signed(value))
+        .ok_or_else(|| DecodeError::new(InvalidValue))?
+}, has no empty state);
 
 varint!(varint_i32, i32,
 to_uint64(value) {
@@ -206,6 +289,17 @@ from_uint64(value) {
     u32_to_signed(value)
 });
 
+varint!(varint_nonzeroi32, core::num::NonZeroI32,
+to_uint64(value) {
+    i32_to_unsigned(value.get()) as u64
+},
+from_uint64(value) {
+    let value = u32::try_from(value)
+        .map_err(|_| DecodeError::new(OutOfDomainValue))?;
+    core::num::NonZeroI32::new(u32_to_signed(value))
+        .ok_or_else(|| DecodeError::new(InvalidValue))?
+}, has no empty state);
+
 varint!(varint_i64, i64,
 to_uint64(value) {
     i64_to_unsigned(*value)
@@ -213,6 +307,15 @@ to_uint64(value) {
 from_uint64(value) {
     u64_to_signed(value)
 });
+
+varint!(varint_nonzero648, core::num::NonZeroI64,
+to_uint64(value) {
+    i64_to_unsigned(value.get())
+},
+from_uint64(value) {
+    core::num::NonZeroI64::new(u64_to_signed(value))
+        .ok_or_else(|| DecodeError::new(InvalidValue))?
+}, has no empty state);
 
 varint!(varint_isize, isize,
 to_uint64(value) {
@@ -222,3 +325,14 @@ from_uint64(value) {
     isize::try_from(u64_to_signed(value))
         .map_err(|_| DecodeError::new(OutOfDomainValue))?
 });
+
+varint!(varint_nonzeroisize, core::num::NonZeroIsize,
+to_uint64(value) {
+    i64_to_unsigned(value.get() as i64)
+},
+from_uint64(value) {
+    let value = isize::try_from(u64_to_signed(value))
+        .map_err(|_| DecodeError::new(OutOfDomainValue))?;
+    core::num::NonZeroIsize::new(value)
+        .ok_or_else(|| DecodeError::new(InvalidValue))?
+}, has no empty state);
