@@ -19,6 +19,7 @@ use bilrost::{
 use core::mem::size_of;
 use itertools::{repeat_n, Itertools};
 use std::borrow::Cow;
+use std::collections::BTreeSet;
 use std::default::Default;
 use std::fmt::Debug;
 use std::iter;
@@ -1435,6 +1436,135 @@ fn parsing_varints() {
         let should_fit = [(tag, OV::u64(out_of_range - 1))];
         assert::decodes!(owned distinguished, &should_fit, Foo::from_opaque(&should_fit));
     }
+}
+
+#[test]
+fn nonzero_varints() {
+    use core::num::NonZeroU32;
+
+    #[derive(Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
+    struct Foo<T>(T);
+
+    assert::decodes!(
+        owned distinguished,
+        [(0, OV::u32(10))],
+        Foo(NonZeroU32::new(10)), // NonZero::new produces an option
+    );
+    assert::decodes!(
+        owned never decodes Foo<Option<NonZeroU32>>,
+        [(0, OV::u32(0))],
+        InvalidValue,
+        "Foo.0",
+    );
+    assert::decodes!(
+        owned never decodes Foo<Option<NonZeroU32>>,
+        [(0, OV::u64(u64::MAX))],
+        OutOfDomainValue,
+        "Foo.0",
+    );
+    assert::decodes!(
+        owned distinguished,
+        [
+            (0, OV::u32(1)),
+            (0, OV::u32(1)),
+            (0, OV::u32(2)),
+            (0, OV::u32(3)),
+            (0, OV::u32(5)),
+        ],
+        Foo(vec![
+            NonZeroU32::new(1).unwrap(),
+            NonZeroU32::new(1).unwrap(),
+            NonZeroU32::new(2).unwrap(),
+            NonZeroU32::new(3).unwrap(),
+            NonZeroU32::new(5).unwrap(),
+        ]),
+    );
+
+    // These non-empty number values are also nestable in arrays and containers.
+    #[derive(Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
+    struct FooRepeated<T> {
+        #[bilrost(tag(1), encoding(unpacked))]
+        unpacked: T,
+        #[bilrost(tag(2), encoding(packed))]
+        packed: T,
+    }
+    assert::decodes!(
+        owned distinguished,
+        [
+            (1, OV::u32(1)),
+            (1, OV::u32(1)),
+            (1, OV::u32(2)),
+            (1, OV::u32(3)),
+            (1, OV::u32(5)),
+        ],
+        FooRepeated{
+            unpacked: Some([
+                NonZeroU32::new(1).unwrap(),
+                NonZeroU32::new(1).unwrap(),
+                NonZeroU32::new(2).unwrap(),
+                NonZeroU32::new(3).unwrap(),
+                NonZeroU32::new(5).unwrap(),
+            ]),
+            packed: None,
+        },
+    );
+    assert::decodes!(
+        owned distinguished,
+        [
+            (2, OV::packed([
+                OV::u32(55),
+                OV::u32(34),
+                OV::u32(21),
+                OV::u32(13),
+                OV::u32(8),
+            ]))
+        ],
+        FooRepeated{
+            unpacked: None,
+            packed: Some([
+                NonZeroU32::new(55).unwrap(),
+                NonZeroU32::new(34).unwrap(),
+                NonZeroU32::new(21).unwrap(),
+                NonZeroU32::new(13).unwrap(),
+                NonZeroU32::new(8).unwrap(),
+            ]),
+        },
+    );
+    assert::decodes!(
+        owned distinguished,
+        [
+            (1, OV::u32(987)),
+            (1, OV::u32(1597)),
+            (1, OV::u32(2584)),
+            (1, OV::u32(4181)),
+            (1, OV::u32(6765)),
+            (2, OV::packed([
+                OV::u32(89),
+                OV::u32(144),
+                OV::u32(233),
+                OV::u32(377),
+                OV::u32(610),
+            ]))
+        ],
+        FooRepeated{
+            unpacked: BTreeSet::from_iter([
+                NonZeroU32::new(987).unwrap(),
+                NonZeroU32::new(1597).unwrap(),
+                NonZeroU32::new(2584).unwrap(),
+                NonZeroU32::new(4181).unwrap(),
+                NonZeroU32::new(6765).unwrap(),
+            ]),
+            packed: BTreeSet::from_iter([
+                NonZeroU32::new(89).unwrap(),
+                NonZeroU32::new(144).unwrap(),
+                NonZeroU32::new(233).unwrap(),
+                NonZeroU32::new(377).unwrap(),
+                NonZeroU32::new(610).unwrap(),
+            ]),
+        }
+    );
 }
 
 #[test]

@@ -11,17 +11,29 @@ use tinyvec::ArrayVec;
 /// could trigger bugs that occur in any message type in this file.  We verify
 /// this stays true in a unit test.
 #[derive(Clone, Debug, PartialEq, Message)]
-#[bilrost(reserved_tags(129-299, 320-1000, 1013-1999, 2013..))]
+#[bilrost(reserved_tags(166-299, 320-1000, 1013-1999, 2013..))]
 pub struct TestAllTypes {
     /// Singular
+    #[bilrost(tag(130), encoding(varint))]
+    pub sint8: i8,
+    #[bilrost(131)]
+    pub sint16: i16,
     #[bilrost(1)]
     pub sint32: i32,
     #[bilrost(2)]
     pub sint64: i64,
+    #[bilrost(132)]
+    pub sintsize: isize,
+    #[bilrost(tag(133), encoding(varint))]
+    pub uint8: u8,
+    #[bilrost(134)]
+    pub uint16: u16,
     #[bilrost(3)]
     pub uint32: u32,
     #[bilrost(4)]
     pub uint64: u64,
+    #[bilrost(135)]
+    pub uintsize: usize,
     #[bilrost(tag(5), encoding(fixed))]
     pub ufixed32: u32,
     #[bilrost(tag(6), encoding(fixed))]
@@ -91,14 +103,26 @@ pub struct TestAllTypes {
     #[bilrost(30)]
     pub map_string_nested_enum: BTreeMap<String, test_message::NestedEnum>,
     /// Optional
+    #[bilrost(tag(136), encoding(varint))]
+    pub optional_sint8: Option<i8>,
+    #[bilrost(137)]
+    pub optional_sint16: Option<i16>,
     #[bilrost(31)]
     pub optional_sint32: Option<i32>,
     #[bilrost(32)]
     pub optional_sint64: Option<i64>,
+    #[bilrost(138)]
+    pub optional_sintsize: Option<isize>,
+    #[bilrost(tag(139), encoding(varint))]
+    pub optional_uint8: Option<u8>,
+    #[bilrost(140)]
+    pub optional_uint16: Option<u16>,
     #[bilrost(33)]
     pub optional_uint32: Option<u32>,
     #[bilrost(34)]
     pub optional_uint64: Option<u64>,
+    #[bilrost(141)]
+    pub optional_uintsize: Option<usize>,
     #[bilrost(tag(35), encoding(fixed))]
     pub optional_ufixed32: Option<u32>,
     #[bilrost(tag(36), encoding(fixed))]
@@ -107,6 +131,34 @@ pub struct TestAllTypes {
     pub optional_sfixed32: Option<i32>,
     #[bilrost(tag(38), encoding(fixed))]
     pub optional_sfixed64: Option<i64>,
+    #[bilrost(142)]
+    pub optional_nonzerosint8: Option<core::num::NonZeroI8>,
+    #[bilrost(143)]
+    pub optional_nonzerosint16: Option<core::num::NonZeroI16>,
+    #[bilrost(144)]
+    pub optional_nonzerosint32: Option<core::num::NonZeroI32>,
+    #[bilrost(145)]
+    pub optional_nonzerosint64: Option<core::num::NonZeroI64>,
+    #[bilrost(146)]
+    pub optional_nonzerosintsize: Option<core::num::NonZeroIsize>,
+    #[bilrost(147)]
+    pub optional_nonzerouint8: Option<core::num::NonZeroU8>,
+    #[bilrost(148)]
+    pub optional_nonzerouint16: Option<core::num::NonZeroU16>,
+    #[bilrost(149)]
+    pub optional_nonzerouint32: Option<core::num::NonZeroU32>,
+    #[bilrost(150)]
+    pub optional_nonzerouint64: Option<core::num::NonZeroU64>,
+    #[bilrost(151)]
+    pub optional_nonzerouintsize: Option<core::num::NonZeroUsize>,
+    #[bilrost(tag(152), encoding(fixed))]
+    pub optional_nonzeroufixed32: Option<core::num::NonZeroU32>,
+    #[bilrost(tag(153), encoding(fixed))]
+    pub optional_nonzeroufixed64: Option<core::num::NonZeroU64>,
+    #[bilrost(tag(154), encoding(fixed))]
+    pub optional_nonzerosfixed32: Option<core::num::NonZeroI32>,
+    #[bilrost(tag(155), encoding(fixed))]
+    pub optional_nonzerosfixed64: Option<core::num::NonZeroI64>,
     #[bilrost(39)]
     pub optional_float32: Option<f32>,
     #[bilrost(40)]
@@ -162,6 +214,8 @@ pub struct TestAllTypes {
     pub unpacked_uint32: Vec<u32>,
     #[bilrost(59)]
     pub unpacked_uint64: Vec<u64>,
+    #[bilrost(156)]
+    pub unpacked_nonzerouint32: Vec<core::num::NonZeroU32>,
     #[bilrost(tag(60), encoding(unpacked<fixed>))]
     pub unpacked_ufixed32: Vec<u32>,
     #[bilrost(tag(61), encoding(unpacked<fixed>))]
@@ -170,6 +224,8 @@ pub struct TestAllTypes {
     pub unpacked_sfixed32: Vec<i32>,
     #[bilrost(tag(63), encoding(unpacked<fixed>))]
     pub unpacked_sfixed64: Vec<i64>,
+    #[bilrost(tag(157), encoding(unpacked<fixed>))]
+    pub unpacked_nonzeroufixed32: Vec<core::num::NonZeroU32>,
     #[bilrost(64)]
     pub unpacked_float32: Vec<f32>,
     #[bilrost(65)]
@@ -199,10 +255,14 @@ pub struct TestAllTypes {
     pub packed_uint32: Vec<u32>,
     #[bilrost(tag(77), encoding(packed))]
     pub packed_uint64: Vec<u64>,
+    #[bilrost(tag(158), encoding(packed))]
+    pub packed_nonzerouint32: Vec<core::num::NonZeroU32>,
     #[bilrost(tag(78), encoding(packed<fixed>))]
     pub packed_ufixed32: Vec<u32>,
     #[bilrost(tag(79), encoding(packed<fixed>))]
     pub packed_ufixed64: Vec<u64>,
+    #[bilrost(tag(159), encoding(packed<fixed>))]
+    pub packed_nonzeroufixed32: Vec<core::num::NonZeroU32>,
     #[bilrost(tag(80), encoding(packed))]
     pub packed_bool: Vec<bool>,
     #[bilrost(tag(81), encoding(packed))]
@@ -224,10 +284,14 @@ pub struct TestAllTypes {
     pub unpacked_set_uint32: BTreeSet<u32>,
     #[bilrost(89)]
     pub unpacked_set_uint64: BTreeSet<u64>,
+    #[bilrost(tag(160), encoding(packed))]
+    pub unpacked_set_nonzerouint32: BTreeSet<core::num::NonZeroU32>,
     #[bilrost(tag(90), encoding(unpacked<fixed>))]
     pub unpacked_set_ufixed32: BTreeSet<u32>,
     #[bilrost(tag(91), encoding(unpacked<fixed>))]
     pub unpacked_set_ufixed64: BTreeSet<u64>,
+    #[bilrost(tag(161), encoding(packed<fixed>))]
+    pub unpacked_set_nonzeroufixed32: BTreeSet<core::num::NonZeroU32>,
     #[bilrost(92)]
     pub unpacked_set_bool: BTreeSet<bool>,
     #[bilrost(93)]
@@ -243,10 +307,14 @@ pub struct TestAllTypes {
     pub packed_set_uint32: BTreeSet<u32>,
     #[bilrost(tag(98), encoding(packed))]
     pub packed_set_uint64: BTreeSet<u64>,
+    #[bilrost(tag(162), encoding(packed))]
+    pub packed_set_nonzerouint32: BTreeSet<core::num::NonZeroU32>,
     #[bilrost(tag(99), encoding(packed<fixed>))]
     pub packed_set_ufixed32: BTreeSet<u32>,
     #[bilrost(tag(100), encoding(packed<fixed>))]
     pub packed_set_ufixed64: BTreeSet<u64>,
+    #[bilrost(tag(163), encoding(packed<fixed>))]
+    pub packed_set_nonzeroufixed32: BTreeSet<core::num::NonZeroU32>,
     #[bilrost(tag(101), encoding(packed))]
     pub packed_set_bool: BTreeSet<bool>,
     #[bilrost(tag(102), encoding(packed))]
@@ -262,10 +330,14 @@ pub struct TestAllTypes {
     pub optional_packed_set_uint32: Option<BTreeSet<u32>>,
     #[bilrost(tag(107), encoding(packed))]
     pub optional_packed_set_uint64: Option<BTreeSet<u64>>,
+    #[bilrost(tag(164), encoding(packed))]
+    pub optional_packed_set_nonzerouint32: Option<BTreeSet<core::num::NonZeroU32>>,
     #[bilrost(tag(108), encoding(packed<fixed>))]
     pub optional_packed_set_ufixed32: Option<BTreeSet<u32>>,
     #[bilrost(tag(109), encoding(packed<fixed>))]
     pub optional_packed_set_ufixed64: Option<BTreeSet<u64>>,
+    #[bilrost(tag(165), encoding(packed<fixed>))]
+    pub optional_packed_set_nonzeroufixed32: Option<BTreeSet<core::num::NonZeroU32>>,
     #[bilrost(tag(110), encoding(packed))]
     pub optional_packed_set_bool: Option<BTreeSet<bool>>,
     #[bilrost(tag(111), encoding(packed))]
@@ -416,7 +488,7 @@ pub mod test_message {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Message)]
-#[bilrost(distinguished, reserved_tags(79-100, 110-199, 210..))]
+#[bilrost(distinguished, reserved_tags(87-100, 110-199, 210..))]
 pub struct TestDistinguished {
     /// Singular
     #[bilrost(tag(1), encoding(varint))]
@@ -431,6 +503,22 @@ pub struct TestDistinguished {
     pub ufixed32: u32,
     #[bilrost(tag(6), encoding(fixed))]
     pub ufixed64: u64,
+    #[bilrost(79)]
+    pub usize: usize,
+    #[bilrost(80)]
+    pub optional_nonzerouint8: Option<core::num::NonZeroU8>,
+    #[bilrost(81)]
+    pub optional_nonzerouint16: Option<core::num::NonZeroU16>,
+    #[bilrost(82)]
+    pub optional_nonzerouint32: Option<core::num::NonZeroU32>,
+    #[bilrost(83)]
+    pub optional_nonzerouint64: Option<core::num::NonZeroU64>,
+    #[bilrost(tag(84), encoding(fixed))]
+    pub optional_nonzeroufixed32: Option<core::num::NonZeroU32>,
+    #[bilrost(tag(85), encoding(fixed))]
+    pub optional_nonzeroufixed64: Option<core::num::NonZeroU64>,
+    #[bilrost(86)]
+    pub optional_nonzerousize: Option<core::num::NonZeroUsize>,
     #[bilrost(7)]
     pub bool: bool,
     #[bilrost(8)]
