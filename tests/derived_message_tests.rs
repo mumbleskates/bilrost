@@ -4864,7 +4864,7 @@ fn ranges() {
 
     #[derive(Debug, PartialEq, Eq, Message)]
     #[bilrost(distinguished)]
-    struct FooFixed<T>(#[bilrost(encoding( (fixed,) ))] T);
+    struct FooFixed<T>(#[bilrost(encoding((fixed, fixed)))] T);
 
     assert::decodes!(
         owned distinguished,

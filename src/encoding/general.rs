@@ -90,12 +90,12 @@ delegate_value_encoding!(
 // General encodings encode Range and RangeInclusive with the General encoding; to use a different
 // encoding for the T value, encode ranges as tuples directly
 delegate_value_encoding!(
-    delegate from (GeneralGeneric<P>) to ((General,))
+    delegate from (GeneralGeneric<P>) to ((General, General))
     for type (core::ops::Range<T>) including distinguished
     with generics (const P: u8, T)
 );
 delegate_value_encoding!(
-    delegate from (GeneralGeneric<P>) to ((General,))
+    delegate from (GeneralGeneric<P>) to ((General, General))
     for type (core::ops::RangeInclusive<T>) including distinguished
     with generics (const P: u8, T)
 );
