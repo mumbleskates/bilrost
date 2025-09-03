@@ -1147,6 +1147,7 @@ fn field_clearing() {
     use bytes::Bytes;
     #[cfg(feature = "bytestring")]
     use bytestring::ByteString;
+    use core::ops::{Range, RangeInclusive};
     #[cfg(feature = "smallvec")]
     use smallvec::SmallVec;
     use std::collections::{BTreeMap, BTreeSet};
@@ -1156,6 +1157,12 @@ fn field_clearing() {
     use thin_vec::ThinVec;
     #[cfg(feature = "tinyvec")]
     use tinyvec::TinyVec;
+
+    fn string_with_capacity(s: &str) -> String {
+        let mut res = String::with_capacity(64);
+        res.push_str(s);
+        res
+    }
 
     #[derive(Clone, Debug, PartialEq, Eq, Enumeration)]
     enum Hmm {
@@ -1191,6 +1198,8 @@ fn field_clearing() {
         vec: Vec<u32>,
         btmap: BTreeMap<u32, u32>,
         btset: BTreeSet<u32>,
+        range: Range<String>,
+        range_inclusive: RangeInclusive<String>,
         #[cfg(feature = "std")]
         hashmap: HashMap<u32, u32>,
         #[cfg(feature = "std")]
@@ -1245,7 +1254,7 @@ fn field_clearing() {
                 i: true,
                 j: 1.0,
                 k: 1.0,
-                string: String::with_capacity(64),
+                string: string_with_capacity("foo"),
                 blob: Blob::from_vec(Vec::with_capacity(64)),
                 byte_arr: [1],
                 hmm: Hmm::Maybe,
@@ -1254,6 +1263,8 @@ fn field_clearing() {
                 vec: Vec::with_capacity(64),
                 btmap: [(1, 1)].into(),
                 btset: [1].into(),
+                range: string_with_capacity("abc")..string_with_capacity("xyz"),
+                range_inclusive: string_with_capacity("ABC")..=string_with_capacity("XYZ"),
                 #[cfg(feature = "std")]
                 hashmap: HashMap::with_capacity(64),
                 #[cfg(feature = "std")]
@@ -1264,7 +1275,7 @@ fn field_clearing() {
                 cow_bytes_borrowed: Cow::Borrowed(&b"foo"[..]),
                 cow_bytes_owned: Vec::with_capacity(64).into(),
                 cow_str_borrowed: Cow::Borrowed("foo"),
-                cow_str_owned: String::with_capacity(64).into(),
+                cow_str_owned: string_with_capacity("foo").into(),
                 #[cfg(feature = "arrayvec")]
                 arrayvec: arrayvec::ArrayVec::from([1, 2]),
                 #[cfg(feature = "smallvec")]
@@ -1286,7 +1297,6 @@ fn field_clearing() {
                 #[cfg(feature = "hashbrown")]
                 hbset: hashbrown::HashSet::with_capacity(64),
             };
-            result.string.push_str("foo");
             result.blob.push(1);
             result.vec.push(1);
             #[cfg(feature = "std")]
@@ -1294,7 +1304,6 @@ fn field_clearing() {
             #[cfg(feature = "std")]
             result.hashset.insert(1);
             result.cow_bytes_owned.to_mut().push(1);
-            result.cow_str_owned.to_mut().push_str("foo");
             #[cfg(feature = "smallvec")]
             result.smallvec.push(1);
             #[cfg(feature = "smallvec")]
@@ -1323,6 +1332,10 @@ fn field_clearing() {
     assert!(clearable.string.capacity() >= 64);
     assert!(clearable.blob.capacity() >= 64);
     assert!(clearable.vec.capacity() >= 64);
+    assert!(clearable.range.start.capacity() >= 64);
+    assert!(clearable.range.end.capacity() >= 64);
+    assert!(clearable.range_inclusive.start().capacity() >= 64);
+    assert!(clearable.range_inclusive.end().capacity() >= 64);
     #[cfg(feature = "std")]
     assert!(clearable.hashmap.capacity() >= 64);
     #[cfg(feature = "std")]
@@ -4629,6 +4642,249 @@ fn tuples() {
         ],
         UnexpectedlyRepeated,
         "Wrapper.0/(1-tuple).0",
+    );
+}
+
+#[allow(clippy::reversed_empty_ranges)]
+#[test]
+fn ranges() {
+    use std::ops::{Range, RangeInclusive};
+
+    // Ranges encode and decode the same as (start, end) tuples but produce errors that give names
+    // to the fields.
+
+    #[derive(Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
+    struct Foo<T>(T);
+
+    assert::decodes!(
+        owned distinguished,
+        [
+            (0, OV::message(&[
+                (0, OV::u32(1)),
+                (1, OV::u32(2)),
+            ].into_opaque_message())),
+        ],
+        Foo(1u32..2),
+    );
+    assert::decodes!(
+        owned distinguished,
+        [
+            (0, OV::message(&[
+                (0, OV::u32(1)),
+                (1, OV::u32(2)),
+            ].into_opaque_message())),
+        ],
+        Foo(1u32..=2),
+    );
+    assert::decodes!(
+        borrowed distinguished,
+        [
+            (0, OV::message(&[
+                (0, OV::str("aardvark")),
+                (1, OV::str("zebra")),
+            ].into_opaque_message())),
+        ],
+        Foo("aardvark".."zebra"),
+    );
+    assert::decodes!(
+        borrowed distinguished,
+        [
+            (0, OV::message(&[
+                (0, OV::str("aardvark")),
+                (1, OV::str("zebra")),
+            ].into_opaque_message())),
+        ],
+        Foo("aardvark"..="zebra"),
+    );
+    // ranges don't assert anything about their bounds being ascending
+    assert::decodes!(
+        owned distinguished,
+        [
+            (0, OV::message(&[
+                (0, OV::i64(999)),
+                (1, OV::i64(1)),
+            ].into_opaque_message())),
+        ],
+        Foo(999i64..1),
+    );
+    assert::decodes!(
+        owned distinguished,
+        [
+            (0, OV::message(&[
+                (0, OV::i64(999)),
+                (1, OV::i64(1)),
+            ].into_opaque_message())),
+        ],
+        Foo(999i64..=1),
+    );
+    assert::decodes!(
+        owned distinguished,
+        [
+            (0, OV::message(&[
+                (0, OV::i64(999)),
+            ].into_opaque_message())),
+        ],
+        Foo(999i64..0)
+    );
+    assert::decodes!(
+        owned distinguished,
+        [
+            (0, OV::message(&[
+                (1, OV::i64(999)),
+            ].into_opaque_message())),
+        ],
+        Foo(0..=999i64)
+    );
+    assert::decodes!(
+        owned distinguished,
+        [],
+        Foo(0u32..0),
+    );
+    assert::decodes!(
+        owned distinguished,
+        [],
+        Foo("".to_owned()..="".to_owned()),
+    );
+
+    assert::decodes!(
+        owned non-canonically,
+        [
+            (0, OV::message(&[
+                (0, OV::i32(1)),
+                (1, OV::i32(2)),
+                (2, OV::str("more stuff in there")),
+            ].into_opaque_message())),
+        ],
+        Foo(1i32..2),
+        HasExtensions,
+        "Foo.0",
+    );
+    assert::decodes!(
+        owned non-canonically,
+        [
+            (0, OV::message(&[
+                (0, OV::i32(1)),
+                (1, OV::i32(2)),
+                (2, OV::str("more stuff in there")),
+            ].into_opaque_message())),
+        ],
+        Foo(1i32..=2),
+        HasExtensions,
+        "Foo.0",
+    );
+    assert::decodes!(
+        owned never decodes Foo<Range<String>>,
+        [
+            (0, OV::message(&[
+                (0, OV::u32(1)),
+            ].into_opaque_message())),
+        ],
+        WrongWireType,
+        "Foo.0/Range.start",
+    );
+    assert::decodes!(
+        owned never decodes Foo<RangeInclusive<String>>,
+        [
+            (0, OV::message(&[
+                (0, OV::u32(1)),
+            ].into_opaque_message())),
+        ],
+        WrongWireType,
+        "Foo.0/RangeInclusive.start",
+    );
+    assert::decodes!(
+        owned never decodes Foo<Range<String>>,
+        [
+            (0, OV::message(&[
+                (0, OV::str("aardvark")),
+                (1, OV::u32(5)),
+            ].into_opaque_message())),
+        ],
+        WrongWireType,
+        "Foo.0/Range.end",
+    );
+    assert::decodes!(
+        owned never decodes Foo<RangeInclusive<String>>,
+        [
+            (0, OV::message(&[
+                (0, OV::str("aardvark")),
+                (1, OV::u32(5)),
+            ].into_opaque_message())),
+        ],
+        WrongWireType,
+        "Foo.0/RangeInclusive.end",
+    );
+
+    assert::decodes!(
+        owned never decodes Foo<Range<String>>,
+        [
+            (0, OV::message(&[
+                (0, OV::bytes(b"\xff")),
+            ].into_opaque_message())),
+        ],
+        InvalidValue,
+        "Foo.0/Range.start",
+    );
+    assert::decodes!(
+        owned never decodes Foo<RangeInclusive<String>>,
+        [
+            (0, OV::message(&[
+                (0, OV::bytes(b"\xff")),
+            ].into_opaque_message())),
+        ],
+        InvalidValue,
+        "Foo.0/RangeInclusive.start",
+    );
+    assert::decodes!(
+        owned never decodes Foo<Range<String>>,
+        [
+            (0, OV::message(&[
+                (0, OV::str("aardvark")),
+                (1, OV::bytes(b"\xff")),
+            ].into_opaque_message())),
+        ],
+        InvalidValue,
+        "Foo.0/Range.end",
+    );
+    assert::decodes!(
+        owned never decodes Foo<RangeInclusive<String>>,
+        [
+            (0, OV::message(&[
+                (0, OV::str("aardvark")),
+                (1, OV::bytes(b"\xff")),
+            ].into_opaque_message())),
+        ],
+        InvalidValue,
+        "Foo.0/RangeInclusive.end",
+    );
+
+    // To customize the encoding of the values inside a Range or a RangeInclusive, we can use the
+    // (E,) 1-tuple encoding.
+
+    #[derive(Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
+    struct FooFixed<T>(#[bilrost(encoding( (fixed,) ))] T);
+
+    assert::decodes!(
+        owned distinguished,
+        [
+            (0, OV::message(&[
+                (0, OV::fixed_i32(123)),
+                (1, OV::fixed_i32(456)),
+            ].into_opaque_message())),
+        ],
+        FooFixed(123i32..456),
+    );
+    assert::decodes!(
+        owned distinguished,
+        [
+            (0, OV::message(&[
+                (0, OV::fixed_i32(123)),
+                (1, OV::fixed_i32(456)),
+            ].into_opaque_message())),
+        ],
+        FooFixed(123i32..=456),
     );
 }
 
