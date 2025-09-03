@@ -120,6 +120,27 @@ delegate_value_encoding!(delegate from (GeneralGeneric<P>) to (Varint)
 delegate_value_encoding!(delegate from (GeneralGeneric<P>) to (Varint)
     for type (isize) including distinguished with generics (const P: u8));
 
+delegate_value_encoding!(delegate from (GeneralGeneric<P>) to (Varint)
+    for type (core::num::NonZeroU8) including distinguished with generics (const P: u8));
+delegate_value_encoding!(delegate from (GeneralGeneric<P>) to (Varint)
+    for type (core::num::NonZeroI8) including distinguished with generics (const P: u8));
+delegate_value_encoding!(delegate from (GeneralGeneric<P>) to (Varint)
+    for type (core::num::NonZeroU16) including distinguished with generics (const P: u8));
+delegate_value_encoding!(delegate from (GeneralGeneric<P>) to (Varint)
+    for type (core::num::NonZeroI16) including distinguished with generics (const P: u8));
+delegate_value_encoding!(delegate from (GeneralGeneric<P>) to (Varint)
+    for type (core::num::NonZeroU32) including distinguished with generics (const P: u8));
+delegate_value_encoding!(delegate from (GeneralGeneric<P>) to (Varint)
+    for type (core::num::NonZeroI32) including distinguished with generics (const P: u8));
+delegate_value_encoding!(delegate from (GeneralGeneric<P>) to (Varint)
+    for type (core::num::NonZeroU64) including distinguished with generics (const P: u8));
+delegate_value_encoding!(delegate from (GeneralGeneric<P>) to (Varint)
+    for type (core::num::NonZeroI64) including distinguished with generics (const P: u8));
+delegate_value_encoding!(delegate from (GeneralGeneric<P>) to (Varint)
+    for type (core::num::NonZeroUsize) including distinguished with generics (const P: u8));
+delegate_value_encoding!(delegate from (GeneralGeneric<P>) to (Varint)
+    for type (core::num::NonZeroIsize) including distinguished with generics (const P: u8));
+
 // General also encodes floating point values.
 delegate_value_encoding!(delegate from (GeneralGeneric<P>) to (Fixed)
     for type (f32) with generics (const P: u8));
