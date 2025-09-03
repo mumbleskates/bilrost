@@ -12,8 +12,8 @@ use alloc::collections::{btree_map, btree_set, BTreeMap, BTreeSet};
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::cmp::Ordering::{Equal, Greater, Less};
+use core::mem;
 use core::ops::{Range, RangeInclusive};
-use std::mem;
 
 for_overwrite_via_default!(String);
 
