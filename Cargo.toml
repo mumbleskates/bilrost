@@ -63,7 +63,7 @@ bytes = { version = "^1", default-features = false }
 bytestring = { version = "^1", default-features = false, optional = true }
 chrono = { version = "^0.4.34", default-features = false, optional = true }
 const_panic = { version = "0.2.12", default-features = false, features = ["non_basic"], optional = true }
-hashbrown = { version = ">=0.1.0,<0.16", default-features = false, optional = true }
+hashbrown = { version = ">=0.1.0,<0.17", default-features = false, optional = true }
 smallvec = { version = ">=1.6.1,<2", default-features = false, features = ["const_generics"], optional = true }
 thin-vec = { version = "^0.2", default-features = false, optional = true }
 time = { version = "^0.3.0", default-features = false, optional = true }

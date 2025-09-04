@@ -4,6 +4,8 @@
 
 ### New features
 
+* Allows intercompatibility with `hashbrown 0.16`
+
 ### Fixes
 
 ### Cleanups
