@@ -2,6 +2,8 @@
 
 ### Breaking changes
 
+There should be no breaking changes this release.
+
 ### New features
 
 * Headline feature: Added the "message" attribute for oneof variants which
@@ -26,8 +28,8 @@
 
 ### Cleanups
 
-* Major cleanups to most parts of the derive macro codegen implementation
-* Various cleanups to string formatting code
+* Major cleanups to most parts of the derive macro codegen implementation.
+* Various cleanups to string formatting code.
 
 ## v0.1013.0
 
