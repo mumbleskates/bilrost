@@ -21,6 +21,9 @@
 
 ### Fixes
 
+* Don't imply that that general encodings may output 32 & 64 bit integers in a
+  fixed-size representation in the readme documentation.
+
 ### Cleanups
 
 * Major cleanups to most parts of the derive macro codegen implementation
