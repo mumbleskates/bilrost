@@ -769,9 +769,9 @@ use bilrost::{Enumeration, Message, Oneof};
 
 #[derive(PartialEq, Eq, Enumeration)]
 enum PhoneKind {
-  Home = 1,
-  Work = 2,
-  Cell = 3,
+    Home = 1,
+    Work = 2,
+    Cell = 3,
 }
 
 #[derive(Oneof)]
