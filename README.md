@@ -2389,10 +2389,14 @@ Any field whose value is [empty](#empty-values) should always be omitted from
 the encoding. The presence of any field represented in the encoding with an
 empty value must cause the encoding to be considered non-canonical.
 
-Fields whose types do not encode into multiple fields must not occur more than
-once. If they do, the message must be rejected with an error in any decoding
-mode. This currently includes every type of field not encoded with an unpacked
-representation.
+Fields whose types could not encode into multiple fields must not occur more
+than once. If they do, the message must be rejected with an error in any
+decoding mode. This currently includes every type of field not encoded with a
+packed or unpacked representation. If the field's encoding is "packed", it is
+decoded in distinguished decoding mode, and it is found to be represented in
+multiple fields, then the message may attempt to decode the data as an
+equivalent "unpacked" representation and must at least consider the encoding
+non-canonical.
 
 Oneofs, sets of mutually exclusive fields, must not have conflicting values
 present in the encoding. If they do, the message must be rejected with an error
@@ -2462,8 +2466,8 @@ For supported non-message types, the following orderings are standardized:
 nul byte `0x00`, and the greatest is `0xff`.
 
 This standardization corresponds to the existing definitions of [`Ord`][ord] in
-the Rust language for booleans, integers, strings, arrays/slices, ordered sets,
-and ordered maps.
+the Rust language for booleans, integers, strings, tuples, arrays/slices,
+ordered sets, and ordered maps.
 
 ## `bilrost` vs. `prost`
 
