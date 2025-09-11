@@ -2145,7 +2145,7 @@ bytes comprising the value itself.
 **2: fixed-length 32 bits** - the value is a string of exactly 4 bytes, encoded
 with no additional prelude.
 
-**3: fixed-length 64 bits** - the value is a string of exaclty 8 bytes, encoded
+**3: fixed-length 64 bits** - the value is a string of exactly 8 bytes, encoded
 with no additional prelude.
 
 Note that because field keys encode only the *delta* from the previous tag, it
