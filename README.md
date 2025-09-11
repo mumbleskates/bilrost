@@ -1978,9 +1978,10 @@ enum EnumWithNonUnitVariants {
 ```
 
 All enumeration types are encoded and decoded by conversion to and from the Rust
-`u32` type, using `Into<u32>` and `TryFrom<u32, Error = bilrost::DecodeError>`.
-In addition to deriving trait impls with `Enumeration`, the following additional
-traits are also mandatory: `Clone` and `Eq` (and thus `PartialEq` as well).
+`u32` type using the `Enumeration` trait's `to_number` and `try_from_number`
+methods. In addition to deriving trait impls with `Enumeration`, the following
+additional traits are also mandatory: `Clone` and `Eq` (and thus `PartialEq` as
+well).
 
 If the discriminants of an enumeration conflict at all, compilation will fail;
 the discriminants must be unique within any given enumeration.
