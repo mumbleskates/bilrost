@@ -1093,7 +1093,7 @@ struct Foo {
 ```rust,compile_fail
 # use bilrost::Message;
 #[derive(Message)]
-//       ^^^^^^^ overflow evaluating the requirement `Tree: ValueEncoder<General>`
+//       ^^^^^^^ overflow evaluating the requirement `Tree: RawMessageDecoder`
 struct Tree {
     name: String,
     children: Vec<Tree>,
@@ -1311,8 +1311,9 @@ owned message decoding!
 const STATIC_LUTS: &[u8] = &[/* pretend this is include_bytes!'d */];
 
 #[derive(Message)]
-//       ^^^^^^^ error: the trait `ValueDecoder<General>` is not implemented
-//                      for `BTreeMap<&'static str, &'static str>`
+//       ^^^^^^^ error: the trait `ValueDecoder<GeneralGeneric<0>,
+//                      BTreeMap<&'static str, &'static str>>` is not
+//                      implemented for ()
 struct LookupTables {
     alpha2: BTreeMap<&'static str, &'static str>,
     alpha3: BTreeMap<&'static str, &'static str>,
