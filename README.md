@@ -308,7 +308,8 @@ numbers are represented in their standard [IEEE 754][ieee754] binary format
 standard to most computers today. This comes with particular rules for equality
 semantics that are generally uniform across all languages, and which don't form
 an equivalence relation. "NaN" values are never equal to each other or to
-themselves.
+themselves. IEEE 754 floating point numbers also represent +0.0 and -0.0 as
+distinct values, but consider those values to be equal to each other.
 
 [ieee754]: https://en.wikipedia.org/wiki/IEEE_754
 
