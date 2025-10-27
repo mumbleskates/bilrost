@@ -114,7 +114,7 @@ mod macros;
 mod map;
 pub(crate) mod message;
 mod oneof;
-/// Tools for opaque encoding and decoding of any valid bilrost data.
+/// Tools for opaque encoding and decoding of any valid Bilrost data.
 pub mod opaque;
 mod packed;
 mod plain_bytes;
