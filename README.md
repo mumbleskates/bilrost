@@ -2212,8 +2212,8 @@ one byte to avoid ambiguity. Consider instead:
 ...this is *almost exactly* the Bilrost varint encoding. The sole exception is
 that, starting at the value 9295997013522923648 (hexadecimal
 0x8102_0408_1020_4080, encoded as
-`[128, 128, 128, 128, 128, 128, 128, 128, 128, 0]`) and the maximum
-18446744073709551615 (hexadecimal 0xffff_ffff_ffff_ffff, encoded as
+`[128, 128, 128, 128, 128, 128, 128, 128, 128, 0]`) and up through the maximum
+value 18446744073709551615 (hexadecimal 0xffff_ffff_ffff_ffff, encoded as
 `[255, 254, 254, 254, 254, 254, 254, 254, 254, 0]`), there is always a tenth
 byte and it is always zero.
 
