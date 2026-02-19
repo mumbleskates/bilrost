@@ -48,8 +48,7 @@ test-msrv:
   stage: test
   before_script:
     - ./.gitlab-cargo-cache-expire.sh
-    - cp Cargo.lock.msrv Cargo.lock
-    - cp old-hashbrown-check/Cargo.lock.msrv old-hashbrown-check/Cargo.lock
+    - ./msrv-lock.sh
   script:
     - cargo test --workspace --all-targets --features full-test-suite
     - cargo test --workspace --doc         --features full-test-suite
