@@ -48,7 +48,7 @@ test-msrv:
   stage: test
   before_script:
     - ./.gitlab-cargo-cache-expire.sh
-    - ./downgrade-for-msrv.sh
+    - ./msrv-lock.sh
   script:
     - cargo test --workspace --all-targets --features full-test-suite
     - cargo test --workspace --doc         --features full-test-suite
