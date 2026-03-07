@@ -94,6 +94,7 @@ default = ["auto-optimize", "derive", "detailed-errors", "std"]
 derive = ["dep:bilrost-derive"]
 detailed-errors = ["dep:thin-vec"]
 extended-diagnostics = ["dep:const_panic"]
+forbid-unsafe = []
 no-recursion-limit = []
 std = []
 
@@ -168,6 +169,3 @@ test-suite-extra = [
 
 # Enables pprof profiling in benchmarks.
 pprof = ["dep:pprof"]
-
-# Removes all unsafe code from the crate at the expense of performance
-forbid-unsafe = []
