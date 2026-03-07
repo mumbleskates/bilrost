@@ -285,7 +285,7 @@ impl<const P: u8> ValueDecoder<GeneralGeneric<P>, String> for () {
         // Vec, we decode into that, and then we convert it into a String before putting it back.
         let mut taken_value = <Vec<u8>>::from(mem::take(value));
         <() as ValueDecoder<PlainBytes, Vec<u8>>>::decode_value(&mut taken_value, buf, ctx)?;
-        *value = String::try_from(taken_value).map_err(|_| DecodeError::new(InvalidValue))?;
+        *value = String::from_utf8(taken_value).map_err(|_| DecodeError::new(InvalidValue))?;
         Ok(())
     }
 }
