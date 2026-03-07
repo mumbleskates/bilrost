@@ -11,6 +11,7 @@ jobs:
         with:
           components: clippy, rustfmt
       - run: cargo clippy --all --all-targets --features full-test-suite
+      - run: cargo clippy --all --all-targets --features full-test-suite,forbid-unsafe
       - run: cargo clippy --all --all-targets --features full-test-suite --no-default-features
       - run: cargo clippy --all --all-targets --no-default-features
       - run: cargo fmt --all --check
@@ -37,6 +38,8 @@ jobs:
         run: if [[ "stable" != "${{ matrix.toolchain }}" ]]; then ./msrv-lock.sh ; fi
       - name: test
         run: cargo test --workspace --all-targets --features full-test-suite
+      - name: test forbid-unsafe
+        run: cargo test --workspace --all-targets --features full-test-suite,forbid-unsafe
       - name: test no-default-features
         run: cargo test --workspace --all-targets --features full-test-suite --no-default-features
       - name: test minimal features
