@@ -476,7 +476,9 @@ impl ReverseBuffer {
                 );
             }
             #[cfg(feature = "forbid-unsafe")]
-            self.front_chunk_mut().put_slice(data_back);
+            {
+                self.front_chunk_mut().put_slice(data_back);
+            }
             // add a new chunk
             self.grow();
             new_front = self.front - data.len();
