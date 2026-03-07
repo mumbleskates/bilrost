@@ -6,12 +6,13 @@ use core::cmp::{max, min};
 use core::iter;
 use core::marker::PhantomData;
 use core::mem;
-use core::ptr;
 
 #[cfg(feature = "forbid-unsafe")]
 use bytes::BufMut;
 #[cfg(not(feature = "forbid-unsafe"))]
 use core::mem::{transmute, MaybeUninit};
+#[cfg(not(feature = "forbid-unsafe"))]
+use core::ptr;
 
 // Flag for platform-specific optimization that avoids large slowdowns on some architectures.
 const ENABLE_SELF_COPY_OPTIMIZATION: bool = cfg!(any(
@@ -420,8 +421,15 @@ impl ReverseBuffer {
             .chunks
             .last()
             .map_or(true, |old_front_chunk| old_front < old_front_chunk.len()));
-        copy_buf(&mut data, unsafe {
-            self.front_chunk_mut().get_unchecked_mut(..old_front)
+        copy_buf(&mut data, {
+            #[cfg(not(feature = "forbid-unsafe"))]
+            unsafe {
+                self.front_chunk_mut().get_unchecked_mut(..old_front)
+            }
+            #[cfg(feature = "forbid-unsafe")]
+            {
+                &mut self.front_chunk_mut()[..old_front]
+            }
         });
         debug_assert_eq!(data.remaining(), 0);
         // Data is all written; update our state.
@@ -441,6 +449,7 @@ impl ReverseBuffer {
             // We are growing and copying the whole thing once into the back of the new chunk.
             self.grow();
             new_front = self.front - data.len();
+            #[cfg(not(feature = "forbid-unsafe"))]
             // SAFETY: we are initializing the end of the new front chunk from `data`.
             unsafe {
                 ptr::copy_nonoverlapping(
@@ -449,9 +458,14 @@ impl ReverseBuffer {
                     data.len(),
                 );
             }
+            #[cfg(feature = "forbid-unsafe")]
+            {
+                (&mut self.front_chunk_mut()[new_front..]).put_slice(data);
+            }
         } else {
             // The prepended data will be split across the current and new front chunk.
             let (data_front, data_back) = data.split_at(data.len() - self.front);
+            #[cfg(not(feature = "forbid-unsafe"))]
             // SAFETY: we are initializing the range of the front chunk before the current front
             // with bytes from the back part of `data`.
             unsafe {
@@ -461,10 +475,13 @@ impl ReverseBuffer {
                     self.front,
                 );
             }
+            #[cfg(feature = "forbid-unsafe")]
+            self.front_chunk_mut().put_slice(data_back);
             // add a new chunk
             self.grow();
             new_front = self.front - data.len();
             debug_assert_eq!(new_front + data_front.len(), self.front_chunk_mut().len());
+            #[cfg(not(feature = "forbid-unsafe"))]
             // SAFETY: we are initializing the end of the new front chunk from the front part of
             // `data`.
             unsafe {
@@ -473,6 +490,10 @@ impl ReverseBuffer {
                     &mut self.front_chunk_mut()[new_front..] as *mut _ as *mut u8,
                     data_front.len(),
                 );
+            }
+            #[cfg(feature = "forbid-unsafe")]
+            {
+                (&mut self.front_chunk_mut()[new_front..]).put_slice(data_front);
             }
         }
         self.front = new_front;
@@ -636,6 +657,7 @@ impl ReverseBuf for ReverseBuffer {
                     }
                 }
             } else {
+                #[cfg(not(feature = "forbid-unsafe"))]
                 // SAFETY: we are initializing the range of the front chunk before the front with
                 // bytes from `data`.
                 unsafe {
@@ -644,6 +666,10 @@ impl ReverseBuf for ReverseBuffer {
                         self.front_chunk_mut()[new_front..].as_mut_ptr() as *mut u8,
                         data.len(),
                     );
+                }
+                #[cfg(feature = "forbid-unsafe")]
+                {
+                    (&mut self.front_chunk_mut()[new_front..]).put_slice(data);
                 }
             }
             self.front = new_front;
@@ -659,6 +685,7 @@ impl ReverseBuf for ReverseBuffer {
     #[inline(always)]
     fn prepend_array<const N: usize>(&mut self, data: [u8; N]) {
         if let Some(new_front) = self.front.checked_sub(N) {
+            #[cfg(not(feature = "forbid-unsafe"))]
             // SAFETY: we are initializing the range of the front chunk before the front with
             // bytes from `data`.
             unsafe {
@@ -667,6 +694,10 @@ impl ReverseBuf for ReverseBuffer {
                     self.front_chunk_mut()[new_front..].as_mut_ptr() as *mut u8,
                     data.len(),
                 );
+            }
+            #[cfg(feature = "forbid-unsafe")]
+            {
+                (&mut self.front_chunk_mut()[new_front..]).put_slice(&data);
             }
             self.front = new_front;
         } else {
