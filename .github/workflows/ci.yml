@@ -34,7 +34,7 @@ jobs:
           toolchain: ${{ matrix.toolchain }}
       - uses: Swatinem/rust-cache@v2
       - name: msrv pinning
-        run: if [[ "stable" != "${{ matrix.toolchain }}" ]]; then ./downgrade-for-msrv.sh ; fi
+        run: if [[ "stable" != "${{ matrix.toolchain }}" ]]; then ./msrv-lock.sh ; fi
       - name: test
         run: cargo test --workspace --all-targets --features full-test-suite
       - name: test no-default-features
