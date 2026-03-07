@@ -20,11 +20,18 @@ where
     type Target = [T];
 
     fn deref(&self) -> &Self::Target {
+        #[cfg(not(feature = "forbid-unsafe"))]
         // SAFETY: self.size is only ever initialized to zero or to N. it is only ever increased in
         // Collection::insert, which always checks that it is not yet equal to N. Therefore there
         // should be no way to create a LocalProxy value with an illegal size field, and we do not
         // have to perform a bounds check here.
-        unsafe { self.arr.get_unchecked(..self.size) }
+        unsafe {
+            self.arr.get_unchecked(..self.size)
+        }
+        #[cfg(feature = "forbid-unsafe")]
+        {
+            &self.arr[..self.size]
+        }
     }
 }
 
