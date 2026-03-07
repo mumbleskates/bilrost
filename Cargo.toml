@@ -168,3 +168,6 @@ test-suite-extra = [
 
 # Enables pprof profiling in benchmarks.
 pprof = ["dep:pprof"]
+
+# Removes all unsafe code from the crate at the expense of performance
+forbid-unsafe = []
