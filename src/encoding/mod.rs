@@ -422,6 +422,7 @@ pub fn decode_varint<B: Buf + ?Sized>(buf: &mut B) -> Result<u64, DecodeError> {
 ///
 /// [1]: https://github.com/google/protobuf/blob/3.3.x/src/google/protobuf/io/coded_stream.cc#L365-L406
 /// [2]: https://github.com/protocolbuffers/protobuf-go/blob/v1.27.1/encoding/protowire/wire.go#L358
+#[cfg(not(feature = "forbid-unsafe"))]
 #[inline(always)]
 fn decode_varint_slice(bytes: &[u8]) -> Result<(u64, usize), DecodeError> {
     // Fully unrolled varint decoding loop. Splitting into 32-bit pieces gives better performance.
@@ -476,6 +477,67 @@ fn decode_varint_slice(bytes: &[u8]) -> Result<(u64, usize), DecodeError> {
     let value = value + ((u64::from(part1)) << 28);
 
     b = unsafe { *bytes.get_unchecked(8) };
+    if (b as u32) + ((value >> 56) as u32) > 0xff {
+        Err(DecodeError::new(InvalidVarint))
+    } else {
+        Ok((value + (u64::from(b) << 56), 9))
+    }
+}
+#[cfg(feature = "forbid-unsafe")]
+#[inline(always)]
+fn decode_varint_slice(bytes: &[u8]) -> Result<(u64, usize), DecodeError> {
+    // Fully unrolled varint decoding loop. Splitting into 32-bit pieces gives better performance.
+
+    // Use assertions to ensure memory safety, but it should always be optimized after inline.
+    assert!(!bytes.is_empty());
+    // If the varint is 9 bytes long, the last byte may have its MSB set.
+    assert!(bytes.len() >= 9 || bytes[bytes.len() - 1] < 0x80);
+
+    let mut b: u8 = bytes[0];
+    let mut part0: u32 = u32::from(b);
+    if b < 0x80 {
+        return Ok((u64::from(part0), 1));
+    };
+    b = bytes[1];
+    part0 += u32::from(b) << 7;
+    if b < 0x80 {
+        return Ok((u64::from(part0), 2));
+    };
+    b = bytes[2];
+    part0 += u32::from(b) << 14;
+    if b < 0x80 {
+        return Ok((u64::from(part0), 3));
+    };
+    b = bytes[3];
+    part0 += u32::from(b) << 21;
+    if b < 0x80 {
+        return Ok((u64::from(part0), 4));
+    };
+    let value = u64::from(part0);
+
+    b = bytes[4];
+    let mut part1: u32 = u32::from(b);
+    if b < 0x80 {
+        return Ok((value + (u64::from(part1) << 28), 5));
+    };
+    b = bytes[5];
+    part1 += u32::from(b) << 7;
+    if b < 0x80 {
+        return Ok((value + (u64::from(part1) << 28), 6));
+    };
+    b = bytes[6];
+    part1 += u32::from(b) << 14;
+    if b < 0x80 {
+        return Ok((value + (u64::from(part1) << 28), 7));
+    };
+    b = bytes[7];
+    part1 += u32::from(b) << 21;
+    if b < 0x80 {
+        return Ok((value + (u64::from(part1) << 28), 8));
+    };
+    let value = value + ((u64::from(part1)) << 28);
+
+    b = bytes[8];
     if (b as u32) + ((value >> 56) as u32) > 0xff {
         Err(DecodeError::new(InvalidVarint))
     } else {
@@ -1008,9 +1070,17 @@ impl<'a> Capped<'_, &'a [u8]> {
         // Unlike the non-borrowed impl, we advance the buf and give the slice directly as a result.
         let taken;
         // MSRV: this could be `split_at_unchecked` (1.79)
-        (taken, *self.buf) =
+        (taken, *self.buf) = {
+            #[cfg(not(feature = "forbid-unsafe"))]
             // SAFETY: we checked above that `self.buf` is of at least length `len`
-            unsafe { (self.buf.get_unchecked(..len), self.buf.get_unchecked(len..)) };
+            unsafe {
+                (self.buf.get_unchecked(..len), self.buf.get_unchecked(len..))
+            }
+            #[cfg(feature = "forbid-unsafe")]
+            {
+                (&self.buf[..len], &self.buf[len..])
+            }
+        };
 
         Ok(taken)
     }

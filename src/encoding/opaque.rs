@@ -1,12 +1,3 @@
-use alloc::borrow::{Cow, ToOwned};
-use alloc::collections::BTreeMap;
-use alloc::string::String;
-use alloc::vec::Vec;
-use core::mem;
-use core::ops::Index;
-
-use bytes::{Buf, BufMut};
-
 use crate::buf::ReverseBuf;
 use crate::encoding::{
     encode_varint, encoded_len_varint, prepend_varint, Capped, DecodeContext,
@@ -17,6 +8,12 @@ use crate::encoding::{
 use crate::iter::FlatAdapter;
 use crate::DecodeErrorKind::Truncated;
 use crate::{Canonicity, DecodeError, Message};
+use alloc::borrow::{Cow, ToOwned};
+use alloc::collections::BTreeMap;
+use alloc::string::String;
+use alloc::vec::Vec;
+use bytes::{Buf, BufMut};
+use core::ops::Index;
 
 /// Represents an opaque bilrost field value. Can represent any valid encoded value.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -297,6 +294,7 @@ impl<'a> OpaqueMessage<'a> {
         self.iter().map(|(k, v)| (*k, v.borrow())).collect()
     }
 
+    #[cfg(not(feature = "forbid-unsafe"))]
     /// Converts this message to a fully owned deep copy.
     pub fn into_owned(mut self) -> OpaqueMessage<'static> {
         for (_, value) in self.iter_mut() {
@@ -306,7 +304,36 @@ impl<'a> OpaqueMessage<'a> {
         }
         // SAFETY: we've converted every `Cow` in the structure to `Owned` in-place; no values that
         // have the lifetime we are transmuting can still exist
-        unsafe { mem::transmute(self) }
+        unsafe { core::mem::transmute(self) }
+    }
+    #[cfg(feature = "forbid-unsafe")]
+    /// Converts this message to a fully owned deep copy.
+    pub fn into_owned(self) -> OpaqueMessage<'static> {
+        // In the safe version we into-iterate, convert to owned, and collect both the outer
+        // BTreeMap and each inner Vec of values rather than doing the conversion in-place.
+        // This means the BTreeMap itself probably gets re-built since it probably doesn't have
+        // the same in-place specializations Vec does.
+        OpaqueMessage::<'static>(
+            self.0
+                .into_iter()
+                .map(|(tag, values)| {
+                    (
+                        tag,
+                        values
+                            .into_iter()
+                            .map(|value| match value {
+                                LengthDelimited(delimited) => {
+                                    LengthDelimited(delimited.into_owned().into())
+                                }
+                                Varint(val) => Varint(val),
+                                ThirtyTwoBit(val) => ThirtyTwoBit(val),
+                                SixtyFourBit(val) => SixtyFourBit(val),
+                            })
+                            .collect(),
+                    )
+                })
+                .collect(),
+        )
     }
 }
 
