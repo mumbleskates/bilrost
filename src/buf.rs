@@ -5,8 +5,13 @@ use bytes::Buf;
 use core::cmp::{max, min};
 use core::iter;
 use core::marker::PhantomData;
-use core::mem::{self, transmute, MaybeUninit};
+use core::mem;
 use core::ptr;
+
+#[cfg(feature = "forbid-unsafe")]
+use bytes::BufMut;
+#[cfg(not(feature = "forbid-unsafe"))]
+use core::mem::{transmute, MaybeUninit};
 
 // Flag for platform-specific optimization that avoids large slowdowns on some architectures.
 const ENABLE_SELF_COPY_OPTIMIZATION: bool = cfg!(any(
@@ -169,7 +174,11 @@ pub trait ReverseBuf: Buf {
 #[derive(Clone)]
 pub struct ReverseBuffer {
     /// Chunks of owned items in reverse order.
+    #[cfg(not(feature = "forbid-unsafe"))]
     chunks: Vec<Box<[MaybeUninit<u8>]>>,
+    /// Chunks of owned items in reverse order.
+    #[cfg(feature = "forbid-unsafe")]
+    chunks: Vec<Box<[u8]>>,
     /// Index of the first initialized byte in the front chunk (at the end of `self.chunks`).
     /// Invariant: Always a valid index in that chunk when any chunk exists, or the same as the
     /// length of the only chunk when that chunk is being kept and the buffer is empty.
@@ -269,8 +278,17 @@ impl ReverseBuffer {
     /// capacity, the conversion will be performed without copying data.
     pub fn into_vec(mut self) -> Vec<u8> {
         if self.chunks.len() == 1 && self.front == 0 {
-            // SAFETY: the whole buffer is initialized.
-            let whole_buffer: Box<[u8]> = unsafe { transmute(self.chunks.pop().unwrap()) };
+            let whole_buffer: Box<[u8]> = {
+                #[cfg(not(feature = "forbid-unsafe"))]
+                // SAFETY: the whole buffer is initialized.
+                unsafe {
+                    transmute(self.chunks.pop().unwrap())
+                }
+                #[cfg(feature = "forbid-unsafe")]
+                {
+                    self.chunks.pop().unwrap()
+                }
+            };
             // CORRECTNESS: the whole buffer is only one chunk.
             return whole_buffer.to_vec();
         }
@@ -310,11 +328,17 @@ impl ReverseBuffer {
     }
 
     /// Returns the slice of bytes ordered at the front of the buffer.
+    #[cfg(not(feature = "forbid-unsafe"))]
     #[inline]
     fn front_chunk_mut(&mut self) -> &mut [MaybeUninit<u8>] {
         self.chunks.last_mut().map(Box::as_mut).unwrap_or(&mut [])
     }
+    #[cfg(feature = "forbid-unsafe")]
+    fn front_chunk_mut(&mut self) -> &mut [u8] {
+        self.chunks.last_mut().map(Box::as_mut).unwrap_or(&mut [])
+    }
 
+    #[cfg(not(feature = "forbid-unsafe"))]
     #[inline]
     fn allocate_chunk(new_chunk_size: usize) -> Box<[MaybeUninit<u8>]> {
         debug_assert!(new_chunk_size > 0);
@@ -327,6 +351,12 @@ impl ReverseBuffer {
                 new_chunk_size,
             ))
         }
+    }
+    #[cfg(feature = "forbid-unsafe")]
+    #[inline]
+    fn allocate_chunk(new_chunk_size: usize) -> Box<[u8]> {
+        debug_assert!(new_chunk_size > 0);
+        vec![0u8; new_chunk_size].into_boxed_slice()
     }
 
     #[inline]
@@ -376,8 +406,15 @@ impl ReverseBuffer {
         let old_front = self.front;
         let new_front = new_chunk_size + self.front - prepending_len;
         debug_assert!(new_front < new_chunk.len());
-        copy_buf(&mut data, unsafe {
-            new_chunk.get_unchecked_mut(new_front..)
+        copy_buf(&mut data, {
+            #[cfg(not(feature = "forbid-unsafe"))]
+            unsafe {
+                new_chunk.get_unchecked_mut(new_front..)
+            }
+            #[cfg(feature = "forbid-unsafe")]
+            {
+                new_chunk.get_mut(new_front..).unwrap()
+            }
         });
         debug_assert!(self
             .chunks
@@ -459,13 +496,22 @@ impl ReverseBuffer {
     /// https://doc.rust-lang.org/stable/std/io/trait.Write.html#method.write_all_vectored), first
     /// collecting the slices like `b.slices().map(IoSlice::new)`.
     pub fn slices(&self) -> impl Iterator<Item = &[u8]> {
-        // SAFETY: self is valid
-        unsafe { to_vectorable_slices(&self.chunks, self.front) }
+        #[cfg(not(feature = "forbid-unsafe"))]
+        {
+            // SAFETY: self is valid
+            unsafe { to_vectorable_slices(&self.chunks, self.front) }
+        }
+        #[cfg(feature = "forbid-unsafe")]
+        {
+            // this version of `to_vectorable_slices` is safe
+            to_vectorable_slices(&self.chunks, self.front)
+        }
     }
 }
 
 /// Copies bytes out of a `bytes::Buf` directly into a slice of uninitialized bytes, filling it. The
 /// source must have enough bytes to fill the destination.
+#[cfg(not(feature = "forbid-unsafe"))]
 #[inline(always)]
 fn copy_buf<B: Buf>(data: &mut B, mut dest_chunk: &mut [MaybeUninit<u8>]) {
     debug_assert!(data.remaining() >= dest_chunk.len());
@@ -480,7 +526,21 @@ fn copy_buf<B: Buf>(data: &mut B, mut dest_chunk: &mut [MaybeUninit<u8>]) {
         data.advance(copy_size);
     }
 }
+/// Copies bytes out of a `bytes::Buf` directly into a slice of bytes, filling it. The source must
+/// have enough bytes to fill the destination.
+#[cfg(feature = "forbid-unsafe")]
+#[inline(always)]
+fn copy_buf<B: Buf>(data: &mut B, mut dest_chunk: &mut [u8]) {
+    debug_assert!(data.remaining() >= dest_chunk.len());
+    while !dest_chunk.is_empty() {
+        let src = data.chunk();
+        let copy_size = min(src.len(), dest_chunk.len());
+        dest_chunk.put_slice(&src[..copy_size]);
+        data.advance(copy_size);
+    }
+}
 
+#[cfg(not(feature = "forbid-unsafe"))]
 // SAFETY: front must be a valid front index in the front chunk.
 #[inline(always)]
 unsafe fn to_vectorable_slices(
@@ -496,6 +556,16 @@ unsafe fn to_vectorable_slices(
         // SAFETY: the portion of the front chunk after `front` that we have sliced, and every chunk
         // after that, are all valid bytes.
         .map(|m| unsafe { transmute::<&[MaybeUninit<u8>], &[u8]>(m) })
+}
+#[cfg(feature = "forbid-unsafe")]
+#[inline(always)]
+fn to_vectorable_slices(chunks: &[Box<[u8]>], front: usize) -> impl Iterator<Item = &[u8]> {
+    chunks
+        .split_last()
+        .into_iter()
+        .flat_map(move |(front_chunk, rest)| {
+            iter::once(&front_chunk[front..]).chain(rest.iter().rev().map(Box::as_ref))
+        })
 }
 
 impl ReverseBuf for ReverseBuffer {
@@ -518,7 +588,14 @@ impl ReverseBuf for ReverseBuffer {
                     .rev()
                     .zip(self.front_chunk_mut()[..old_front].iter_mut().rev())
                 {
-                    *to = MaybeUninit::new(*from);
+                    #[cfg(not(feature = "forbid-unsafe"))]
+                    {
+                        *to = MaybeUninit::new(*from);
+                    }
+                    #[cfg(feature = "forbid-unsafe")]
+                    {
+                        *to = *from;
+                    }
                 }
             } else {
                 let dest_range = new_front..self.front;
@@ -549,7 +626,14 @@ impl ReverseBuf for ReverseBuffer {
                     .rev()
                     .zip(self.front_chunk_mut()[..old_front].iter_mut().rev())
                 {
-                    *to = MaybeUninit::new(*from);
+                    #[cfg(not(feature = "forbid-unsafe"))]
+                    {
+                        *to = MaybeUninit::new(*from);
+                    }
+                    #[cfg(feature = "forbid-unsafe")]
+                    {
+                        *to = *from;
+                    }
                 }
             } else {
                 // SAFETY: we are initializing the range of the front chunk before the front with
@@ -596,7 +680,14 @@ impl ReverseBuf for ReverseBuffer {
             self.grow_slow();
         }
         let new_front = self.front - 1;
-        self.front_chunk_mut()[new_front].write(byte);
+        #[cfg(not(feature = "forbid-unsafe"))]
+        {
+            self.front_chunk_mut()[new_front].write(byte);
+        }
+        #[cfg(feature = "forbid-unsafe")]
+        {
+            *self.front_chunk_mut().get_mut(new_front).unwrap() = byte;
+        }
         self.front = new_front;
     }
 }
@@ -621,9 +712,16 @@ impl Buf for ReverseBuffer {
             return &[];
         };
         debug_assert!(self.front < front_chunk.len());
+        #[cfg(not(feature = "forbid-unsafe"))]
         // SAFETY: front is always a valid index in the front chunk, and the bytes at and
         // after that index are always initialized.
-        unsafe { transmute(front_chunk.get_unchecked(self.front..)) }
+        unsafe {
+            transmute(front_chunk.get_unchecked(self.front..))
+        }
+        #[cfg(feature = "forbid-unsafe")]
+        {
+            &front_chunk[self.front..]
+        }
     }
 
     #[inline]
@@ -672,7 +770,16 @@ impl From<Box<[u8]>> for ReverseBuffer {
             // SAFETY: we are actually marking the data as LESS initialized, in a transparent
             // representation. This is trivial to do and completely safe, but there's no safe method
             // available to call that does this for you itemwise when it's in a Box like this.
-            chunks: vec![unsafe { transmute::<Box<[u8]>, Box<[MaybeUninit<u8>]>>(value) }],
+            chunks: vec![{
+                #[cfg(not(feature = "forbid-unsafe"))]
+                unsafe {
+                    transmute::<Box<[u8]>, Box<[MaybeUninit<u8>]>>(value)
+                }
+                #[cfg(feature = "forbid-unsafe")]
+                {
+                    value
+                }
+            }],
             front: 0, // front chunk is full
             ..Self::new()
         }
@@ -688,7 +795,11 @@ impl From<Vec<u8>> for ReverseBuffer {
 /// Non-draining reader-by-reference for `ReverseBuf`, implementing `bytes::Buf`.
 pub struct ReverseBufferReader<'a> {
     /// Buffer being read
+    #[cfg(not(feature = "forbid-unsafe"))]
     chunks: &'a [Box<[MaybeUninit<u8>]>],
+    /// Buffer being read
+    #[cfg(feature = "forbid-unsafe")]
+    chunks: &'a [Box<[u8]>],
     /// Index of the front byte in the front chunk (the last in the slice). If chunks is non-empty,
     /// front is always a valid index inside it.
     front: usize,
@@ -714,8 +825,16 @@ impl ReverseBufferReader<'_> {
     /// https://doc.rust-lang.org/stable/std/io/trait.Write.html#method.write_all_vectored), first
     /// collecting the slices like `b.slices().map(IoSlice::new)`.
     pub fn slices(&self) -> impl Iterator<Item = &[u8]> {
-        // SAFETY: self is valid
-        unsafe { to_vectorable_slices(self.chunks, self.front) }
+        #[cfg(not(feature = "forbid-unsafe"))]
+        {
+            // SAFETY: self is valid
+            unsafe { to_vectorable_slices(self.chunks, self.front) }
+        }
+        #[cfg(feature = "forbid-unsafe")]
+        {
+            // this version of `to_vectorable_slices
+            to_vectorable_slices(self.chunks, self.front)
+        }
     }
 }
 
@@ -731,9 +850,16 @@ impl Buf for ReverseBufferReader<'_> {
             return &[];
         };
         debug_assert!(self.front < front_chunk.len());
+        #[cfg(not(feature = "forbid-unsafe"))]
         // SAFETY: front is always a valid index in the front chunk, and the bytes at and
         // after that index are always initialized.
-        unsafe { transmute(front_chunk.get_unchecked(self.front..)) }
+        {
+            unsafe { transmute(front_chunk.get_unchecked(self.front..)) }
+        }
+        #[cfg(feature = "forbid-unsafe")]
+        {
+            &front_chunk[self.front..]
+        }
     }
 
     #[inline]
