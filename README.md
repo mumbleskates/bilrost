@@ -452,6 +452,8 @@ The `bilrost` crate has several optional features:
   have more information on the path to the exact field in the decoded data that
   encountered an error. With this disabled errors are more opaque, but may be
   smaller and faster.
+* "forbid-unsafe": configures out every usage of `unsafe` in the crate for
+  increased levels of safety paranoia at the cost of some performance.
 * "auto-optimize" (default): makes some automatic choices about some
   performance-related implementation details. The related features can be useful
   controls for profiling and experimentation, and are documented in

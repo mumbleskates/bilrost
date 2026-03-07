@@ -439,8 +439,15 @@ macro_rules! impl_nonzero_foroverwrite {
     ($ty:ident) => {
         impl ForOverwrite<(), core::num::$ty> for () {
             fn for_overwrite() -> core::num::$ty {
+                #[cfg(not(feature = "forbid-unsafe"))]
                 // SAFETY: 1 is not zero and probably never will be
-                unsafe { core::num::$ty::new_unchecked(1) }
+                unsafe {
+                    core::num::$ty::new_unchecked(1)
+                }
+                #[cfg(feature = "forbid-unsafe")]
+                {
+                    core::num::$ty::new(1).unwrap()
+                }
             }
         }
     };
