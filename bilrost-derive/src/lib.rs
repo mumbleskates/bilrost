@@ -2,6 +2,7 @@
 // The `quote!` macro requires deep recursion.
 #![recursion_limit = "4096"]
 #![no_std]
+#![forbid(unsafe_code)]
 
 //! This crate contains the derive macro implementations for the
 //! [`bilrost`][bilrost] crate; see the documentation in that crate for usage and
