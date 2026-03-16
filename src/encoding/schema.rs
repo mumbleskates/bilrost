@@ -1,3 +1,16 @@
+//! Tools for outputting (human-readable) information about the encoding of the message types used
+//! in a program.
+//!
+//! The general flow goes like this:
+//!  * Create a Schema
+//!  * Register each of the message types we want to see with that schema. Messages that contain
+//!    other messages will register those in turn.
+//!      * When a message is registered this way, new message types that haven't been registered
+//!        before will have `MessageSchema::register_fields` called, and must describe their
+//!        fields into the `FieldSet` provided.
+//!  * Finally, once all relevant message types are registered, the schema can be Displayed, which
+//!    will output all the collected information.
+
 use alloc::borrow::ToOwned;
 use alloc::boxed::Box;
 use alloc::collections::btree_map::Entry;
@@ -11,6 +24,10 @@ use core::cell::RefCell;
 use core::fmt::Formatter;
 use core::marker::PhantomData;
 
+pub fn new_schema() -> impl Schema {
+    MessageSet::new()
+}
+
 /// Receptacle for a full schema that can record the schemas of many messages.
 ///
 /// This trait is usable from a const reference with interior mutability because when messages
@@ -18,12 +35,13 @@ use core::marker::PhantomData;
 /// whole schema so that they can get the name of a type. We want the overall schema not to be
 /// frozen in place as we collect these reprs even as their potential output changes and more types
 /// are registered.
-pub trait SchemaSet: Clone {
+pub trait Schema: Clone + Display {
     // TODO: notes for a type, like what it should be called etc.
     /// Visits a specific message type. May shortcut if this method has already been invoked
     /// elsewhere for the same type.
-    fn visit_message<M: MessageSchema>(&self, name: &str);
-    // TODO: way to get a name for a message that refers to where it's printed out in the schema
+    fn register<M: MessageSchema>(&self, name: &str);
+    /// Name for a type that disambiguates where it can be found in the entire schema output.
+    fn type_reference<M: MessageSchema>(&self) -> String;
 }
 
 /// Receptacle for fields in a single specific message type.
@@ -37,16 +55,24 @@ pub trait FieldSet {
 
 /// A message type that can report the fields in its schema.
 pub trait MessageSchema: Any {
-    fn register(fields: &mut impl FieldSet, schema: &impl SchemaSet);
+    fn register_fields(fields: &mut impl FieldSet, schema: &impl Schema);
 }
 
-/// Trait for an encoding to describe its representation.
+/// Trait for an encoding E to describe its representation of a type T.
 pub trait ValueSchema<E, T> {
+    // TODO: we have to capture / pass in the outer schema here probably
     fn repr() -> Box<dyn Display>;
 }
 
+pub fn repr<E, T>() -> impl Display
+where
+    (): ValueSchema<E, T>,
+{
+    Repr::<E, T>::new()
+}
+
 /// Translation standin; proxies Display when the value schema has a description.
-pub struct Repr<E, T>(PhantomData<(E, T)>);
+struct Repr<E, T>(PhantomData<(E, T)>);
 
 impl<E, T> Repr<E, T> {
     pub fn new() -> Self {
@@ -64,27 +90,32 @@ where
 }
 
 /// A collected internally-complete set of message definitions.
-pub struct Schema {
+struct MessageSet {
     types: RefCell<BTreeMap<TypeId, MessageInfo>>,
     // TODO: pre-organize the types (or their names) for disambiguation and which index they will
     //  be found at in the final printout
 }
 
-impl Schema {
-    pub fn new() -> Self {
+impl MessageSet {
+    fn new() -> Rc<Self> {
         Self {
             types: Default::default(),
         }
+        .into()
     }
 }
 
-impl SchemaSet for Rc<Schema> {
-    fn visit_message<M: MessageSchema>(&self, name: &str) {
+impl Schema for Rc<MessageSet> {
+    fn register<M: MessageSchema>(&self, name: &str) {
         let mut types = self.types.borrow_mut();
         match types.entry(TypeId::of::<M>()) {
             Entry::Vacant(entry) => {
                 let field_set = entry.insert(MessageInfo::new(name));
-                M::register(field_set, self);
+                // TODO: if another message type is registered here we will probably crash due to
+                //  the borrow of types. probably there needs to be another refcell around the
+                //  MessageInfo so we can insert it first and then modify it without holding a mut
+                //  borrow on self.types
+                M::register_fields(field_set, self);
             }
             Entry::Occupied(mut entry) => {
                 entry.get_mut().add_name(name);
@@ -92,9 +123,20 @@ impl SchemaSet for Rc<Schema> {
             }
         }
     }
+
+    fn type_reference<M: MessageSchema>(&self) -> String {
+        // TODO: this is a placeholder
+        let id = TypeId::of::<M>();
+        let name = self
+            .types
+            .borrow()
+            .get(&id)
+            .map_or_else(|| "<unnamed>".to_owned(), |info| info.name());
+        format!("{name} ({id:?})")
+    }
 }
 
-impl Display for Schema {
+impl Display for MessageSet {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         let mut type_indexes = BTreeMap::new();
         for (msg_idx, (type_id, msg_info)) in self.types.borrow().iter().enumerate() {
