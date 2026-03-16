@@ -3,33 +3,41 @@ use alloc::boxed::Box;
 use alloc::collections::btree_map::Entry;
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::fmt::Display;
+use alloc::format;
+use alloc::rc::Rc;
 use alloc::string::String;
 use core::any::{Any, TypeId};
 use core::cell::RefCell;
 use core::fmt::Formatter;
 use core::marker::PhantomData;
-use alloc::format;
 
 /// Receptacle for a full schema that can record the schemas of many messages.
-pub trait SchemaSet {
+///
+/// This trait is usable from a const reference with interior mutability because when messages
+/// register the appearance of their fields' reprs they will sometimes capture references to the
+/// whole schema so that they can get the name of a type. We want the overall schema not to be
+/// frozen in place as we collect these reprs even as their potential output changes and more types
+/// are registered.
+pub trait SchemaSet: Clone {
     // TODO: notes for a type, like what it should be called etc.
     /// Visits a specific message type. May shortcut if this method has already been invoked
     /// elsewhere for the same type.
     fn visit_message<M: MessageSchema>(&self, name: &str);
+    // TODO: way to get a name for a message that refers to where it's printed out in the schema
 }
 
 /// Receptacle for fields in a single specific message type.
 pub trait FieldSet {
     // TODO: notes for the whole type (distinguished?)
     /// Adds a field to the type.
-    fn add_field(&self, name: &str, tag: u32, repr: Box<dyn Display>);
+    fn add_field(&mut self, name: &str, tag: u32, repr: Box<dyn Display>);
     /// Registers a oneof on the message by the tags of its mutually exclusive member fields.
-    fn add_oneof(&self, name: &str, tags: &[u32]);
+    fn add_oneof(&mut self, name: &str, tags: &[u32]);
 }
 
-/// A message type that can report the fields in its schema
+/// A message type that can report the fields in its schema.
 pub trait MessageSchema: Any {
-    fn register(schema: impl SchemaSet + FieldSet);
+    fn register(fields: &mut impl FieldSet, schema: &impl SchemaSet);
 }
 
 /// Trait for an encoding to describe its representation.
@@ -55,23 +63,28 @@ where
     }
 }
 
+/// A collected internally-complete set of message definitions.
 pub struct Schema {
     types: RefCell<BTreeMap<TypeId, MessageInfo>>,
+    // TODO: pre-organize the types (or their names) for disambiguation and which index they will
+    //  be found at in the final printout
 }
 
 impl Schema {
     pub fn new() -> Self {
-        Self{types: Default::default()}
+        Self {
+            types: Default::default(),
+        }
     }
 }
 
-impl SchemaSet for Schema {
+impl SchemaSet for Rc<Schema> {
     fn visit_message<M: MessageSchema>(&self, name: &str) {
         let mut types = self.types.borrow_mut();
         match types.entry(TypeId::of::<M>()) {
             Entry::Vacant(entry) => {
                 let field_set = entry.insert(MessageInfo::new(name));
-                M::register(field_set);
+                M::register(field_set, self);
             }
             Entry::Occupied(mut entry) => {
                 entry.get_mut().add_name(name);
@@ -83,16 +96,28 @@ impl SchemaSet for Schema {
 
 impl Display for Schema {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-
-        for message_idx in 1usize.. {
-
+        let mut type_indexes = BTreeMap::new();
+        for (msg_idx, (type_id, msg_info)) in self.types.borrow().iter().enumerate() {
+            type_indexes.insert(*type_id, msg_idx);
+            if msg_idx > 0 {
+                writeln!(f)?;
+            }
+            writeln!(f, "[{msg_idx}] {name} {{", name = msg_info.name())?;
+            for (tag, field) in &msg_info.fields {
+                writeln!(
+                    f,
+                    "    {tag}: {field_name} ({repr}),",
+                    field_name = &field.name,
+                    repr = &field.repr,
+                )?;
+            }
+            writeln!(f, "}}")?;
         }
-        writeln!(f, "{name} {{")?;
-        writeln!(f, "}}")?;
         Ok(())
     }
 }
 
+/// Collected information about a specific message type and its fields.
 struct MessageInfo {
     names: BTreeSet<String>,
     fields: BTreeMap<u32, FieldInfo>,
@@ -120,15 +145,19 @@ impl MessageInfo {
     }
 }
 
-impl FieldSet for &mut MessageInfo {
-    fn add_field(&self, name: &str, tag: u32, repr: Box<dyn Display>) {
-        if self.fields.insert(
-            tag,
-            FieldInfo {
-                name: name.to_owned(),
-                repr,
-            },
-        ).is_some() {
+impl FieldSet for MessageInfo {
+    fn add_field(&mut self, name: &str, tag: u32, repr: Box<dyn Display>) {
+        if self
+            .fields
+            .insert(
+                tag,
+                FieldInfo {
+                    name: name.to_owned(),
+                    repr,
+                },
+            )
+            .is_some()
+        {
             panic!(
                 "message {name} registered multiple fields with tag {tag}",
                 name = self.name(),
@@ -136,8 +165,8 @@ impl FieldSet for &mut MessageInfo {
         };
     }
 
-    fn add_oneof(&self, oneof_name: &str, tags: &[u32]) {
-        let tag_set = tags.into();
+    fn add_oneof(&mut self, oneof_name: &str, tags: &[u32]) {
+        let tag_set = tags.into_iter().copied().collect();
         for (existing_oneof_name, existing_set) in &self.oneofs {
             if let Some(conflicting_tag) = existing_set.intersection(&tag_set).next() {
                 panic!(
