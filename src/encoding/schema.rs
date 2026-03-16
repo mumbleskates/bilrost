@@ -139,7 +139,8 @@ impl MessageInfo {
 
     fn name(&self) -> String {
         match self.names.len() {
-            1 => format!("{name:?}", name = self.names.first().unwrap()),
+            // MSRV: this could be .first()
+            1 => format!("{name:?}", name = self.names.iter().next().unwrap()),
             _ => format!("(message known as {names:?})", names = self.names),
         }
     }
