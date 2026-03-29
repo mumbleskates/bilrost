@@ -22,6 +22,7 @@ use alloc::string::String;
 use core::any::{Any, TypeId};
 use core::cell::RefCell;
 use core::fmt::Formatter;
+use core::ops::DerefMut;
 
 pub fn new_schema() -> impl Schema {
     MessageSet::new()
@@ -64,7 +65,7 @@ pub trait ValueSchema<E, T> {
 
 /// A collected internally-complete set of message definitions.
 struct MessageSet {
-    types: RefCell<BTreeMap<TypeId, MessageInfo>>,
+    types: RefCell<BTreeMap<TypeId, Rc<RefCell<MessageInfo>>>>,
     // TODO: pre-organize the types (or their names) for disambiguation and which index they will
     //  be found at in the final printout
 }
@@ -81,30 +82,27 @@ impl MessageSet {
 impl Schema for Rc<MessageSet> {
     fn register<M: MessageSchema>(&self, name: &str) {
         let mut types = self.types.borrow_mut();
-        match types.entry(TypeId::of::<M>()) {
-            Entry::Vacant(entry) => {
-                let field_set = entry.insert(MessageInfo::new(name));
-                // TODO: if another message type is registered here we will probably crash due to
-                //  the borrow of types. probably there needs to be another refcell around the
-                //  MessageInfo so we can insert it first and then modify it without holding a mut
-                //  borrow on self.types
-                M::register_fields(field_set, self);
-            }
+        let field_set = match types.entry(TypeId::of::<M>()) {
+            Entry::Vacant(entry) => entry
+                .insert(Rc::new(RefCell::new(MessageInfo::new(name))))
+                .clone(),
             Entry::Occupied(mut entry) => {
-                entry.get_mut().add_name(name);
-                // type was already registered previously
+                entry.get_mut().borrow_mut().add_name(name);
+                return; // type was already registered previously
             }
-        }
+        };
+        drop(types);
+        M::register_fields(field_set.borrow_mut().deref_mut(), self);
     }
 
     fn type_reference<M: MessageSchema>(&self) -> String {
-        // TODO: this is a placeholder
+        // TODO: this is a placeholder, we want to use the type's ordinal after they're organized
         let id = TypeId::of::<M>();
         let name = self
             .types
             .borrow()
             .get(&id)
-            .map_or_else(|| "<unnamed>".to_owned(), |info| info.name());
+            .map_or_else(|| "<unnamed>".to_owned(), |info| info.borrow().name());
         format!("{name} ({id:?})")
     }
 }
@@ -117,6 +115,7 @@ impl Display for MessageSet {
             if msg_idx > 0 {
                 writeln!(f)?;
             }
+            let msg_info = msg_info.borrow();
             writeln!(f, "[{msg_idx}] {name} {{", name = msg_info.name())?;
             for (tag, field) in &msg_info.fields {
                 writeln!(
