@@ -17,12 +17,50 @@ use alloc::collections::btree_map::Entry;
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::fmt::Display;
 use alloc::format;
-use alloc::rc::Rc;
 use alloc::string::String;
+use alloc::sync::Arc;
 use core::any::{Any, TypeId};
-use core::cell::RefCell;
 use core::fmt::Formatter;
 use core::ops::DerefMut;
+
+/// Common trait for interior mutability
+trait BorrowGuard<T> {
+    fn new(t: T) -> Self;
+
+    fn get_guarded(&self) -> impl DerefMut<Target = T>;
+}
+
+#[cfg(feature = "threadsafe-schema")]
+mod guard {
+    pub(super) use spin::Mutex as Guard;
+
+    impl<T> super::BorrowGuard<T> for Guard<T> {
+        fn new(t: T) -> Self {
+            Guard::new(t)
+        }
+
+        fn get_guarded(&self) -> impl core::ops::DerefMut<Target = T> {
+            self.lock()
+        }
+    }
+}
+
+#[cfg(not(feature = "threadsafe-schema"))]
+mod guard {
+    pub(super) use core::cell::RefCell as Guard;
+
+    impl<T> super::BorrowGuard<T> for Guard<T> {
+        fn new(t: T) -> Self {
+            Guard::new(t)
+        }
+
+        fn get_guarded(&self) -> impl core::ops::DerefMut<Target = T> {
+            self.borrow_mut()
+        }
+    }
+}
+
+use guard::Guard;
 
 pub fn new_schema() -> impl Schema {
     MessageSet::new()
@@ -65,13 +103,13 @@ pub trait ValueSchema<E, T> {
 
 /// A collected internally-complete set of message definitions.
 struct MessageSet {
-    types: RefCell<BTreeMap<TypeId, Rc<RefCell<MessageInfo>>>>,
+    types: Guard<BTreeMap<TypeId, Arc<Guard<MessageInfo>>>>,
     // TODO: pre-organize the types (or their names) for disambiguation and which index they will
     //  be found at in the final printout
 }
 
 impl MessageSet {
-    fn new() -> Rc<Self> {
+    fn new() -> Arc<Self> {
         Self {
             types: Default::default(),
         }
@@ -79,20 +117,20 @@ impl MessageSet {
     }
 }
 
-impl Schema for Rc<MessageSet> {
+impl Schema for Arc<MessageSet> {
     fn register<M: MessageSchema>(&self, name: &str) {
-        let mut types = self.types.borrow_mut();
+        let mut types = self.types.get_guarded();
         let field_set = match types.entry(TypeId::of::<M>()) {
             Entry::Vacant(entry) => entry
-                .insert(Rc::new(RefCell::new(MessageInfo::new(name))))
+                .insert(Arc::new(Guard::new(MessageInfo::new(name))))
                 .clone(),
             Entry::Occupied(mut entry) => {
-                entry.get_mut().borrow_mut().add_name(name);
+                entry.get_mut().get_guarded().add_name(name);
                 return; // type was already registered previously
             }
         };
         drop(types);
-        M::register_fields(field_set.borrow_mut().deref_mut(), self);
+        M::register_fields(field_set.get_guarded().deref_mut(), self);
     }
 
     fn type_reference<M: MessageSchema>(&self) -> String {
@@ -100,9 +138,9 @@ impl Schema for Rc<MessageSet> {
         let id = TypeId::of::<M>();
         let name = self
             .types
-            .borrow()
+            .get_guarded()
             .get(&id)
-            .map_or_else(|| "<unnamed>".to_owned(), |info| info.borrow().name());
+            .map_or_else(|| "<unnamed>".to_owned(), |info| info.get_guarded().name());
         format!("{name} ({id:?})")
     }
 }
@@ -110,12 +148,12 @@ impl Schema for Rc<MessageSet> {
 impl Display for MessageSet {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         let mut type_indexes = BTreeMap::new();
-        for (msg_idx, (type_id, msg_info)) in self.types.borrow().iter().enumerate() {
+        for (msg_idx, (type_id, msg_info)) in self.types.get_guarded().iter().enumerate() {
             type_indexes.insert(*type_id, msg_idx);
             if msg_idx > 0 {
                 writeln!(f)?;
             }
-            let msg_info = msg_info.borrow();
+            let msg_info = msg_info.get_guarded();
             writeln!(f, "[{msg_idx}] {name} {{", name = msg_info.name())?;
             for (tag, field) in &msg_info.fields {
                 writeln!(
