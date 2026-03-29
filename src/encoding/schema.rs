@@ -22,7 +22,6 @@ use alloc::string::String;
 use core::any::{Any, TypeId};
 use core::cell::RefCell;
 use core::fmt::Formatter;
-use core::marker::PhantomData;
 
 pub fn new_schema() -> impl Schema {
     MessageSet::new()
@@ -60,33 +59,7 @@ pub trait MessageSchema: Any {
 
 /// Trait for an encoding E to describe its representation of a type T.
 pub trait ValueSchema<E, T> {
-    // TODO: we have to capture / pass in the outer schema here probably
-    fn repr() -> Box<dyn Display>;
-}
-
-pub fn repr<E, T>() -> impl Display
-where
-    (): ValueSchema<E, T>,
-{
-    Repr::<E, T>::new()
-}
-
-/// Translation standin; proxies Display when the value schema has a description.
-struct Repr<E, T>(PhantomData<(E, T)>);
-
-impl<E, T> Repr<E, T> {
-    pub fn new() -> Self {
-        Self(PhantomData)
-    }
-}
-
-impl<E, T> Display for Repr<E, T>
-where
-    (): ValueSchema<E, T>,
-{
-    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        <() as ValueSchema<E, T>>::repr().fmt(f)
-    }
+    fn repr(schema: &impl Schema) -> Box<dyn Display>;
 }
 
 /// A collected internally-complete set of message definitions.
