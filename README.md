@@ -87,6 +87,11 @@ decoding.
 
 🌈
 
+Bilrost is in-production in [Graft](https://graft.rs/),
+[Restate](https://www.restate.dev/), and more; in use in tools like
+[pdf-sign](https://signed.page); and is not affiliated with anything else
+calling itself by the same name.
+
 [pb]: https://developers.google.com/protocol-buffers/
 
 [rs]: https://www.rust-lang.org/
