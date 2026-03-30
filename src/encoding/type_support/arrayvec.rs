@@ -35,6 +35,8 @@ impl<T, const N: usize> Collection for arrayvec::ArrayVec<T, N> {
         Self::Item: 'a,
         Self: 'a;
 
+    const BOUNDS: core::ops::RangeInclusive<Option<usize>> = None..=Some(N);
+
     #[inline]
     fn len(&self) -> usize {
         arrayvec::ArrayVec::len(self)
@@ -59,13 +61,13 @@ impl<T, const N: usize> Collection for arrayvec::ArrayVec<T, N> {
 impl<T, const N: usize> TriviallyDistinguishedCollection for arrayvec::ArrayVec<T, N> {}
 
 delegate_encoding!(
-    delegate from (General) to (Unpacked)
-    for type (arrayvec::ArrayVec<T, N>) including distinguished
+    delegate from (General) to (Unpacked) for type (arrayvec::ArrayVec<T, N>)
+    including distinguished including schema
     with generics (T, const N: usize)
 );
 delegate_value_encoding!(
-    delegate from (GeneralPacked) to (Packed)
-    for type (arrayvec::ArrayVec<T, N>) including distinguished
+    delegate from (GeneralPacked) to (Packed) for type (arrayvec::ArrayVec<T, N>)
+    including distinguished including schema
     with generics (T, const N: usize)
 );
 

@@ -97,8 +97,20 @@ pub trait MessageSchema: Any {
 }
 
 /// Trait for an encoding E to describe its representation of a type T.
-pub trait ValueSchema<E, T> {
+///
+/// This trait is always implemented on the unit type `()`.
+pub trait ValueSchema<E, T: ?Sized> {
+    /// Returns the representation of the field. This may register other message types with the
+    /// schema and the returned value may use the schema to look up the name of those other message
+    /// types when displaying.
     fn repr(schema: &impl Schema) -> Box<dyn Display>;
+}
+
+pub fn repr<E, T>(schema: &impl Schema) -> Box<dyn Display>
+where
+    (): ValueSchema<E, T>,
+{
+    <() as ValueSchema<E, T>>::repr(schema)
 }
 
 /// A collected internally-complete set of message definitions.

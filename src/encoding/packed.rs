@@ -1,4 +1,5 @@
 use crate::buf::ReverseBuf;
+use crate::encoding::schema::{Schema, ValueSchema};
 use crate::encoding::value_traits::{
     Collection, DistinguishedCollection, EmptyState, ForOverwrite,
 };
@@ -11,6 +12,9 @@ use crate::encoding::{
     Wiretyped,
 };
 use crate::DecodeErrorKind::{InvalidValue, Truncated};
+use alloc::boxed::Box;
+use alloc::format;
+use alloc::string::String;
 use bytes::{Buf, BufMut};
 
 pub struct Packed<E = GeneralPacked>(E);
@@ -20,6 +24,30 @@ encoding_uses_base_empty_state!(Packed<E>, with generics (E));
 /// Packed encodings always prefer to encode length delimited.
 impl<E, T: ?Sized> Wiretyped<Packed<E>, T> for () {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
+}
+
+impl<C, T, E> ValueSchema<Packed<E>, C> for ()
+where
+    C: Collection<Item = T>,
+    (): ValueSchema<E, T> + EmptyState<(), C> + ForOverwrite<E, T> + ValueEncoder<E, T>,
+{
+    fn repr(schema: &impl Schema) -> Box<dyn core::fmt::Display> {
+        let bounds = match (C::BOUNDS.start(), C::BOUNDS.end()) {
+            (None, None) => String::new(),
+            (None, Some(max)) => format!("; at most {max} items"),
+            (Some(min), None) => format!("; at least {min} items"),
+            (Some(min), Some(max)) if min == max => format!("; exactly {min} items"),
+            (Some(min), Some(max)) => format!("; between {min} and {max} items"),
+        };
+        let restrictions = match C::RESTRICTIONS {
+            Some(r) => format!("; items are {r}"),
+            None => String::new(),
+        };
+        Box::new(format!(
+            "{packed_repr}{bounds}{restrictions}",
+            packed_repr = <() as ValueSchema<Packed<E>, [T]>>::repr(schema),
+        ))
+    }
 }
 
 impl<C, T, E> ValueEncoder<Packed<E>, C> for ()
@@ -91,6 +119,22 @@ where
     }
 }
 
+impl<T, const N: usize, E> ValueSchema<Packed<E>, [T; N]> for ()
+where
+    (): ValueSchema<E, T> + ValueEncoder<E, T>,
+{
+    fn repr(schema: &impl Schema) -> Box<dyn core::fmt::Display> {
+        if N == 0 {
+            Box::new("delimited empty")
+        } else {
+            Box::new(format!(
+                "{packed_repr}; exactly {N} items",
+                packed_repr = <() as ValueSchema<Packed<E>, [T]>>::repr(schema),
+            ))
+        }
+    }
+}
+
 impl<T, const N: usize, E> ValueEncoder<Packed<E>, [T; N]> for ()
 where
     (): ValueEncoder<E, T>,
@@ -141,6 +185,18 @@ where
         } else {
             0
         }
+    }
+}
+
+impl<T, E> ValueSchema<Packed<E>, [T]> for ()
+where
+    (): ValueSchema<E, T>,
+{
+    fn repr(schema: &impl Schema) -> Box<dyn core::fmt::Display> {
+        Box::new(format!(
+            "delimited packed (items: {item_repr})",
+            item_repr = <() as ValueSchema<E, T>>::repr(schema),
+        ))
     }
 }
 

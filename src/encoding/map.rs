@@ -1,4 +1,5 @@
 use crate::buf::ReverseBuf;
+use crate::encoding::schema::{Schema, ValueSchema};
 use crate::encoding::value_traits::{DistinguishedMapping, Mapping};
 use crate::encoding::{
     decoding_modes, encode_varint, encoded_len_varint, encoding_implemented_via_value_encoding,
@@ -8,6 +9,8 @@ use crate::encoding::{
     WireType, Wiretyped,
 };
 use crate::DecodeErrorKind::Truncated;
+use alloc::boxed::Box;
+use alloc::format;
 use bytes::{Buf, BufMut};
 
 pub struct Map<KE = GeneralPacked, VE = GeneralPacked>(KE, VE);
@@ -52,6 +55,26 @@ where
         },
         |fixed_size| value.len() * fixed_size, // Both key and value are constant length; shortcut
     )
+}
+
+impl<M, K, V, KE, VE> ValueSchema<Map<KE, VE>, M> for ()
+where
+    M: Mapping<Key = K, Value = V>,
+    (): ValueSchema<KE, K>
+        + ValueSchema<VE, V>
+        + EmptyState<(), M>
+        + ForOverwrite<KE, K>
+        + ValueEncoder<KE, K>
+        + ForOverwrite<VE, V>
+        + ValueEncoder<VE, V>,
+{
+    fn repr(schema: &impl Schema) -> Box<dyn core::fmt::Display> {
+        Box::new(format!(
+            "delimited map (keys: {key_repr}; values: {value_repr})",
+            key_repr = <() as ValueSchema<KE, K>>::repr(schema),
+            value_repr = <() as ValueSchema<VE, V>>::repr(schema),
+        ))
+    }
 }
 
 impl<M, K, V, KE, VE> ValueEncoder<Map<KE, VE>, M> for ()

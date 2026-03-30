@@ -1,5 +1,55 @@
 //! Macro rules for expressly delegating from one encoder to another.
 
+/// Delegates the value schema of this type to another encoding and possibly another type
+#[macro_export]
+macro_rules! delegate_schema {
+    (
+        ($from_ty:ty) encodes ($from_value_ty:ty)
+        like ($to_ty:ty) encodes ($to_value_ty:ty)
+        $(with where clause ($($where_clause:tt)*))?
+        $(with generics ($($value_generics:tt)*))?
+    ) => {
+        impl$(<$($value_generics)*>)? $crate::encoding::schema::ValueSchema<$from_ty, $from_value_ty>
+        for ()
+        where
+            (): $crate::encoding::schema::ValueSchema<$to_ty, $to_value_ty>,
+            $($($where_clause)+ ,)?
+        {
+            fn repr(
+                schema: &impl $crate::encoding::schema::Schema,
+            ) -> ::alloc::boxed::Box<dyn ::core::fmt::Display> {
+                <() as $crate::encoding::schema::ValueSchema<$to_ty, $to_value_ty>>::repr(schema)
+            }
+        }
+    };
+
+    (
+        ($from_ty:ty) encodes ($value_ty:ty)
+        like ($to_ty:ty) does
+        $(with where clause ($($where_clause:tt)*))?
+        $(with generics ($($value_generics:tt)*))?
+    ) => {
+        $crate::delegate_schema!(
+            ($from_ty) encodes ($value_ty) like ($to_ty) encodes ($value_ty)
+            $(with where clause ($($where_clause)*))?
+            $(with generics ($($value_generics)*))?
+        );
+    };
+
+    (
+        ($encoder:ty) encodes ($from_value_ty:ty)
+        as ($to_value_ty:ty)
+        $(with where clause ($($where_clause:tt)*))?
+        $(with generics ($($value_generics:tt)*))?
+    ) => {
+        $crate::delegate_schema!(
+            ($encoder) encodes ($from_value_ty) like ($encoder) encodes ($to_value_ty)
+            $(with where clause ($($where_clause)*))?
+            $(with generics ($($value_generics)*))?
+        );
+    }
+}
+
 /// Expressly delegates support for encoding message fields from one encoding to another.
 #[macro_export]
 macro_rules! delegate_encoding {
@@ -88,7 +138,8 @@ macro_rules! delegate_encoding {
     };
 
     (
-        delegate from ($from_ty:ty) to ($to_ty:ty) for type ($value_ty:ty) including distinguished
+        delegate from ($from_ty:ty) to ($to_ty:ty) for type ($value_ty:ty)
+        including distinguished
         $(with where clause ($($where_clause:tt)*))?
         $(with generics ($($value_generics:tt)*))?
     ) => {
@@ -145,6 +196,44 @@ macro_rules! delegate_encoding {
                 )
             }
         }
+    };
+
+    (
+        delegate from ($from_ty:ty) to ($to_ty:ty) for type ($value_ty:ty)
+        including schema
+        $(with where clause ($($where_clause:tt)*))?
+        $(with generics ($($value_generics:tt)*))?
+    ) => {
+        $crate::delegate_encoding!(
+            delegate from ($from_ty) to ($to_ty) for type ($value_ty)
+            $(with where clause ($($where_clause)*))?
+            $(with generics ($($value_generics)*))?
+        );
+        $crate::delegate_schema!(
+            ($from_ty) encodes ($value_ty) like ($to_ty) does
+            $(with where clause ($($where_clause)*))?
+            $(with generics ($($value_generics)*))?
+        );
+    };
+
+    (
+        delegate from ($from_ty:ty) to ($to_ty:ty) for type ($value_ty:ty)
+        including distinguished
+        including schema
+        $(with where clause ($($where_clause:tt)*))?
+        $(with generics ($($value_generics:tt)*))?
+    ) => {
+        $crate::delegate_encoding!(
+            delegate from ($from_ty) to ($to_ty) for type ($value_ty)
+            including distinguished
+            $(with where clause ($($where_clause)*))?
+            $(with generics ($($value_generics)*))?
+        );
+        $crate::delegate_schema!(
+            ($from_ty) encodes ($value_ty) like ($to_ty) does
+            $(with where clause ($($where_clause)*))?
+            $(with generics ($($value_generics)*))?
+        );
     };
 }
 pub use delegate_encoding;
@@ -315,6 +404,45 @@ macro_rules! delegate_value_encoding {
                 )
             }
         }
+    };
+
+    (
+        delegate from ($from_ty:ty) to ($to_ty:ty) for type ($value_ty:ty)
+        including schema
+        $(with where clause ($($where_clause:tt)+))?
+        $(with generics ($($value_generics:tt)*))?
+    ) => {
+        $crate::delegate_value_encoding!(
+            delegate from ($from_ty) to ($to_ty) for type ($value_ty)
+            $(with where clause ($($where_clause)*))?
+            $(with generics ($($value_generics)*))?
+        );
+        $crate::delegate_schema!(
+            ($from_ty) encodes ($value_ty) like ($to_ty) does
+            $(with where clause ($($where_clause)*))?
+            $(with generics ($($value_generics)*))?
+        );
+    };
+
+    (
+        delegate from ($from_ty:ty) to ($to_ty:ty) for type ($value_ty:ty)
+        including distinguished
+        including schema
+        $(with where clause for relaxed ($($relaxed_where:tt)+))?
+        $(with where clause for distinguished ($($distinguished_where:tt)+))?
+        $(with generics ($($value_generics:tt)*))?
+    ) => {
+        $crate::delegate_value_encoding!(
+            delegate from ($from_ty) to ($to_ty) for type ($value_ty) including distinguished
+            $(with where clause for relaxed ($($relaxed_where)*))?
+            $(with where clause for distinguished ($($distinguished_where)*))?
+            $(with generics ($($value_generics)*))?
+        );
+        $crate::delegate_schema!(
+            ($from_ty) encodes ($value_ty) like ($to_ty) does
+            $(with where clause ($($relaxed_where)*))?
+            $(with generics ($($value_generics)*))?
+        );
     };
 
     (

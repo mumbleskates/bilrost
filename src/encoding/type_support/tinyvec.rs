@@ -37,6 +37,8 @@ impl<T, A: tinyvec::Array<Item = T>> Collection for tinyvec::ArrayVec<A> {
         Self::Item: 'a,
         Self: 'a;
 
+    const BOUNDS: core::ops::RangeInclusive<Option<usize>> = None..=Some(A::CAPACITY);
+
     #[inline]
     fn len(&self) -> usize {
         tinyvec::ArrayVec::len(self)
@@ -118,25 +120,29 @@ impl<A: tinyvec::Array> TriviallyDistinguishedCollection for tinyvec::TinyVec<A>
 
 delegate_encoding!(
     delegate from (General) to (Unpacked)
-    for type (tinyvec::ArrayVec<A>) including distinguished
+    for type (tinyvec::ArrayVec<A>)
+    including distinguished including schema
     with where clause (A: tinyvec::Array<Item = T>)
     with generics (T, A)
 );
 delegate_encoding!(
     delegate from (General) to (Unpacked)
-    for type (tinyvec::TinyVec<A>) including distinguished
+    for type (tinyvec::TinyVec<A>)
+    including distinguished including schema
     with where clause (A: tinyvec::Array<Item = T>)
     with generics (T, A)
 );
 delegate_value_encoding!(
     delegate from (GeneralPacked) to (Packed)
-    for type (tinyvec::ArrayVec<A>) including distinguished
+    for type (tinyvec::ArrayVec<A>)
+    including distinguished including schema
     with where clause for relaxed (A: tinyvec::Array<Item = T>)
     with generics (T, A)
 );
 delegate_value_encoding!(
     delegate from (GeneralPacked) to (Packed)
-    for type (tinyvec::TinyVec<A>) including distinguished
+    for type (tinyvec::TinyVec<A>)
+    including distinguished including schema
     with where clause for relaxed (A: tinyvec::Array<Item = T>)
     with generics (T, A)
 );

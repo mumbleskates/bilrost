@@ -9,7 +9,7 @@ use crate::encoding::{
     Encoder, ForOverwrite, RestrictedDecodeContext, ValueBorrowDecoder, ValueDecoder, ValueEncoder,
     WireType, Wiretyped,
 };
-use crate::{Canonicity, DecodeError};
+use crate::{delegate_schema, Canonicity, DecodeError};
 use bytes::{Buf, BufMut};
 use core::mem;
 use core::ops::{Range, RangeInclusive};
@@ -50,6 +50,12 @@ where
         <() as EmptyState<Eend, T>>::clear(&mut val.end);
     }
 }
+
+// TODO: actually these should be named
+delegate_schema!(
+    ((Estart, Eend)) encodes (Range<T>) as ((T, T))
+    with generics (Estart, Eend, T)
+);
 
 impl<T, Estart, Eend> ValueEncoder<(Estart, Eend), Range<T>> for ()
 where
@@ -228,6 +234,12 @@ where
         drop(mem::replace(val, start..=end));
     }
 }
+
+// TODO: actually these should be named
+delegate_schema!(
+    ((Estart, Eend)) encodes (RangeInclusive<T>) as ((T, T))
+    with generics (Estart, Eend, T)
+);
 
 impl<T, Estart, Eend> ValueEncoder<(Estart, Eend), RangeInclusive<T>> for ()
 where

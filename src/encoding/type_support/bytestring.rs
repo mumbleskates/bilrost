@@ -6,7 +6,7 @@ use crate::encoding::{
     ValueDecoder, ValueEncoder, WireType, Wiretyped,
 };
 use crate::DecodeErrorKind::InvalidValue;
-use crate::{Canonicity, DecodeError};
+use crate::{delegate_schema, Canonicity, DecodeError};
 use bytes::{Buf, BufMut};
 
 for_overwrite_via_default!(bytestring::ByteString);
@@ -26,6 +26,11 @@ impl EmptyState<(), bytestring::ByteString> for () {
 impl<const P: u8> Wiretyped<GeneralGeneric<P>, bytestring::ByteString> for () {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
 }
+
+delegate_schema!(
+    (GeneralGeneric<P>) encodes (bytestring::ByteString) as (&'static str)
+    with generics (const P: u8)
+);
 
 impl<const P: u8> ValueEncoder<GeneralGeneric<P>, bytestring::ByteString> for () {
     #[inline]

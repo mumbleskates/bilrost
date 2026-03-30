@@ -1,4 +1,5 @@
 use crate::buf::ReverseBuf;
+use crate::encoding::schema::{Schema, ValueSchema};
 use crate::encoding::value_traits::{
     Collection, DistinguishedCollection, EmptyState, ForOverwrite,
 };
@@ -10,7 +11,10 @@ use crate::encoding::{
     TagWriter, ValueBorrowDecoder, ValueDecoder, ValueEncoder, WireType, Wiretyped,
 };
 use crate::DecodeErrorKind::InvalidValue;
-use crate::{Canonicity, DecodeError};
+use crate::{delegate_schema, Canonicity, DecodeError};
+use alloc::boxed::Box;
+use alloc::format;
+use alloc::string::String;
 use bytes::BufMut;
 
 pub struct Unpacked<E = GeneralPacked>(E);
@@ -247,6 +251,30 @@ pub(crate) mod borrowed {
     decoding_modes::__invoke!(define_decoders, borrowed);
 }
 
+impl<C, T, E> ValueSchema<Unpacked<E>, C> for ()
+where
+    C: Collection<Item = T>,
+    (): ValueSchema<E, T> + EmptyState<(), C> + ForOverwrite<E, T> + ValueEncoder<E, T>,
+{
+    fn repr(schema: &impl Schema) -> Box<dyn core::fmt::Display> {
+        let bounds = match (C::BOUNDS.start(), C::BOUNDS.end()) {
+            (None, None) => String::new(),
+            (None, Some(max)) => format!("; at most {max} items"),
+            (Some(min), None) => format!("; at least {min} items"),
+            (Some(min), Some(max)) if min == max => format!("; exactly {min} items"),
+            (Some(min), Some(max)) => format!("; between {min} and {max} items"),
+        };
+        let restrictions = match C::RESTRICTIONS {
+            Some(r) => format!("; items are {r}"),
+            None => String::new(),
+        };
+        Box::new(format!(
+            "{unpacked_repr}{bounds}{restrictions}",
+            unpacked_repr = <() as ValueSchema<Unpacked<E>, [T]>>::repr(schema),
+        ))
+    }
+}
+
 /// Unpacked encodes vecs as repeated fields and in relaxed decoding mode will accept both packed
 /// and un-packed encodings.
 impl<C, T, E> Encoder<Unpacked<E>, C> for ()
@@ -287,6 +315,18 @@ where
     }
 }
 
+impl<T, const N: usize, E> ValueSchema<Unpacked<E>, [T; N]> for ()
+where
+    (): ValueSchema<E, T> + ForOverwrite<E, T> + ValueEncoder<E, T>,
+{
+    fn repr(schema: &impl Schema) -> Box<dyn core::fmt::Display> {
+        Box::new(format!(
+            "{unpacked_repr}; exactly {N} items",
+            unpacked_repr = <() as ValueSchema<Unpacked<E>, [T]>>::repr(schema),
+        ))
+    }
+}
+
 /// Unpacked encodes arrays as repeated fields if any of the values are non-empty, and in relaxed
 /// decoding mode will accept both packed and un-packed encodings.
 impl<T, const N: usize, E> Encoder<Unpacked<E>, [T; N]> for ()
@@ -319,6 +359,18 @@ where
         } else {
             0
         }
+    }
+}
+
+impl<T, E> ValueSchema<Unpacked<E>, [T]> for ()
+where
+    (): ValueSchema<E, T> + ForOverwrite<E, T> + ValueEncoder<E, T>,
+{
+    fn repr(schema: &impl Schema) -> Box<dyn core::fmt::Display> {
+        Box::new(format!(
+            "repeated field (items: {value_repr})",
+            value_repr = <() as ValueSchema<E, T>>::repr(schema),
+        ))
     }
 }
 
@@ -361,6 +413,11 @@ where
         }
     }
 }
+
+delegate_schema!(
+    (Unpacked<E>) encodes (Option<[T; N]>) as ([T; N])
+    with generics (T, const N: usize, E)
+);
 
 /// Unpacked encodes arrays as repeated fields if any of the values are non-empty.
 impl<T, const N: usize, E> Encoder<Unpacked<E>, Option<[T; N]>> for ()

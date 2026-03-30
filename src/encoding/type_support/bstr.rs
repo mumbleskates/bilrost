@@ -5,7 +5,7 @@ use crate::encoding::{
     DistinguishedValueDecoder, EmptyState, GeneralGeneric, PlainBytes, RestrictedDecodeContext,
     ValueBorrowDecoder, ValueDecoder, ValueEncoder, WireType, Wiretyped,
 };
-use crate::{Canonicity, DecodeError};
+use crate::{delegate_schema, Canonicity, DecodeError};
 use alloc::vec::Vec;
 use bytes::{Buf, BufMut};
 
@@ -14,6 +14,11 @@ empty_state_via_default!(&'a bstr::BStr, with generics ('a));
 impl<const P: u8> Wiretyped<GeneralGeneric<P>, &bstr::BStr> for () {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
 }
+
+delegate_schema!(
+    (GeneralGeneric<P>) encodes (&'static bstr::BStr) like (PlainBytes) encodes (&'static [u8])
+    with generics (const P: u8)
+);
 
 impl<const P: u8> ValueEncoder<GeneralGeneric<P>, &bstr::BStr> for () {
     #[inline]
@@ -90,6 +95,11 @@ impl EmptyState<(), bstr::BString> for () {
 impl<const P: u8> Wiretyped<GeneralGeneric<P>, bstr::BString> for () {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
 }
+
+delegate_schema!(
+    (GeneralGeneric<P>) encodes (bstr::BString) like (PlainBytes) encodes (&'static [u8])
+    with generics (const P: u8)
+);
 
 impl<const P: u8> ValueEncoder<GeneralGeneric<P>, bstr::BString> for () {
     #[inline(always)]

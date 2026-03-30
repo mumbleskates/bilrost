@@ -1,4 +1,6 @@
 use crate::buf::ReverseBuf;
+use crate::delegate_schema;
+use crate::encoding::schema::{Schema, ValueSchema};
 use crate::encoding::{
     const_varint, delegate_encoding, delegate_value_encoding, encode_varint, encoded_len_varint,
     encoding_implemented_via_value_encoding, encoding_uses_base_empty_state,
@@ -8,6 +10,8 @@ use crate::encoding::{
 };
 use crate::DecodeErrorKind::InvalidValue;
 use alloc::borrow::Cow;
+use alloc::boxed::Box;
+use alloc::format;
 use alloc::vec::Vec;
 use bytes::{Buf, BufMut};
 use core::ops::Deref;
@@ -24,6 +28,12 @@ encoding_implemented_via_value_encoding!(PlainBytes);
 
 impl Wiretyped<PlainBytes, &[u8]> for () {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
+}
+
+impl ValueSchema<PlainBytes, &'static [u8]> for () {
+    fn repr(_: &impl Schema) -> Box<dyn core::fmt::Display> {
+        Box::new("delimited bytes")
+    }
 }
 
 impl ValueEncoder<PlainBytes, &[u8]> for () {
@@ -80,6 +90,8 @@ impl Wiretyped<PlainBytes, Vec<u8>> for () {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
 }
 
+delegate_schema!((PlainBytes) encodes (Vec<u8>) as (&'static [u8]));
+
 impl ValueEncoder<PlainBytes, Vec<u8>> for () {
     #[inline]
     fn encode_value<B: BufMut + ?Sized>(value: &Vec<u8>, buf: &mut B) {
@@ -129,13 +141,16 @@ delegate_value_encoding!(
 );
 
 delegate_encoding!(delegate from (PlainBytes) to (crate::encoding::Unpacked<PlainBytes>)
-    for type (Vec<Vec<u8>>) including distinguished);
+    for type (Vec<Vec<u8>>) including distinguished including schema);
 delegate_encoding!(delegate from (PlainBytes) to (crate::encoding::Unpacked<PlainBytes>)
-    for type (Vec<Cow<'a, [u8]>>) including distinguished with generics ('a));
+    for type (Vec<Cow<'a, [u8]>>) including distinguished including schema
+    with generics ('a));
 delegate_encoding!(delegate from (PlainBytes) to (crate::encoding::Unpacked<PlainBytes>)
-    for type (Vec<&'a [u8]>) including distinguished with generics ('a));
+    for type (Vec<&'a [u8]>) including distinguished including schema
+    with generics ('a));
 delegate_encoding!(delegate from (PlainBytes) to (crate::encoding::Unpacked<PlainBytes>)
-    for type (Vec<&'a [u8; N]>) including distinguished with generics ('a, const N: usize));
+    for type (Vec<&'a [u8; N]>) including distinguished including schema
+    with generics ('a, const N: usize));
 
 #[cfg(test)]
 mod vec_u8 {
@@ -167,6 +182,12 @@ mod cow_bytes {
 
 impl<const N: usize> Wiretyped<PlainBytes, [u8; N]> for () {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
+}
+
+impl<const N: usize> ValueSchema<PlainBytes, [u8; N]> for () {
+    fn repr(_: &impl Schema) -> Box<dyn core::fmt::Display> {
+        Box::new(format!("delimited bytes, exactly {N}"))
+    }
 }
 
 impl<const N: usize> ValueEncoder<PlainBytes, [u8; N]> for () {
@@ -233,6 +254,11 @@ delegate_value_encoding!(
 impl<const N: usize> Wiretyped<PlainBytes, &[u8; N]> for () {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
 }
+
+delegate_schema!(
+    (PlainBytes) encodes (&'static [u8; N]) as ([u8; N])
+    with generics (const N: usize)
+);
 
 impl<'a, const N: usize> ValueEncoder<PlainBytes, &'a [u8; N]> for () {
     #[inline]

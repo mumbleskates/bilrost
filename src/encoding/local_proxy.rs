@@ -134,6 +134,8 @@ where
         Self::Item: 'a,
         Self: 'a;
 
+    const BOUNDS: core::ops::RangeInclusive<Option<usize>> = None..=Some(N);
+
     fn len(&self) -> usize {
         self.size
     }

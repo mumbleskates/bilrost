@@ -1,5 +1,6 @@
 use crate::encoding::implement_core_empty_state_rules;
 use crate::{Canonicity, DecodeErrorKind};
+use core::ops::RangeInclusive;
 
 /// Trait for types that have a state that is considered "empty".
 ///
@@ -143,6 +144,10 @@ where
     where
         Self::Item: 'a,
         Self: 'a;
+    /// Range for how many items may be contained
+    const BOUNDS: RangeInclusive<Option<usize>> = None..=None;
+    /// Restrictions on the contained items, such as "unique".
+    const RESTRICTIONS: Option<&'static str> = None;
 
     fn len(&self) -> usize;
     fn iter(&self) -> Self::RefIter<'_>;
