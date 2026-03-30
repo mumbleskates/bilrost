@@ -16,6 +16,7 @@ use alloc::boxed::Box;
 use alloc::format;
 use alloc::string::String;
 use bytes::BufMut;
+use core::fmt::Display;
 
 pub struct Unpacked<E = GeneralPacked>(E);
 
@@ -256,7 +257,7 @@ where
     C: Collection<Item = T>,
     (): ValueSchema<E, T> + EmptyState<(), C> + ForOverwrite<E, T> + ValueEncoder<E, T>,
 {
-    fn repr(schema: &Schema) -> Box<dyn core::fmt::Display> {
+    fn repr(schema: &Schema) -> Box<dyn Display> {
         let bounds = match (C::BOUNDS.start(), C::BOUNDS.end()) {
             (None, None) => String::new(),
             (None, Some(max)) => format!("; at most {max} items"),
@@ -319,7 +320,7 @@ impl<T, const N: usize, E> ValueSchema<Unpacked<E>, [T; N]> for ()
 where
     (): ValueSchema<E, T> + ForOverwrite<E, T> + ValueEncoder<E, T>,
 {
-    fn repr(schema: &Schema) -> Box<dyn core::fmt::Display> {
+    fn repr(schema: &Schema) -> Box<dyn Display> {
         Box::new(format!(
             "{unpacked_repr}; exactly {N} items",
             unpacked_repr = <() as ValueSchema<Unpacked<E>, [T]>>::repr(schema),
@@ -366,7 +367,7 @@ impl<T, E> ValueSchema<Unpacked<E>, [T]> for ()
 where
     (): ValueSchema<E, T> + ForOverwrite<E, T> + ValueEncoder<E, T>,
 {
-    fn repr(schema: &Schema) -> Box<dyn core::fmt::Display> {
+    fn repr(schema: &Schema) -> Box<dyn Display> {
         Box::new(format!(
             "repeated field (items: {value_repr})",
             value_repr = <() as ValueSchema<E, T>>::repr(schema),

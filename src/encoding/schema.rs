@@ -15,12 +15,11 @@ use alloc::borrow::ToOwned;
 use alloc::boxed::Box;
 use alloc::collections::btree_map::Entry;
 use alloc::collections::{BTreeMap, BTreeSet};
-use alloc::fmt::Display;
 use alloc::format;
 use alloc::string::String;
 use alloc::sync::Arc;
 use core::any::{Any, TypeId};
-use core::fmt::Formatter;
+use core::fmt::{Display, Formatter};
 use core::ops::DerefMut;
 
 /// Common trait for interior mutability
@@ -155,7 +154,7 @@ impl Schema {
             func: A,
         }
 
-        impl<A> core::fmt::Display for LazyRepr<A>
+        impl<A> Display for LazyRepr<A>
         where
             A: 'static + Fn(&Schema, &mut core::fmt::Formatter<'_>) -> core::fmt::Result,
         {

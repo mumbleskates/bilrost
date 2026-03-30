@@ -16,6 +16,7 @@ use alloc::boxed::Box;
 use alloc::format;
 use alloc::string::String;
 use bytes::{Buf, BufMut};
+use core::fmt::Display;
 
 pub struct Packed<E = GeneralPacked>(E);
 
@@ -31,7 +32,7 @@ where
     C: Collection<Item = T>,
     (): ValueSchema<E, T> + EmptyState<(), C> + ForOverwrite<E, T> + ValueEncoder<E, T>,
 {
-    fn repr(schema: &Schema) -> Box<dyn core::fmt::Display> {
+    fn repr(schema: &Schema) -> Box<dyn Display> {
         let bounds = match (C::BOUNDS.start(), C::BOUNDS.end()) {
             (None, None) => String::new(),
             (None, Some(max)) => format!("; at most {max} items"),
@@ -123,7 +124,7 @@ impl<T, const N: usize, E> ValueSchema<Packed<E>, [T; N]> for ()
 where
     (): ValueSchema<E, T> + ValueEncoder<E, T>,
 {
-    fn repr(schema: &Schema) -> Box<dyn core::fmt::Display> {
+    fn repr(schema: &Schema) -> Box<dyn Display> {
         if N == 0 {
             Box::new("delimited empty")
         } else {
@@ -192,7 +193,7 @@ impl<T, E> ValueSchema<Packed<E>, [T]> for ()
 where
     (): ValueSchema<E, T>,
 {
-    fn repr(schema: &Schema) -> Box<dyn core::fmt::Display> {
+    fn repr(schema: &Schema) -> Box<dyn Display> {
         Box::new(format!(
             "delimited packed (items: {item_repr})",
             item_repr = <() as ValueSchema<E, T>>::repr(schema),

@@ -12,6 +12,7 @@ use crate::DecodeErrorKind::Truncated;
 use alloc::boxed::Box;
 use alloc::format;
 use bytes::{Buf, BufMut};
+use core::fmt::Display;
 
 pub struct Map<KE = GeneralPacked, VE = GeneralPacked>(KE, VE);
 
@@ -68,7 +69,7 @@ where
         + ForOverwrite<VE, V>
         + ValueEncoder<VE, V>,
 {
-    fn repr(schema: &Schema) -> Box<dyn core::fmt::Display> {
+    fn repr(schema: &Schema) -> Box<dyn Display> {
         Box::new(format!(
             "delimited map (keys: {key_repr}; values: {value_repr})",
             key_repr = <() as ValueSchema<KE, K>>::repr(schema),

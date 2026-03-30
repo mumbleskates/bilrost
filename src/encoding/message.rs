@@ -10,6 +10,7 @@ use crate::Canonicity::Canonical;
 use crate::DecodeError;
 use alloc::boxed::Box;
 use bytes::{Buf, BufMut};
+use core::fmt::Display;
 
 /// Encoding that performs the actual value-encoding of messages, to and from `RawMessage`-family
 /// traits into length-delimited values on the wire. By default this is directly delegated to by
@@ -354,7 +355,7 @@ impl<T> ValueSchema<MessageEncoding, T> for ()
 where
     T: MessageSchema,
 {
-    fn repr(schema: &Schema) -> Box<dyn core::fmt::Display> {
+    fn repr(schema: &Schema) -> Box<dyn Display> {
         schema.register::<T>();
         schema.make_lazy_repr(|schema, f| {
             write!(

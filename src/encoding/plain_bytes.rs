@@ -14,6 +14,7 @@ use alloc::boxed::Box;
 use alloc::format;
 use alloc::vec::Vec;
 use bytes::{Buf, BufMut};
+use core::fmt::Display;
 use core::ops::Deref;
 
 /// `PlainBytes` implements encoding for blob values directly into `Vec<u8>`, and provides the base
@@ -31,7 +32,7 @@ impl Wiretyped<PlainBytes, &[u8]> for () {
 }
 
 impl ValueSchema<PlainBytes, &[u8]> for () {
-    fn repr(_: &Schema) -> Box<dyn core::fmt::Display> {
+    fn repr(_: &Schema) -> Box<dyn Display> {
         Box::new("delimited bytes")
     }
 }
@@ -199,7 +200,7 @@ impl<const N: usize> Wiretyped<PlainBytes, [u8; N]> for () {
 }
 
 impl<const N: usize> ValueSchema<PlainBytes, [u8; N]> for () {
-    fn repr(_: &Schema) -> Box<dyn core::fmt::Display> {
+    fn repr(_: &Schema) -> Box<dyn Display> {
         Box::new(format!("delimited bytes, exactly {N}"))
     }
 }

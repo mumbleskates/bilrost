@@ -20,6 +20,7 @@ use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::string::String;
 use alloc::vec::Vec;
 use bytes::{Buf, BufMut, Bytes};
+use core::fmt::Display;
 use core::mem;
 use core::str;
 
@@ -175,7 +176,7 @@ impl<const P: u8> Wiretyped<GeneralGeneric<P>, &str> for () {
 }
 
 impl<const P: u8> ValueSchema<GeneralGeneric<P>, &str> for () {
-    fn repr(_: &Schema) -> Box<dyn core::fmt::Display> {
+    fn repr(_: &Schema) -> Box<dyn Display> {
         Box::new("delimited, must be utf8")
     }
 }
