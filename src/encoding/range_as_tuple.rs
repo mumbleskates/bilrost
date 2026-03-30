@@ -51,7 +51,6 @@ where
     }
 }
 
-// TODO: actually these should be named
 delegate_schema!(
     ((Estart, Eend)) encodes (Range<T>) as ((T, T))
     with generics (Estart, Eend, T)
@@ -235,7 +234,6 @@ where
     }
 }
 
-// TODO: actually these should be named
 delegate_schema!(
     ((Estart, Eend)) encodes (RangeInclusive<T>) as ((T, T))
     with generics (Estart, Eend, T)
