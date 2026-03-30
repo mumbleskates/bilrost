@@ -25,9 +25,14 @@ use core::ops::DerefMut;
 
 /// Common trait for interior mutability
 trait BorrowGuard<T> {
+    type Borrowed<'a>: DerefMut<Target = T>
+    where
+        Self: 'a,
+        T: 'a;
+
     fn new(t: T) -> Self;
 
-    fn get_guarded(&self) -> impl DerefMut<Target = T>;
+    fn get_guarded(&self) -> Self::Borrowed<'_>;
 }
 
 #[cfg(feature = "threadsafe-schema")]
@@ -35,11 +40,16 @@ mod guard {
     pub(super) use spin::Mutex as Guard;
 
     impl<T> super::BorrowGuard<T> for Guard<T> {
+        type Borrowed<'a>
+            = spin::MutexGuard<'a, T>
+        where
+            T: 'a;
+
         fn new(t: T) -> Self {
             Guard::new(t)
         }
 
-        fn get_guarded(&self) -> impl core::ops::DerefMut<Target = T> {
+        fn get_guarded(&self) -> Self::Borrowed<'_> {
             self.lock()
         }
     }
@@ -50,11 +60,16 @@ mod guard {
     pub(super) use core::cell::RefCell as Guard;
 
     impl<T> super::BorrowGuard<T> for Guard<T> {
+        type Borrowed<'a>
+            = core::cell::RefMut<'a, T>
+        where
+            T: 'a;
+
         fn new(t: T) -> Self {
             Guard::new(t)
         }
 
-        fn get_guarded(&self) -> impl core::ops::DerefMut<Target = T> {
+        fn get_guarded(&self) -> Self::Borrowed<'_> {
             self.borrow_mut()
         }
     }
