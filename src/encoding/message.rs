@@ -1,5 +1,5 @@
 use crate::buf::ReverseBuf;
-use crate::encoding::schema::{MessageSchema, Schema, ValueSchema};
+use crate::encoding::schema::{FieldSet, MessageSchema, Schema, ValueSchema};
 use crate::encoding::{
     encode_varint, encoded_len_varint, implement_core_empty_state_rules, prepend_varint,
     Canonicity, Capped, DecodeContext, DistinguishedValueBorrowDecoder, DistinguishedValueDecoder,
@@ -361,7 +361,7 @@ where
             write!(
                 f,
                 "delimited message {message_type}",
-                message_type = schema.type_reference::<T>()
+                message_type = schema.type_reference::<T>(),
             )
         })
     }
@@ -466,5 +466,11 @@ where
             return ctx.check(Canonicity::NotCanonical);
         }
         borrow_merge_distinguished(value, buf, ctx.enter_recursion())
+    }
+}
+
+impl MessageSchema for () {
+    fn register_fields(fields: &mut impl FieldSet, _: &Schema) {
+        fields.add_name("()");
     }
 }

@@ -1,9 +1,10 @@
 #[cfg(any(feature = "chrono", feature = "time"))]
 pub(crate) mod time_proxies {
     use crate::buf::ReverseBuf;
+    use crate::encoding::schema::{FieldSet, MessageSchema, Schema, ValueSchema};
     use crate::encoding::underived::{
         underived_decode, underived_decode_distinguished, underived_encode, underived_encoded_len,
-        underived_prepend,
+        underived_prepend, underived_schema,
     };
     use crate::encoding::{
         delegate_value_encoding, empty_state_via_default, Capped, DecodeContext,
@@ -12,7 +13,9 @@ pub(crate) mod time_proxies {
     };
     use crate::DecodeErrorKind::InvalidValue;
     use crate::{Canonicity, DecodeError};
+    use alloc::boxed::Box;
     use bytes::{Buf, BufMut};
+    use core::fmt::Display;
 
     #[derive(Debug, Default, PartialEq, Eq)]
     pub(crate) struct TimeDeltaProxy {
@@ -24,6 +27,26 @@ pub(crate) mod time_proxies {
 
     impl<const P: u8> Wiretyped<GeneralGeneric<P>, TimeDeltaProxy> for () {
         const WIRE_TYPE: WireType = WireType::LengthDelimited;
+    }
+
+    impl MessageSchema for TimeDeltaProxy {
+        underived_schema!(TimeDelta {
+            1: General => secs: i64,
+            2: Fixed => nanos: i32,
+        });
+    }
+
+    impl<const P: u8> ValueSchema<GeneralGeneric<P>, TimeDeltaProxy> for () {
+        fn repr(schema: &Schema) -> Box<dyn Display> {
+            schema.register::<TimeDeltaProxy>();
+            schema.make_lazy_repr(|schema, f| {
+                write!(
+                    f,
+                    "delimited message {message_type}",
+                    message_type = schema.type_reference::<TimeDeltaProxy>(),
+                )
+            })
+        }
     }
 
     impl<const P: u8> ValueEncoder<GeneralGeneric<P>, TimeDeltaProxy> for () {

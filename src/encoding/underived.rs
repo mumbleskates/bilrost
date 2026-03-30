@@ -3,6 +3,27 @@
 //! being forced to use tuple types which might not be desirable. The implementations here are based
 //! on the code in the tuple encoder macro; these are mostly useful for making proxies.
 
+#[allow(unused_macros)]
+macro_rules! underived_schema {
+    (
+        $name:ident {
+            $($tag:literal: $encoding:ty => $field_name:ident: $ty:ty),* $(,)?
+        }
+    ) => {
+        fn register_fields(
+            fields: &mut impl $crate::encoding::schema::FieldSet,
+            schema: &crate::encoding::schema::Schema,
+        ) {
+            $(fields.add_field(
+                stringify!($field_name),
+                $tag,
+                <() as ValueSchema<$encoding, $ty>>::repr(schema),
+            );)*
+        }
+    };
+}
+pub(crate) use underived_schema;
+
 /// Fields must be listed in forward order here, and the targets should be &const.
 #[allow(unused_macros)]
 macro_rules! underived_encode {
@@ -23,7 +44,7 @@ macro_rules! underived_encode {
             let tw = &mut TagWriter::new();
             $(<() as Encoder<$encoding, _>>::encode($tag, $target, buf, tw);)*
         }
-    }
+    };
 }
 #[allow(unused_imports)]
 pub(crate) use underived_encode;
@@ -46,7 +67,7 @@ macro_rules! underived_prepend {
             tw.finalize(buf);
             prepend_varint((buf.remaining() - end) as u64, buf);
         }
-    }
+    };
 }
 #[allow(unused_imports)]
 pub(crate) use underived_prepend;
@@ -67,7 +88,7 @@ macro_rules! underived_encoded_len {
             )*;
             encoded_len_varint(message_len as u64) + message_len
         }
-    }
+    };
 }
 #[allow(unused_imports)]
 pub(crate) use underived_encoded_len;
@@ -120,6 +141,7 @@ macro_rules! underived_decode {
             Result::<(), crate::DecodeError>::Ok(())
         }
     };
+
     (
         $name:ident {
             $($tag:literal: $encoding:ty => $field_name:ident: $target:expr),* $(,)?
@@ -212,6 +234,7 @@ macro_rules! underived_decode_distinguished {
             }
         }
     };
+
     (
         $name:ident {
             $($tag:literal: $encoding:ty => $field_name:ident: $target:expr),* $(,)?

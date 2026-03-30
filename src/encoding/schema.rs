@@ -201,18 +201,23 @@ impl Display for Schema {
         let mut type_indexes = BTreeMap::new();
         for (msg_idx, (type_id, msg_info)) in self.0.types.get_guarded().iter().enumerate() {
             type_indexes.insert(*type_id, msg_idx);
+            // TODO: build the indexes in the schema itself and use them in `type_reference`
             if msg_idx > 0 {
                 writeln!(f)?;
             }
             let msg_info = msg_info.get_guarded();
             writeln!(f, "[{msg_idx}] {name} {{", name = msg_info.name())?;
-            for (tag, field) in &msg_info.fields {
-                writeln!(
-                    f,
-                    "    {tag}: {field_name} ({repr}),",
-                    field_name = &field.name,
-                    repr = &field.repr,
-                )?;
+            if msg_info.fields.is_empty() {
+                writeln!(f, "    // empty")?;
+            } else {
+                for (tag, field) in &msg_info.fields {
+                    writeln!(
+                        f,
+                        "    {tag}: {field_name} ({repr}),",
+                        field_name = &field.name,
+                        repr = &field.repr,
+                    )?;
+                }
             }
             writeln!(f, "}}")?;
         }
