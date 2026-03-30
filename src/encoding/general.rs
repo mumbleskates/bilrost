@@ -56,7 +56,7 @@ delegate_encoding!(
     delegate from (General) to (Unpacked) for type (Cow<'a, [T]>)
     including distinguished including schema
     with where clause (T: Clone)
-    with generics ('a, T)
+    with generics ('a, T: 'a)
 );
 delegate_encoding!(
     delegate from (General) to (Unpacked) for type (BTreeSet<T>)
@@ -174,7 +174,7 @@ impl<const P: u8> Wiretyped<GeneralGeneric<P>, &str> for () {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
 }
 
-impl<const P: u8> ValueSchema<GeneralGeneric<P>, &'static str> for () {
+impl<const P: u8> ValueSchema<GeneralGeneric<P>, &str> for () {
     fn repr(_: &impl Schema) -> Box<dyn core::fmt::Display> {
         Box::new("delimited, must be utf8")
     }

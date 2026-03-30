@@ -16,7 +16,7 @@ impl<const P: u8> Wiretyped<GeneralGeneric<P>, &bstr::BStr> for () {
 }
 
 delegate_schema!(
-    (GeneralGeneric<P>) encodes (&'static bstr::BStr) like (PlainBytes) encodes (&'static [u8])
+    (GeneralGeneric<P>) encodes (&bstr::BStr) like (PlainBytes) encodes (&'static [u8])
     with generics (const P: u8)
 );
 
