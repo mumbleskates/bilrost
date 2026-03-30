@@ -77,8 +77,14 @@ mod guard {
 
 use guard::Guard;
 
-pub fn new_schema() -> impl Schema {
-    MessageSet::new()
+/// A collected internally-complete set of message definitions.
+#[derive(Clone)]
+pub struct Schema(Arc<MessageSet>);
+
+struct MessageSet {
+    types: Guard<BTreeMap<TypeId, Arc<Guard<MessageInfo>>>>,
+    // TODO: pre-organize the types (or their names) for disambiguation and which index they will
+    //  be found at in the final printout
 }
 
 /// Receptacle for a full schema that can record the schemas of many messages.
@@ -88,17 +94,85 @@ pub fn new_schema() -> impl Schema {
 /// whole schema so that they can get the name of a type. We want the overall schema not to be
 /// frozen in place as we collect these reprs even as their potential output changes and more types
 /// are registered.
-pub trait Schema: Clone + Display {
-    // TODO: notes for a type, like what it should be called etc.
+impl Schema {
+    pub fn new() -> Self {
+        Self(
+            MessageSet {
+                types: Default::default(),
+            }
+            .into(),
+        )
+    }
+
     /// Visits a specific message type. May shortcut if this method has already been invoked
     /// elsewhere for the same type.
-    fn register<M: MessageSchema>(&self, name: &str);
+    // TODO: this should probably take no name and there should be another method for naming it
+    pub fn register<M: MessageSchema>(&self) {
+        self.register_with_alias::<M>("")
+    }
+
+    pub fn register_with_alias<M: MessageSchema>(&self, name: &str) {
+        let mut types = self.0.types.get_guarded();
+        let field_set = match types.entry(TypeId::of::<M>()) {
+            Entry::Vacant(entry) => entry
+                .insert(Arc::new(Guard::new(MessageInfo::new(name))))
+                .clone(),
+            Entry::Occupied(mut entry) => {
+                if name != "" {
+                    entry.get_mut().get_guarded().add_name(name);
+                }
+                return; // type was already registered previously
+            }
+        };
+        drop(types);
+        M::register_fields(field_set.get_guarded().deref_mut(), self);
+    }
+
     /// Name for a type that disambiguates where it can be found in the entire schema output.
-    fn type_reference<M: MessageSchema>(&self) -> String;
+    pub fn type_reference<M: MessageSchema>(&self) -> String {
+        // TODO: this is a placeholder, we want to use the type's ordinal after they're organized
+        let id = TypeId::of::<M>();
+        let name = self
+            .0
+            .types
+            .get_guarded()
+            .get(&id)
+            .map_or_else(|| "<unnamed>".to_owned(), |info| info.get_guarded().name());
+        format!("{name} ({id:?})")
+    }
+
+    /// Returns a lazily-evaluated repr using the given closure. The closure won't be invoked until
+    /// the schema is displayed, so `schema.type_reference::<T>()` can correctly specify the name
+    /// of the type `T`.
+    pub fn make_lazy_repr<A>(&self, a: A) -> Box<dyn Display>
+    where
+        A: 'static + Fn(&Schema, &mut core::fmt::Formatter<'_>) -> core::fmt::Result,
+    {
+        struct LazyRepr<A> {
+            schema: Schema,
+            func: A,
+        }
+
+        impl<A> core::fmt::Display for LazyRepr<A>
+        where
+            A: 'static + Fn(&Schema, &mut core::fmt::Formatter<'_>) -> core::fmt::Result,
+        {
+            fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+                (self.func)(&self.schema, f)
+            }
+        }
+
+        Box::new(LazyRepr {
+            schema: self.clone(),
+            func: a,
+        })
+    }
 }
 
 /// Receptacle for fields in a single specific message type.
 pub trait FieldSet {
+    /// Adds a name for the whole message.
+    fn add_name(&mut self, message_name: &str);
     // TODO: notes for the whole type (distinguished?)
     /// Adds a field to the type.
     fn add_field(&mut self, name: &str, tag: u32, repr: Box<dyn Display>);
@@ -108,7 +182,7 @@ pub trait FieldSet {
 
 /// A message type that can report the fields in its schema.
 pub trait MessageSchema: Any {
-    fn register_fields(fields: &mut impl FieldSet, schema: &impl Schema);
+    fn register_fields(fields: &mut impl FieldSet, schema: &Schema);
 }
 
 /// Trait for an encoding E to describe its representation of a type T.
@@ -118,64 +192,13 @@ pub trait ValueSchema<E, T: ?Sized> {
     /// Returns the representation of the field. This may register other message types with the
     /// schema and the returned value may use the schema to look up the name of those other message
     /// types when displaying.
-    fn repr(schema: &impl Schema) -> Box<dyn Display>;
+    fn repr(schema: &Schema) -> Box<dyn Display>;
 }
 
-pub fn repr<E, T>(schema: &impl Schema) -> Box<dyn Display>
-where
-    (): ValueSchema<E, T>,
-{
-    <() as ValueSchema<E, T>>::repr(schema)
-}
-
-/// A collected internally-complete set of message definitions.
-struct MessageSet {
-    types: Guard<BTreeMap<TypeId, Arc<Guard<MessageInfo>>>>,
-    // TODO: pre-organize the types (or their names) for disambiguation and which index they will
-    //  be found at in the final printout
-}
-
-impl MessageSet {
-    fn new() -> Arc<Self> {
-        Self {
-            types: Default::default(),
-        }
-        .into()
-    }
-}
-
-impl Schema for Arc<MessageSet> {
-    fn register<M: MessageSchema>(&self, name: &str) {
-        let mut types = self.types.get_guarded();
-        let field_set = match types.entry(TypeId::of::<M>()) {
-            Entry::Vacant(entry) => entry
-                .insert(Arc::new(Guard::new(MessageInfo::new(name))))
-                .clone(),
-            Entry::Occupied(mut entry) => {
-                entry.get_mut().get_guarded().add_name(name);
-                return; // type was already registered previously
-            }
-        };
-        drop(types);
-        M::register_fields(field_set.get_guarded().deref_mut(), self);
-    }
-
-    fn type_reference<M: MessageSchema>(&self) -> String {
-        // TODO: this is a placeholder, we want to use the type's ordinal after they're organized
-        let id = TypeId::of::<M>();
-        let name = self
-            .types
-            .get_guarded()
-            .get(&id)
-            .map_or_else(|| "<unnamed>".to_owned(), |info| info.get_guarded().name());
-        format!("{name} ({id:?})")
-    }
-}
-
-impl Display for MessageSet {
+impl Display for Schema {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         let mut type_indexes = BTreeMap::new();
-        for (msg_idx, (type_id, msg_info)) in self.types.get_guarded().iter().enumerate() {
+        for (msg_idx, (type_id, msg_info)) in self.0.types.get_guarded().iter().enumerate() {
             type_indexes.insert(*type_id, msg_idx);
             if msg_idx > 0 {
                 writeln!(f)?;
@@ -212,10 +235,6 @@ impl MessageInfo {
         }
     }
 
-    fn add_name(&mut self, name: &str) {
-        self.names.insert(name.to_owned());
-    }
-
     fn name(&self) -> String {
         match self.names.len() {
             // MSRV: this could be .first()
@@ -226,6 +245,10 @@ impl MessageInfo {
 }
 
 impl FieldSet for MessageInfo {
+    fn add_name(&mut self, name: &str) {
+        self.names.insert(name.to_owned());
+    }
+
     fn add_field(&mut self, name: &str, tag: u32, repr: Box<dyn Display>) {
         if self
             .fields

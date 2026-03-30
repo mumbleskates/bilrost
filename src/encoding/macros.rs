@@ -16,7 +16,7 @@ macro_rules! delegate_schema {
             $($($where_clause)+ ,)?
         {
             fn repr(
-                schema: &impl $crate::encoding::schema::Schema,
+                schema: &$crate::encoding::schema::Schema,
             ) -> ::alloc::boxed::Box<dyn ::core::fmt::Display> {
                 <() as $crate::encoding::schema::ValueSchema<$to_ty, $to_value_ty>>::repr(schema)
             }

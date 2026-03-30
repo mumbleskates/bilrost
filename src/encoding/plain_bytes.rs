@@ -31,7 +31,7 @@ impl Wiretyped<PlainBytes, &[u8]> for () {
 }
 
 impl ValueSchema<PlainBytes, &[u8]> for () {
-    fn repr(_: &impl Schema) -> Box<dyn core::fmt::Display> {
+    fn repr(_: &Schema) -> Box<dyn core::fmt::Display> {
         Box::new("delimited bytes")
     }
 }
@@ -199,7 +199,7 @@ impl<const N: usize> Wiretyped<PlainBytes, [u8; N]> for () {
 }
 
 impl<const N: usize> ValueSchema<PlainBytes, [u8; N]> for () {
-    fn repr(_: &impl Schema) -> Box<dyn core::fmt::Display> {
+    fn repr(_: &Schema) -> Box<dyn core::fmt::Display> {
         Box::new(format!("delimited bytes, exactly {N}"))
     }
 }

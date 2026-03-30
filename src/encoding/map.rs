@@ -68,7 +68,7 @@ where
         + ForOverwrite<VE, V>
         + ValueEncoder<VE, V>,
 {
-    fn repr(schema: &impl Schema) -> Box<dyn core::fmt::Display> {
+    fn repr(schema: &Schema) -> Box<dyn core::fmt::Display> {
         Box::new(format!(
             "delimited map (keys: {key_repr}; values: {value_repr})",
             key_repr = <() as ValueSchema<KE, K>>::repr(schema),

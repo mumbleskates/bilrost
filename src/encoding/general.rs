@@ -175,7 +175,7 @@ impl<const P: u8> Wiretyped<GeneralGeneric<P>, &str> for () {
 }
 
 impl<const P: u8> ValueSchema<GeneralGeneric<P>, &str> for () {
-    fn repr(_: &impl Schema) -> Box<dyn core::fmt::Display> {
+    fn repr(_: &Schema) -> Box<dyn core::fmt::Display> {
         Box::new("delimited, must be utf8")
     }
 }

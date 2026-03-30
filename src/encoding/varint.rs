@@ -74,7 +74,7 @@ macro_rules! varint {
         }
 
         impl ValueSchema<Varint, $ty> for () {
-            fn repr(_: &impl Schema) -> Box<dyn core::fmt::Display> {
+            fn repr(_: &Schema) -> Box<dyn core::fmt::Display> {
                 const SIGNEDNESS: &'static str = $signedness;
                 const SIZE: usize = mem::size_of::<$ty>();
                 if SIGNEDNESS== "boolean" {

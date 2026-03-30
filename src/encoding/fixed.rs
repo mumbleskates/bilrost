@@ -95,7 +95,7 @@ macro_rules! fixed_width_int {
         );
 
         impl ValueSchema<Fixed, $ty> for () {
-            fn repr(_: &impl Schema) -> Box<dyn core::fmt::Display> {
+            fn repr(_: &Schema) -> Box<dyn core::fmt::Display> {
                 Box::new(format!(
                     "fixed {size} bytes, {signedness} integer",
                     size = mem::size_of::<$ty>(),
@@ -182,7 +182,7 @@ macro_rules! fixed_width_float {
         delegate_value_encoding!(encoding (Fixed) borrows type ($ty) as owned);
 
         impl ValueSchema<Fixed, $ty> for () {
-            fn repr(_: &impl Schema) -> Box<dyn core::fmt::Display> {
+            fn repr(_: &Schema) -> Box<dyn core::fmt::Display> {
                 Box::new(format!(
                     "fixed {size} bytes, ieee754 floating point",
                     size = mem::size_of::<$ty>(),
@@ -219,7 +219,7 @@ macro_rules! fixed_width_array {
         }
 
         impl ValueSchema<Fixed, [u8; $N]> for () {
-            fn repr(_: &impl Schema) -> Box<dyn core::fmt::Display> {
+            fn repr(_: &Schema) -> Box<dyn core::fmt::Display> {
                 Box::new(format!("fixed {size} bytes, plain", size = $N))
             }
         }

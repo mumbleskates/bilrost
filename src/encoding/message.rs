@@ -1,4 +1,5 @@
 use crate::buf::ReverseBuf;
+use crate::encoding::schema::{MessageSchema, Schema, ValueSchema};
 use crate::encoding::{
     encode_varint, encoded_len_varint, implement_core_empty_state_rules, prepend_varint,
     Canonicity, Capped, DecodeContext, DistinguishedValueBorrowDecoder, DistinguishedValueDecoder,
@@ -347,6 +348,22 @@ where
     T: RawMessage,
 {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
+}
+
+impl<T> ValueSchema<MessageEncoding, T> for ()
+where
+    T: MessageSchema,
+{
+    fn repr(schema: &Schema) -> Box<dyn core::fmt::Display> {
+        schema.register::<T>();
+        schema.make_lazy_repr(|schema, f| {
+            write!(
+                f,
+                "delimited message {message_type}",
+                message_type = schema.type_reference::<T>()
+            )
+        })
+    }
 }
 
 impl<T> ValueEncoder<MessageEncoding, T> for ()

@@ -18,6 +18,7 @@
 use bytes::{Buf, BufMut};
 
 use crate::buf::ReverseBuf;
+use crate::encoding::schema::{FieldSet, MessageSchema, Schema, ValueSchema};
 use crate::encoding::{
     delegate_value_encoding, encode_varint, encoded_len_varint,
     encoding_implemented_via_value_encoding, implement_core_empty_state_rules, prepend_varint,
@@ -29,6 +30,15 @@ use crate::encoding::{
 };
 use crate::DecodeError;
 use crate::DecodeErrorKind::UnexpectedlyRepeated;
+use alloc::boxed::Box;
+
+/// This type is intentionally never constructed. It stands in as an identifier of tuple messages
+/// and identifies both the value types and their encodings via its type-id.
+#[allow(dead_code)]
+struct TupleIdentity<E: 'static, V: 'static> {
+    encodings: E,
+    values: V,
+}
 
 macro_rules! impl_tuple {
     (
@@ -84,6 +94,39 @@ macro_rules! impl_tuple {
 
         impl<$($letters,)* $($encodings,)*> Wiretyped<($($encodings,)*), ($($letters,)*)> for () {
             const WIRE_TYPE: WireType = WireType::LengthDelimited;
+        }
+
+        impl <$($letters,)* $($encodings,)*> MessageSchema
+        for TupleIdentity<($($encodings,)*), ($($letters,)*)>
+        where
+            $((): ValueSchema<$encodings, $letters>, $letters: 'static, $encodings: 'static,)*
+        {
+            fn register_fields(fields: &mut impl FieldSet, schema: &Schema) {
+                $(fields.add_field(
+                    stringify!($numbers),
+                    $numbers,
+                    <() as ValueSchema<$encodings, $letters>>::repr(schema),
+                );)*
+            }
+        }
+
+        impl <$($letters,)* $($encodings,)*> ValueSchema<($($encodings,)*), ($($letters,)*)> for ()
+        where
+            $((): ValueSchema<$encodings, $letters>, $letters: 'static, $encodings: 'static,)*
+        {
+            fn repr(schema: &Schema) -> Box<dyn core::fmt::Display> {
+                // TODO: possibly there's a better way to name the type here. any::type_name can
+                //  is one example of something that can get the actual names of the tuple members
+                //  but we might not want to do that.
+                schema.register_with_alias::<TupleIdentity<($($encodings,)*), ($($letters,)*)>>($name);
+                schema.make_lazy_repr(|schema, f| write!(
+                    f,
+                    "delimited tuple message {message_type}",
+                    message_type = schema.type_reference::<
+                        TupleIdentity<($($encodings,)*), ($($letters,)*)>
+                    >()
+                ))
+            }
         }
 
         impl<$($letters,)* $($encodings,)*> ValueEncoder<($($encodings,)*), ($($letters,)*)> for ()
