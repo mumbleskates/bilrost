@@ -651,7 +651,7 @@ fn test_present_and_empty() {
 
 #[test]
 fn unaligned_fixed64_packed() {
-    // Construct a length-delineated field that is not a multiple of 8 bytes.
+    // Construct a length-delimited field that is not a multiple of 8 bytes.
     let mut buf = Vec::<u8>::new();
     encode_varint(12, &mut buf);
     buf.extend([1; 12]);
@@ -681,7 +681,7 @@ fn unaligned_fixed64_packed() {
 
 #[test]
 fn unaligned_fixed32_packed() {
-    // Construct a length-delineated field that is not a multiple of 4 bytes.
+    // Construct a length-delimited field that is not a multiple of 4 bytes.
     let mut buf = Vec::<u8>::new();
     encode_varint(17, &mut buf);
     buf.extend([1; 17]);
@@ -711,7 +711,7 @@ fn unaligned_fixed32_packed() {
 
 #[test]
 fn unaligned_map_packed() {
-    // Construct a length-delineated field that is not a multiple of the sum of fixed size key
+    // Construct a length-delimited field that is not a multiple of the sum of fixed size key
     // and value in a map. In the case we are testing it is a fixed size 4+8 = 12 bytes per
     // entry.
     let mut buf = Vec::<u8>::new();

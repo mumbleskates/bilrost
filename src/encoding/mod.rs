@@ -982,7 +982,7 @@ impl<'a, B: 'a + Buf + ?Sized> Capped<'a, B> {
     }
 
     /// Reads a length delimiter from the beginning of the wrapped buffer, then returns a subsidiary
-    /// Capped instance for the delineated bytes if it does not overrun the underlying buffer or
+    /// Capped instance for the delimited bytes if it does not overrun the underlying buffer or
     /// this instance's cap.
     #[inline(always)]
     pub fn take_length_delimited(&mut self) -> Result<Capped<'_, B>, DecodeError> {
@@ -1052,7 +1052,7 @@ impl<'a, B: 'a + Buf + ?Sized> Capped<'a, B> {
 
 impl<'a> Capped<'_, &'a [u8]> {
     /// Reads a length delimiter from the beginning of the wrapped slice, then advances that inner
-    /// slice past the delineated bytes and returns them borrowed with lifetime if the instance's
+    /// slice past the delimited bytes and returns them borrowed with lifetime if the instance's
     /// cap is not overrun.
     #[inline(always)]
     pub fn take_borrowed_length_delimited(&mut self) -> Result<&'a [u8], DecodeError> {

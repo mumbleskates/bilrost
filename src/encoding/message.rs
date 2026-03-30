@@ -11,7 +11,7 @@ use alloc::boxed::Box;
 use bytes::{Buf, BufMut};
 
 /// Encoding that performs the actual value-encoding of messages, to and from `RawMessage`-family
-/// traits into length-delineated values on the wire. By default this is directly delegated to by
+/// traits into length-delimited values on the wire. By default this is directly delegated to by
 /// the general encodings.
 pub struct MessageEncoding;
 

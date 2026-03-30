@@ -1398,7 +1398,7 @@ Trait `BorrowedMessage<'a>`: decoding by borrowing data from a `&'a [u8]` slice
   type from a byte slice. The length delimited version of the call accepts a
   `&mut &'a [u8]` and after returning will have consumed the bytes that
   encoded the message from the front of the slice, leaving only the left-over
-  data (if any); the versions that are not length-delineated consume the entire
+  data (if any); the versions that are not length-delimited consume the entire
   slice by value.
 * `replace_borrowed_from`, `replace_borrowed_from_length_delimited`: exactly
   what you would expect based on `replace_from` and `decode_borrowed` -- this
