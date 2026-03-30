@@ -32,9 +32,10 @@ use crate::DecodeError;
 use crate::DecodeErrorKind::UnexpectedlyRepeated;
 use alloc::boxed::Box;
 
-/// This type is intentionally never constructed. It stands in as an identifier of tuple messages
-/// and identifies both the value types and their encodings via its type-id.
-#[allow(dead_code)]
+/// This type is intentionally never constructed and is private. It stands in as an identifier of
+/// tuple messages and identifies that ad-hoc message type by both its value types and their
+/// encodings.
+#[allow(dead_code)] // This type is intentionally never constructed
 struct TupleIdentity<E: 'static, V: 'static> {
     encodings: E,
     values: V,

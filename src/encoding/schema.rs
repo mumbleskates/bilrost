@@ -3,11 +3,11 @@
 //!
 //! The general flow goes like this:
 //!  * Create a Schema
-//!  * Register each of the message types we want to see with that schema. Messages that contain
-//!    other messages will register those in turn.
+//!  * Register each of the message types we want to see with that schema.
 //!      * When a message is registered this way, new message types that haven't been registered
 //!        before will have `MessageSchema::register_fields` called, and must describe their
 //!        fields into the `FieldSet` provided.
+//!      * Messages that contain other messages will register those in turn.
 //!  * Finally, once all relevant message types are registered, the schema can be Displayed, which
 //!    will output all the collected information.
 
@@ -128,7 +128,9 @@ impl Schema {
         M::register_fields(field_set.get_guarded().deref_mut(), self);
     }
 
-    /// Name for a type that disambiguates where it can be found in the entire schema output.
+    /// Name for a type that disambiguates where it can be found in the entire schema output. The
+    /// output of this function may differ as more types are added to the schema, so this should
+    /// only be called when the whole schema is being rendered; see `make_lazy_repr`.
     pub fn type_reference<M: MessageSchema>(&self) -> String {
         // TODO: this is a placeholder, we want to use the type's ordinal after they're organized
         let id = TypeId::of::<M>();
