@@ -6,7 +6,7 @@ use crate::field::traits::{
     DecodeLifetime::{self, Borrowed, Owned},
     DecodeMode::{self, Distinguished, Relaxed},
     FieldBearer, SinglyTagged, Tagged,
-    WhereFor::{self, Decode, Encode},
+    WhereFor::{self, Decode, Encode, Schema},
 };
 use crate::field::{parse_message_fields, Field, FieldTarget, InitMode, MessageFieldsSorted};
 use alloc::boxed::Box;
@@ -222,29 +222,33 @@ impl MessageField {
         }
         let ty = &self.value.ty;
         let encoding = &self.value.encoding;
-        vec![
-            match purpose {
-                Encode => quote!((): #crate_::encoding::Encoder<#encoding, #ty>),
-                Decode(Owned, Relaxed) => {
-                    quote!((): #crate_::encoding::Decoder<#encoding, #ty>)
-                }
-                Decode(Borrowed, Relaxed) => {
-                    quote!((): #crate_::encoding::BorrowDecoder<'__a, #encoding, #ty>)
-                }
-                Decode(Owned, Distinguished) => {
-                    quote!((): #crate_::encoding::DistinguishedDecoder<#encoding, #ty>)
-                }
-                Decode(Borrowed, Distinguished) => {
-                    quote!(
-                        (): #crate_::encoding::DistinguishedBorrowDecoder<'__a, #encoding, #ty>
-                    )
-                }
-            },
-            // Message field encoding always requires EmptyState instead of just ForOverwrite
-            // because we need to know whether a field is empty to know whether we should write
-            // anything; and all the decoding traits imply the encoding trait.
-            quote!((): #crate_::encoding::EmptyState<#encoding, #ty>),
-        ]
+        let mut res = vec![match purpose {
+            Encode => quote!((): #crate_::encoding::Encoder<#encoding, #ty>),
+            Decode(Owned, Relaxed) => {
+                quote!((): #crate_::encoding::Decoder<#encoding, #ty>)
+            }
+            Decode(Borrowed, Relaxed) => {
+                quote!((): #crate_::encoding::BorrowDecoder<'__a, #encoding, #ty>)
+            }
+            Decode(Owned, Distinguished) => {
+                quote!((): #crate_::encoding::DistinguishedDecoder<#encoding, #ty>)
+            }
+            Decode(Borrowed, Distinguished) => {
+                quote!(
+                    (): #crate_::encoding::DistinguishedBorrowDecoder<'__a, #encoding, #ty>
+                )
+            }
+            Schema => quote!((): #crate_::encoding::schema::ValueSchema<#encoding, #ty>),
+        }];
+        if !matches!(purpose, Schema) {
+            res.push(
+                // Message field encoding always requires EmptyState instead of just ForOverwrite
+                // because we need to know whether a field is empty to know whether we should write
+                // anything; and all the decoding traits imply the encoding trait.
+                quote!((): #crate_::encoding::EmptyState<#encoding, #ty>),
+            );
+        }
+        res
     }
 
     /// Returns methods to embed in the message. `ident` must be the name of the field within the
@@ -287,6 +291,20 @@ impl MessageField {
                 >::help_set(val);
             }
         })
+    }
+
+    pub fn schema(&self, field_name: &str) -> TokenStream {
+        let crate_ = crate_name();
+        let tag = self.tag;
+        let encoding = &self.value.encoding;
+        let ty = &self.value.ty;
+        quote! {
+            fields.add_field(
+                #field_name,
+                #tag,
+                <() as #crate_::encoding::schema::ValueSchema<#encoding, #ty>>::repr(schema),
+            );
+        }
     }
 }
 
@@ -856,29 +874,33 @@ impl FieldBearer for FieldInVariant {
         }
         let ty = &self.value.ty;
         let encoding = &self.value.encoding;
-        vec![
-            match purpose {
-                Encode => quote!((): #crate_::encoding::ValueEncoder<#encoding, #ty>),
-                Decode(Owned, Relaxed) => {
-                    quote!((): #crate_::encoding::ValueDecoder<#encoding, #ty>)
-                }
-                Decode(Borrowed, Relaxed) => {
-                    quote!((): #crate_::encoding::ValueBorrowDecoder<'__a, #encoding, #ty>)
-                }
-                Decode(Owned, Distinguished) => {
-                    quote!((): #crate_::encoding::DistinguishedValueDecoder<#encoding, #ty>)
-                }
-                Decode(Borrowed, Distinguished) => {
-                    quote!(
-                        (): #crate_::encoding::
-                            DistinguishedValueBorrowDecoder<'__a, #encoding, #ty>
-                    )
-                }
-            },
-            // Encoding or decoding a oneof field always has trivially externally determined
-            // presence, and we never need to know whether or not the value is empty; it never
-            // needs to implement the empty state.
-            quote!((): #crate_::encoding::ForOverwrite<#encoding, #ty>),
-        ]
+        let mut res = vec![match purpose {
+            Encode => quote!((): #crate_::encoding::ValueEncoder<#encoding, #ty>),
+            Decode(Owned, Relaxed) => {
+                quote!((): #crate_::encoding::ValueDecoder<#encoding, #ty>)
+            }
+            Decode(Borrowed, Relaxed) => {
+                quote!((): #crate_::encoding::ValueBorrowDecoder<'__a, #encoding, #ty>)
+            }
+            Decode(Owned, Distinguished) => {
+                quote!((): #crate_::encoding::DistinguishedValueDecoder<#encoding, #ty>)
+            }
+            Decode(Borrowed, Distinguished) => {
+                quote!(
+                    (): #crate_::encoding::
+                        DistinguishedValueBorrowDecoder<'__a, #encoding, #ty>
+                )
+            }
+            Schema => quote!((): #crate_::encoding::schema::ValueSchema<#encoding, #ty>),
+        }];
+        if !matches!(purpose, Schema) {
+            res.push(
+                // Encoding or decoding a oneof field always has trivially externally determined
+                // presence, and we never need to know whether or not the value is empty; it never
+                // needs to implement the empty state.
+                quote!((): #crate_::encoding::ForOverwrite<#encoding, #ty>),
+            );
+        }
+        res
     }
 }

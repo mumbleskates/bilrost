@@ -17,7 +17,7 @@ use crate::field::traits::{
     DecodeLifetime::{Borrowed, Owned},
     DecodeMode::{Distinguished, Relaxed},
     FieldBearer, SinglyTagged, Tagged,
-    WhereFor::{self, Decode, Encode},
+    WhereFor::{self, Decode, Encode, Schema},
 };
 use crate::field::{
     parse_message_fields, tag_measurer, Field, FieldTarget, InitMode, MessageFieldsSorted,
@@ -202,6 +202,15 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
                 Decode(lifetime, Relaxed),
             )
         });
+    let schema_where_clause = append_wheres_with_fields(
+        where_clause,
+        self_where
+            .clone()
+            .into_iter()
+            .chain([quote!(Self: 'static)]),
+        &where_fields,
+        Schema,
+    );
 
     let self_instance = FieldTarget::MessageInstance(quote!(self));
     let fields = MessageFieldsSorted::new(&unsorted_fields);
@@ -265,6 +274,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         .iter()
         .map(|field| field.clear(&self_instance))
         .collect();
+    let field_schemas: Vec<_> = unsorted_fields.iter().map(|field| field.schema()).collect();
 
     let maybe_fill_default = if default_per_field || ignored_fields.is_empty() {
         None
@@ -391,6 +401,16 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
 
             fn clear(val: &mut __Self #ty_generics) {
                 <__Self #ty_generics as #crate_::encoding::RawMessage>::clear(val);
+            }
+        }
+
+        impl #impl_generics #crate_::encoding::schema::MessageSchema for __Self #ty_generics
+        #schema_where_clause {
+            fn register_fields(
+                fields: &mut impl #crate_::encoding::schema::FieldSet,
+                schema: &#crate_::encoding::schema::Schema,
+            ) {
+                #(#field_schemas)*
             }
         }
     };
@@ -779,6 +799,7 @@ pub fn message(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     try_message(input.into()).unwrap().into()
 }
 
+// TODO: implement ValueSchema for these
 fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
     let crate_ = crate_name();
     let input: DeriveInput = parse2(input)?;
@@ -1214,6 +1235,8 @@ fn preprocess_oneof(input: &DeriveInput) -> Result<PreprocessedOneof<'_>, Error>
     })
 }
 
+// TODO: implement schemas here
+//  This will require allowing the message to register arbitrary inner messages for message arms
 fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
     let crate_ = crate_name();
     let input: DeriveInput = parse2(input)?;

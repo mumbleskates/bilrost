@@ -285,6 +285,14 @@ impl Field {
             _ => None,
         }
     }
+
+    pub fn schema(&self) -> TokenStream {
+        match &self.content {
+            Value(scalar) => scalar.schema(&self.ident.to_string()),
+            Oneof(oneof) => oneof.schema(&self.ident.to_string()),
+            Ignored(..) => panic!("can't emit schema of ignored field"),
+        }
+    }
 }
 
 impl FieldBearer for Field {
