@@ -106,11 +106,11 @@ impl Schema {
     /// Visits a specific message type. May shortcut if this method has already been invoked
     /// elsewhere for the same type.
     // TODO: this should probably take no name and there should be another method for naming it
-    pub fn register<M: MessageSchema>(&self) {
+    pub fn register<M: MessageSchema + ?Sized>(&self) {
         self.register_with_alias::<M>("")
     }
 
-    pub fn register_with_alias<M: MessageSchema>(&self, name: &str) {
+    pub fn register_with_alias<M: MessageSchema + ?Sized>(&self, name: &str) {
         let mut types = self.0.types.get_guarded();
         let field_set = match types.entry(TypeId::of::<M>()) {
             Entry::Vacant(entry) => entry
@@ -130,7 +130,7 @@ impl Schema {
     /// Name for a type that disambiguates where it can be found in the entire schema output. The
     /// output of this function may differ as more types are added to the schema, so this should
     /// only be called when the whole schema is being rendered; see `make_lazy_repr`.
-    pub fn type_reference<M: MessageSchema>(&self) -> String {
+    pub fn type_reference<M: MessageSchema + ?Sized>(&self) -> String {
         // TODO: this is a placeholder, we want to use the type's ordinal after they're organized
         let id = TypeId::of::<M>();
         let name = self
@@ -185,6 +185,20 @@ pub trait FieldSet {
 pub trait MessageSchema: Any {
     fn register_fields(fields: &mut impl FieldSet, schema: &Schema);
 }
+
+/// Possibly an easier way to register types with a schema. This just calls the corresponding
+/// method on the schema object, but doesn't require a turbofish to spell.
+pub trait Registerable: MessageSchema {
+    fn register(schema: &Schema) {
+        schema.register::<Self>();
+    }
+
+    fn register_with_alias(schema: &Schema, name: &str) {
+        schema.register_with_alias::<Self>(name);
+    }
+}
+
+impl<T: MessageSchema + ?Sized> Registerable for T {}
 
 /// Trait for an encoding E to describe its representation of a type T.
 ///
