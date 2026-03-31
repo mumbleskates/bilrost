@@ -36,19 +36,6 @@ pub(crate) mod time_proxies {
         });
     }
 
-    impl<const P: u8> ValueSchema<GeneralGeneric<P>, TimeDeltaProxy> for () {
-        fn repr(schema: &Schema) -> Box<dyn Display> {
-            schema.register::<TimeDeltaProxy>();
-            schema.make_lazy_repr(|schema, f| {
-                write!(
-                    f,
-                    "delimited message {message_type}",
-                    message_type = schema.type_reference::<TimeDeltaProxy>(),
-                )
-            })
-        }
-    }
-
     impl<const P: u8> ValueEncoder<GeneralGeneric<P>, TimeDeltaProxy> for () {
         fn encode_value<B: BufMut + ?Sized>(value: &TimeDeltaProxy, buf: &mut B) {
             underived_encode!(TimeDelta {

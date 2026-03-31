@@ -567,6 +567,8 @@ mod core_time {
 }
 
 mod delegate_to_message_encoding {
+    use crate::encoding::schema::MessageSchema;
+
     use super::*;
 
     impl<const P: u8, T> Wiretyped<GeneralGeneric<P>, T> for ()
@@ -579,7 +581,7 @@ mod delegate_to_message_encoding {
 
     delegate_schema!(
         (GeneralGeneric<P>) encodes (T) like (MessageEncoding) does
-        with where clause (T: RawMessage)
+        with where clause (T: MessageSchema)
         with generics (const P: u8, T)
     );
 

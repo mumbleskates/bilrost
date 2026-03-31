@@ -120,7 +120,7 @@ mod packed;
 mod plain_bytes;
 mod proxy;
 mod range_as_tuple;
-mod schema;
+pub mod schema;
 #[cfg(test)]
 mod test;
 mod tuple;

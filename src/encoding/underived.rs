@@ -22,6 +22,7 @@ macro_rules! underived_schema {
         }
     };
 }
+#[allow(unused_imports)]
 pub(crate) use underived_schema;
 
 /// Fields must be listed in forward order here, and the targets should be &const.
