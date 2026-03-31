@@ -38,14 +38,15 @@ mod implement_encoding_for_range {
         T: Clone,
         (): ForOverwrite<(), T>,
     {
-        type Proxy = (T, T);
+        type Proxy = [T; 2];
 
         fn encode_proxy(&self) -> Self::Proxy {
-            (self.start().clone(), self.end().clone())
+            [self.start().clone(), self.end().clone()]
         }
 
         fn decode_proxy(&mut self, proxy: Self::Proxy) -> Result<(), DecodeErrorKind> {
-            *self = proxy.0..=proxy.1;
+            let [start, end] = proxy;
+            *self = start..=end;
             Ok(())
         }
     }
@@ -99,14 +100,15 @@ mod implement_encoding_for_range {
     }
 
     bilrost::delegate_proxied_encoding!(
-        use encoding (bilrost::encoding::General)
+        use encoding (bilrost::encoding::Packed)
         to encode proxied type (RangeInclusive<T>) using proxy tag (Tag)
         with encoding (CustomEncoding) including distinguished
         with generics (T)
     );
     // TODO: use including schema mode of the above macro instead
     bilrost::delegate_schema!(
-        (CustomEncoding) encodes (RangeInclusive<T>) like (Proxied<bilrost::encoding::General, Tag>) encodes ((T, T))
+        (CustomEncoding) encodes (RangeInclusive<T>)
+        like (bilrost::encoding::Packed) encodes ([T; 2])
         with generics (T)
     );
 }
@@ -133,7 +135,8 @@ fn main() {
     #[derive(Debug, PartialEq, Message)]
     struct EquivalentMessage {
         numeric: (i64, i64),
-        stringy: (String, String),
+        #[bilrost(encoding(packed))]
+        stringy: [String; 2],
     }
     let equivalent = EquivalentMessage::decode(encoded.as_slice());
     println!("we can see the ranges are encoded as-if they were the proxy type: {equivalent:#?}");
@@ -141,7 +144,7 @@ fn main() {
         equivalent,
         Ok(EquivalentMessage {
             numeric: (-100, 234),
-            stringy: ("aardvark".to_string(), "after".to_string()),
+            stringy: ["aardvark".to_string(), "after".to_string()],
         })
     );
 }
