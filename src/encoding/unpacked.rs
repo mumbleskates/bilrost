@@ -11,7 +11,7 @@ use crate::encoding::{
     TagWriter, ValueBorrowDecoder, ValueDecoder, ValueEncoder, WireType, Wiretyped,
 };
 use crate::DecodeErrorKind::InvalidValue;
-use crate::{delegate_schema, Canonicity, DecodeError};
+use crate::{Canonicity, DecodeError};
 use alloc::boxed::Box;
 use alloc::format;
 use alloc::string::String;
@@ -414,11 +414,6 @@ where
         }
     }
 }
-
-delegate_schema!(
-    (Unpacked<E>) encodes (Option<[T; N]>) as ([T; N])
-    with generics (T, const N: usize, E)
-);
 
 /// Unpacked encodes arrays as repeated fields if any of the values are non-empty.
 impl<T, const N: usize, E> Encoder<Unpacked<E>, Option<[T; N]>> for ()
