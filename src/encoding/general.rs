@@ -538,6 +538,12 @@ delegate_proxied_encoding!(
     using proxy tag (SealedBilrostTag)
     with general encodings including distinguished
 );
+// TODO: use includes schema mode of the above macro instead
+delegate_schema!(
+    (GeneralGeneric<P>) encodes (core::time::Duration)
+    like (Packed<Varint>) encodes (<core::time::Duration as Proxiable<SealedBilrostTag>>::Proxy)
+    with generics (const P: u8)
+);
 
 #[cfg(test)]
 mod core_time {

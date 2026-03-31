@@ -17,7 +17,7 @@ macro_rules! delegate_schema {
         {
             fn repr(
                 schema: &$crate::encoding::schema::Schema,
-            ) -> ::alloc::boxed::Box<dyn ::core::fmt::Display> {
+            ) -> $crate::alloc::boxed::Box<dyn ::core::fmt::Display> {
                 <() as $crate::encoding::schema::ValueSchema<$to_ty, $to_value_ty>>::repr(schema)
             }
         }
@@ -508,6 +508,7 @@ macro_rules! delegate_value_encoding {
 }
 pub use delegate_value_encoding;
 
+// TODO: include schema delegation in here
 /// Shorthand call for delegating encoding using the `Proxiable` traits and the `Proxied` encoding
 /// that uses it.
 #[macro_export]

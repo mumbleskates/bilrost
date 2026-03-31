@@ -1,12 +1,10 @@
 use crate::buf::ReverseBuf;
-use crate::encoding::schema::{Schema, ValueSchema};
 use crate::encoding::{
     Capped, DecodeContext, DistinguishedValueBorrowDecoder, DistinguishedValueDecoder,
     ForOverwrite, RestrictedDecodeContext, ValueBorrowDecoder, ValueDecoder, ValueEncoder,
     WireType, Wiretyped,
 };
-use crate::{delegate_schema, Canonicity, DecodeError, DecodeErrorKind};
-use alloc::boxed::Box;
+use crate::{Canonicity, DecodeError, DecodeErrorKind};
 use bytes::{Buf, BufMut};
 use core::ops::Deref;
 
@@ -63,12 +61,6 @@ where
 {
     const WIRE_TYPE: WireType = <() as Wiretyped<E, T::Proxy>>::WIRE_TYPE;
 }
-
-delegate_schema!(
-    (Proxied<E, Tag>) encodes (T) like (E) encodes (<T as Proxiable<Tag>>::Proxy)
-    with where clause (T: Proxiable<Tag>)
-    with generics (T, E, Tag)
-);
 
 impl<T, E, Tag> ValueEncoder<Proxied<E, Tag>, T> for ()
 where

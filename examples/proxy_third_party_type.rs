@@ -25,7 +25,7 @@ bilrost::implement_core_empty_state_rules!(CustomEncoding);
 
 mod implement_encoding_for_range {
     use crate::{CustomEncoding, Tag};
-    use bilrost::encoding::{DistinguishedProxiable, EmptyState, ForOverwrite, Proxiable};
+    use bilrost::encoding::{DistinguishedProxiable, EmptyState, ForOverwrite, Proxiable, Proxied};
     use bilrost::Canonicity::Canonical;
     use bilrost::{Canonicity, DecodeErrorKind};
     use std::ops::RangeInclusive;
@@ -102,6 +102,11 @@ mod implement_encoding_for_range {
         use encoding (bilrost::encoding::General)
         to encode proxied type (RangeInclusive<T>) using proxy tag (Tag)
         with encoding (CustomEncoding) including distinguished
+        with generics (T)
+    );
+    // TODO: use including schema mode of the above macro instead
+    bilrost::delegate_schema!(
+        (CustomEncoding) encodes (RangeInclusive<T>) like (Proxied<bilrost::encoding::General, Tag>) encodes ((T, T))
         with generics (T)
     );
 }
