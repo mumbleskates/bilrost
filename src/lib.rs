@@ -7,7 +7,7 @@
 #![forbid(unsafe_op_in_unsafe_fn)]
 #![cfg_attr(feature = "forbid-unsafe", forbid(unsafe_code))]
 
-pub extern crate alloc;
+extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
 

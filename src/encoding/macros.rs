@@ -17,7 +17,7 @@ macro_rules! delegate_schema {
         {
             fn repr(
                 schema: &$crate::encoding::schema::Schema,
-            ) -> $crate::alloc::boxed::Box<dyn ::core::fmt::Display> {
+            ) -> $crate::encoding::Box<dyn ::core::fmt::Display> {
                 <() as $crate::encoding::schema::ValueSchema<$to_ty, $to_value_ty>>::repr(schema)
             }
         }
@@ -49,6 +49,7 @@ macro_rules! delegate_schema {
         );
     }
 }
+pub use delegate_schema;
 
 /// Expressly delegates support for encoding message fields from one encoding to another.
 #[macro_export]
