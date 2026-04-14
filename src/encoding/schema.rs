@@ -18,7 +18,7 @@ use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::format;
 use alloc::string::String;
 use alloc::sync::Arc;
-use core::any::{Any, TypeId};
+use core::any::{type_name, Any, TypeId};
 use core::fmt::{Display, Formatter};
 use core::ops::DerefMut;
 
@@ -81,9 +81,10 @@ use guard::Guard;
 pub struct Schema(Arc<MessageSet>);
 
 struct MessageSet {
-    types: Guard<BTreeMap<TypeId, Arc<Guard<MessageInfo>>>>,
+    types: Guard<BTreeMap<TypeId, Arc<Guard<TypeInfo>>>>,
     // TODO: pre-organize the types (or their names) for disambiguation and which index they will
     //  be found at in the final printout
+    // TODO: registry of type equivalence and maybe alternate names
 }
 
 /// Receptacle for a full schema that can record the schemas of many messages.
@@ -103,34 +104,102 @@ impl Schema {
         )
     }
 
-    /// Visits a specific message type. May shortcut if this method has already been invoked
-    /// elsewhere for the same type.
-    // TODO: this should probably take no name and there should be another method for naming it
-    pub fn register<M: MessageSchema + ?Sized>(&self) {
-        self.register_with_alias::<M>("")
+    /// Registers a specific message type. May shortcut if this method has already been invoked
+    /// for the same type.
+    pub fn register_message<M: Any + ?Sized>(
+        &self,
+        name: &str,
+        fields: impl Fn(&mut MessageFields),
+    ) {
+        let info = match self.0.types.get_guarded().entry(type_of::<M>()) {
+            Entry::Vacant(entry) => entry
+                .insert(Arc::new(Guard::new(TypeInfo {
+                    name: name.to_owned(),
+                    alternate_names: Default::default(),
+                    details: TypeDetails::Message(MessageFields::new()),
+                })))
+                .clone(),
+            Entry::Occupied(entry) => return, // already registered
+        };
+
+        // Only after we've inserted the message info into the map do we populate its fields. This
+        // ensures that we are no longer holding the lock on `types` so other types can be
+        // recursively registered.
+        let TypeInfo {
+            details: TypeDetails::Message(msg),
+            ..
+        } = info.get_guarded().deref_mut()
+        else {
+            unreachable!();
+        };
+        fields(msg)
     }
 
-    pub fn register_with_alias<M: MessageSchema + ?Sized>(&self, name: &str) {
-        let mut types = self.0.types.get_guarded();
-        let field_set = match types.entry(TypeId::of::<M>()) {
+    pub fn register_enumeration<E: ?Sized>(&self, name: &str, fields: impl Fn(&mut EnumFields)) {
+        let info = match self.0.types.get_guarded().entry(type_of::<M>()) {
             Entry::Vacant(entry) => entry
-                .insert(Arc::new(Guard::new(MessageInfo::new(name))))
+                .insert(Arc::new(Guard::new(TypeInfo {
+                    name: name.to_owned(),
+                    alternate_names: Default::default(),
+                    details: TypeDetails::Enum(EnumInfo::new()),
+                })))
                 .clone(),
-            Entry::Occupied(mut entry) => {
-                if name != "" {
-                    entry.get_mut().get_guarded().add_name(name);
-                }
-                return; // type was already registered previously
-            }
+            Entry::Occupied(entry) => return, // already registered
         };
-        drop(types);
-        M::register_fields(field_set.get_guarded().deref_mut(), self);
+
+        // Only after we've inserted the enum info into the map do we populate its fields. This
+        // ensures that we are no longer holding the lock on `types` so other types can be
+        // recursively registered.
+        let TypeInfo {
+            details: TypeDetails::Enum(enum_info),
+            ..
+        } = info.get_guarded().deref_mut()
+        else {
+            unreachable!();
+        };
+        fields(enum_info)
     }
+
+    /// Registers the message variants of a oneof enum. A oneof may have several variants that each
+    /// encode as messages, and they should each be registered on the `OneofMessages` value
+    /// provided to the `variants` closure.
+    pub fn register_oneof_messages<T: Any + ?Sized>(
+        &self,
+        name: &str,
+        variants: impl Fn(&mut OneofMessages),
+    ) {
+        let info = match self.0.types.get_guarded().entry(type_of::<M>()) {
+            Entry::Vacant(entry) => entry
+                .insert(Arc::new(Guard::new(TypeInfo {
+                    name: name.to_owned(),
+                    alternate_names: Default::default(),
+                    details: TypeDetails::Oneof(OneofMessages::new()),
+                })))
+                .clone(),
+            Entry::Occupied(entry) => return, // already registered
+        };
+
+        // Only after we've inserted the oneof info into the map do we populate its variants. This
+        // ensures that we are no longer holding the lock on `types` so other types can be
+        // recursively registered.
+        let TypeInfo {
+            details: TypeDetails::Oneof(submsgs),
+            ..
+        } = info.get_guarded().deref_mut()
+        else {
+            unreachable!();
+        };
+        variants(submsgs)
+    }
+
+    // TODO: way to register alternate names; the TypeInfo needs to be restructured so alternate
+    //  names can be added by &const without needing to look at the details object. Maybe these
+    //  go in the same place as the "equivalent types" thing we need to do for boxed messages
 
     /// Name for a type that disambiguates where it can be found in the entire schema output. The
     /// output of this function may differ as more types are added to the schema, so this should
     /// only be called when the whole schema is being rendered; see `make_lazy_repr`.
-    pub fn type_reference<M: MessageSchema + ?Sized>(&self) -> String {
+    pub fn type_reference<M: Any + ?Sized>(&self) -> String {
         // TODO: this is a placeholder, we want to use the type's ordinal after they're organized
         let id = TypeId::of::<M>();
         let name = self
@@ -139,6 +208,31 @@ impl Schema {
             .get_guarded()
             .get(&id)
             .map_or_else(|| "<unnamed>".to_owned(), |info| info.get_guarded().name());
+        format!("{name} ({id:?})")
+    }
+
+    /// Name for a sub-type (message variant of a oneof enum) that disambiguates where it can be
+    /// found in the entire schema output. The output of this function may differ as more types are
+    /// added to the schema, so this should only be called when the whole schema is being rendered;
+    /// see `make_lazy_repr`.
+    pub fn subtype_reference<M: Any + ?Sized, const Tag: u32>(&self) -> String {
+        // TODO: this is a placeholder, we want to use the type's ordinal after they're organized
+        let id = TypeId::of::<M>();
+        let name = self.0.types.get_guarded().get(&id).map_or_else(
+            || "<unnamed>".to_owned(),
+            |info| {
+                let info = info.get_guarded();
+                let type_name = &info.name;
+                let TypeDetails::Oneof(variants) = info.get_guarded().details else {
+                    panic!("type {name:?} is not registered as a oneof with subtypes");
+                };
+                let (variant_name, _) = variants
+                    .variants
+                    .get(&Tag)
+                    .expect("type {name:?} does not have a registered variant with tag {Tag}");
+                format!("{type_name}::{variant_name}")
+            },
+        );
         format!("{name} ({id:?})")
     }
 
@@ -170,46 +264,6 @@ impl Schema {
     }
 }
 
-/// Receptacle for fields in a single specific message type.
-pub trait FieldSet {
-    /// Adds a name for the whole message.
-    fn add_name(&mut self, message_name: &str);
-    // TODO: notes for the whole type (distinguished?)
-    /// Adds a field to the type.
-    fn add_field(&mut self, name: &str, tag: u32, repr: Box<dyn Display>);
-    /// Registers a oneof on the message by the tags of its mutually exclusive member fields.
-    fn add_oneof(&mut self, name: &str, tags: &[u32]);
-}
-
-/// A message type that can report the fields in its schema.
-pub trait MessageSchema: Any {
-    fn register_fields(fields: &mut impl FieldSet, schema: &Schema);
-}
-
-/// Possibly an easier way to register types with a schema. This just calls the corresponding
-/// method on the schema object, but doesn't require a turbofish to spell.
-pub trait Registerable: MessageSchema {
-    fn register(schema: &Schema) {
-        schema.register::<Self>();
-    }
-
-    fn register_with_alias(schema: &Schema, name: &str) {
-        schema.register_with_alias::<Self>(name);
-    }
-}
-
-impl<T: MessageSchema + ?Sized> Registerable for T {}
-
-/// Trait for an encoding E to describe its representation of a type T.
-///
-/// This trait is always implemented on the unit type `()`.
-pub trait ValueSchema<E, T: ?Sized> {
-    /// Returns the representation of the field. This may register other message types with the
-    /// schema and the returned value may use the schema to look up the name of those other message
-    /// types when displaying.
-    fn repr(schema: &Schema) -> Box<dyn Display>;
-}
-
 impl Display for Schema {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         let mut type_indexes = BTreeMap::new();
@@ -239,37 +293,46 @@ impl Display for Schema {
     }
 }
 
+struct TypeInfo {
+    name: String,
+    alternate_names: BTreeSet<String>,
+    details: TypeDetails,
+}
+
+impl TypeInfo {
+    fn name(&self) -> String {
+        match self.alternate_names.len() {
+            0 => format!("{name:?}", name = self.name),
+            _ => format!(
+                "{name:?} (aka {alts:?})",
+                name = self.name,
+                alts = self.alternate_names,
+            ),
+        }
+    }
+}
+
+enum TypeDetails {
+    Message(MessageFields),
+    Enum(EnumInfo),
+    Oneof(OneofMessages),
+}
+
 /// Collected information about a specific message type and its fields.
-struct MessageInfo {
-    names: BTreeSet<String>,
+pub struct MessageFields {
     fields: BTreeMap<u32, FieldInfo>,
     oneofs: BTreeMap<String, BTreeSet<u32>>,
 }
 
-impl MessageInfo {
-    fn new(name: &str) -> Self {
+impl MessageFields {
+    fn new() -> Self {
         Self {
-            names: [name.to_owned()].into(),
             fields: Default::default(),
             oneofs: Default::default(),
         }
     }
 
-    fn name(&self) -> String {
-        match self.names.len() {
-            // MSRV: this could be .first()
-            1 => format!("{name:?}", name = self.names.iter().next().unwrap()),
-            _ => format!("(message known as {names:?})", names = self.names),
-        }
-    }
-}
-
-impl FieldSet for MessageInfo {
-    fn add_name(&mut self, name: &str) {
-        self.names.insert(name.to_owned());
-    }
-
-    fn add_field(&mut self, name: &str, tag: u32, repr: Box<dyn Display>) {
+    pub fn add_field(&mut self, name: &str, tag: u32, repr: Box<dyn Display>) {
         if self
             .fields
             .insert(
@@ -288,7 +351,7 @@ impl FieldSet for MessageInfo {
         };
     }
 
-    fn add_oneof(&mut self, oneof_name: &str, tags: &[u32]) {
+    pub fn add_oneof(&mut self, oneof_name: &str, tags: &[u32]) {
         let tag_set = tags.into_iter().copied().collect();
         for (existing_oneof_name, existing_set) in &self.oneofs {
             if let Some(conflicting_tag) = existing_set.intersection(&tag_set).next() {
@@ -313,4 +376,47 @@ impl FieldSet for MessageInfo {
 struct FieldInfo {
     name: String,
     repr: Box<dyn Display>,
+}
+
+struct EnumInfo {
+    values: BTreeMap<u32, String>,
+}
+
+impl EnumInfo {
+    fn new() -> Self {
+        Self {
+            values: Default::default(),
+        }
+    }
+
+    /// Add a value to the enumeration.
+    pub fn add_value(&mut self, name: &str, value: u32) {
+        self.values.insert(value, name.to_owned());
+    }
+}
+
+struct OneofMessages {
+    variants: BTreeMap<u32, (String, MessageFields)>,
+}
+
+impl OneofMessages {
+    fn new() -> Self {
+        Self {
+            variants: Default::default(),
+        }
+    }
+
+    /// Adds a message variant to the oneof.
+    pub fn add_message_variant(
+        &mut self,
+        tag: u32,
+        name: &str,
+        fields: impl Fn(&mut MessageFields),
+    ) {
+        let Entry::Vacant(entry) = self.variants.entry(tag) else {
+            panic!("multiple variants added with the tag {tag}");
+        };
+        let (_, msg) = entry.insert((name.to_owned(), MessageFields::new()));
+        fields(msg);
+    }
 }
