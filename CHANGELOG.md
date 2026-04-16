@@ -1,12 +1,8 @@
 ## v0.1014.2
 
-### Breaking changes
-
 ### New features
 
-### Fixes
-
-### Cleanups
+* Allows intercompatibility with `hashbrown 0.17`
 
 ## v0.1014.1
 
