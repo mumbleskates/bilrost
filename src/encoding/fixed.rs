@@ -1,7 +1,7 @@
 use bytes::{Buf, BufMut};
 
 use crate::buf::ReverseBuf;
-use crate::encoding::schema::{Schema, ValueSchema};
+use crate::encoding::schema::{Schema, ValueRepr};
 use crate::encoding::{
     delegate_value_encoding, encoding_implemented_via_value_encoding,
     encoding_uses_base_empty_state, Canonicity, Capped, DecodeContext, DistinguishedValueDecoder,
@@ -11,6 +11,7 @@ use crate::DecodeError;
 use crate::DecodeErrorKind::{InvalidValue, Truncated};
 use alloc::boxed::Box;
 use alloc::format;
+use core::fmt::Display;
 use core::mem;
 
 pub struct Fixed;
@@ -27,10 +28,15 @@ macro_rules! fixed_width_common {
         $prepend:ident,
         $get:ident,
         get_value($value:ident) { $value_expr:expr },
-        set_value($gotten_value:ident) $set_value_body:block
+        set_value($gotten_value:ident) $set_value_body:block,
+        repr($schema:ident) $repr_body:block
     ) => {
         impl Wiretyped<Fixed, $ty> for () {
             const WIRE_TYPE: WireType = WireType::$wire_type;
+        }
+
+        impl ValueRepr<Fixed, $ty> for () {
+            fn repr($schema: &Schema) -> Box<dyn Display> $repr_body
         }
 
         impl ValueEncoder<Fixed, $ty> for () {
@@ -88,21 +94,18 @@ macro_rules! fixed_width_int {
             $prepend,
             $get,
             get_value($value) { $value_expr },
-            set_value($gotten_value) $set_value_body
-        );
-        delegate_value_encoding!(
-            encoding (Fixed) borrows type ($ty) as owned including distinguished
-        );
-
-        impl ValueSchema<Fixed, $ty> for () {
-            fn repr(_: &Schema) -> Box<dyn core::fmt::Display> {
+            set_value($gotten_value) $set_value_body,
+            repr(_schema) {
                 Box::new(format!(
                     "fixed {size} bytes, {signedness} integer",
                     size = mem::size_of::<$ty>(),
                     signedness = $signedness,
                 ))
             }
-        }
+        );
+        delegate_value_encoding!(
+            encoding (Fixed) borrows type ($ty) as owned including distinguished
+        );
 
         impl DistinguishedValueDecoder<Fixed, $ty> for () {
             const CHECKS_EMPTY: bool = false;
@@ -177,18 +180,15 @@ macro_rules! fixed_width_float {
             $prepend,
             $get,
             get_value(value) { *value },
-            set_value(gotten_value) { *value = gotten_value; }
-        );
-        delegate_value_encoding!(encoding (Fixed) borrows type ($ty) as owned);
-
-        impl ValueSchema<Fixed, $ty> for () {
-            fn repr(_: &Schema) -> Box<dyn core::fmt::Display> {
+            set_value(gotten_value) { *value = gotten_value; },
+            repr(_schema) {
                 Box::new(format!(
                     "fixed {size} bytes, ieee754 floating point",
                     size = mem::size_of::<$ty>(),
                 ))
             }
-        }
+        );
+        delegate_value_encoding!(encoding (Fixed) borrows type ($ty) as owned);
 
         #[cfg(test)]
         mod $test_name {
@@ -218,8 +218,8 @@ macro_rules! fixed_width_array {
             const WIRE_TYPE: WireType = WireType::$wire_type;
         }
 
-        impl ValueSchema<Fixed, [u8; $N]> for () {
-            fn repr(_: &Schema) -> Box<dyn core::fmt::Display> {
+        impl ValueRepr<Fixed, [u8; $N]> for () {
+            fn repr(_: &Schema) -> Box<dyn Display> {
                 Box::new(format!("fixed {size} bytes, plain", size = $N))
             }
         }
