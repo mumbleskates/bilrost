@@ -217,14 +217,12 @@ mod systemtime {
 delegate_encoding!(
     delegate from (General) to (Unpacked)
     for type (HashSet<T, S>)
-    including schema
     with where clause (S: Default + core::hash::BuildHasher)
     with generics (T, S)
 );
 delegate_value_encoding!(
     delegate from (GeneralPacked) to (Packed)
     for type (HashSet<T, S>)
-    including schema
     with where clause (S: Default + core::hash::BuildHasher)
     with generics (T, S)
 );
@@ -232,7 +230,6 @@ delegate_value_encoding!(
 delegate_value_encoding!(
     delegate from (GeneralGeneric<P>) to (Map)
     for type (HashMap<K, V, S>)
-    including schema
     with where clause (K: Eq + core::hash::Hash, S: Default + core::hash::BuildHasher)
     with generics (const P: u8, K, V, S)
 );

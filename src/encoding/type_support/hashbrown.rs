@@ -139,21 +139,18 @@ where
 delegate_encoding!(
     delegate from (General) to (Unpacked)
     for type (hashbrown::HashSet<T, S>)
-    including schema
     with where clause (T: Eq + Hash, S: Default + core::hash::BuildHasher)
     with generics (T, S)
 );
 delegate_value_encoding!(
     delegate from (GeneralPacked) to (Packed)
     for type (hashbrown::HashSet<T, S>)
-    including schema
     with where clause (T: Eq + Hash, S: Default + core::hash::BuildHasher)
     with generics (T, S)
 );
 delegate_value_encoding!(
     delegate from (GeneralGeneric<P>) to (Map)
     for type (hashbrown::HashMap<K, V, S>)
-    including schema
     with where clause (K: Eq + Hash, S: Default + core::hash::BuildHasher)
     with generics (const P: u8, K, V, S)
 );

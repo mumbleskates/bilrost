@@ -7,6 +7,7 @@ use core::ops::{Deref, DerefMut};
 use bytes::{Buf, BufMut};
 
 use crate::buf::ReverseBuf;
+use crate::encoding::schema::Schema;
 use crate::encoding::{
     skip_field, Canonicity, Capped, DecodeContext, RawDistinguishedMessageBorrowDecoder,
     RawDistinguishedMessageDecoder, RawMessage, RawMessageBorrowDecoder, RawMessageDecoder,
@@ -165,6 +166,10 @@ impl RawMessage for () {
 
     fn raw_encoded_len(&self) -> usize {
         0
+    }
+
+    fn register_fields(schema: &Schema) {
+        schema.register_message("()", |_| {});
     }
 }
 

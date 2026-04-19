@@ -1,5 +1,5 @@
 use crate::buf::ReverseBuf;
-use crate::encoding::schema::{Schema, ValueSchema};
+use crate::encoding::schema::{Schema, ValueRepr};
 use crate::encoding::{
     encode_varint, encoded_len_varint, encoding_implemented_via_value_encoding,
     encoding_uses_base_empty_state, prepend_varint, Buf, BufMut, Canonicity, Capped, DecodeContext,
@@ -10,6 +10,7 @@ use crate::DecodeError;
 use crate::DecodeErrorKind::{InvalidValue, OutOfDomainValue};
 use alloc::boxed::Box;
 use alloc::format;
+use core::fmt::Display;
 use core::mem;
 
 pub struct Varint;
@@ -73,8 +74,8 @@ macro_rules! varint {
             const WIRE_TYPE: WireType = WireType::Varint;
         }
 
-        impl ValueSchema<Varint, $ty> for () {
-            fn repr(_: &Schema) -> Box<dyn core::fmt::Display> {
+        impl ValueRepr<Varint, $ty> for () {
+            fn repr(schema: &Schema) -> Box<dyn Display> {
                 const SIGNEDNESS: &'static str = $signedness;
                 const SIZE: usize = mem::size_of::<$ty>();
                 if SIGNEDNESS== "boolean" {
