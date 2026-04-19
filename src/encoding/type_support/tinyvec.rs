@@ -121,28 +121,28 @@ impl<A: tinyvec::Array> TriviallyDistinguishedCollection for tinyvec::TinyVec<A>
 delegate_encoding!(
     delegate from (General) to (Unpacked)
     for type (tinyvec::ArrayVec<A>)
-    including distinguished including schema
+    including distinguished
     with where clause (A: tinyvec::Array<Item = T>)
     with generics (T, A)
 );
 delegate_encoding!(
     delegate from (General) to (Unpacked)
     for type (tinyvec::TinyVec<A>)
-    including distinguished including schema
+    including distinguished
     with where clause (A: tinyvec::Array<Item = T>)
     with generics (T, A)
 );
 delegate_value_encoding!(
     delegate from (GeneralPacked) to (Packed)
     for type (tinyvec::ArrayVec<A>)
-    including distinguished including schema
+    including distinguished
     with where clause for relaxed (A: tinyvec::Array<Item = T>)
     with generics (T, A)
 );
 delegate_value_encoding!(
     delegate from (GeneralPacked) to (Packed)
     for type (tinyvec::TinyVec<A>)
-    including distinguished including schema
+    including distinguished
     with where clause for relaxed (A: tinyvec::Array<Item = T>)
     with generics (T, A)
 );
@@ -165,6 +165,7 @@ plain_bytes_vec_impl!(
         return Err(DecodeError::new(InvalidValue));
     },
     value.extend_from_slice(chunk),
+    limit <A as tinyvec::Array>::CAPACITY,
     with generics (A: tinyvec::Array<Item = u8>)
 );
 

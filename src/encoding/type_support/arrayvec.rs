@@ -62,12 +62,12 @@ impl<T, const N: usize> TriviallyDistinguishedCollection for arrayvec::ArrayVec<
 
 delegate_encoding!(
     delegate from (General) to (Unpacked) for type (arrayvec::ArrayVec<T, N>)
-    including distinguished including schema
+    including distinguished
     with generics (T, const N: usize)
 );
 delegate_value_encoding!(
     delegate from (GeneralPacked) to (Packed) for type (arrayvec::ArrayVec<T, N>)
-    including distinguished including schema
+    including distinguished
     with generics (T, const N: usize)
 );
 
@@ -80,6 +80,7 @@ plain_bytes_vec_impl!(
         return Err(DecodeError::new(InvalidValue));
     },
     value.extend(chunk.iter().cloned()),
+    limit N,
     with generics (const N: usize)
 );
 

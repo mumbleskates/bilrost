@@ -1,6 +1,5 @@
 use crate::buf::ReverseBuf;
-use crate::delegate_schema;
-use crate::encoding::schema::{Schema, ValueSchema};
+use crate::encoding::schema::{Schema, ValueRepr};
 use crate::encoding::{
     const_varint, delegate_encoding, delegate_value_encoding, encode_varint, encoded_len_varint,
     encoding_implemented_via_value_encoding, encoding_uses_base_empty_state,
@@ -31,7 +30,7 @@ impl Wiretyped<PlainBytes, &[u8]> for () {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
 }
 
-impl ValueSchema<PlainBytes, &[u8]> for () {
+impl ValueRepr<PlainBytes, &[u8]> for () {
     fn repr(_: &Schema) -> Box<dyn Display> {
         Box::new("delimited bytes")
     }
@@ -91,7 +90,11 @@ impl Wiretyped<PlainBytes, Vec<u8>> for () {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
 }
 
-delegate_schema!((PlainBytes) encodes (Vec<u8>) as (&'static [u8]));
+impl ValueRepr<PlainBytes, Vec<u8>> for () {
+    fn repr(schema: &Schema) -> Box<dyn Display> {
+        <() as ValueRepr<PlainBytes, &[u8]>>::repr(schema)
+    }
+}
 
 impl ValueEncoder<PlainBytes, Vec<u8>> for () {
     #[inline]
@@ -144,24 +147,24 @@ delegate_value_encoding!(
 delegate_encoding!(
     delegate from (PlainBytes) to (crate::encoding::Unpacked<PlainBytes>)
     for type (Vec<Vec<u8>>)
-    including distinguished including schema
+    including distinguished
 );
 delegate_encoding!(
     delegate from (PlainBytes) to (crate::encoding::Unpacked<PlainBytes>)
     for type (Vec<Cow<'a, [u8]>>)
-    including distinguished including schema
+    including distinguished
     with generics ('a)
 );
 delegate_encoding!(
     delegate from (PlainBytes) to (crate::encoding::Unpacked<PlainBytes>)
     for type (Vec<&'a [u8]>)
-    including distinguished including schema
+    including distinguished
     with generics ('a)
 );
 delegate_encoding!(
     delegate from (PlainBytes) to (crate::encoding::Unpacked<PlainBytes>)
     for type (Vec<&'a [u8; N]>)
-    including distinguished including schema
+    including distinguished
     with generics ('a, const N: usize)
 );
 
@@ -177,8 +180,6 @@ mod vec_u8 {
         WireType::LengthDelimited
     );
 }
-
-delegate_schema!((PlainBytes) encodes (Cow<'a, [u8]>) as (Vec<u8>) with generics ('a));
 
 impl_cow_value_encoding!(borrowed [u8], owned Vec<u8>, encoding PlainBytes);
 
@@ -199,7 +200,7 @@ impl<const N: usize> Wiretyped<PlainBytes, [u8; N]> for () {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
 }
 
-impl<const N: usize> ValueSchema<PlainBytes, [u8; N]> for () {
+impl<const N: usize> ValueRepr<PlainBytes, [u8; N]> for () {
     fn repr(_: &Schema) -> Box<dyn Display> {
         Box::new(format!("delimited bytes, exactly {N}"))
     }
@@ -270,10 +271,11 @@ impl<const N: usize> Wiretyped<PlainBytes, &[u8; N]> for () {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
 }
 
-delegate_schema!(
-    (PlainBytes) encodes (&'a [u8; N]) as ([u8; N])
-    with generics ('a, const N: usize)
-);
+impl<const N: usize> ValueRepr<PlainBytes, &[u8; N]> for () {
+    fn repr(schema: &Schema) -> Box<dyn Display> {
+        <() as ValueRepr<PlainBytes, [u8; N]>>::repr(schema)
+    }
+}
 
 impl<'a, const N: usize> ValueEncoder<PlainBytes, &'a [u8; N]> for () {
     #[inline]
@@ -399,11 +401,6 @@ mod u8_array {
     }
 }
 
-delegate_schema!(
-    (PlainBytes) encodes (Cow<'a, [u8; N]>) as ([u8; N])
-    with generics ('a, const N: usize)
-);
-
 impl_cow_value_encoding!(
     borrowed [u8; N], owned [u8; N], encoding PlainBytes, with generic (const N: usize)
 );
@@ -415,6 +412,7 @@ macro_rules! plain_bytes_vec_impl {
         $value:ident, $buf:ident, $chunk:ident,
         $do_reserve:expr,
         $do_extend:expr
+        $(, limit $limit:expr)?
         $(, with generics ($($generics:tt)*))?
     ) => {
         $crate::encoding::delegate_value_encoding!(
@@ -430,20 +428,44 @@ macro_rules! plain_bytes_vec_impl {
         }
 
         impl$(<$($generics)*>)?
+        $crate::encoding::schema::ValueRepr<$crate::encoding::PlainBytes, $ty> for () {
+            fn repr(
+                schema: &$crate::encoding::schema::Schema,
+            ) -> $crate::encoding::Box<dyn ::core::fmt::Display> {
+                let res = <() as $crate::encoding::schema::ValueRepr<
+                    $crate::encoding::PlainBytes,
+                    &[u8]
+                >>::repr(schema);
+                $(
+                    let res = $crate::encoding::Box::new(
+                        ::alloc::format!("{res}; at most {limit} bytes", limit = $limit)
+                    );
+                )?
+                res
+            }
+        }
+
+        impl$(<$($generics)*>)?
         $crate::encoding::ValueEncoder<$crate::encoding::PlainBytes, $ty> for () {
             fn encode_value<B: $crate::bytes::BufMut + ?Sized>(value: &$ty, buf: &mut B) {
-                <() as $crate::encoding::ValueEncoder<$crate::encoding::PlainBytes, _>>::encode_value
-                    (&&**value, buf)
+                <() as $crate::encoding::ValueEncoder<
+                    $crate::encoding::PlainBytes,
+                    _
+                >>::encode_value(&&**value, buf)
             }
 
             fn prepend_value<B: $crate::buf::ReverseBuf + ?Sized>(value: &$ty, buf: &mut B) {
-                <() as $crate::encoding::ValueEncoder<$crate::encoding::PlainBytes, _>>::prepend_value
-                    (&&**value, buf)
+                <() as $crate::encoding::ValueEncoder<
+                    $crate::encoding::PlainBytes,
+                    _
+                >>::prepend_value(&&**value, buf)
             }
 
             fn value_encoded_len(value: &$ty) -> usize {
-                <() as $crate::encoding::ValueEncoder<$crate::encoding::PlainBytes, _>>::value_encoded_len
-                    (&&**value)
+                <() as $crate::encoding::ValueEncoder<
+                    $crate::encoding::PlainBytes,
+                    _
+                >>::value_encoded_len(&&**value)
             }
         }
 
