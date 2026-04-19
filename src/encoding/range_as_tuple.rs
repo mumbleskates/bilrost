@@ -1,4 +1,5 @@
 use crate::buf::ReverseBuf;
+use crate::encoding::schema::{Schema, ValueRepr};
 use crate::encoding::underived::{
     underived_decode, underived_decode_distinguished, underived_encode, underived_encoded_len,
     underived_prepend,
@@ -9,8 +10,10 @@ use crate::encoding::{
     Encoder, ForOverwrite, RestrictedDecodeContext, ValueBorrowDecoder, ValueDecoder, ValueEncoder,
     WireType, Wiretyped,
 };
-use crate::{delegate_schema, Canonicity, DecodeError};
+use crate::{Canonicity, DecodeError};
+use alloc::boxed::Box;
 use bytes::{Buf, BufMut};
+use core::fmt::Display;
 use core::mem;
 use core::ops::{Range, RangeInclusive};
 
@@ -51,10 +54,14 @@ where
     }
 }
 
-delegate_schema!(
-    ((Estart, Eend)) encodes (Range<T>) as ((T, T))
-    with generics (Estart, Eend, T)
-);
+impl<T, Estart, Eend> ValueRepr<(Estart, Eend), Range<T>> for ()
+where
+    (): ValueRepr<(Estart, Eend), (T, T)>,
+{
+    fn repr(schema: &Schema) -> Box<dyn Display> {
+        <() as ValueRepr<(Estart, Eend), (T, T)>>::repr(schema)
+    }
+}
 
 impl<T, Estart, Eend> ValueEncoder<(Estart, Eend), Range<T>> for ()
 where
@@ -234,10 +241,14 @@ where
     }
 }
 
-delegate_schema!(
-    ((Estart, Eend)) encodes (RangeInclusive<T>) as ((T, T))
-    with generics (Estart, Eend, T)
-);
+impl<T, Estart, Eend> ValueRepr<(Estart, Eend), RangeInclusive<T>> for ()
+where
+    (): ValueRepr<(Estart, Eend), (T, T)>,
+{
+    fn repr(schema: &Schema) -> Box<dyn Display> {
+        <() as ValueRepr<(Estart, Eend), (T, T)>>::repr(schema)
+    }
+}
 
 impl<T, Estart, Eend> ValueEncoder<(Estart, Eend), RangeInclusive<T>> for ()
 where
