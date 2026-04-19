@@ -1,13 +1,16 @@
 use crate::buf::ReverseBuf;
+use crate::encoding::schema::{Schema, ValueRepr};
 use crate::encoding::value_traits::for_overwrite_via_default;
 use crate::encoding::{
     delegate_value_encoding, encode_varint, encoded_len_varint, prepend_varint, Capped,
-    DecodeContext, DistinguishedValueDecoder, EmptyState, GeneralGeneric, RestrictedDecodeContext,
-    ValueDecoder, ValueEncoder, WireType, Wiretyped,
+    DecodeContext, DistinguishedValueDecoder, EmptyState, General, GeneralGeneric,
+    RestrictedDecodeContext, ValueDecoder, ValueEncoder, WireType, Wiretyped,
 };
 use crate::DecodeErrorKind::InvalidValue;
-use crate::{delegate_schema, Canonicity, DecodeError};
+use crate::{Canonicity, DecodeError};
+use alloc::boxed::Box;
 use bytes::{Buf, BufMut};
+use core::fmt::Display;
 
 for_overwrite_via_default!(bytestring::ByteString);
 
@@ -27,10 +30,11 @@ impl<const P: u8> Wiretyped<GeneralGeneric<P>, bytestring::ByteString> for () {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
 }
 
-delegate_schema!(
-    (GeneralGeneric<P>) encodes (bytestring::ByteString) as (&'static str)
-    with generics (const P: u8)
-);
+impl<const P: u8> ValueRepr<GeneralGeneric<P>, bytestring::ByteString> for () {
+    fn repr(schema: &Schema) -> Box<dyn Display> {
+        <() as ValueRepr<General, &str>>::repr(schema)
+    }
+}
 
 impl<const P: u8> ValueEncoder<GeneralGeneric<P>, bytestring::ByteString> for () {
     #[inline]
