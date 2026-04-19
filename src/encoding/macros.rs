@@ -813,7 +813,7 @@ macro_rules! impl_cow_value_encoding {
                 ForOverwrite, RestrictedDecodeContext, ValueBorrowDecoder, ValueEncoder, WireType,
                 Wiretyped,
             };
-            use $crate::encoding::schema::Schema;
+            use $crate::encoding::schema::{Schema, ValueRepr};
             use $crate::{Canonicity, DecodeError};
 
             impl$(<$($generic)*>)? Wiretyped<$E, Cow<'_, $T>> for () {
@@ -833,14 +833,12 @@ macro_rules! impl_cow_value_encoding {
                 };
             }
 
-            impl$(<$($generic)*>)? $crate::encoding::schema::ValueRepr<$E, Cow<'_, $T>> for ()
+            impl$(<$($generic)*>)? ValueRepr<$E, Cow<'_, $T>> for ()
             where
-                (): $crate::encoding::schema::ValueRepr<$E, $Owned>,
+                (): ValueRepr<$E, $Owned>,
             {
-                fn repr(
-                    schema: &$crate::encoding::schema::Schema
-                ) -> $crate::encoding::Box<dyn ::core::fmt::Display> {
-                    <() as $crate::encoding::schema::ValueRepr<$E, $Owned>>::repr(schema)
+                fn repr(schema: &Schema) -> Box<dyn Display> {
+                    <() as ValueRepr<$E, $Owned>>::repr(schema)
                 }
             }
 
