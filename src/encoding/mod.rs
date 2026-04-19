@@ -130,9 +130,8 @@ mod unpacked;
 mod value_traits;
 mod varint;
 
-/// Re-export for writing impls of the `ValueSchema` trait in the `delegate_schema` macro;
-/// invocations of that macro that are `std` likely won't have the `alloc` crate, so it otherwise
-/// isn't visible under a consistent path.
+/// Re-export for writing impls of the `repr` methods of encoding traits in macros and derives;
+/// when the code is `std` usually the `alloc` crate won't be available.'
 pub use alloc::boxed::Box;
 
 pub use encoding_traits::Wiretyped;
@@ -147,9 +146,7 @@ pub use encoding_traits::{
     DistinguishedValueBorrowDecoder, DistinguishedValueDecoder, ValueBorrowDecoder, ValueDecoder,
     ValueEncoder,
 };
-pub use macros::{
-    delegate_encoding, delegate_proxied_encoding, delegate_schema, delegate_value_encoding,
-};
+pub use macros::{delegate_encoding, delegate_proxied_encoding, delegate_value_encoding};
 pub(crate) use macros::{
     encoding_implemented_via_value_encoding, encoding_uses_base_empty_state,
     impl_cow_value_encoding, implement_core_empty_state_rules,

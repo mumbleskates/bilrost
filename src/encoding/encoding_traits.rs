@@ -341,8 +341,6 @@ where
 mod generic_optional {
     use super::*;
 
-    crate::delegate_schema!((E) encodes (Option<T>) as (T) with generics (T, E));
-
     impl<T, E> Encoder<E, Option<T>> for ()
     where
         (): ValueEncoder<E, T> + ForOverwrite<E, T>,

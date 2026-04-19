@@ -1,5 +1,5 @@
 use crate::buf::ReverseBuf;
-use crate::encoding::schema::{Schema, ValueSchema};
+use crate::encoding::schema::{FieldRepr, Schema, ValueRepr};
 use crate::encoding::value_traits::{
     Collection, DistinguishedCollection, EmptyState, ForOverwrite,
 };
@@ -27,10 +27,10 @@ impl<E, T: ?Sized> Wiretyped<Packed<E>, T> for () {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
 }
 
-impl<C, T, E> ValueSchema<Packed<E>, C> for ()
+impl<C, T, E> ValueRepr<Packed<E>, C> for ()
 where
     C: Collection<Item = T>,
-    (): ValueSchema<E, T> + EmptyState<(), C> + ForOverwrite<E, T> + ValueEncoder<E, T>,
+    (): EmptyState<(), C> + ValueRepr<E, T>,
 {
     fn repr(schema: &Schema) -> Box<dyn Display> {
         let bounds = match (C::BOUNDS.start(), C::BOUNDS.end()) {
@@ -44,10 +44,12 @@ where
             Some(r) => format!("; items are {r}"),
             None => String::new(),
         };
-        Box::new(format!(
-            "{packed_repr}{bounds}{restrictions}",
-            packed_repr = <() as ValueSchema<Packed<E>, [T]>>::repr(schema),
-        ))
+        schema.make_lazy_repr(move |schema| {
+            format!(
+                "{packed_repr}{bounds}{restrictions}",
+                packed_repr = <() as ValueRepr<Packed<E>, [T]>>::repr(schema),
+            )
+        })
     }
 }
 
@@ -82,6 +84,15 @@ where
         encoded_len_varint(inner_len as u64)
             .checked_add(inner_len)
             .unwrap()
+    }
+}
+
+impl<T, E> FieldRepr<Packed<E>, T> for ()
+where
+    (): ValueRepr<Packed<E>, T>,
+{
+    fn repr(schema: &Schema) -> Box<dyn Display> {
+        <() as ValueRepr<Packed<E>, T>>::repr(schema)
     }
 }
 
@@ -120,18 +131,20 @@ where
     }
 }
 
-impl<T, const N: usize, E> ValueSchema<Packed<E>, [T; N]> for ()
+impl<T, const N: usize, E> ValueRepr<Packed<E>, [T; N]> for ()
 where
-    (): ValueSchema<E, T> + ValueEncoder<E, T>,
+    (): ValueRepr<E, T>,
 {
     fn repr(schema: &Schema) -> Box<dyn Display> {
         if N == 0 {
             Box::new("delimited empty")
         } else {
-            Box::new(format!(
-                "{packed_repr}; exactly {N} items",
-                packed_repr = <() as ValueSchema<Packed<E>, [T]>>::repr(schema),
-            ))
+            schema.make_lazy_repr(|schema| {
+                format!(
+                    "{packed_repr}; exactly {N} items",
+                    packed_repr = <() as ValueRepr<Packed<E>, [T]>>::repr(schema),
+                )
+            })
         }
     }
 }
@@ -189,15 +202,17 @@ where
     }
 }
 
-impl<T, E> ValueSchema<Packed<E>, [T]> for ()
+impl<T, E> ValueRepr<Packed<E>, [T]> for ()
 where
-    (): ValueSchema<E, T>,
+    (): ValueRepr<E, T>,
 {
     fn repr(schema: &Schema) -> Box<dyn Display> {
-        Box::new(format!(
-            "delimited packed (items: {item_repr})",
-            item_repr = <() as ValueSchema<E, T>>::repr(schema),
-        ))
+        schema.make_lazy_repr(|schema| {
+            format!(
+                "delimited packed (items: {item_repr})",
+                item_repr = <() as ValueRepr<E, T>>::repr(schema),
+            )
+        })
     }
 }
 

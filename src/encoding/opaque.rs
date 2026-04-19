@@ -1,4 +1,5 @@
 use crate::buf::ReverseBuf;
+use crate::encoding::schema::Schema;
 use crate::encoding::{
     encode_varint, encoded_len_varint, prepend_varint, Capped, DecodeContext,
     RawDistinguishedMessageBorrowDecoder, RawDistinguishedMessageDecoder, RawMessage,
@@ -13,6 +14,7 @@ use alloc::collections::BTreeMap;
 use alloc::string::String;
 use alloc::vec::Vec;
 use bytes::{Buf, BufMut};
+use core::any::Any;
 use core::ops::Index;
 
 /// Represents an opaque bilrost field value. Can represent any valid encoded value.
@@ -421,6 +423,13 @@ impl RawMessage for OpaqueMessage<'_> {
         self.iter()
             .map(|(tag, value)| tm.key_len(*tag) + value.value_encoded_len())
             .sum()
+    }
+
+    fn register_fields(schema: &Schema)
+    where
+        Self: Any,
+    {
+        schema.register_message::<Self>("OpaqueMessage", || {});
     }
 }
 

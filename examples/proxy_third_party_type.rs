@@ -105,12 +105,6 @@ mod implement_encoding_for_range {
         with encoding (CustomEncoding) including distinguished
         with generics (T)
     );
-    // TODO: use including schema mode of the above macro instead
-    bilrost::delegate_schema!(
-        (CustomEncoding) encodes (RangeInclusive<T>)
-        like (bilrost::encoding::Packed) encodes ([T; 2])
-        with generics (T)
-    );
 }
 
 fn main() {

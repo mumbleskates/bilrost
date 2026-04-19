@@ -1,5 +1,5 @@
 use crate::buf::ReverseBuf;
-use crate::encoding::schema::{Schema, ValueSchema};
+use crate::encoding::schema::{Schema, ValueRepr};
 use crate::encoding::value_traits::{DistinguishedMapping, Mapping};
 use crate::encoding::{
     decoding_modes, encode_varint, encoded_len_varint, encoding_implemented_via_value_encoding,
@@ -58,34 +58,26 @@ where
     )
 }
 
-impl<M, K, V, KE, VE> ValueSchema<Map<KE, VE>, M> for ()
+impl<M, K, V, KE, VE> ValueRepr<Map<KE, VE>, M> for ()
 where
     M: Mapping<Key = K, Value = V>,
-    (): ValueSchema<KE, K>
-        + ValueSchema<VE, V>
-        + EmptyState<(), M>
-        + ForOverwrite<KE, K>
-        + ValueEncoder<KE, K>
-        + ForOverwrite<VE, V>
-        + ValueEncoder<VE, V>,
+    (): EmptyState<(), M> + ValueRepr<KE, K> + ValueRepr<VE, V>,
 {
     fn repr(schema: &Schema) -> Box<dyn Display> {
-        Box::new(format!(
-            "delimited map (keys: {key_repr}; values: {value_repr})",
-            key_repr = <() as ValueSchema<KE, K>>::repr(schema),
-            value_repr = <() as ValueSchema<VE, V>>::repr(schema),
-        ))
+        schema.make_lazy_repr(|schema| {
+            format!(
+                "delimited map (keys: {key_repr}; values: {value_repr})",
+                key_repr = <() as ValueRepr<KE, K>>::repr(schema),
+                value_repr = <() as ValueRepr<VE, V>>::repr(schema),
+            )
+        })
     }
 }
 
 impl<M, K, V, KE, VE> ValueEncoder<Map<KE, VE>, M> for ()
 where
     M: Mapping<Key = K, Value = V>,
-    (): EmptyState<(), M>
-        + ForOverwrite<KE, K>
-        + ValueEncoder<KE, K>
-        + ForOverwrite<VE, V>
-        + ValueEncoder<VE, V>,
+    (): EmptyState<(), M> + ValueEncoder<KE, K> + ValueEncoder<VE, V>,
 {
     fn encode_value<B: BufMut + ?Sized>(value: &M, buf: &mut B) {
         encode_varint(map_encoded_length::<M, KE, VE>(value) as u64, buf);
