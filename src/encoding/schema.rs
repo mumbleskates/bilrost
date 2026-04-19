@@ -422,12 +422,12 @@ impl OneofMessages {
 }
 
 /// Representation of a value type T when encoded by the encoding E.
-pub trait ValueRepr<E, T> {
+pub trait ValueRepr<E, T: ?Sized> {
     fn repr(schema: &Schema) -> Box<dyn Display>;
 }
 
 /// Representation of a field type T when encoded by the encoding E.
-pub trait FieldRepr<E, T> {
+pub trait FieldRepr<E, T: ?Sized> {
     fn repr(schema: &Schema) -> Box<dyn Display>;
 }
 
