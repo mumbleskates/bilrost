@@ -1,7 +1,6 @@
 #[cfg(any(feature = "chrono", feature = "time"))]
 pub(crate) mod time_proxies {
     use crate::buf::ReverseBuf;
-    use crate::encoding::schema::{FieldSet, MessageSchema, Schema, ValueSchema};
     use crate::encoding::underived::{
         underived_decode, underived_decode_distinguished, underived_encode, underived_encoded_len,
         underived_prepend, underived_schema,
@@ -13,9 +12,7 @@ pub(crate) mod time_proxies {
     };
     use crate::DecodeErrorKind::InvalidValue;
     use crate::{Canonicity, DecodeError};
-    use alloc::boxed::Box;
     use bytes::{Buf, BufMut};
-    use core::fmt::Display;
 
     #[derive(Debug, Default, PartialEq, Eq)]
     pub(crate) struct TimeDeltaProxy {
@@ -29,12 +26,10 @@ pub(crate) mod time_proxies {
         const WIRE_TYPE: WireType = WireType::LengthDelimited;
     }
 
-    impl MessageSchema for TimeDeltaProxy {
-        underived_schema!(TimeDelta {
-            1: General => secs: i64,
-            2: Fixed => nanos: i32,
-        });
-    }
+    underived_schema!(TimeDeltaProxy: "TimeDelta" {
+        1: General => secs: i64,
+        2: Fixed => nanos: i32,
+    });
 
     impl<const P: u8> ValueEncoder<GeneralGeneric<P>, TimeDeltaProxy> for () {
         fn encode_value<B: BufMut + ?Sized>(value: &TimeDeltaProxy, buf: &mut B) {

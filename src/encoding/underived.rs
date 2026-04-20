@@ -6,19 +6,34 @@
 #[allow(unused_macros)]
 macro_rules! underived_schema {
     (
-        $name:ident {
+        $message_struct:ty: $aka:literal {
             $($tag:literal: $encoding:ty => $field_name:ident: $ty:ty),* $(,)?
         }
     ) => {
-        fn register_fields(
-            fields: &mut impl $crate::encoding::schema::FieldSet,
-            schema: &crate::encoding::schema::Schema,
-        ) {
-            $(fields.add_field(
-                stringify!($field_name),
-                $tag,
-                <() as ValueSchema<$encoding, $ty>>::repr(schema),
-            );)*
+        impl<const P: u8> $crate::encoding::schema::ValueRepr<
+            $crate::encoding::GeneralGeneric<P>,
+            $message_struct
+        > for ()
+        where
+            $message_struct: ::core::any::Any,
+            $((): $crate::encoding::schema::FieldRepr<$encoding, $ty>,)*
+        {
+            fn repr(
+                schema: &$crate::encoding::schema::Schema,
+            ) -> $crate::encoding::Box<dyn ::core::fmt::Display>
+            {
+                schema.register_message::<$message_struct>($aka, |fields| {
+                    $(fields.add_field(
+                        stringify!($field_name),
+                        $tag,
+                        <() as $crate::encoding::schema::FieldRepr<$encoding, $ty>>::repr(schema),
+                    );)*
+                });
+                schema.make_lazy_repr(|schema| ::alloc::format!(
+                    "delimited message {message_type}",
+                    message_type = schema.type_reference::<$message_struct>(),
+                ))
+            }
         }
     };
 }
