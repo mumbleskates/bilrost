@@ -114,8 +114,8 @@ calling itself by the same name.
 - [Crate features](#crate-features)
 - [Differences from `prost`](#bilrost-vs-prost)
 - [Differences from Protobuf](#differences-from-protobuf)
-    - [Distinguished representation of data](#distinguished-decoding) and [how
-      this is achieved](#distinguished-representation-on-the-wire-in-bilrost)
+    - [Distinguished decoding of canonical data](#distinguished-decoding) and [how
+      this is achieved](#canonical-representation-on-the-wire-in-bilrost)
 - [Compared to other encodings, distinguished and not](
   #comparisons-to-other-encodings)
 - [Why use Bilrost?](#strengths-aims-and-advantages)
@@ -2627,15 +2627,16 @@ informed by experience with Protobuf:
 
 </details>
 
-### Distinguished representation on the wire in `bilrost`
+### Canonical representation on the wire in `bilrost`
 
 Leveraging the changes to varint representation and field order, Bilrost
 standardizes easily-distinguishable canonical encodings for many message types.
-Zero-extension of varints and unordered fields are the two main things that can
-lead Protobuf encodings to vary for the same meaning, and most of what remains
-involves enforcing that empty values are never encoded, packed/unpacked
-collections have a matching representation, map keys are in sorted order, and
-keeping track of whether any unknown fields exist in the encoding.
+Zero-extension of varints and unordered or duplicate fields are the two main
+things that can lead Protobuf encodings to vary for the same meaning, and most
+of what remains involves enforcing that empty values are never encoded,
+packed/unpacked collections have a matching representation, map keys are in
+sorted order, and keeping track of whether any unknown fields exist in the
+encoding.
 
 ## Comparisons to other encodings
 
