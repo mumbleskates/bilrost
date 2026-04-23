@@ -110,7 +110,7 @@ calling itself by the same name.
       - [Self-referential borrowing with `yoke` for enormous speed + portable
         structs](#recipe-for-making-borrowed-messages-portable)
     - [`no_std` support](#no_std-support)
-    - [Changelog](./CHANGELOG.md) ([on github][ghchangelog])
+    - [Changelog](./source/CHANGELOG.md) ([on github][ghchangelog])
 - [Crate features](#crate-features)
 - [Differences from `prost`](#bilrost-vs-prost)
 - [Differences from Protobuf](#differences-from-protobuf)
