@@ -111,6 +111,7 @@ calling itself by the same name.
         structs](#recipe-for-making-borrowed-messages-portable)
     - [`no_std` support](#no_std-support)
     - [Changelog](./CHANGELOG.md) ([on github][ghchangelog])
+- [Crate features](#crate-features)
 - [Differences from `prost`](#bilrost-vs-prost)
 - [Differences from Protobuf](#differences-from-protobuf)
     - [Distinguished representation of data](#distinguished-decoding) and [how
