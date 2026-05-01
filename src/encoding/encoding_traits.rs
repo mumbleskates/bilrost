@@ -1,10 +1,15 @@
 use crate::buf::ReverseBuf;
+use crate::encoding::schema::RegisterFields;
+use crate::encoding::schema::{FieldRepr, Schema, ValueRepr};
 use crate::encoding::{
     check_wire_type, Capped, DecodeContext, ForOverwrite, RestrictedDecodeContext, TagMeasurer,
     TagRevWriter, TagWriter, WireType,
 };
 use crate::{Canonicity, DecodeError};
+use alloc::boxed::Box;
 use bytes::{Buf, BufMut};
+use core::any::Any;
+use core::fmt::Display;
 use core::ops::Deref;
 
 /// The core trait for encoding bilrost data.
@@ -340,6 +345,25 @@ where
 /// type for each is not stored.
 mod generic_optional {
     use super::*;
+
+    impl<T> RegisterFields for Option<T>
+    where
+        T: Any + RegisterFields,
+    {
+        fn register(schema: &Schema) {
+            schema.register_message_wrapper::<Option<T>, T>();
+            T::register(schema);
+        }
+    }
+
+    impl<T, E> FieldRepr<E, Option<T>> for ()
+    where
+        (): ValueRepr<E, T>,
+    {
+        fn repr(schema: &Schema) -> Box<dyn Display> {
+            <() as ValueRepr<E, T>>::repr(schema)
+        }
+    }
 
     impl<T, E> Encoder<E, Option<T>> for ()
     where
