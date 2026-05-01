@@ -238,7 +238,7 @@ impl MessageField {
                     (): #crate_::encoding::DistinguishedBorrowDecoder<'__a, #encoding, #ty>
                 )
             }
-            Schema => quote!((): #crate_::encoding::schema::ValueSchema<#encoding, #ty>),
+            Schema => quote!((): #crate_::encoding::schema::FieldRepr<#encoding, #ty>),
         }];
         if !matches!(purpose, Schema) {
             res.push(
@@ -302,7 +302,7 @@ impl MessageField {
             fields.add_field(
                 #field_name,
                 #tag,
-                <() as #crate_::encoding::schema::ValueSchema<#encoding, #ty>>::repr(schema),
+                <() as #crate_::encoding::schema::FieldRepr<#encoding, #ty>>::repr(schema),
             );
         }
     }
@@ -891,7 +891,7 @@ impl FieldBearer for FieldInVariant {
                         DistinguishedValueBorrowDecoder<'__a, #encoding, #ty>
                 )
             }
-            Schema => quote!((): #crate_::encoding::schema::ValueSchema<#encoding, #ty>),
+            Schema => quote!((): #crate_::encoding::schema::FieldRepr<#encoding, #ty>),
         }];
         if !matches!(purpose, Schema) {
             res.push(

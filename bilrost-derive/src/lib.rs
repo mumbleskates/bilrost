@@ -207,7 +207,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         self_where
             .clone()
             .into_iter()
-            .chain([quote!(Self: 'static)]),
+            .chain([quote!(Self: ::core::any::Any)]),
         &where_fields,
         Schema,
     );
@@ -404,13 +404,12 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
             }
         }
 
-        impl #impl_generics #crate_::encoding::schema::MessageSchema for __Self #ty_generics
+        impl #impl_generics #crate_::encoding::schema::RegisterFields for __Self #ty_generics
         #schema_where_clause {
-            fn register_fields(
-                fields: &mut impl #crate_::encoding::schema::FieldSet,
-                schema: &#crate_::encoding::schema::Schema,
-            ) {
-                #(#field_schemas)*
+            fn register(schema: &#crate_::encoding::schema::Schema) {
+                schema.register_message::<Self>(stringify!(#ident), |fields| {
+                    #(#field_schemas)*
+                });
             }
         }
     };
