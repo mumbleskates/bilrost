@@ -1,5 +1,5 @@
 use crate::buf::ReverseBuf;
-use crate::encoding::schema::{FieldSet, MessageSchema, Schema, ValueSchema};
+use crate::encoding::schema::{RegisterFields, Schema, ValueRepr};
 use crate::encoding::{
     encode_varint, encoded_len_varint, implement_core_empty_state_rules, prepend_varint,
     Canonicity, Capped, DecodeContext, DistinguishedValueBorrowDecoder, DistinguishedValueDecoder,
@@ -9,7 +9,9 @@ use crate::encoding::{
 use crate::Canonicity::Canonical;
 use crate::DecodeError;
 use alloc::boxed::Box;
+use alloc::format;
 use bytes::{Buf, BufMut};
+use core::any::Any;
 use core::fmt::Display;
 
 /// Encoding that performs the actual value-encoding of messages, to and from `RawMessage`-family
@@ -145,6 +147,18 @@ pub trait RawMessage {
 
     /// Returns the encoded length of the message without a length delimiter.
     fn raw_encoded_len(&self) -> usize;
+
+    /// Registers this message's fields with the given schema.
+    fn register_fields(schema: &Schema)
+    where
+        Self: Any;
+    // TODO: add this default impl back when everything is populated in the lib
+    // {
+    //     unimplemented!(
+    //         "unknown fields for message {name:?}",
+    //         name = type_name::<T>(),
+    //     );
+    // }
 }
 
 /// Decoding trait to be implemented by messages. The methods of this trait are meant to only be
@@ -211,7 +225,7 @@ pub trait RawDistinguishedMessageBorrowDecoder<'a>: RawMessage + Eq {
 
 impl<T> RawMessage for Box<T>
 where
-    T: RawMessage + Sized,
+    T: RawMessage + Sized, // TODO: is this Sized bound necessary?
 {
     const __ASSERTIONS: () = ();
 
@@ -240,6 +254,14 @@ where
 
     fn raw_encoded_len(&self) -> usize {
         (**self).raw_encoded_len()
+    }
+
+    fn register_fields(schema: &Schema)
+    where
+        Self: Any,
+    {
+        // TODO: how do we solve this indirection at render time
+        T::register_fields(schema);
     }
 }
 
@@ -351,15 +373,14 @@ where
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
 }
 
-impl<T> ValueSchema<MessageEncoding, T> for ()
+impl<T> ValueRepr<MessageEncoding, T> for ()
 where
-    T: MessageSchema,
+    T: RawMessage + RegisterFields,
 {
     fn repr(schema: &Schema) -> Box<dyn Display> {
-        schema.register::<T>();
-        schema.make_lazy_repr(|schema, f| {
-            write!(
-                f,
+        T::register_fields(schema);
+        schema.make_lazy_repr(|schema| {
+            format!(
                 "delimited message {message_type}",
                 message_type = schema.type_reference::<T>(),
             )
@@ -466,11 +487,5 @@ where
             return ctx.check(Canonicity::NotCanonical);
         }
         borrow_merge_distinguished(value, buf, ctx.enter_recursion())
-    }
-}
-
-impl MessageSchema for () {
-    fn register_fields(fields: &mut impl FieldSet, _: &Schema) {
-        fields.add_name("()");
     }
 }
