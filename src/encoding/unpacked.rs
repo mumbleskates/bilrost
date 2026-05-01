@@ -1,5 +1,5 @@
 use crate::buf::ReverseBuf;
-use crate::encoding::schema::{Schema, ValueSchema};
+use crate::encoding::schema::{FieldRepr, Schema, ValueRepr};
 use crate::encoding::value_traits::{
     Collection, DistinguishedCollection, EmptyState, ForOverwrite,
 };
@@ -252,10 +252,10 @@ pub(crate) mod borrowed {
     decoding_modes::__invoke!(define_decoders, borrowed);
 }
 
-impl<C, T, E> ValueSchema<Unpacked<E>, C> for ()
+impl<C, T, E> FieldRepr<Unpacked<E>, C> for ()
 where
     C: Collection<Item = T>,
-    (): ValueSchema<E, T> + EmptyState<(), C> + ForOverwrite<E, T> + ValueEncoder<E, T>,
+    (): EmptyState<(), C> + ValueRepr<E, T>,
 {
     fn repr(schema: &Schema) -> Box<dyn Display> {
         let bounds = match (C::BOUNDS.start(), C::BOUNDS.end()) {
@@ -269,10 +269,12 @@ where
             Some(r) => format!("; items are {r}"),
             None => String::new(),
         };
-        Box::new(format!(
-            "{unpacked_repr}{bounds}{restrictions}",
-            unpacked_repr = <() as ValueSchema<Unpacked<E>, [T]>>::repr(schema),
-        ))
+        schema.make_lazy_repr(move |schema| {
+            format!(
+                "{unpacked_repr}{bounds}{restrictions}",
+                unpacked_repr = <() as ValueRepr<Unpacked<E>, [T]>>::repr(schema),
+            )
+        })
     }
 }
 
@@ -316,15 +318,17 @@ where
     }
 }
 
-impl<T, const N: usize, E> ValueSchema<Unpacked<E>, [T; N]> for ()
+impl<T, const N: usize, E> FieldRepr<Unpacked<E>, [T; N]> for ()
 where
-    (): ValueSchema<E, T> + ForOverwrite<E, T> + ValueEncoder<E, T>,
+    (): EmptyState<E, [T; N]> + ValueRepr<E, T>,
 {
     fn repr(schema: &Schema) -> Box<dyn Display> {
-        Box::new(format!(
-            "{unpacked_repr}; exactly {N} items",
-            unpacked_repr = <() as ValueSchema<Unpacked<E>, [T]>>::repr(schema),
-        ))
+        schema.make_lazy_repr(|schema| {
+            format!(
+                "{unpacked_repr}; exactly {N} items",
+                unpacked_repr = <() as FieldRepr<Unpacked<E>, [T]>>::repr(schema),
+            )
+        })
     }
 }
 
@@ -363,15 +367,17 @@ where
     }
 }
 
-impl<T, E> ValueSchema<Unpacked<E>, [T]> for ()
+impl<T, E> FieldRepr<Unpacked<E>, [T]> for ()
 where
-    (): ValueSchema<E, T> + ForOverwrite<E, T> + ValueEncoder<E, T>,
+    (): ValueRepr<E, T>,
 {
     fn repr(schema: &Schema) -> Box<dyn Display> {
-        Box::new(format!(
-            "repeated field (items: {value_repr})",
-            value_repr = <() as ValueSchema<E, T>>::repr(schema),
-        ))
+        schema.make_lazy_repr(|schema| {
+            format!(
+                "repeated field (items: {value_repr})",
+                value_repr = <() as ValueRepr<E, T>>::repr(schema),
+            )
+        })
     }
 }
 
@@ -412,6 +418,20 @@ where
         } else {
             0
         }
+    }
+}
+
+impl<T, const N: usize, E> FieldRepr<Unpacked<E>, Option<[T; N]>> for ()
+where
+    (): EmptyState<E, [T; N]> + ValueRepr<E, T>,
+{
+    fn repr(schema: &Schema) -> Box<dyn Display> {
+        schema.make_lazy_repr(|schema| {
+            format!(
+                "{unpacked_repr}; exactly {N} items",
+                unpacked_repr = <() as FieldRepr<Unpacked<E>, [T]>>::repr(schema),
+            )
+        })
     }
 }
 
