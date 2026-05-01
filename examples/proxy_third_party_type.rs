@@ -25,7 +25,7 @@ bilrost::implement_core_empty_state_rules!(CustomEncoding);
 
 mod implement_encoding_for_range {
     use crate::{CustomEncoding, Tag};
-    use bilrost::encoding::{DistinguishedProxiable, EmptyState, ForOverwrite, Proxiable, Proxied};
+    use bilrost::encoding::{DistinguishedProxiable, EmptyState, ForOverwrite, Proxiable};
     use bilrost::Canonicity::Canonical;
     use bilrost::{Canonicity, DecodeErrorKind};
     use std::ops::RangeInclusive;
