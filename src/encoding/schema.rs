@@ -434,5 +434,5 @@ pub trait FieldRepr<E, T: ?Sized> {
 /// Ability of a message or oneof to register its fields with a schema.
 // TODO: where does the name go
 pub trait RegisterFields {
-    fn register(fields: &mut MessageFields);
+    fn register(schema: &Schema);
 }

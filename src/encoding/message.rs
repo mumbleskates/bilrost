@@ -11,7 +11,6 @@ use crate::DecodeError;
 use alloc::boxed::Box;
 use alloc::format;
 use bytes::{Buf, BufMut};
-use core::any::Any;
 use core::fmt::Display;
 
 /// Encoding that performs the actual value-encoding of messages, to and from `RawMessage`-family
@@ -147,18 +146,6 @@ pub trait RawMessage {
 
     /// Returns the encoded length of the message without a length delimiter.
     fn raw_encoded_len(&self) -> usize;
-
-    /// Registers this message's fields with the given schema.
-    fn register_fields(schema: &Schema)
-    where
-        Self: Any;
-    // TODO: add this default impl back when everything is populated in the lib
-    // {
-    //     unimplemented!(
-    //         "unknown fields for message {name:?}",
-    //         name = type_name::<T>(),
-    //     );
-    // }
 }
 
 /// Decoding trait to be implemented by messages. The methods of this trait are meant to only be
@@ -223,9 +210,19 @@ pub trait RawDistinguishedMessageBorrowDecoder<'a>: RawMessage + Eq {
         Self: Sized;
 }
 
+impl<T> RegisterFields for Box<T>
+where
+    T: RawMessage + RegisterFields,
+{
+    fn register(schema: &Schema) {
+        schema.register_message_wrapper::<Self, T>();
+        T::register(schema);
+    }
+}
+
 impl<T> RawMessage for Box<T>
 where
-    T: RawMessage + Sized, // TODO: is this Sized bound necessary?
+    T: RawMessage,
 {
     const __ASSERTIONS: () = ();
 
@@ -254,14 +251,6 @@ where
 
     fn raw_encoded_len(&self) -> usize {
         (**self).raw_encoded_len()
-    }
-
-    fn register_fields(schema: &Schema)
-    where
-        Self: Any,
-    {
-        // TODO: how do we solve this indirection at render time
-        T::register_fields(schema);
     }
 }
 
@@ -378,7 +367,7 @@ where
     T: RawMessage + RegisterFields,
 {
     fn repr(schema: &Schema) -> Box<dyn Display> {
-        T::register_fields(schema);
+        T::register(schema);
         schema.make_lazy_repr(|schema| {
             format!(
                 "delimited message {message_type}",
