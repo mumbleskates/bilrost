@@ -75,7 +75,7 @@ macro_rules! varint {
         }
 
         impl ValueRepr<Varint, $ty> for () {
-            fn repr(schema: &Schema) -> Box<dyn Display> {
+            fn repr(_schema: &Schema) -> Box<dyn Display> {
                 const SIGNEDNESS: &'static str = $signedness;
                 const SIZE: usize = mem::size_of::<$ty>();
                 if SIGNEDNESS== "boolean" {

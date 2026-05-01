@@ -272,7 +272,7 @@ where
         schema.make_lazy_repr(move |schema| {
             format!(
                 "{unpacked_repr}{bounds}{restrictions}",
-                unpacked_repr = <() as ValueRepr<Unpacked<E>, [T]>>::repr(schema),
+                unpacked_repr = <() as FieldRepr<Unpacked<E>, [T]>>::repr(schema),
             )
         })
     }

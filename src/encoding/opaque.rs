@@ -14,7 +14,6 @@ use alloc::collections::BTreeMap;
 use alloc::string::String;
 use alloc::vec::Vec;
 use bytes::{Buf, BufMut};
-use core::any::Any;
 use core::ops::Index;
 
 /// Represents an opaque bilrost field value. Can represent any valid encoded value.
@@ -388,7 +387,7 @@ impl<'a> FromIterator<(u32, OpaqueValue<'a>)> for OpaqueMessage<'a> {
 
 impl RegisterFields for OpaqueMessage<'static> {
     fn register(schema: &Schema) {
-        schema.register_message::<Self>("OpaqueMessage", || {});
+        schema.register_message::<Self>("OpaqueMessage", |_| {});
     }
 }
 

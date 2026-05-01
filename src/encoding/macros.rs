@@ -193,7 +193,7 @@ macro_rules! delegate_value_encoding {
             fn repr(
                 schema: &$crate::encoding::schema::Schema
             ) -> $crate::encoding::Box<dyn ::core::fmt::Display> {
-                <() as $crate::encoding::schema::FieldRepr<$to_ty, $value_ty>>::repr(schema)
+                <() as $crate::encoding::schema::ValueRepr<$to_ty, $value_ty>>::repr(schema)
             }
         }
 

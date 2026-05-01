@@ -145,7 +145,7 @@ impl proptest::arbitrary::Arbitrary for Blob {
 
 impl RegisterFields for () {
     fn register(schema: &Schema) {
-        schema.register_message("()", |_| {});
+        schema.register_message::<()>("()", |_| {});
     }
 }
 

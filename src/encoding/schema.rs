@@ -213,12 +213,10 @@ impl Schema {
             .get(&m_id)
             .cloned()
             .unwrap_or(m_id);
-        let name = self
-            .0
-            .types
-            .get_guarded()
-            .get(&effective_id)
-            .map_or_else(|| "<unnamed>".to_owned(), |info| info.get_guarded().name());
+        let name = self.0.types.get_guarded().get(&effective_id).map_or_else(
+            || "<unnamed>".to_owned(),
+            |info| info.get_guarded().name().to_owned(),
+        );
         format!("{name} ({effective_id:?})")
     }
 
@@ -233,7 +231,7 @@ impl Schema {
             || "<unnamed>".to_owned(),
             |info| {
                 let info = info.get_guarded();
-                let TypeInfo::Oneof(variants) = &info.details else {
+                let TypeInfo::Oneof(variants) = &*info else {
                     panic!(
                         "type {ty_name:?} is not registered as a oneof with subtypes",
                         ty_name = type_name::<M>(),
@@ -318,6 +316,16 @@ enum TypeInfo {
     Message(MessageFields),
     Enum(EnumInfo),
     Oneof(OneofMessages),
+}
+
+impl TypeInfo {
+    fn name(&self) -> &str {
+        match self {
+            TypeInfo::Message(message_fields) => &message_fields.message_name,
+            TypeInfo::Enum(enum_info) => &enum_info.enum_name,
+            TypeInfo::Oneof(oneof_messages) => &oneof_messages.oneof_name,
+        }
+    }
 }
 
 /// Collected information about a specific message type and its fields.

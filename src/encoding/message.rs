@@ -11,6 +11,7 @@ use crate::DecodeError;
 use alloc::boxed::Box;
 use alloc::format;
 use bytes::{Buf, BufMut};
+use core::any::Any;
 use core::fmt::Display;
 
 /// Encoding that performs the actual value-encoding of messages, to and from `RawMessage`-family
@@ -212,7 +213,7 @@ pub trait RawDistinguishedMessageBorrowDecoder<'a>: RawMessage + Eq {
 
 impl<T> RegisterFields for Box<T>
 where
-    T: RawMessage + RegisterFields,
+    T: Any + RawMessage + RegisterFields,
 {
     fn register(schema: &Schema) {
         schema.register_message_wrapper::<Self, T>();
@@ -364,7 +365,7 @@ where
 
 impl<T> ValueRepr<MessageEncoding, T> for ()
 where
-    T: RawMessage + RegisterFields,
+    T: Any + RawMessage + RegisterFields,
 {
     fn repr(schema: &Schema) -> Box<dyn Display> {
         T::register(schema);
