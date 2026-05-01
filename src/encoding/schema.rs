@@ -29,8 +29,6 @@ trait BorrowGuard<T> {
         Self: 'a,
         T: 'a;
 
-    fn new(t: T) -> Self;
-
     fn get_guarded(&self) -> Self::Borrowed<'_>;
 }
 
@@ -43,10 +41,6 @@ mod guard {
             = spin::MutexGuard<'a, T>
         where
             T: 'a;
-
-        fn new(t: T) -> Self {
-            Guard::new(t)
-        }
 
         fn get_guarded(&self) -> Self::Borrowed<'_> {
             self.lock()
@@ -63,10 +57,6 @@ mod guard {
             = core::cell::RefMut<'a, T>
         where
             T: 'a;
-
-        fn new(t: T) -> Self {
-            Guard::new(t)
-        }
 
         fn get_guarded(&self) -> Self::Borrowed<'_> {
             self.borrow_mut()
@@ -224,7 +214,7 @@ impl Schema {
     /// found in the entire schema output. The output of this function may differ as more types are
     /// added to the schema, so this should only be called when the whole schema is being rendered;
     /// see `make_lazy_repr`.
-    pub fn subtype_reference<M: Any + ?Sized, const Tag: u32>(&self) -> String {
+    pub fn subtype_reference<M: Any + ?Sized, const TAG: u32>(&self) -> String {
         // TODO: this is a placeholder, we want to use the type's ordinal after they're organized
         let id = TypeId::of::<M>();
         let name = self.0.types.get_guarded().get(&id).map_or_else(
@@ -239,7 +229,7 @@ impl Schema {
                 };
                 let (variant_name, _) = variants
                     .variants
-                    .get(&Tag)
+                    .get(&TAG)
                     .expect("type {name:?} does not have a registered variant with tag {Tag}");
                 format!("{name}::{variant_name}", name = variants.oneof_name)
             },
@@ -382,7 +372,7 @@ struct FieldInfo {
     repr: Box<dyn Display>,
 }
 
-struct EnumInfo {
+pub struct EnumInfo {
     enum_name: String,
     values: BTreeMap<u32, String>,
 }
@@ -401,7 +391,7 @@ impl EnumInfo {
     }
 }
 
-struct OneofMessages {
+pub struct OneofMessages {
     oneof_name: String,
     variants: BTreeMap<u32, (String, MessageFields)>,
 }
