@@ -1,19 +1,17 @@
-use alloc::borrow::Cow;
-use alloc::boxed::Box;
-use alloc::vec::Vec;
-use core::borrow::{Borrow, BorrowMut};
-use core::ops::{Deref, DerefMut};
-
-use bytes::{Buf, BufMut};
-
 use crate::buf::ReverseBuf;
-use crate::encoding::schema::Schema;
+use crate::encoding::schema::{RegisterFields, Schema};
 use crate::encoding::{
     skip_field, Canonicity, Capped, DecodeContext, RawDistinguishedMessageBorrowDecoder,
     RawDistinguishedMessageDecoder, RawMessage, RawMessageBorrowDecoder, RawMessageDecoder,
     RestrictedDecodeContext, WireType,
 };
 use crate::DecodeError;
+use alloc::borrow::Cow;
+use alloc::boxed::Box;
+use alloc::vec::Vec;
+use bytes::{Buf, BufMut};
+use core::borrow::{Borrow, BorrowMut};
+use core::ops::{Deref, DerefMut};
 
 /// Newtype wrapper to act as a simple "bytes data" type in Bilrost. It transparently wraps a
 /// `Vec<u8>` and is fully supported by the `General` encoders.
@@ -145,6 +143,12 @@ impl proptest::arbitrary::Arbitrary for Blob {
     >;
 }
 
+impl RegisterFields for () {
+    fn register(schema: &Schema) {
+        schema.register_message("()", |_| {});
+    }
+}
+
 /// The empty tuple unit is the only native tuple type that implements Message because there are no
 /// choices to be made about how its fields will be encoded. All other native tuples are only
 /// implemented as field values. They encode exactly as if they were nested messages, but their
@@ -166,10 +170,6 @@ impl RawMessage for () {
 
     fn raw_encoded_len(&self) -> usize {
         0
-    }
-
-    fn register_fields(schema: &Schema) {
-        schema.register_message("()", |_| {});
     }
 }
 
