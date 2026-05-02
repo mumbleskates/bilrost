@@ -20,7 +20,7 @@ macro_rules! underived_schema {
         {
             fn repr(
                 schema: &$crate::encoding::schema::Schema,
-            ) -> $crate::encoding::Box<dyn ::core::fmt::Display>
+            ) -> $crate::alloc::boxed::Box<dyn ::core::fmt::Display>
             {
                 schema.register_message::<$message_struct>($aka, |fields| {
                     $(fields.add_field(

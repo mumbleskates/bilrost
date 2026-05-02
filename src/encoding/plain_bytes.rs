@@ -431,13 +431,13 @@ macro_rules! plain_bytes_vec_impl {
         $crate::encoding::schema::ValueRepr<$crate::encoding::PlainBytes, $ty> for () {
             fn repr(
                 schema: &$crate::encoding::schema::Schema,
-            ) -> $crate::encoding::Box<dyn ::core::fmt::Display> {
+            ) -> $crate::alloc::boxed::Box<dyn ::core::fmt::Display> {
                 let res = <() as $crate::encoding::schema::ValueRepr<
                     $crate::encoding::PlainBytes,
                     &[u8]
                 >>::repr(schema);
                 $(
-                    let res = $crate::encoding::Box::new(
+                    let res = $crate::alloc::boxed::Box::new(
                         ::alloc::format!("{res}; at most {limit} bytes", limit = $limit)
                     );
                 )?

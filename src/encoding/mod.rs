@@ -130,10 +130,6 @@ mod unpacked;
 mod value_traits;
 mod varint;
 
-/// Re-export for writing impls of the `repr` methods of encoding traits in macros and derives;
-/// when the code is `std` usually the `alloc` crate won't be available.'
-pub use alloc::boxed::Box;
-
 pub use encoding_traits::Wiretyped;
 pub use encoding_traits::{
     BorrowDecoder, Decoder, DistinguishedBorrowDecoder, DistinguishedDecoder, Encoder,
