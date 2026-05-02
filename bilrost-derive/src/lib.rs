@@ -798,7 +798,6 @@ pub fn message(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     try_message(input.into()).unwrap().into()
 }
 
-// TODO: implement ValueSchema for these
 fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
     let crate_ = crate_name();
     let input: DeriveInput = parse2(input)?;
@@ -946,6 +945,24 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
             #ident #ty_generics
         > for () #where_clause {
             const WIRE_TYPE: #crate_::encoding::WireType = #crate_::encoding::WireType::Varint;
+        }
+
+        impl #unborrowed_generics
+        #crate_::encoding::schema::ValueRepr<
+            #crate_::encoding::GeneralGeneric<__G>,
+            #ident #ty_generics
+        > for () #where_clause {
+            fn repr(
+                schema: &#crate_::encoding::schema::Schema,
+            ) -> #crate_::alloc::boxed::Box<dyn ::core::fmt::Display> {
+                schema.register_enumeration::<Self>(stringify!(#ident), |fields| {
+                    #(fields.add_value(stringify!(#variant_idents), #discriminant_exprs);)*
+                });
+                schema.make_lazy_repr(|schema| #crate_::alloc::format!(
+                    "varint, unsigned; one of enumeration {enum_type}",
+                    enum_type = schema.type_reference::<Self>(),
+                ))
+            }
         }
 
         impl #unborrowed_generics
