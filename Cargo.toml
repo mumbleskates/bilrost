@@ -3,9 +3,6 @@ name = "bilrost"
 version = "0.1015.0-dev"
 authors = [
     "Kent Ross <k@mad.cash>",
-    "Dan Burkert <dan@danburkert.com>",
-    "Lucio Franco <luciofranco14@gmail.com",
-    "Tokio Contributors <team@tokio.rs>",
 ]
 license = "Apache-2.0"
 repository = "https://github.com/mumbleskates/bilrost"
