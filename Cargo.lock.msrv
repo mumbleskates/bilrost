@@ -92,9 +92,9 @@ checksum = "7c02d123df017efcdfbd739ef81735b36c5ba83ec3c59c80a9d7ecc718f92e50"
 
 [[package]]
 name = "autocfg"
-version = "1.5.0"
+version = "1.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c08606f8c3cbf4ce6ec8e28fb0014a2c086708fe954eaa885384a6165172e7e8"
+checksum = "f2032f911046de80f0a198e0901378627c33f59ea0ac00e363d481118bd70a53"
 
 [[package]]
 name = "backtrace"
@@ -113,7 +113,7 @@ dependencies = [
 
 [[package]]
 name = "bilrost"
-version = "0.1014.1"
+version = "0.1015.0-dev"
 dependencies = [
  "arbitrary",
  "arrayvec",
@@ -127,11 +127,12 @@ dependencies = [
  "const_panic",
  "criterion",
  "hashbrown",
- "itertools 0.14.0",
+ "itertools 0.15.0",
  "pprof",
  "proptest",
  "rand",
  "smallvec",
+ "smol_str",
  "static_assertions",
  "thin-vec",
  "time",
@@ -141,10 +142,10 @@ dependencies = [
 
 [[package]]
 name = "bilrost-derive"
-version = "0.1014.1"
+version = "0.1015.0-dev"
 dependencies = [
  "eyre",
- "itertools 0.14.0",
+ "itertools 0.15.0",
  "proc-macro2",
  "quote",
  "syn",
@@ -152,7 +153,7 @@ dependencies = [
 
 [[package]]
 name = "bilrost-types"
-version = "0.1014.1"
+version = "0.1015.0-dev"
 dependencies = [
  "bilrost",
  "proptest",
@@ -326,6 +327,7 @@ dependencies = [
  "eyre",
  "once_cell",
  "regex",
+ "smol_str",
  "time",
  "tinyvec",
 ]
@@ -635,9 +637,9 @@ dependencies = [
 
 [[package]]
 name = "itertools"
-version = "0.14.0"
+version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2b192c782037fadd9cfa75548310488aabdbf3d2da73885b31bd0abd03351285"
+checksum = "8b4baf93f58d4425749ca49a51c50ebab072c5df6994d08fed93541c331481dc"
 dependencies = [
  "either",
 ]
@@ -897,9 +899,9 @@ dependencies = [
 
 [[package]]
 name = "regex"
-version = "1.12.3"
+version = "1.12.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e10754a14b9137dd7b1e3e5b0493cc9171fdd105e0ab477f51b72e7f3ac0e276"
+checksum = "f1292b7759ae1cb9ec195452d1390a074f0cd8541ab7a5a8c31cd6db45d4a6ba"
 dependencies = [
  "aho-corasick",
  "memchr",
@@ -920,9 +922,9 @@ dependencies = [
 
 [[package]]
 name = "regex-syntax"
-version = "0.8.9"
+version = "0.8.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a96887878f22d7bad8a3b6dc5b7440e0ada9a245242924394987b21cf2210a4c"
+checksum = "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4"
 
 [[package]]
 name = "rgb"
@@ -1045,6 +1047,12 @@ name = "smallvec"
 version = "1.15.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "67b1b7a3b5fe4f1376887184045fcf45c69e92af734b7aaddc05fb777b6fbd03"
+
+[[package]]
+name = "smol_str"
+version = "0.3.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4aaa7368fcf4852a4c2dd92df0cace6a71f2091ca0a23391ce7f3a31833f1523"
 
 [[package]]
 name = "spin"

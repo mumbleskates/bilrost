@@ -4,13 +4,13 @@ version = 3
 
 [[package]]
 name = "autocfg"
-version = "1.5.0"
+version = "1.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c08606f8c3cbf4ce6ec8e28fb0014a2c086708fe954eaa885384a6165172e7e8"
+checksum = "f2032f911046de80f0a198e0901378627c33f59ea0ac00e363d481118bd70a53"
 
 [[package]]
 name = "bilrost"
-version = "0.1014.1"
+version = "0.1015.0-dev"
 dependencies = [
  "autocfg",
  "bilrost-derive",
@@ -20,7 +20,7 @@ dependencies = [
 
 [[package]]
 name = "bilrost-derive"
-version = "0.1014.1"
+version = "0.1015.0-dev"
 dependencies = [
  "eyre",
  "itertools",
@@ -75,9 +75,9 @@ checksum = "964de6e86d545b246d84badc0fef527924ace5134f30641c203ef52ba83f58d5"
 
 [[package]]
 name = "itertools"
-version = "0.14.0"
+version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2b192c782037fadd9cfa75548310488aabdbf3d2da73885b31bd0abd03351285"
+checksum = "8b4baf93f58d4425749ca49a51c50ebab072c5df6994d08fed93541c331481dc"
 dependencies = [
  "either",
 ]
