@@ -74,7 +74,7 @@ tinyvec = { version = "^1", default-features = false, features = ["alloc", "rust
 pprof = { version = ">=0.13,<0.16", features = ["flamegraph"], optional = true }
 
 [build-dependencies]
-autocfg = "1.5.0"
+autocfg = "1.5.1"
 
 [dev-dependencies]
 arbitrary = "1.4"
