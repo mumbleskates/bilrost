@@ -6,11 +6,16 @@
 
 * Added a "forbid-unsafe" feature that enables `#![forbid(unsafe_code)]`
   crate-wide and implements alternative, safe versions of all affected code.
-* Allows intercompatibility with `hashbrown 0.17`.
 
 ### Fixes
 
 ### Cleanups
+
+## v0.1014.2
+
+### New features
+
+* Allows intercompatibility with `hashbrown 0.17`
 
 ## v0.1014.1
 
