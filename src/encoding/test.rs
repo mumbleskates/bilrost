@@ -53,6 +53,7 @@ macro_rules! check_type_test {
     ) => {
         #[cfg(test)]
         mod $kind {
+            #[allow(unused_imports)]
             use proptest::prelude::*;
 
             use crate::encoding::test::$kind::check_type;
