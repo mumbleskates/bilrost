@@ -80,7 +80,7 @@ bilrost = { path = ".", default-features = false, features = ["derive"] } # alwa
 chrono = { version = ">=0.4.34", default-features = false, features = ["arbitrary", "std"] } # "arbitrary" and "std" are both required for proptests
 criterion = { version = ">=0.5,<0.8", default-features = false }
 hashbrown = { version = ">=0.15.2", default-features = false, features = ["default-hasher"] }
-itertools = { version = "0.14", default-features = false, features = ["use_alloc"] }
+itertools = { version = "0.15", default-features = false, features = ["use_alloc"] }
 proptest = ">=1.6,<1.7"
 rand = "0.8"
 static_assertions = "1"
