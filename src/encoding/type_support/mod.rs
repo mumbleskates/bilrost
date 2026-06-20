@@ -26,6 +26,8 @@ mod chrono;
 mod hashbrown;
 #[cfg(feature = "smallvec")]
 mod smallvec;
+#[cfg(feature = "smol_str")]
+mod smol_str;
 #[cfg(feature = "std")]
 mod std;
 #[cfg(feature = "thin-vec")]

@@ -784,9 +784,10 @@ pub struct TestTypeSupport {
     time_offsetdatetime: time::OffsetDateTime,
     #[bilrost(14)]
     time_duration: time::Duration,
-
     #[bilrost(15)]
     std_systemtime: std::time::SystemTime,
+    #[bilrost(16)]
+    smol_str: smol_str::SmolStr,
 }
 
 #[derive(Debug, PartialEq, Eq, Message)]
@@ -820,6 +821,8 @@ pub struct TestTypeSupportDistinguished {
     time_offsetdatetime: time::OffsetDateTime,
     #[bilrost(14)]
     time_duration: time::Duration,
+    #[bilrost(15)]
+    smol_str: smol_str::SmolStr,
 }
 
 #[derive(Debug, PartialEq, Eq, Message)]

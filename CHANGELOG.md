@@ -6,6 +6,8 @@
 
 * Added a "forbid-unsafe" feature that enables `#![forbid(unsafe_code)]`
   crate-wide and implements alternative, safe versions of all affected code.
+* Added support for the `smol_str::SmolStr` type via a new crate feature
+  "smol_str".
 
 ### Fixes
 

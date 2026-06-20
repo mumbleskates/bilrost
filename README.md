@@ -484,6 +484,7 @@ The `bilrost` crate has several optional features:
 * "hashbrown": provides first-party support for `hashbrown` types
   [`HashMap`][hbmap] and [`HashSet`][hbset]
 * "smallvec": provides first-party support for [`smallvec::SmallVec`][smallvec]
+* "smol_str": provides first-party support for [`smol_str::SmolStr`][smol_str]
 * "thin-vec": provides first-party support for [`thin_vec::ThinVec`][thinvec]
 * "time": provides first-party support for the following `time` types:
     * [`Date`][timedate]
@@ -1817,6 +1818,7 @@ Many alternative types are also available for both scalar values and containers!
 | `String`/`Vec<u8>`* | [`bstr::BString`][bstr][^bstrnote]              | general encodings   | yes           | "bstr"            |
 | `String`            | [`Cow<str>`][cow]                               | general encodings   | yes           | (none)            |
 | `String`            | [`bytestring::ByteString`][bytestring][^bzcopy] | general encodings   | yes           | "bytestring"      |
+| `String`            | [`smol_str::SmolStr`][smol_str]                 | general encodings   | yes           | "smol_str"        |
 
 [^bstrnote]: [`bstr::BString`][bstr] is like `String` in that it has many useful
 features for working with text, yet it is also like `Vec<u8>` in that it can
@@ -1888,6 +1890,8 @@ value.
 [prim]: https://doc.rust-lang.org/std/index.html#primitives
 
 [smallvec]: https://docs.rs/smallvec/latest/smallvec/struct.SmallVec.html
+
+[smol_str]: https://docs.rs/smol_str/latest/smol_str/struct.SmolStr.html
 
 [str]: https://doc.rust-lang.org/std/string/struct.String.html
 
