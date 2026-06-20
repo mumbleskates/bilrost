@@ -3,8 +3,6 @@ name = "common"
 version = "0.0.0"
 authors = [
     "Kent Ross <k@mad.cash>",
-    "Dan Burkert <dan@danburkert.com>",
-    "Tokio Contributors <team@tokio.rs>",
 ]
 publish = false
 edition = "2021"
@@ -45,6 +43,7 @@ features = [
 
 [features]
 compare-borrowed = []
+forbid-unsafe = ["bilrost/forbid-unsafe"]
 # this is the feature name we enable everywhere for the workspace test suite, ensuring that we will
 # assert all our types' borrowing impls via the test messages.
 full-test-suite = ["compare-borrowed"]

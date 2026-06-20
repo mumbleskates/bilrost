@@ -2,8 +2,6 @@
 name = "fuzz-libfuzzer"
 version = "0.0.0"
 authors = [
-    "Dan Burkert <dan@danburkert.com>",
-    "Tokio Contributors <team@tokio.rs>",
     "Kent Ross <k@mad.cash>",
 ]
 publish = false
@@ -22,6 +20,9 @@ cargo-fuzz = true
 [dependencies]
 common = { path = "common" }
 libfuzzer-sys = "0.4"
+
+[features]
+forbid-unsafe = ["common/forbid-unsafe"]
 
 [[bin]]
 name = "bilrost_fuzz"
