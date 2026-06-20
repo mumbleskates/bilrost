@@ -13,6 +13,8 @@
 
 ### Cleanups
 
+* Some small cleanups to wording and consistency in the documentation.
+
 ## v0.1014.2
 
 ### New features
