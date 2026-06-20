@@ -10,6 +10,7 @@ use crate::encoding::{
 use crate::DecodeErrorKind::InvalidValue;
 use crate::{Canonicity, DecodeError};
 use bytes::{Buf, BufMut};
+use core::str::from_utf8;
 
 empty_state_via_default!(smol_str::SmolStr);
 
@@ -49,8 +50,7 @@ impl<const P: u8> ValueDecoder<GeneralGeneric<P>, smol_str::SmolStr> for () {
             let mut inline = [0u8; 23];
             let mut buf = &mut inline[..];
             buf.put(string_data.take_all());
-            let inline_string_data =
-                str::from_utf8(&inline[..string_len]).map_err(|_| InvalidValue)?;
+            let inline_string_data = from_utf8(&inline[..string_len]).map_err(|_| InvalidValue)?;
             smol_str::SmolStr::new_inline(inline_string_data)
         } else {
             // TODO: to avoid the extra copy here, we'd prefer to create an appropriately sized
@@ -62,7 +62,7 @@ impl<const P: u8> ValueDecoder<GeneralGeneric<P>, smol_str::SmolStr> for () {
             //  the alternative process. So, larger strings will just get copied twice.
             let mut buf = Vec::with_capacity(string_len);
             buf.put(string_data.take_all());
-            let allocated_string_data = str::from_utf8(&buf).map_err(|_| InvalidValue)?;
+            let allocated_string_data = from_utf8(&buf).map_err(|_| InvalidValue)?;
             smol_str::SmolStr::new(allocated_string_data)
         };
         *value = decoded_val;
