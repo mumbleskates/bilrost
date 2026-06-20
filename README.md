@@ -1810,15 +1810,25 @@ Many alternative types are also available for both scalar values and containers!
 
 | Value type          | Alternative                                     | Supporting encoding | Distinguished | Feature to enable |
 |---------------------|-------------------------------------------------|---------------------|---------------|-------------------|
-| `u32`, `u64`        | [`[u8; 4]`][prim], [`[u8; 8]`][prim]            | `fixed`             | yes           | (none)            |
+| `u32`, `u64`        | [`[u8; 4]`][array], [`[u8; 8]`][array]          | `fixed`             | yes           | (none)            |
 | `Vec<u8>`           | `Blob`[^blob]                                   | general encodings   | yes           | (none)            |
 | `Vec<u8>`           | [`Cow<[u8]>`][cow]                              | `plainbytes`        | yes           | (none)            |
 | `Vec<u8>`           | [`bytes::Bytes`][bytes][^bzcopy]                | general encodings   | yes           | (none)            |
-| `Vec<u8>`           | [`[u8; N]`][prim][^plainbytearr]                | `plainbytes`        | yes           | (none)            |
+| `Vec<u8>`           | [`[u8; N]`][array][^plainbytearr]               | `plainbytes`        | yes           | (none)            |
 | `String`/`Vec<u8>`* | [`bstr::BString`][bstr][^bstrnote]              | general encodings   | yes           | "bstr"            |
 | `String`            | [`Cow<str>`][cow]                               | general encodings   | yes           | (none)            |
 | `String`            | [`bytestring::ByteString`][bytestring][^bzcopy] | general encodings   | yes           | "bytestring"      |
 | `String`            | [`smol_str::SmolStr`][smol_str]                 | general encodings   | yes           | "smol_str"        |
+
+And several types have borrowed variants that are available for
+[borrowed decoding](#borrowed-messages) only:
+
+| Value type          | Alternative                         | Supporting encoding | Distinguished | Feature to enable |
+|---------------------|-------------------------------------|---------------------|---------------|-------------------|
+| `Vec<u8>`           | [`&[u8]`][slice]                    | `plainbytes`        | yes           | (none)            |
+| `[u8; N]`           | [`&[u8; N]`][array]                 | `plainbytes`        | yes           | (none)            |
+| `String`            | [`&str`][strref]                    | general encodings   | yes           | (none)            |
+| `String`/`Vec<u8>`* | [`&bstr::BStr`][bstrref][^bstrnote] | general encodings   | yes           | "bstr"            |
 
 [^bstrnote]: [`bstr::BString`][bstr] is like `String` in that it has many useful
 features for working with text, yet it is also like `Vec<u8>` in that it can
@@ -1826,9 +1836,8 @@ hold any unvalidated bytes content (it can work with UTF-8 text, but it doesn't
 *necessarily* contain valid UTF-8 text). This can be useful for both speed and
 for semi-valid data that is mostly textual, and its third-party support is
 included here for those use cases. If it's not immediately convenient as a value
-type, the crate also provides [`bstr::BStr`][bstrref] as a reference type (
-analogous to
-`str`) which can be used with any `&[u8]`.
+type, the crate also provides [`bstr::BStr`][bstrref] as a reference type
+(analogous to `str`) which can be used with any `&[u8]`.
 
 [^bzcopy]: When decoding from a `bytes::Bytes` object, both `bytes::Bytes` and
 `bytes::ByteString` have a zero-copy optimization and will reference the decoded
@@ -1889,11 +1898,15 @@ value.
 
 [prim]: https://doc.rust-lang.org/std/index.html#primitives
 
+[slice]: https://doc.rust-lang.org/std/primitive.slice.html
+
 [smallvec]: https://docs.rs/smallvec/latest/smallvec/struct.SmallVec.html
 
 [smol_str]: https://docs.rs/smol_str/latest/smol_str/struct.SmolStr.html
 
 [str]: https://doc.rust-lang.org/std/string/struct.String.html
+
+[strref]: https://doc.rust-lang.org/std/primitive.str.html
 
 [thinvec]: https://docs.rs/thin-vec/latest/thin_vec/struct.ThinVec.html
 
