@@ -942,8 +942,8 @@ pub fn check_wire_type(expected: WireType, actual: WireType) -> Result<(), Decod
 }
 
 /// A soft-limited wrapper for `impl Buf` that doesn't invoke extra work whenever the buffer is read
-/// from, only when the remaining bytes are checked. This means it can be nested arbitrarily without
-/// adding extra work every time.
+/// from, only when the remaining bytes are checked. This means it can be used to decode arbitrarily
+/// nested regions without adding extra work every time.
 pub struct Capped<'a, B: 'a + Buf + ?Sized> {
     buf: &'a mut B,
     extra_bytes_remaining: usize,
