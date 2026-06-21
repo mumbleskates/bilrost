@@ -291,10 +291,8 @@ fn parse_offset(s: &str) -> Option<(i8, i8, &str)> {
     } else {
         let (is_positive, s) = if let Some(s) = parse_char(s, b'+') {
             (true, s)
-        } else if let Some(s) = parse_char(s, b'-') {
-            (false, s)
         } else {
-            return None;
+            (false, parse_char(s, b'-')?)
         };
 
         let (hour, s) = parse_two_digit_numeric(s)?;

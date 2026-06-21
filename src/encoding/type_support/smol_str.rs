@@ -1,5 +1,3 @@
-use std::vec::Vec;
-
 use crate::buf::ReverseBuf;
 use crate::encoding::value_traits::empty_state_via_default;
 use crate::encoding::{
@@ -9,7 +7,6 @@ use crate::encoding::{
 };
 use crate::DecodeErrorKind::InvalidValue;
 use crate::{Canonicity, DecodeError};
-use alloc::sync::Arc;
 use bytes::{Buf, BufMut};
 use core::str::from_utf8;
 
@@ -71,6 +68,7 @@ impl<const P: u8> ValueDecoder<GeneralGeneric<P>, smol_str::SmolStr> for () {
                 // We prefer this fast-path, when available: we create a preallocated Arc of the
                 // right size, copy the data into it, validate it, and then convert it directly
                 // into the result type which retains the Arc.
+                use alloc::sync::Arc;
                 #[allow(clippy::incompatible_msrv)]
                 let mut buf = Arc::new_uninit_slice(string_len);
                 let mut buf_slice = Arc::get_mut(&mut buf).unwrap();
@@ -93,7 +91,7 @@ impl<const P: u8> ValueDecoder<GeneralGeneric<P>, smol_str::SmolStr> for () {
                 // anyway. And there are no nice ways to create that `Arc<[u8]>` until 1.82, and no
                 // safe apis for turning it into a validated `Arc<str>` in any version. So in this
                 // condition we just write it into a temporary `Vec`, copying the data twice.
-                let mut buf = Vec::with_capacity(string_len);
+                let mut buf = alloc::vec::Vec::with_capacity(string_len);
                 buf.put(string_data.take_all());
                 let allocated_string_data = from_utf8(&buf).map_err(|_| InvalidValue)?;
                 smol_str::SmolStr::new(allocated_string_data)

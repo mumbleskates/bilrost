@@ -25,8 +25,7 @@ pub fn bilrost_attrs(attrs: &[Attribute]) -> Result<Vec<Meta>, Error> {
                 } else {
                     result.extend(
                         meta_list
-                            .parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)?
-                            .into_iter(),
+                            .parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)?,
                     );
                 }
             }
