@@ -74,19 +74,19 @@ impl<const P: u8> ValueDecoder<GeneralGeneric<P>, smol_str::SmolStr> for () {
                 // into the result type which retains the Arc.
                 use alloc::sync::Arc;
                 #[allow(clippy::incompatible_msrv)]
-                let mut buf = Arc::new_uninit_slice(string_len);
-                let mut buf_slice = Arc::get_mut(&mut buf).unwrap();
-                buf_slice.put(string_data.take_all());
+                let mut arc = Arc::new_uninit_slice(string_len);
+                let mut arc_slice = Arc::get_mut(&mut arc).unwrap();
+                arc_slice.put(string_data.take_all());
                 // Check that we wrote every byte in the buf
-                debug_assert!(buf_slice.is_empty());
+                debug_assert!(arc_slice.is_empty());
                 // SAFETY: we just wrote to the buf's entire contents
                 #[allow(clippy::incompatible_msrv)]
-                let buf = unsafe { buf.assume_init() };
+                let arc = unsafe { arc.assume_init() };
                 // Validate that buf contains utf8
-                from_utf8(&buf).map_err(|_| InvalidValue)?;
+                from_utf8(&arc).map_err(|_| InvalidValue)?;
                 // SAFETY: we just validated the contents of the arc are valid for str
-                let buf = unsafe { core::mem::transmute::<Arc<[u8]>, Arc<str>>(buf) };
-                smol_str::SmolStr::from(buf)
+                let arc = unsafe { core::mem::transmute::<Arc<[u8]>, Arc<str>>(arc) };
+                smol_str::SmolStr::from(arc)
             }
             #[cfg(any(not(rustc_1_82), feature = "forbid-unsafe"))]
             {
