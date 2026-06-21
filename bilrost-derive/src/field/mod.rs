@@ -245,7 +245,7 @@ impl Field {
         match &self.content {
             Value(scalar) => Some(scalar.empty()),
             Oneof(oneof) => Some(oneof.empty()),
-            Ignored(ignored) => ignored.initialize().clone(),
+            Ignored(ignored) => ignored.initialize(),
         }
     }
 

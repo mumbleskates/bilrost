@@ -282,7 +282,7 @@ mod generic_oneof_grant_empty_state_impls {
                     ConflictingFields
                 }))
             } else {
-                T::oneof_decode_field_distinguished(tag, wire_type, buf, ctx.clone()).map(
+                T::oneof_decode_field_distinguished(tag, wire_type, buf, ctx).map(
                     |(decoded, canon)| {
                         *value = Some(decoded);
                         canon
@@ -347,7 +347,7 @@ mod generic_oneof_grant_empty_state_impls {
                     ConflictingFields
                 }))
             } else {
-                T::oneof_borrow_decode_field_distinguished(tag, wire_type, buf, ctx.clone()).map(
+                T::oneof_borrow_decode_field_distinguished(tag, wire_type, buf, ctx).map(
                     |(decoded, canon)| {
                         *value = Some(decoded);
                         canon
