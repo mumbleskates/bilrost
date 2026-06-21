@@ -863,7 +863,7 @@ impl ReverseBufferReader<'_> {
         }
         #[cfg(feature = "forbid-unsafe")]
         {
-            // this version of `to_vectorable_slices
+            // this version of `to_vectorable_slices` is safe
             to_vectorable_slices(self.chunks, self.front)
         }
     }
