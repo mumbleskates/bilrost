@@ -95,9 +95,9 @@ impl<const P: u8> ValueDecoder<GeneralGeneric<P>, smol_str::SmolStr> for () {
                 // anyway. And there are no nice ways to create that `Arc<[u8]>` until 1.82, and no
                 // safe apis for turning it into a validated `Arc<str>` in any version. So in this
                 // condition we just write it into a temporary `Vec`, copying the data twice.
-                let mut buf = alloc::vec::Vec::with_capacity(string_len);
-                buf.put(string_data.take_all());
-                let allocated_string_data = from_utf8(&buf).map_err(|_| InvalidValue)?;
+                let mut temp_vec = alloc::vec::Vec::with_capacity(string_len);
+                temp_vec.put(string_data.take_all());
+                let allocated_string_data = from_utf8(&temp_vec).map_err(|_| InvalidValue)?;
                 smol_str::SmolStr::new(allocated_string_data)
             }
         };
