@@ -9,6 +9,7 @@ use crate::encoding::{
 };
 use crate::DecodeErrorKind::InvalidValue;
 use crate::{Canonicity, DecodeError};
+use alloc::sync::Arc;
 use bytes::{Buf, BufMut};
 use core::str::from_utf8;
 
@@ -47,19 +48,45 @@ impl<const P: u8> ValueDecoder<GeneralGeneric<P>, smol_str::SmolStr> for () {
         let string_data = buf.take_length_delimited()?;
         let string_len = string_data.remaining_before_cap();
         let decoded_val = if string_len <= 23 {
+            // For short strings, we can always just create the result with an inline value.
             let mut inline = [0u8; 23];
             let mut buf = &mut inline[..];
             buf.put(string_data.take_all());
             let inline_string_data = from_utf8(&inline[..string_len]).map_err(|_| InvalidValue)?;
             smol_str::SmolStr::new_inline(inline_string_data)
-        } else {
-            // TODO: to avoid the extra copy here, we'd prefer to create an appropriately sized
-            //  `Arc<[MaybeUninit<u8>]>`, read into it, and validate it in-place before turning it
-            //  into an `Arc<str>` and creating a `SmolStr` directly from that.
+        } else if let Some(whole_value_bytes) = string_data.chunk().get(..string_len) {
+            // Otherwise, the string is too long to fit inline, but it is available contiguously.
             //
-            //  Regrettably we can't use `SmolStrBuilder` because the chunks we read may not all be
-            //  valid utf8 on their own, and there are no remotely MSRV-compatible ways to perform
-            //  the alternative process. So, larger strings will just get copied twice.
+            // We prefer taking this path even if the next branch where we create an Arc directly
+            // is available, since on this path we can validate the string data *before* we copy
+            // it rather than after.
+            let input_string_data = from_utf8(whole_value_bytes).map_err(|_| InvalidValue)?;
+            smol_str::SmolStr::new(input_string_data)
+        } else if cfg!(all(rustc_1_82, not(feature = "forbid-unsafe"))) {
+            // Otherwise, the data won't fit inline and isn't contiguous, so we have to copy it
+            // out.
+            //
+            // We prefer this fast-path, when available: we create a preallocated Arc of the
+            // right size, copy the data into it, validate it, and then convert it directly
+            // into the result type which retains the Arc.
+            let mut buf = Arc::new_uninit_slice(string_len);
+            let mut buf_slice = Arc::get_mut(&mut buf).unwrap();
+            buf_slice.put(string_data.take_all());
+            // Check that we wrote every byte in the buf
+            debug_assert!(buf_slice.is_empty());
+            // SAFETY: we just wrote to the buf's entire contents
+            let buf = unsafe { buf.assume_init() };
+            // Validate that buf contains utf8
+            from_utf8(&buf).map_err(|_| InvalidValue)?;
+            // SAFETY: we just validated the contents of the arc are valid for str
+            let buf = unsafe { core::mem::transmute::<Arc<[u8]>, Arc<str>>(buf) };
+            smol_str::SmolStr::from(buf)
+        } else {
+            // Regrettably we can't use `SmolStrBuilder` because the chunks we read may not
+            // all be valid utf8 on their own, and that api isn't avoiding an extra copy yet
+            // anyway. And there are no nice ways to create that `Arc<[u8]>` until 1.82, and no
+            // safe apis for turning it into a validated `Arc<str>` in any version. So in this
+            // condition we just write it into a temporary `Vec`, copying the data twice.
             let mut buf = Vec::with_capacity(string_len);
             buf.put(string_data.take_all());
             let allocated_string_data = from_utf8(&buf).map_err(|_| InvalidValue)?;
