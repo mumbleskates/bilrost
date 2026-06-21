@@ -58,7 +58,11 @@ impl<const P: u8> ValueDecoder<GeneralGeneric<P>, smol_str::SmolStr> for () {
             // is available, since on this path we can validate the string data *before* we copy
             // it rather than after.
             let input_string_data = from_utf8(whole_value_bytes).map_err(|_| InvalidValue)?;
-            smol_str::SmolStr::new(input_string_data)
+            let res = smol_str::SmolStr::new(input_string_data);
+            // We got the data by reading the chunk from the buf directly, so we must advance it
+            // manually as well.
+            buf.advance(string_len);
+            res
         } else {
             #[cfg(all(rustc_1_82, not(feature = "forbid-unsafe")))]
             {

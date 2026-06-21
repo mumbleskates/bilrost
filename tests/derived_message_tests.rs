@@ -1151,6 +1151,8 @@ fn field_clearing() {
     use core::ops::{Range, RangeInclusive};
     #[cfg(feature = "smallvec")]
     use smallvec::SmallVec;
+    #[cfg(feature = "smol_str")]
+    use smol_str::SmolStr;
     use std::collections::{BTreeMap, BTreeSet};
     #[cfg(feature = "std")]
     use std::collections::{HashMap, HashSet};
@@ -1214,6 +1216,8 @@ fn field_clearing() {
         cow_bytes_owned: Cow<'a, [u8]>,
         cow_str_borrowed: Cow<'a, str>,
         cow_str_owned: Cow<'a, str>,
+        #[cfg(feature = "smol_str")]
+        smol_str: SmolStr,
         #[cfg(feature = "arrayvec")]
         arrayvec: arrayvec::ArrayVec<u32, 2>,
         #[cfg(feature = "smallvec")]
@@ -1277,6 +1281,8 @@ fn field_clearing() {
                 cow_bytes_owned: Vec::with_capacity(64).into(),
                 cow_str_borrowed: Cow::Borrowed("foo"),
                 cow_str_owned: string_with_capacity("foo").into(),
+                #[cfg(feature = "smol_str")]
+                smol_str: SmolStr::new_inline("foo"),
                 #[cfg(feature = "arrayvec")]
                 arrayvec: arrayvec::ArrayVec::from([1, 2]),
                 #[cfg(feature = "smallvec")]
@@ -1918,6 +1924,11 @@ fn parsing_strings() {
                 [(0, OV::string("hello world"))],
                 Foo::<$ty>("hello world".into()),
             );
+            assert::decodes!(
+                $lifetime distinguished,
+                [(0, OV::string("somewhat longer string that's still perfectly normal"))],
+                Foo::<$ty>("somewhat longer string that's still perfectly normal".into()),
+            );
             let mut invalid_strings = Vec::<Vec<u8>>::from([
                 b"bad byte: \xff can't appear in utf-8".as_slice().into(),
                 b"non-canonical representation \xc0\x80 of nul byte"
@@ -1966,6 +1977,8 @@ fn parsing_strings() {
     parsing_string_type!(owned Cow<str>);
     #[cfg(feature = "bytestring")]
     parsing_string_type!(owned bytestring::ByteString);
+    #[cfg(feature = "smol_str")]
+    parsing_string_type!(owned smol_str::SmolStr);
     parsing_string_type!(borrowed & str);
 }
 
