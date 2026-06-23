@@ -10,7 +10,8 @@ cargo clean
 mkdir -p coverage/tests/profdata
 rm coverage/tests/profdata/* || echo ok
 
-RUSTFLAGS="-C instrument-coverage" cargo test --features full-test-suite,forbid-unsafe
+FEATURES="${FEATURES:-full-test-suite}"
+RUSTFLAGS="-C instrument-coverage" cargo test --features "${FEATURES}"
 
 mv ./*.profraw coverage/tests/profdata
 llvm-profdata merge -sparse \
