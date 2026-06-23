@@ -162,9 +162,11 @@ full-test-suite = [
 ]
 
 # Extra parameters to outside crates that may affect our encoding and decoding we should test for.
+test-smolstr-force-noncontiguous = []
 test-suite-extra = [
     "time",
     "time/large-dates",
+    "test-smolstr-force-noncontiguous",
 ]
 
 # Enables pprof profiling in benchmarks.

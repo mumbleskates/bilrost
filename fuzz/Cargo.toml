@@ -23,6 +23,7 @@ libfuzzer-sys = "0.4"
 
 [features]
 forbid-unsafe = ["common/forbid-unsafe"]
+extra = ["common/extra"]
 
 [[bin]]
 name = "bilrost_fuzz"
