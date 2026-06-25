@@ -162,6 +162,10 @@ impl Field {
         matches!(self.content, Ignored(..))
     }
 
+    pub fn ignored_and_uses_struct_update_syntax(&self) -> bool {
+        matches!(&self.content, Ignored(inner) if inner.uses_struct_update_syntax())
+    }
+
     pub fn has_enumeration_type(&self) -> bool {
         let Value(scalar) = &self.content else {
             return false;

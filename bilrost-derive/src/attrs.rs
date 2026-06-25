@@ -1,3 +1,5 @@
+use alloc::format;
+use alloc::string::String;
 use alloc::vec::Vec;
 use core::any::type_name;
 use core::fmt::Debug;
@@ -100,6 +102,24 @@ impl TagList {
 
     pub fn iter_tag_ranges(&self) -> impl '_ + Iterator<Item = RangeInclusive<u32>> {
         self.0.iter().cloned()
+    }
+
+    pub fn display(&self) -> String {
+        use core::fmt::Write;
+        let mut res = String::new();
+        write!(&mut res, "(").unwrap();
+        for (i, range) in self.0.iter().enumerate() {
+            if i > 0 {
+                write!(&mut res, ", ").unwrap();
+            }
+            if range.start() == range.end() {
+                write!(&mut res, "{n}", n = range.start()).unwrap();
+            } else {
+                write!(&mut res, "{range:?}").unwrap();
+            }
+        }
+        write!(&mut res, ")").unwrap();
+        res
     }
 }
 
@@ -226,12 +246,25 @@ pub fn word_attr(attr: &Meta, key: &str) -> bool {
     }
 }
 
-pub fn set_option<T>(option: &mut Option<T>, value: T, message: &str) -> Result<(), Error>
+pub fn set_option<T: Debug>(option: &mut Option<T>, value: T, message: &str) -> Result<(), Error> {
+    set_option_with_display(option, value, message, |val| format!("{val:?}"))
+}
+
+pub fn set_option_with_display<T>(
+    option: &mut Option<T>,
+    value: T,
+    message: &str,
+    display: impl Fn(&T) -> String,
+) -> Result<(), Error>
 where
     T: Debug,
 {
     if let Some(existing) = option {
-        bail!("{message}: {existing:?} and {value:?}");
+        bail!(
+            "{message}: {existing} and {value}",
+            existing = display(existing),
+            value = display(&value),
+        );
     }
     *option = Some(value);
     Ok(())

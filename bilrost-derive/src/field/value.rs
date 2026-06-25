@@ -1,5 +1,6 @@
 use crate::attrs::{
-    bilrost_attrs, named_attr, set_bool, set_option, tag_attr, tag_list_attr, word_attr, TagList,
+    bilrost_attrs, named_attr, set_bool, set_option, set_option_with_display, tag_attr,
+    tag_list_attr, word_attr, TagList,
 };
 use crate::crate_name;
 use crate::field::traits::{
@@ -50,6 +51,13 @@ pub struct OneofVariant {
     contents: VariantContents,
 }
 
+// TODO: use this to let the empty variant have ignored fields
+// #[derive(Clone)]
+// pub struct EmptyVariant {
+//     variant_ident: Ident,
+//     contents: Vec<IgnoredField>,
+// }
+
 #[derive(Clone)]
 enum VariantContents {
     Value(Box<FieldInVariant>),
@@ -69,14 +77,19 @@ impl MessageField {
         inferred_tag: Option<u32>,
     ) -> Result<Box<MessageField>, Error> {
         let mut tag = None;
-        let mut enumeration_ty = None;
+        let mut enumeration_ty: Option<Type> = None;
         let mut remaining_attrs = vec![];
 
         for attr in attrs {
             if let Some(t) = tag_attr(&attr)? {
                 set_option(&mut tag, t, "duplicate tag attributes")?;
             } else if let Some(t) = named_attr(&attr, "enumeration")? {
-                set_option(&mut enumeration_ty, t, "duplicate enumeration attributes")?;
+                set_option_with_display(
+                    &mut enumeration_ty,
+                    t,
+                    "duplicate enumeration attributes",
+                    |ty| quote!(<#ty>).to_string(),
+                )?;
             } else {
                 remaining_attrs.push(attr);
             }
@@ -308,7 +321,9 @@ impl ValueField {
 
         for attr in &attrs {
             if let Some(t) = named_attr(attr, "encoding")? {
-                set_option(&mut encoding, t, "duplicate encoding attributes")?;
+                set_option_with_display(&mut encoding, t, "duplicate encoding attributes", |t| {
+                    quote!((#t)).to_string()
+                })?;
             } else if word_attr(attr, "recurses") {
                 set_bool(&mut recurses, "duplicate recurses attributes")?;
             } else {
@@ -449,10 +464,11 @@ impl OneofVariant {
                 let mut unknown_attrs = vec![];
                 for attr in &other_attrs {
                     if let Some(tags) = tag_list_attr(attr, "reserved_tags", None)? {
-                        set_option(
+                        set_option_with_display(
                             &mut reserved_tags,
                             tags,
                             "duplicate reserved_tags attributes",
+                            TagList::display,
                         )?;
                     } else {
                         unknown_attrs.push(attr);

@@ -12,7 +12,9 @@
 
 extern crate alloc;
 
-use crate::attrs::{bilrost_attrs, set_bool, set_option, tag_list_attr, word_attr, TagList};
+use crate::attrs::{
+    bilrost_attrs, named_attr, set_bool, set_option_with_display, tag_list_attr, word_attr, TagList,
+};
 use crate::field::traits::{
     DecodeLifetime::{Borrowed, Owned},
     DecodeMode::{Distinguished, Relaxed},
@@ -134,13 +136,15 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     let mut distinguished = false;
     let mut borrow_only = false;
     let mut default_per_field = false;
+    let mut default_expr: Option<Expr> = None;
     let mut unknown_attrs = Vec::new();
     for attr in bilrost_attrs(&input_attrs)? {
         if let Some(tags) = tag_list_attr(&attr, "reserved_tags", None)? {
-            set_option(
+            set_option_with_display(
                 &mut reserved_tags,
                 tags,
                 "duplicate reserved_tags attributes",
+                TagList::display,
             )?;
         } else if word_attr(&attr, "distinguished") {
             set_bool(&mut distinguished, "duplicated distinguished attributes")?;
@@ -151,9 +155,19 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
                 &mut default_per_field,
                 "duplicated default_per_field attributes",
             )?;
+        } else if let Some(expr) = named_attr(&attr, "default")? {
+            set_option_with_display(
+                &mut default_expr,
+                expr,
+                "duplicated default (expression) attributes",
+                |t| quote!((#t)).to_string(),
+            )?;
         } else {
             unknown_attrs.push(attr);
         }
+    }
+    if default_per_field && default_expr.is_some() {
+        bail!("default_per_field and default (expression) attributes are mutually exclusive");
     }
 
     if !unknown_attrs.is_empty() {
@@ -165,7 +179,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
 
     let init_mode = match default_per_field {
         true => InitMode::DefaultPerField,
-        false => InitMode::ParentDefault,
+        false => InitMode::FromStructUpdate,
     };
 
     // Parse field data
@@ -180,12 +194,16 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
 
     let (_, ty_generics, where_clause) = impl_generics.split_for_impl();
 
-    let self_where = if default_per_field || ignored_fields.is_empty() {
-        None
-    } else {
-        // When there are ignored fields that we are taking from <Self as Default>, the whole
+    let self_where = if ignored_fields
+        .iter()
+        .any(Field::ignored_and_uses_struct_update_syntax)
+        && default_expr.is_none()
+    {
+        // When there are ignored fields that we are taking from ..<Self as Default>, the whole
         // message impl should be bounded by Self: Default
         Some(quote!(Self: ::core::default::Default))
+    } else {
+        None
     };
 
     let borrow_generics = prepend_to_generics(&impl_generics, quote!('__a));
@@ -266,11 +284,18 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         .map(|field| field.clear(&self_instance))
         .collect();
 
-    let maybe_fill_default = if default_per_field || ignored_fields.is_empty() {
-        None
+    let maybe_struct_update = if ignored_fields
+        .iter()
+        .any(Field::ignored_and_uses_struct_update_syntax)
+    {
+        // initialize ignored fields from our struct-update expression:
+        let default_expr = default_expr.map_or(
+            quote!(::core::default::Default::default()),
+            |expr| quote!(#expr),
+        );
+        Some(quote!(..#default_expr))
     } else {
-        // initialize ignored fields from <Self as Default>
-        Some(quote!(..::core::default::Default::default()))
+        None
     };
 
     let impl_owned_decoder = (!borrow_only).then(|| {
@@ -316,7 +341,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
             fn empty() -> Self {
                 Self {
                     #(#empties,)*
-                    #maybe_fill_default
+                    #maybe_struct_update
                 }
             }
 
@@ -1101,10 +1126,11 @@ fn variant_attr(attrs: &Vec<Attribute>) -> Result<Option<Expr>, Error> {
                 );
             };
 
-            set_option(
+            set_option_with_display(
                 &mut result,
                 expr,
                 "duplicate value attributes on enumeration variant",
+                |t| quote!((#t)).to_string(),
             )?;
         }
     }
@@ -1137,11 +1163,12 @@ fn preprocess_oneof(input: &DeriveInput) -> Result<PreprocessedOneof<'_>, Error>
     let mut borrow_only = false;
     for attr in bilrost_attrs(&input.attrs)? {
         if let Some(tags) = tag_list_attr(&attr, "reserved_tags", None)? {
-            set_option(
+            set_option_with_display(
                 &mut reserved_tags,
                 tags,
                 "duplicate reserved_tags attributes",
-            )?
+                TagList::display,
+            )?;
         } else if word_attr(&attr, "distinguished") {
             set_bool(&mut distinguished, "duplicated distinguished attributes")?;
         } else if word_attr(&attr, "borrowed_only") {
@@ -1172,13 +1199,14 @@ fn preprocess_oneof(input: &DeriveInput) -> Result<PreprocessedOneof<'_>, Error>
                 variants.push(variant);
             }
             None => {
-                set_option(
+                set_option_with_display(
                     &mut empty_variant,
                     variant_ident,
                     "Oneofs may have at most one empty enum variant. To use multiple \
                     variants without fields, the non-empty variants can be marked as values with \
                     the 'message' attribute and the empty variant can be either left un-marked or \
                     explicitly marked with the 'empty' attribute.\n\nThe conflicting variants were",
+                    |t| t.to_string(),
                 )?;
             }
         }
@@ -2126,7 +2154,7 @@ mod test {
             "Oneofs may have at most one empty enum variant. To use multiple variants without \
             fields, the non-empty variants can be marked as values with the 'message' attribute \
             and the empty variant can be either left un-marked or explicitly marked with the \
-            'empty' attribute.\n\nThe conflicting variants were: Ident(Empty) and Ident(AlsoEmpty)"
+            'empty' attribute.\n\nThe conflicting variants were: Empty and AlsoEmpty"
         );
     }
 
@@ -2465,8 +2493,42 @@ mod test {
             "invalid field what: duplicated ignore attributes for field: ignore , ignore"
         );
         let output = try_message(quote!(
+            enum Thing {
+                #[bilrost(tag(1), message)]
+                VeryIgnored {
+                    #[bilrost(ignore, ignore)]
+                    what: u32,
+                },
+            }
+        ));
+        assert_eq!(
+            output
+                .expect_err("field with duplicated ignore attributes not detected")
+                .root_cause()
+                .to_string(),
+            "in message variant VeryIgnored: invalid field what: duplicated ignore attributes \
+            for field: ignore , ignore"
+        );
+        let output = try_message(quote!(
+            enum Thing {
+                #[bilrost(tag(1), message)]
+                VeryIgnored {
+                    #[bilrost(ignore, ignore = "1")]
+                    what: u32,
+                },
+            }
+        ));
+        assert_eq!(
+            output
+                .expect_err("field with duplicated ignore attributes not detected")
+                .root_cause()
+                .to_string(),
+            "in message variant VeryIgnored: invalid field what: duplicated ignore attributes \
+                    for field: ignore , ignore = \"1\""
+        );
+        let output = try_message(quote!(
             struct MixedIgnores {
-                #[bilrost(tag(123), ignore, ignore)]
+                #[bilrost(tag(123), ignore)]
                 what: u32,
             }
         ));
@@ -2475,8 +2537,25 @@ mod test {
                 .expect_err("field with duplicated ignore attributes not detected")
                 .root_cause()
                 .to_string(),
-            "invalid field what: duplicated ignore attributes for field: tag (123) , ignore , \
-            ignore"
+            "invalid field what: ignore attribute mixed with other attributes on the same field: \
+            tag (123) , ignore"
+        );
+        let output = try_message(quote!(
+            enum Foo {
+                #[bilrost(tag(1), message)]
+                MixedIgnores {
+                    #[bilrost(tag(123), ignore)]
+                    what: u32,
+                },
+            }
+        ));
+        assert_eq!(
+            output
+                .expect_err("field with duplicated ignore attributes not detected")
+                .root_cause()
+                .to_string(),
+            "in message variant MixedIgnores: invalid field what: ignore attribute mixed with \
+            other attributes on the same field: tag (123) , ignore"
         );
         let output = try_message(quote!(
             #[bilrost(default_per_field, default_per_field)]
@@ -2487,6 +2566,83 @@ mod test {
                 .expect_err("field with duplicated ignore attributes not detected")
                 .to_string(),
             "duplicated default_per_field attributes"
+        );
+    }
+
+    #[test]
+    fn test_field_specific_ignore() {
+        let _ = try_message(quote!(
+            struct Foo {
+                bar: usize,
+                #[bilrost(ignore = "5")]
+                baz: u32,
+                #[bilrost(ignore(wabl()))]
+                bear: String,
+            }
+        ))
+        .unwrap();
+        let _ = try_message(quote!(
+            #[bilrost(default_per_field)]
+            struct Foo {
+                bar: usize,
+                #[bilrost(ignore = "5")]
+                baz: u32,
+                #[bilrost(ignore(wabl()))]
+                bear: String,
+            }
+        ))
+        .unwrap();
+        let _ = try_message(quote!(
+            #[bilrost(default(Trait::new()))]
+            struct Foo {
+                bar: usize,
+                #[bilrost(ignore = "5")]
+                baz: u32,
+                #[bilrost(ignore(wabl()))]
+                bear: String,
+            }
+        ))
+        .unwrap();
+        let _ = try_oneof(quote!(
+            enum Foo {
+                #[bilrost(tag(1), message)]
+                Thing {
+                    #[bilrost(ignore = "5")]
+                    baz: u32,
+                    #[bilrost(ignore(wabl()))]
+                    bear: String,
+                },
+            }
+        ))
+        .unwrap();
+    }
+
+    #[test]
+    fn test_conflicting_struct_default_attributes() {
+        let output = try_message(quote!(
+            #[bilrost(default = "Trait::new()", default_per_field)]
+            struct Struct {
+                x: usize,
+            }
+        ));
+        assert_eq!(
+            output
+                .expect_err("conflicting default attributes not detected")
+                .to_string(),
+            "default_per_field and default (expression) attributes are mutually exclusive"
+        );
+        let output = try_message(quote!(
+            #[bilrost(default = "Trait::new()", default(Trait::even_newer()))]
+            struct Struct {
+                x: usize,
+            }
+        ));
+        assert_eq!(
+            output
+                .expect_err("duplicated default attributes not detected")
+                .to_string(),
+            "duplicated default (expression) attributes: (Trait :: new ()) and \
+            (Trait :: even_newer ())"
         );
     }
 }

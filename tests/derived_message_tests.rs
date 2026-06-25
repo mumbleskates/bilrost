@@ -1051,6 +1051,8 @@ fn ignored_fields_with_defaults() {
         y: i64,
         #[bilrost(ignore)]
         also: usize,
+        #[bilrost(ignore = "55555")]
+        more: usize,
     }
 
     // Some Default implementation is required when there are ignored fields. It doesn't have
@@ -1062,6 +1064,7 @@ fn ignored_fields_with_defaults() {
                 x: 111,
                 y: 222,
                 also: 12345,
+                more: 9,
             }
         }
     }
@@ -1074,6 +1077,7 @@ fn ignored_fields_with_defaults() {
             x: 0,
             y: 0,
             also: 12345,
+            more: 55555, // initializes with the value from the ignore attribute, not Self::Default
         }
     );
 
@@ -1084,6 +1088,92 @@ fn ignored_fields_with_defaults() {
             x: 1,
             y: 0,
             also: 12345,
+            more: 55555,
+        },
+    )
+}
+
+#[test]
+fn ignored_fields_with_custom_defaults() {
+    #[derive(Debug, PartialEq, Message)]
+    #[bilrost(default = "make_one_for_me()")]
+    struct FooPlus {
+        x: i64,
+        y: i64,
+        #[bilrost(ignore)]
+        also: usize,
+        #[bilrost(ignore = "55555")]
+        more: usize,
+    }
+
+    // Any valid expression should work for the default initializer, so we use a function call
+    fn make_one_for_me() -> FooPlus {
+        FooPlus {
+            x: 111,
+            y: 222,
+            also: 12345,
+            more: 9,
+        }
+    }
+
+    // The empty value for the message will still have the empty value for all non-ignored
+    // fields; the rest will be taken from the `Default` implementation.
+    assert_eq!(
+        FooPlus::new_empty(),
+        FooPlus {
+            x: 0,
+            y: 0,
+            also: 12345,
+            more: 55555, // initializes with the value from the ignore attribute, not Self::Default
+        }
+    );
+
+    assert::decodes!(
+        owned relaxed,
+        [(1, OV::i64(1))],
+        FooPlus {
+            x: 1,
+            y: 0,
+            also: 12345,
+            more: 55555,
+        },
+    )
+}
+
+#[test]
+fn ignored_fields_all_overridden() {
+    // This struct will still impl Message without requiring `Self: Default` because every field
+    // has a specified default
+    #[derive(Debug, PartialEq, Message)]
+    struct FooPlus {
+        x: i64,
+        y: i64,
+        #[bilrost(ignore = "12345")]
+        also: usize,
+        #[bilrost(ignore = "55555")]
+        more: usize,
+    }
+
+    // The empty value for the message will still have the empty value for all non-ignored
+    // fields; the rest will be taken from the `Default` implementation.
+    assert_eq!(
+        FooPlus::new_empty(),
+        FooPlus {
+            x: 0,
+            y: 0,
+            also: 12345,
+            more: 55555,
+        }
+    );
+
+    assert::decodes!(
+        owned relaxed,
+        [(1, OV::i64(1))],
+        FooPlus {
+            x: 1,
+            y: 0,
+            also: 12345,
+            more: 55555,
         },
     )
 }
@@ -1106,6 +1196,8 @@ fn ignored_fields_with_per_field_defaults() {
         y: i64,
         #[bilrost(ignore)]
         also: Undecodable,
+        #[bilrost(ignore = "Undecodable(67890)")]
+        more: Undecodable,
     }
 
     // The empty value for the message will still have the empty value for all non-ignored
@@ -1116,6 +1208,7 @@ fn ignored_fields_with_per_field_defaults() {
             x: 0,
             y: 0,
             also: Undecodable(12345),
+            more: Undecodable(67890),
         }
     );
 
@@ -1126,6 +1219,7 @@ fn ignored_fields_with_per_field_defaults() {
             x: 1,
             y: 0,
             also: Undecodable(12345),
+            more: Undecodable(67890),
         },
     );
 
@@ -4063,21 +4157,21 @@ fn embedded_messages_with_ignored_fields() {
     enum Foo {
         #[bilrost(tag(1), message)]
         Braced {
-            #[bilrost(ignore)]
+            #[bilrost(ignore(11))]
             bar_ignored: u32,
             baz: String,
             #[bilrost(tag(5), encoding(fixed))]
             bear: u64,
         },
         #[bilrost(tag(2), message)]
-        Tuple(u32, #[bilrost(ignore)] String),
+        Tuple(u32, #[bilrost(ignore("ignored".to_owned()))] String),
         #[bilrost(tag(3), message)]
         Unit,
         #[bilrost(tag(4), message)]
         AllIgnored {
-            #[bilrost(ignore)]
+            #[bilrost(ignore(41))]
             a: u32,
-            #[bilrost(ignore)]
+            #[bilrost(ignore = "42")]
             b: u16,
             #[bilrost(ignore)]
             c: u8,
@@ -4096,7 +4190,7 @@ fn embedded_messages_with_ignored_fields() {
             ].into_opaque_message())),
         ],
         Foo::Braced{
-            bar_ignored: 0,
+            bar_ignored: 11,
             baz: "hello".to_owned(),
             bear: 345,
         },
@@ -4120,7 +4214,7 @@ fn embedded_messages_with_ignored_fields() {
                 (0, OV::u32(123)),
             ].into_opaque_message())),
         ],
-        Foo::Tuple(123, String::new()),
+        Foo::Tuple(123, "ignored".to_owned()),
     );
     assert::encodes(
         Foo::Tuple(23456, "welcome".to_owned()),
@@ -4132,7 +4226,7 @@ fn embedded_messages_with_ignored_fields() {
         [
             (4, OV::bytes([])),
         ],
-        Foo::AllIgnored {a: 0, b: 0, c: 0},
+        Foo::AllIgnored {a: 41, b: 42, c: 0},
     );
     assert::encodes(
         Foo::AllIgnored {

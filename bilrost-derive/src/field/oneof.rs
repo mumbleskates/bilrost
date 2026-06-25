@@ -1,4 +1,4 @@
-use crate::attrs::{set_option, tag_list_attr};
+use crate::attrs::{set_option_with_display, tag_list_attr, TagList};
 use crate::crate_name;
 use crate::field::traits::{
     DecodeLifetime::{self, Borrowed, Owned},
@@ -27,7 +27,12 @@ impl OneofInclusion {
 
         for attr in attrs {
             if let Some(tags) = tag_list_attr(attr, "oneof", Some(100))? {
-                set_option(&mut oneof_tags, tags, "duplicate oneof attribute")?;
+                set_option_with_display(
+                    &mut oneof_tags,
+                    tags,
+                    "duplicate oneof attribute",
+                    TagList::display,
+                )?;
             } else {
                 unknown_attrs.push(attr);
             }
