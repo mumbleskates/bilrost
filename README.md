@@ -1054,18 +1054,72 @@ struct Foo {
 ##### Ignoring fields
 
 * **"ignore"**: Must be alone, with no tag or other attribute. This causes the
-  field to be ignored by the generated message implementation. If any fields in
-  a message are ignored, it must implement `Default` to implement `Message` so
-  there will be a value for those fields to take on when the message is created
-  from scratch.
+  field to be ignored by the generated message implementation. An expression
+  may be provided to this attribute, overriding the value that field will be
+  initialized to. If any fields in a message are ignored without an initializer
+  expression, they are initialized from the whole struct's `Default` impl, and
+  the struct must implement `Default` to implement `Message`.
 
   Ignored fields are not currently considered compatible with distinguished
   decoding.
 
-* **"default_per_field"**: If a message has any ignored fields, adding this
-  attribute to the message itself removes the requirement that the *whole
-  message* needs to implement `Default`; instead, only the types of each ignored
-  field need to do so.
+```rust,
+# use bilrost::Message;
+#[derive(Debug, Default, PartialEq, Message)]
+struct Foo {
+    a: usize,
+    #[bilrost(ignore)] // comes from `..Default::default()`
+    b: u32,
+    #[bilrost(ignore("ignored initializer".to_owned()))]
+    c: String,
+    #[bilrost(ignore = "3.14")]
+    d: f64,
+}
+
+assert_eq!(
+    Foo::new_empty(),
+    Foo {
+        a: 0,
+        b: 0,
+        c: "ignored initializer".to_owned(),
+        d: 3.14,
+    }
+)
+```
+
+* **"default"**: Providing an expression with this attribute on the struct
+  itself causes ignored fields with no initializer expression to be initialized
+  from this expression instead of `<Self as Default>::default()`. The
+  output of this expression in this attribute must be the type of the message
+  struct.
+
+  This conflicts with the "default_per_field" struct attribute.
+
+```rust,
+# use bilrost::Message;
+#[derive(Debug, PartialEq, Message)]
+#[bilrost(default = "Bar(1, 2, 3)")]
+struct Bar(
+    usize,
+    #[bilrost(ignore)] usize,
+    #[bilrost(ignore = "100")] usize,
+);
+
+assert_eq!(
+    Bar::new_empty(),
+    Bar(
+        0,   // this field isn't ignored and is controlled by the encoding
+        2,   // this field is initialized by the "default" expression
+        100, // this field has its own initializer
+    )
+);
+```
+
+* **"default_per_field"**: Causes ignored fields with no initializer expression
+  to be initialized with `Default::default()` for each individual field, rather
+  than from the whole struct's `Default` impl value.
+
+  This conflicts with the "default" struct attribute.
 
 ##### Marking a oneof variant as explicitly the empty variant
 

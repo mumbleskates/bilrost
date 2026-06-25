@@ -8,6 +8,9 @@
   crate-wide and implements alternative, safe versions of all affected code.
 * Added support for the `smol_str::SmolStr` type via a new crate feature
   "smol_str".
+* Added support for custom per-field and whole-struct initializers for ignored
+  fields. These can change the initializers of individual fields (or a whole
+  message struct) from the implicit `Default::default()` to any expression.
 
 ### Fixes
 
