@@ -5,7 +5,7 @@ use alloc::vec;
 use alloc::vec::Vec;
 use eyre::{bail, Report as Error};
 use proc_macro2::TokenStream;
-use quote::{quote, ToTokens};
+use quote::quote;
 use syn::{Expr, Meta, Type};
 
 #[derive(Clone)]
@@ -45,7 +45,7 @@ impl IgnoredField {
         let field_init_mode = match ignore_attr {
             None => return Ok(None),
             Some(None) => init_mode,
-            Some(ignore_expr) => InitMode::Override(ignore_expr.to_token_stream()),
+            Some(Some(ignore_expr)) => InitMode::Override(quote!(#ignore_expr)),
         };
         if attrs.len() > 1 {
             bail!(

@@ -11,8 +11,8 @@ use syn::parse::ParseStream;
 use syn::punctuated::Punctuated;
 use syn::token::Comma;
 use syn::{
-    parse, parse2, parse_str, Attribute, BinOp, Expr, ExprBinary, ExprLit, ExprRange, Lit, LitInt,
-    Meta, MetaList, MetaNameValue, RangeLimits, Token,
+    parse, parse2, Attribute, BinOp, Expr, ExprBinary, ExprLit, ExprRange, Lit, LitInt, Meta,
+    MetaList, MetaNameValue, RangeLimits, Token,
 };
 
 /// Get the items belonging to the 'bilrost' list attribute, e.g. `#[bilrost(foo, bar="baz")]`.
@@ -197,7 +197,7 @@ pub fn tag_list_attr(
                 lit: Lit::Str(lit), ..
             }),
             ..
-        }) => parse_str(&lit.value()),
+        }) => lit.parse(),
         _ => bail!("invalid {name} attribute: {attr}", attr = quote!(#attr)),
     }?;
     tag_list.validate(range_size_limit)?;
@@ -216,7 +216,7 @@ pub fn named_attr<T: parse::Parse>(attr: &Meta, attr_name: &str) -> Result<Optio
             value: Expr::Lit(expr),
             ..
         }) => match &expr.lit {
-            Lit::Str(lit) => parse_str::<T>(&lit.value()),
+            Lit::Str(lit) => lit.parse(),
             _ => bail!(
                 "invalid {attr_name} attribute: {attr}",
                 attr = quote!(#attr)
