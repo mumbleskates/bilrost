@@ -808,12 +808,6 @@ impl OneofVariant {
                             }?;
                             #update_result
                         }
-                        // Ensure that any fields we can get rid of stop existing before we express
-                        // the field initializers for this struct or variant. This limits the kinds
-                        // of bad behavior we could possibly get from an ignored-field initializer
-                        // expression.
-                        drop(msg_buf);
-                        drop(ctx);
                         ::core::result::Result::Ok(#result_value)
                     })()
                 }
@@ -829,24 +823,21 @@ impl OneofVariant {
                 quote!( #type_ident::#variant_ident { #value_ident: value } )
             }
             VariantContents::Message(fields) => {
-                let field_inits = fields
-                    .iter()
-                    .sorted_by_key(|field| field.is_ignored()) // fill ignored fields last
-                    .map(|field| {
-                        let ident = field.ident();
-                        // currently, oneof enums can only act as if they have default-per-field;
-                        // there's no kind of trait behavior that can fill all the fields of the
-                        // variant like `..Default::default()`, since that would require an impl on
-                        // the variant itself. so, we will only ever initialize them on a per-field
-                        // basis like this.
-                        if field.is_ignored() {
-                            let empty = field.empty();
-                            quote!(#ident: #empty)
-                        } else {
-                            let free_ident = FieldTarget::free_field_ident(field);
-                            quote!(#ident: #free_ident)
-                        }
-                    });
+                let field_inits = fields.iter().map(|field| {
+                    let ident = field.ident();
+                    // currently, oneof enums can only act as if they have default-per-field;
+                    // there's no kind of trait behavior that can fill all the fields of the
+                    // variant like `..Default::default()`, since that would require an impl on
+                    // the variant itself. so, we will only ever initialize them on a per-field
+                    // basis like this.
+                    if field.is_ignored() {
+                        let empty = field.empty();
+                        quote!(#ident: #empty)
+                    } else {
+                        let free_ident = FieldTarget::free_field_ident(field);
+                        quote!(#ident: #free_ident)
+                    }
+                });
                 quote! {
                     #type_ident::#variant_ident { #(#field_inits,)* }
                 }
