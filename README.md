@@ -110,6 +110,7 @@ calling itself by the same name.
       - [Self-referential borrowing with `yoke` for enormous speed + portable
         structs](#recipe-for-making-borrowed-messages-portable)
     - [`no_std` support](#no_std-support)
+    - [Enabling `#[forbid(unsafe_code)]`](#forbidding-unsafe-code)
     - [Changelog](./source/CHANGELOG.md) ([on github][ghchangelog])
 - [Crate features](#crate-features)
 - [Differences from `prost`](#bilrost-vs-prost)
@@ -459,7 +460,9 @@ The `bilrost` crate has several optional features:
   encountered an error. With this disabled errors are more opaque, but may be
   smaller and faster.
 * "forbid-unsafe": configures out every usage of `unsafe` in the crate for
-  increased levels of safety paranoia at the cost of some performance.
+  increased levels of safety paranoia at the cost of some performance. This
+  feature also enables the `#[forbid(unsafe_code)]` compiler directive for the
+  entire crate.
 * "auto-optimize" (default): makes some automatic choices about some
   performance-related implementation details. The related features can be useful
   controls for profiling and experimentation, and are documented in
@@ -509,6 +512,14 @@ To enable `no_std` support, disable the `std` features in `bilrost` (and
 [dependencies]
 bilrost = { version = "0.1015.0-dev", default-features = false, features = ["derive"] }
 ```
+
+#### Forbidding unsafe code
+
+The encoding implementations and supporting types and functions in `bilrost`
+make sparing use of `unsafe` code. In each case, there are alternative
+fully-safe implementations that can be switched to by enabling the
+"forbid-unsafe" crate feature. This should not change the crate's behavior at
+all, though it may come at the cost of some performance.
 
 ### Derive macros
 
