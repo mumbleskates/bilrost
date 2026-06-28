@@ -22,8 +22,8 @@ use crate::field::traits::{
     WhereFor::{self, Decode, Encode},
 };
 use crate::field::{
-    parse_message_fields, tag_measurer, Field, FieldTarget, InitMode, MessageFieldsSorted,
-    OneofVariant,
+    initializer_class_definition, parse_message_fields, tag_measurer, Field, FieldTarget, InitMode,
+    MessageFieldsSorted, OneofVariant,
 };
 use alloc::collections::BTreeMap;
 use alloc::string::ToString;
@@ -270,7 +270,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         .iter()
         .chain(ignored_fields.iter())
         .flat_map(|field| {
-            let empty = field.empty()?;
+            let empty = field.empty(None)?;
             let ident = field.ident();
             Some(quote!(#ident: #empty))
         })
@@ -523,9 +523,17 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     });
 
     let aliases = encoder_alias_header();
+    let initializer_class = initializer_class_definition(
+        ignored_fields
+            .iter()
+            .flat_map(|field| field.initializer_method(None)),
+        &impl_generics,
+    );
     let expanded = quote! {
         const _: () = {
             use #ident as __Self;
+
+            #initializer_class
 
             const _: () = {
                 #aliases
@@ -1651,9 +1659,15 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
     });
 
     let aliases = encoder_alias_header();
+    let initializer_class = initializer_class_definition(
+        variants.iter().flat_map(OneofVariant::initializer_methods),
+        impl_generics,
+    );
     Ok(quote! {
         const _: () = {
             use #ident as __Self;
+
+            #initializer_class
 
             const _: () = {
                 #aliases

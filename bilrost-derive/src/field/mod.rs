@@ -4,7 +4,7 @@ use crate::field::traits::{DecodeLifetime, DecodeMode, FieldBearer, Tagged, Wher
 use alloc::boxed::Box;
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::format;
-use alloc::string::ToString;
+use alloc::string::{String, ToString};
 use alloc::vec;
 use alloc::vec::Vec;
 use core::iter::repeat;
@@ -22,7 +22,7 @@ mod oneof;
 pub mod traits;
 mod value;
 
-pub use ignored::InitMode;
+pub use ignored::{initializer_class_definition, InitMode};
 pub use value::OneofVariant;
 
 #[derive(Clone)]
@@ -41,6 +41,16 @@ enum MessageFieldContent {
     Ignored(Box<ignored::IgnoredField>),
 }
 use MessageFieldContent::*;
+
+/// Returns a string of the given ident with any leading `r#` removed.
+fn ident_string(ident: &impl ToString) -> String {
+    let s = ident.to_string();
+    if let Some(after_hash) = s.strip_prefix("r#") {
+        after_hash.to_string()
+    } else {
+        s
+    }
+}
 
 /// Processes message fields from a vec of syn::Field, validating their tags against the given
 /// reserved tag list and each other.
@@ -246,11 +256,11 @@ impl Field {
 
     /// Returns an expression which initializes the field's type with its encoding with a guaranteed
     /// empty value.
-    pub fn empty(&self) -> Option<TokenStream> {
+    pub fn empty(&self, variant_tag: Option<u32>) -> Option<TokenStream> {
         match &self.content {
             Value(scalar) => Some(scalar.empty()),
             Oneof(oneof) => Some(oneof.empty()),
-            Ignored(ignored) => ignored.initialize(),
+            Ignored(ignored) => ignored.initialize(variant_tag, &self.ident),
         }
     }
 
@@ -288,6 +298,15 @@ impl Field {
         match &self.content {
             Value(scalar) => scalar.methods(&self.ident),
             _ => None,
+        }
+    }
+
+    /// Defines the initializer method for an ignored field in a message or message variant
+    pub fn initializer_method(&self, variant_tag: Option<u32>) -> Option<TokenStream> {
+        if let Ignored(ignored) = &self.content {
+            ignored.initializer_method(variant_tag, &self.ident)
+        } else {
+            None
         }
     }
 }

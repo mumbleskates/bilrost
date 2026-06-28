@@ -9,7 +9,9 @@ use crate::field::traits::{
     FieldBearer, SinglyTagged, Tagged,
     WhereFor::{self, Decode, Encode},
 };
-use crate::field::{parse_message_fields, Field, FieldTarget, InitMode, MessageFieldsSorted};
+use crate::field::{
+    ident_string, parse_message_fields, Field, FieldTarget, InitMode, MessageFieldsSorted,
+};
 use alloc::boxed::Box;
 use alloc::format;
 use alloc::string::ToString;
@@ -266,11 +268,10 @@ impl MessageField {
         let crate_ = crate_name();
         let enumeration_ty = self.enumeration_ty.as_ref()?;
 
-        let ident_str = ident.to_string();
-        let ident_str = ident_str.as_str().strip_prefix("r#").unwrap_or(&ident_str);
+        let ident_str = ident_string(ident);
 
         // Prepend `get_` for getter methods of tuple structs.
-        let get = match parse_str::<Index>(ident_str) {
+        let get = match parse_str::<Index>(&ident_str) {
             Ok(index) => {
                 let get = Ident::new(&format!("get_{}", index.index), Span::call_site());
                 quote!(#get)
@@ -702,7 +703,7 @@ impl OneofVariant {
                         return None; // we don't need mutable variables to parse ignored fields into
                     }
                     let field_ident = FieldTarget::free_field_ident(field);
-                    let empty = field.empty();
+                    let empty = field.empty(Some(self.tag));
                     Some(quote! { let mut #field_ident = #empty; })
                 });
                 quote! { #(#empties)* }
@@ -831,7 +832,7 @@ impl OneofVariant {
                     // the variant itself. so, we will only ever initialize them on a per-field
                     // basis like this.
                     if field.is_ignored() {
-                        let empty = field.empty();
+                        let empty = field.empty(Some(self.tag));
                         quote!(#ident: #empty)
                     } else {
                         let free_ident = FieldTarget::free_field_ident(field);
@@ -842,6 +843,19 @@ impl OneofVariant {
                     #type_ident::#variant_ident { #(#field_inits,)* }
                 }
             }
+        }
+    }
+
+    /// All the `_BilrostInitializer` initializer methods for any ignored fields in this variant
+    /// that need them.
+    pub fn initializer_methods(&self) -> Vec<TokenStream> {
+        if let VariantContents::Message(fields) = &self.contents {
+            fields
+                .iter()
+                .flat_map(|field| field.initializer_method(Some(self.tag)))
+                .collect()
+        } else {
+            vec![]
         }
     }
 }

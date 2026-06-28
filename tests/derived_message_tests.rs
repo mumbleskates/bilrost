@@ -1237,6 +1237,88 @@ fn ignored_fields_with_per_field_defaults() {
 }
 
 #[test]
+fn ignored_fields_strange_initializers() {
+    fn ctx() -> i64 {
+        12345
+    }
+
+    fn fixed() -> usize {
+        55555
+    }
+
+    // For both the struct and the oneof here, we give some fields weird expression defaults. These
+    // try to shadow both encoder names and variable names local to the functions that decode and
+    // initialize these types, to show that we can manage to execute those expressions free of any
+    // context that would cause conflicts there.
+    //
+    // (To do this, we're putting each expression into associated functions on a type defined in
+    // the outer scope that doesn't yet have any potentially shadowing imports.)
+
+    #[derive(Debug, PartialEq, Message)]
+    struct FooStruct<'a, T>
+    where
+        T: Debug + Default,
+    {
+        x: i64,
+        y: i64,
+        #[bilrost(ignore(""))]
+        bearer: &'a str,
+        #[bilrost(ignore(T::default()))]
+        t: T,
+        #[bilrost(ignore = "ctx() as usize")]
+        also: usize,
+        #[bilrost(ignore = "fixed()")]
+        more: usize,
+    }
+    assert::decodes!(
+        owned relaxed,
+        [(1, OV::i64(1))],
+        FooStruct::<'static, String> {
+            x: 1,
+            y: 0,
+            bearer: "",
+            t: String::new(),
+            also: 12345,
+            more: 55555,
+        },
+    );
+
+    #[derive(Debug, PartialEq, Oneof, Message)]
+    enum FooPlus<'a, T>
+    where
+        T: Debug + Default,
+    {
+        Empty,
+        #[bilrost(tag(1), message)]
+        Thing {
+            x: i64,
+            y: i64,
+            #[bilrost(ignore(""))]
+            bearer: &'a str,
+            #[bilrost(ignore(T::default()))]
+            t: T,
+            #[bilrost(ignore = "ctx() as usize")]
+            also: usize,
+            #[bilrost(ignore = "fixed()")]
+            more: usize,
+        },
+    }
+
+    assert::decodes!(
+        owned relaxed,
+        [(1, OV::message(&[(1, OV::i64(1))].into_opaque_message()))],
+        FooPlus::<'static, String>::Thing {
+            x: 1,
+            y: 0,
+            bearer: "",
+            t: String::new(),
+            also: 12345,
+            more: 55555,
+        },
+    );
+}
+
+#[test]
 fn field_clearing() {
     use bilrost::Blob;
     use bytes::Bytes;
