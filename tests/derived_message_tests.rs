@@ -16,7 +16,7 @@ use bilrost::{
     BorrowedMessage, DecodeErrorKind, DistinguishedBorrowedMessage, DistinguishedOwnedMessage,
     Enumeration, Message, Oneof, OwnedMessage,
 };
-use core::mem::size_of;
+use core::mem;
 use itertools::{repeat_n, Itertools};
 use std::borrow::Cow;
 use std::collections::BTreeSet;
@@ -4585,7 +4585,7 @@ fn enumeration_value_limits() {
         #[bilrost(u32::MAX)] // Attribute values take precedence within bilrost
         Z = 255,
     }
-    assert_eq!(size_of::<Foo>(), 1);
+    assert_eq!(mem::size_of::<Foo>(), 1);
 
     #[derive(Debug, PartialEq, Eq, Message)]
     #[bilrost(distinguished)]
