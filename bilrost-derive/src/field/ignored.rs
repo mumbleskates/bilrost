@@ -25,7 +25,7 @@ pub enum InitMode {
     Override(Expr),
 }
 
-/// This generates the method name for the `_BilrostInitializer<T>` associated function that
+/// This generates the method name for the `__BilrostInitializer<T>` associated function that
 /// initializes ignored fields for `T`.
 ///
 /// For oneof enumerations the field must also disambiguate which variant the field is in, so we
@@ -90,12 +90,12 @@ impl IgnoredField {
             InitMode::DefaultPerField => Some(quote!(::core::default::Default::default())),
             InitMode::Override(..) => {
                 let method_name = init_method_name(variant_tag, field_ident);
-                Some(quote!(_BilrostInitializer::<Self>::#method_name()))
+                Some(quote!(__BilrostInitializer::<Self>::#method_name()))
             }
         }
     }
 
-    /// The method body in `_BilrostInitializer` for initializing this field, if it needs one.
+    /// The method body in `__BilrostInitializer` for initializing this field, if it needs one.
     pub fn initializer_method(
         &self,
         variant_tag: Option<u32>,
@@ -132,7 +132,7 @@ impl FieldBearer for IgnoredField {
     }
 }
 
-/// Returns the implementation of the `_BilrostInitializer` type we define if we need any
+/// Returns the implementation of the `__BilrostInitializer` type we define if we need any
 /// initializer expressions for ignored fields.
 pub fn initializer_class_definition(
     methods: impl IntoIterator<Item = TokenStream>,
@@ -144,8 +144,8 @@ pub fn initializer_class_definition(
     }
     let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
     Some(quote! {
-        struct _BilrostInitializer<T>(T);
-        impl #impl_generics _BilrostInitializer<__Self #type_generics> #where_clause {
+        struct __BilrostInitializer<T>(T);
+        impl #impl_generics __BilrostInitializer<__Self #type_generics> #where_clause {
             #(#all_methods)*
         }
     })

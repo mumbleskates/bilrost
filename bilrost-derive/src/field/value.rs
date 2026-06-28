@@ -846,7 +846,7 @@ impl OneofVariant {
         }
     }
 
-    /// All the `_BilrostInitializer` initializer methods for any ignored fields in this variant
+    /// All the `__BilrostInitializer` initializer methods for any ignored fields in this variant
     /// that need them.
     pub fn initializer_methods(&self) -> Vec<TokenStream> {
         if let VariantContents::Message(fields) = &self.contents {
