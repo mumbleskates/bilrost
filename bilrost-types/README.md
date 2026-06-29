@@ -22,5 +22,5 @@ is included under its original ([BSD][2]) license.
 
 See [LICENSE](../LICENSE) for details.
 
-Copyright 2023-2025 Kent Ross  
+Copyright 2023-2026 Kent Ross  
 Copyright 2017 Dan Burkert

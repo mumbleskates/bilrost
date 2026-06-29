@@ -138,8 +138,8 @@ pub fn initializer_class_definition(
     methods: impl IntoIterator<Item = TokenStream>,
     generics: &Generics,
 ) -> Option<TokenStream> {
-    let all_methods: Vec<_> = methods.into_iter().collect();
-    if all_methods.is_empty() {
+    let mut all_methods = methods.into_iter().peekable();
+    if all_methods.peek().is_none() {
         return None;
     }
     let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
