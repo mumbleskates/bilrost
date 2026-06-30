@@ -2,6 +2,8 @@
 
 ### Breaking changes
 
+There should be no breaking changes this release.
+
 ### New features
 
 * Added a "forbid-unsafe" feature that enables `#![forbid(unsafe_code)]`
@@ -11,8 +13,6 @@
 * Added support for custom per-field and whole-struct initializers for ignored
   fields. These can change the initializers of individual fields (or a whole
   message struct) from the implicit `Default::default()` to any expression.
-
-### Fixes
 
 ### Cleanups
 
