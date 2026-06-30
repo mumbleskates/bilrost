@@ -1,6 +1,6 @@
 [package]
 name = "bilrost"
-version = "0.1015.0-dev"
+version = "0.1015.0"
 authors = [
     "Kent Ross <k@mad.cash>",
 ]
@@ -54,7 +54,7 @@ harness = false # just run the binary
 
 [dependencies]
 arrayvec = { version = ">=0.6.0,<0.8", default-features = false, optional = true }
-bilrost-derive = { version = "=0.1015.0-dev", path = "bilrost-derive", optional = true }
+bilrost-derive = { version = "=0.1015.0", path = "bilrost-derive", optional = true }
 bstr = { version = "^1", default-features = false, features = ["alloc"], optional = true }
 bytes = { version = "^1", default-features = false }
 bytestring = { version = "^1", default-features = false, optional = true }
