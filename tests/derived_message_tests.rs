@@ -1307,7 +1307,7 @@ fn ignored_fields_strange_initializers() {
     assert::decodes!(
         owned relaxed,
         [(1, OV::message(&[(1, OV::i64(1))].into_opaque_message()))],
-        FooPlus::<'static, String>::Thing {
+        FooPlus::Thing::<'static, String> {
             x: 1,
             y: 0,
             bearer: "",
