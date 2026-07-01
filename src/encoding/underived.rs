@@ -3,6 +3,43 @@
 //! being forced to use tuple types which might not be desirable. The implementations here are based
 //! on the code in the tuple encoder macro; these are mostly useful for making proxies.
 
+#[allow(unused_macros)]
+macro_rules! underived_schema {
+    (
+        $message_struct:ty: $aka:literal {
+            $($tag:literal: $encoding:ty => $field_name:ident: $ty:ty),* $(,)?
+        }
+    ) => {
+        impl<const P: u8> $crate::encoding::schema::ValueRepr<
+            $crate::encoding::GeneralGeneric<P>,
+            $message_struct
+        > for ()
+        where
+            $message_struct: ::core::any::Any,
+            $((): $crate::encoding::schema::FieldRepr<$encoding, $ty>,)*
+        {
+            fn repr(
+                schema: &$crate::encoding::schema::Schema,
+            ) -> $crate::alloc::boxed::Box<dyn ::core::fmt::Display>
+            {
+                schema.register_message::<$message_struct>($aka, |fields| {
+                    $(fields.add_field(
+                        stringify!($field_name),
+                        $tag,
+                        <() as $crate::encoding::schema::FieldRepr<$encoding, $ty>>::repr(schema),
+                    );)*
+                });
+                schema.make_lazy_repr(|schema| ::alloc::format!(
+                    "delimited message {message_type}",
+                    message_type = schema.type_reference::<$message_struct>(),
+                ))
+            }
+        }
+    };
+}
+#[allow(unused_imports)]
+pub(crate) use underived_schema;
+
 /// Fields must be listed in forward order here, and the targets should be &const.
 #[allow(unused_macros)]
 macro_rules! underived_encode {
@@ -23,7 +60,7 @@ macro_rules! underived_encode {
             let tw = &mut TagWriter::new();
             $(<() as Encoder<$encoding, _>>::encode($tag, $target, buf, tw);)*
         }
-    }
+    };
 }
 #[allow(unused_imports)]
 pub(crate) use underived_encode;
@@ -46,7 +83,7 @@ macro_rules! underived_prepend {
             tw.finalize(buf);
             prepend_varint((buf.remaining() - end) as u64, buf);
         }
-    }
+    };
 }
 #[allow(unused_imports)]
 pub(crate) use underived_prepend;
@@ -67,7 +104,7 @@ macro_rules! underived_encoded_len {
             )*;
             encoded_len_varint(message_len as u64) + message_len
         }
-    }
+    };
 }
 #[allow(unused_imports)]
 pub(crate) use underived_encoded_len;
@@ -120,6 +157,7 @@ macro_rules! underived_decode {
             Result::<(), crate::DecodeError>::Ok(())
         }
     };
+
     (
         $name:ident {
             $($tag:literal: $encoding:ty => $field_name:ident: $target:expr),* $(,)?
@@ -212,6 +250,7 @@ macro_rules! underived_decode_distinguished {
             }
         }
     };
+
     (
         $name:ident {
             $($tag:literal: $encoding:ty => $field_name:ident: $target:expr),* $(,)?

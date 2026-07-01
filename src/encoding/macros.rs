@@ -8,6 +8,19 @@ macro_rules! delegate_encoding {
         $(with where clause ($($where_clause:tt)*))?
         $(with generics ($($value_generics:tt)*))?
     ) => {
+        impl$(<$($value_generics)*>)? $crate::encoding::schema::FieldRepr<$from_ty, $value_ty>
+        for ()
+        where
+            (): $crate::encoding::schema::FieldRepr<$to_ty, $value_ty>,
+            $($($where_clause)*)?
+        {
+            fn repr(
+                schema: &$crate::encoding::schema::Schema
+            ) -> $crate::alloc::boxed::Box<dyn ::core::fmt::Display> {
+                <() as $crate::encoding::schema::FieldRepr<$to_ty, $value_ty>>::repr(schema)
+            }
+        }
+
         impl$(<$($value_generics)*>)? $crate::encoding::Encoder<$from_ty, $value_ty> for ()
         where
             (): $crate::encoding::Encoder<$to_ty, $value_ty>,
@@ -88,11 +101,12 @@ macro_rules! delegate_encoding {
     };
 
     (
-        delegate from ($from_ty:ty) to ($to_ty:ty) for type ($value_ty:ty) including distinguished
+        delegate from ($from_ty:ty) to ($to_ty:ty) for type ($value_ty:ty)
+        including distinguished
         $(with where clause ($($where_clause:tt)*))?
         $(with generics ($($value_generics:tt)*))?
     ) => {
-        delegate_encoding!(
+        $crate::delegate_encoding!(
             delegate from ($from_ty) to ($to_ty) for type ($value_ty)
             $(with where clause ($($where_clause)*))?
             $(with generics ($($value_generics)*))?
@@ -170,6 +184,19 @@ macro_rules! delegate_value_encoding {
         $(with where clause ($($where_clause:tt)+))?
         $(with generics ($($value_generics:tt)*))?
     ) => {
+        impl$(<$($value_generics)*>)? $crate::encoding::schema::ValueRepr<$from_ty, $value_ty>
+        for ()
+            where
+            (): $crate::encoding::schema::ValueRepr<$to_ty, $value_ty>,
+            $($($where_clause)*)?
+        {
+            fn repr(
+                schema: &$crate::encoding::schema::Schema
+            ) -> $crate::alloc::boxed::Box<dyn ::core::fmt::Display> {
+                <() as $crate::encoding::schema::ValueRepr<$to_ty, $value_ty>>::repr(schema)
+            }
+        }
+
         impl$(<$($value_generics)*>)? $crate::encoding::Wiretyped<$from_ty, $value_ty> for ()
         where
             (): $crate::encoding::Wiretyped<$to_ty, $value_ty>,
@@ -679,6 +706,18 @@ macro_rules! encoding_implemented_via_value_encoding {
         $(, with where clause ($($where_clause:tt)*))?
         $(, with generics ($($generics:tt)*) $(,)?)?
     ) => {
+        impl<T $(, $($generics)*)?> $crate::encoding::schema::FieldRepr<$encoding, T> for ()
+        where
+            (): $crate::encoding::schema::ValueRepr<$encoding, T>,
+            $($($where_clause)*)?
+        {
+            fn repr(
+                schema: &$crate::encoding::schema::Schema
+            ) -> $crate::alloc::boxed::Box<dyn ::core::fmt::Display> {
+                <() as $crate::encoding::schema::ValueRepr<$encoding, T>>::repr(schema)
+            }
+        }
+
         /// Encodes plain values only when they are non-empty.
         impl<T $(, $($generics)*)?> $crate::encoding::Encoder<$encoding, T> for ()
         where
@@ -765,13 +804,16 @@ macro_rules! impl_cow_value_encoding {
     (borrowed $T:ty, owned $Owned:ty, encoding $E:ty $(, with generic ($($generic:tt)*))?) => {
         const _: () = {
             use alloc::borrow::Cow;
+            use alloc::boxed::Box;
             use bytes::{Buf, BufMut};
+            use core::fmt::Display;
             use $crate::buf::ReverseBuf;
             use $crate::encoding::{
                 Capped, DecodeContext, DistinguishedValueBorrowDecoder, DistinguishedValueDecoder,
                 ForOverwrite, RestrictedDecodeContext, ValueBorrowDecoder, ValueEncoder, WireType,
                 Wiretyped,
             };
+            use $crate::encoding::schema::{Schema, ValueRepr};
             use $crate::{Canonicity, DecodeError};
 
             impl$(<$($generic)*>)? Wiretyped<$E, Cow<'_, $T>> for () {
@@ -789,6 +831,15 @@ macro_rules! impl_cow_value_encoding {
                     }
                     b
                 };
+            }
+
+            impl$(<$($generic)*>)? ValueRepr<$E, Cow<'_, $T>> for ()
+            where
+                (): ValueRepr<$E, $Owned>,
+            {
+                fn repr(schema: &Schema) -> Box<dyn Display> {
+                    <() as ValueRepr<$E, $Owned>>::repr(schema)
+                }
             }
 
             impl$(<$($generic)*>)? ValueEncoder<$E, Cow<'_, $T>> for () {

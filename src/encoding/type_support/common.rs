@@ -3,7 +3,7 @@ pub(crate) mod time_proxies {
     use crate::buf::ReverseBuf;
     use crate::encoding::underived::{
         underived_decode, underived_decode_distinguished, underived_encode, underived_encoded_len,
-        underived_prepend,
+        underived_prepend, underived_schema,
     };
     use crate::encoding::{
         delegate_value_encoding, empty_state_via_default, Capped, DecodeContext,
@@ -25,6 +25,11 @@ pub(crate) mod time_proxies {
     impl<const P: u8> Wiretyped<GeneralGeneric<P>, TimeDeltaProxy> for () {
         const WIRE_TYPE: WireType = WireType::LengthDelimited;
     }
+
+    underived_schema!(TimeDeltaProxy: "TimeDelta" {
+        1: General => secs: i64,
+        2: Fixed => nanos: i32,
+    });
 
     impl<const P: u8> ValueEncoder<GeneralGeneric<P>, TimeDeltaProxy> for () {
         fn encode_value<B: BufMut + ?Sized>(value: &TimeDeltaProxy, buf: &mut B) {

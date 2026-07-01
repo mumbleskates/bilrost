@@ -1,4 +1,5 @@
 use crate::buf::ReverseBuf;
+use crate::encoding::schema::{Schema, ValueRepr};
 use crate::encoding::{
     encode_varint, encoded_len_varint, encoding_implemented_via_value_encoding,
     encoding_uses_base_empty_state, prepend_varint, Buf, BufMut, Canonicity, Capped, DecodeContext,
@@ -7,6 +8,10 @@ use crate::encoding::{
 };
 use crate::DecodeError;
 use crate::DecodeErrorKind::{InvalidValue, OutOfDomainValue};
+use alloc::boxed::Box;
+use alloc::format;
+use core::fmt::Display;
+use core::mem;
 
 pub struct Varint;
 
@@ -60,12 +65,27 @@ macro_rules! varint {
     (
         $name:ident,
         $ty:ty,
+        $signedness:literal,
         to_uint64($to_uint64_value:ident) $to_uint64:expr,
         from_uint64($from_uint64_value:ident) $from_uint64:expr
         $(, $($avoid_no_empty_state:tt)*)?
     ) => {
         impl Wiretyped<Varint, $ty> for () {
             const WIRE_TYPE: WireType = WireType::Varint;
+        }
+
+        impl ValueRepr<Varint, $ty> for () {
+            fn repr(_schema: &Schema) -> Box<dyn Display> {
+                const SIGNEDNESS: &'static str = $signedness;
+                const SIZE: usize = mem::size_of::<$ty>();
+                if SIGNEDNESS== "boolean" {
+                    Box::new("varint, boolean 0 or 1")
+                } else if SIZE == 8 {
+                    Box::new(format!("varint, {SIGNEDNESS}"))
+                } else {
+                    Box::new(format!("varint, {SIGNEDNESS} in {bits} bit range", bits = SIZE * 8))
+                }
+            }
         }
 
         impl ValueEncoder<Varint, $ty> for () {
@@ -137,7 +157,7 @@ macro_rules! varint {
     };
 }
 
-varint!(varint_bool, bool,
+varint!(varint_bool, bool, "boolean",
 to_uint64(value) {
     u64::from(*value)
 },
@@ -149,7 +169,7 @@ from_uint64(value) {
     }
 });
 
-varint!(varint_u8, u8,
+varint!(varint_u8, u8, "unsigned",
 to_uint64(value) {
     *value as u64
 },
@@ -157,7 +177,7 @@ from_uint64(value) {
     u8::try_from(value).map_err(|_| DecodeError::new(OutOfDomainValue))?
 });
 
-varint!(varint_nonzerou8, core::num::NonZeroU8,
+varint!(varint_nonzerou8, core::num::NonZeroU8, "unsigned nonzero",
 to_uint64(value) {
     value.get() as u64
 },
@@ -167,7 +187,7 @@ from_uint64(value) {
     ).ok_or_else(|| DecodeError::new(InvalidValue))?
 }, has no empty state);
 
-varint!(varint_u16, u16,
+varint!(varint_u16, u16, "unsigned",
 to_uint64(value) {
     *value as u64
 },
@@ -175,7 +195,7 @@ from_uint64(value) {
     u16::try_from(value).map_err(|_| DecodeError::new(OutOfDomainValue))?
 });
 
-varint!(varint_nonzerou16, core::num::NonZeroU16,
+varint!(varint_nonzerou16, core::num::NonZeroU16, "unsigned nonzero",
 to_uint64(value) {
     value.get() as u64
 },
@@ -185,7 +205,7 @@ from_uint64(value) {
     ).ok_or_else(|| DecodeError::new(InvalidValue))?
 }, has no empty state);
 
-varint!(varint_u32, u32,
+varint!(varint_u32, u32, "unsigned",
 to_uint64(value) {
     *value as u64
 },
@@ -193,7 +213,7 @@ from_uint64(value) {
     u32::try_from(value).map_err(|_| DecodeError::new(OutOfDomainValue))?
 });
 
-varint!(varint_nonzerou32, core::num::NonZeroU32,
+varint!(varint_nonzerou32, core::num::NonZeroU32, "unsigned nonzero",
 to_uint64(value) {
     value.get() as u64
 },
@@ -203,7 +223,7 @@ from_uint64(value) {
     ).ok_or_else(|| DecodeError::new(InvalidValue))?
 }, has no empty state);
 
-varint!(varint_u64, u64,
+varint!(varint_u64, u64, "unsigned",
 to_uint64(value) {
     *value
 },
@@ -211,7 +231,7 @@ from_uint64(value) {
     value
 });
 
-varint!(varint_nonzerou64, core::num::NonZeroU64,
+varint!(varint_nonzerou64, core::num::NonZeroU64, "unsigned nonzero",
 to_uint64(value) {
     value.get()
 },
@@ -219,7 +239,7 @@ from_uint64(value) {
     core::num::NonZeroU64::new(value).ok_or_else(|| DecodeError::new(InvalidValue))?
 }, has no empty state);
 
-varint!(varint_usize, usize,
+varint!(varint_usize, usize, "unsigned",
 to_uint64(value) {
     *value as u64
 },
@@ -227,7 +247,7 @@ from_uint64(value) {
     usize::try_from(value).map_err(|_| DecodeError::new(OutOfDomainValue))?
 });
 
-varint!(varint_nonzerousize, core::num::NonZeroUsize,
+varint!(varint_nonzerousize, core::num::NonZeroUsize, "unsigned nonzero",
 to_uint64(value) {
     value.get() as u64
 },
@@ -237,7 +257,7 @@ from_uint64(value) {
     ).ok_or_else(|| DecodeError::new(InvalidValue))?
 }, has no empty state);
 
-varint!(varint_i8, i8,
+varint!(varint_i8, i8, "signed",
 to_uint64(value) {
     i8_to_unsigned(*value) as u64
 },
@@ -247,7 +267,7 @@ from_uint64(value) {
     u8_to_signed(value)
 });
 
-varint!(varint_nonzeroi8, core::num::NonZeroI8,
+varint!(varint_nonzeroi8, core::num::NonZeroI8, "signed nonzero",
 to_uint64(value) {
     i8_to_unsigned(value.get()) as u64
 },
@@ -258,7 +278,7 @@ from_uint64(value) {
         .ok_or_else(|| DecodeError::new(InvalidValue))?
 }, has no empty state);
 
-varint!(varint_i16, i16,
+varint!(varint_i16, i16, "signed",
 to_uint64(value) {
     i16_to_unsigned(*value) as u64
 },
@@ -268,7 +288,7 @@ from_uint64(value) {
     u16_to_signed(value)
 });
 
-varint!(varint_nonzeroi16, core::num::NonZeroI16,
+varint!(varint_nonzeroi16, core::num::NonZeroI16, "signed nonzero",
 to_uint64(value) {
     i16_to_unsigned(value.get()) as u64
 },
@@ -279,7 +299,7 @@ from_uint64(value) {
         .ok_or_else(|| DecodeError::new(InvalidValue))?
 }, has no empty state);
 
-varint!(varint_i32, i32,
+varint!(varint_i32, i32, "signed",
 to_uint64(value) {
     i32_to_unsigned(*value) as u64
 },
@@ -289,7 +309,7 @@ from_uint64(value) {
     u32_to_signed(value)
 });
 
-varint!(varint_nonzeroi32, core::num::NonZeroI32,
+varint!(varint_nonzeroi32, core::num::NonZeroI32, "signed nonzero",
 to_uint64(value) {
     i32_to_unsigned(value.get()) as u64
 },
@@ -300,7 +320,7 @@ from_uint64(value) {
         .ok_or_else(|| DecodeError::new(InvalidValue))?
 }, has no empty state);
 
-varint!(varint_i64, i64,
+varint!(varint_i64, i64, "signed",
 to_uint64(value) {
     i64_to_unsigned(*value)
 },
@@ -308,7 +328,7 @@ from_uint64(value) {
     u64_to_signed(value)
 });
 
-varint!(varint_nonzero648, core::num::NonZeroI64,
+varint!(varint_nonzero648, core::num::NonZeroI64, "signed nonzero",
 to_uint64(value) {
     i64_to_unsigned(value.get())
 },
@@ -317,7 +337,7 @@ from_uint64(value) {
         .ok_or_else(|| DecodeError::new(InvalidValue))?
 }, has no empty state);
 
-varint!(varint_isize, isize,
+varint!(varint_isize, isize, "signed",
 to_uint64(value) {
     i64_to_unsigned(*value as i64)
 },
@@ -326,7 +346,7 @@ from_uint64(value) {
         .map_err(|_| DecodeError::new(OutOfDomainValue))?
 });
 
-varint!(varint_nonzeroisize, core::num::NonZeroIsize,
+varint!(varint_nonzeroisize, core::num::NonZeroIsize, "signed nonzero",
 to_uint64(value) {
     i64_to_unsigned(value.get() as i64)
 },

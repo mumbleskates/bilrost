@@ -1,4 +1,5 @@
 use crate::buf::ReverseBuf;
+use crate::encoding::schema::{Schema, ValueRepr};
 use crate::encoding::value_traits::{empty_state_via_default, for_overwrite_via_default};
 use crate::encoding::{
     impl_cow_value_encoding, Capped, DecodeContext, DistinguishedValueBorrowDecoder,
@@ -6,8 +7,10 @@ use crate::encoding::{
     ValueBorrowDecoder, ValueDecoder, ValueEncoder, WireType, Wiretyped,
 };
 use crate::{Canonicity, DecodeError};
+use alloc::boxed::Box;
 use alloc::vec::Vec;
 use bytes::{Buf, BufMut};
+use core::fmt::Display;
 
 empty_state_via_default!(&'a bstr::BStr, with generics ('a));
 
@@ -15,7 +18,13 @@ impl<const P: u8> Wiretyped<GeneralGeneric<P>, &bstr::BStr> for () {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
 }
 
-impl<const P: u8> ValueEncoder<GeneralGeneric<P>, &bstr::BStr> for () {
+impl<const P: u8> ValueRepr<GeneralGeneric<P>, &bstr::BStr> for () {
+    fn repr(schema: &Schema) -> Box<dyn Display> {
+        <() as ValueRepr<PlainBytes, &[u8]>>::repr(schema)
+    }
+}
+
+impl<'a, const P: u8> ValueEncoder<GeneralGeneric<P>, &'a bstr::BStr> for () {
     #[inline]
     fn encode_value<B: BufMut + ?Sized>(value: &&bstr::BStr, buf: &mut B) {
         <() as ValueEncoder<PlainBytes, _>>::encode_value(&&***value, buf)
@@ -89,6 +98,12 @@ impl EmptyState<(), bstr::BString> for () {
 
 impl<const P: u8> Wiretyped<GeneralGeneric<P>, bstr::BString> for () {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
+}
+
+impl<const P: u8> ValueRepr<GeneralGeneric<P>, bstr::BString> for () {
+    fn repr(schema: &Schema) -> Box<dyn Display> {
+        <() as ValueRepr<PlainBytes, &[u8]>>::repr(schema)
+    }
 }
 
 impl<const P: u8> ValueEncoder<GeneralGeneric<P>, bstr::BString> for () {

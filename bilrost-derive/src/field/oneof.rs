@@ -4,7 +4,7 @@ use crate::field::traits::{
     DecodeLifetime::{self, Borrowed, Owned},
     DecodeMode::{self, Distinguished, Relaxed},
     Tagged,
-    WhereFor::{self, Decode, Encode},
+    WhereFor::{self, Decode, Encode, Schema},
 };
 use alloc::boxed::Box;
 use alloc::vec;
@@ -164,7 +164,18 @@ impl OneofInclusion {
             Decode(Borrowed, Distinguished) => {
                 quote!(#ty: #crate_::encoding::DistinguishedOneofBorrowDecoder<'__a>)
             }
+            Schema => quote!(#ty: #crate_::encoding::schema::RegisterFields),
         }]
+    }
+
+    pub fn schema(&self, oneof_name: &str) -> TokenStream {
+        let crate_ = crate_name();
+        let tags = &self.tags;
+        let ty = &self.ty;
+        quote! {
+            fields.add_oneof(#oneof_name, &[#(#tags),*]);
+            <#ty as #crate_::encoding::schema::RegisterFields>::register(schema);
+        }
     }
 }
 

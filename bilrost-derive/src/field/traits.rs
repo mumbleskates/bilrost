@@ -19,6 +19,7 @@ pub enum DecodeLifetime {
 pub enum WhereFor {
     Encode,
     Decode(DecodeLifetime, DecodeMode),
+    Schema,
 }
 
 pub trait FieldBearer {

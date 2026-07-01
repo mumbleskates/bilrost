@@ -46,6 +46,8 @@ where
         Self::Item: 'a,
         Self: 'a;
 
+    const RESTRICTIONS: Option<&'static str> = Some("unique");
+
     #[inline]
     fn len(&self) -> usize {
         HashSet::len(self)

@@ -1,4 +1,5 @@
 use crate::buf::ReverseBuf;
+use crate::encoding::schema::{FieldRepr, Schema, ValueRepr};
 use crate::encoding::value_traits::{
     Collection, DistinguishedCollection, EmptyState, ForOverwrite,
 };
@@ -11,7 +12,11 @@ use crate::encoding::{
 };
 use crate::DecodeErrorKind::InvalidValue;
 use crate::{Canonicity, DecodeError};
+use alloc::boxed::Box;
+use alloc::format;
+use alloc::string::String;
 use bytes::BufMut;
+use core::fmt::Display;
 
 pub struct Unpacked<E = GeneralPacked>(E);
 
@@ -247,6 +252,32 @@ pub(crate) mod borrowed {
     decoding_modes::__invoke!(define_decoders, borrowed);
 }
 
+impl<C, T, E> FieldRepr<Unpacked<E>, C> for ()
+where
+    C: Collection<Item = T>,
+    (): EmptyState<(), C> + ValueRepr<E, T>,
+{
+    fn repr(schema: &Schema) -> Box<dyn Display> {
+        let bounds = match (C::BOUNDS.start(), C::BOUNDS.end()) {
+            (None, None) => String::new(),
+            (None, Some(max)) => format!("; at most {max} items"),
+            (Some(min), None) => format!("; at least {min} items"),
+            (Some(min), Some(max)) if min == max => format!("; exactly {min} items"),
+            (Some(min), Some(max)) => format!("; between {min} and {max} items"),
+        };
+        let restrictions = match C::RESTRICTIONS {
+            Some(r) => format!("; items are {r}"),
+            None => String::new(),
+        };
+        schema.make_lazy_repr(move |schema| {
+            format!(
+                "{unpacked_repr}{bounds}{restrictions}",
+                unpacked_repr = <() as FieldRepr<Unpacked<E>, [T]>>::repr(schema),
+            )
+        })
+    }
+}
+
 /// Unpacked encodes vecs as repeated fields and in relaxed decoding mode will accept both packed
 /// and un-packed encodings.
 impl<C, T, E> Encoder<Unpacked<E>, C> for ()
@@ -287,6 +318,20 @@ where
     }
 }
 
+impl<T, const N: usize, E> FieldRepr<Unpacked<E>, [T; N]> for ()
+where
+    (): EmptyState<E, [T; N]> + ValueRepr<E, T>,
+{
+    fn repr(schema: &Schema) -> Box<dyn Display> {
+        schema.make_lazy_repr(|schema| {
+            format!(
+                "{unpacked_repr}; exactly {N} items",
+                unpacked_repr = <() as FieldRepr<Unpacked<E>, [T]>>::repr(schema),
+            )
+        })
+    }
+}
+
 /// Unpacked encodes arrays as repeated fields if any of the values are non-empty, and in relaxed
 /// decoding mode will accept both packed and un-packed encodings.
 impl<T, const N: usize, E> Encoder<Unpacked<E>, [T; N]> for ()
@@ -319,6 +364,20 @@ where
         } else {
             0
         }
+    }
+}
+
+impl<T, E> FieldRepr<Unpacked<E>, [T]> for ()
+where
+    (): ValueRepr<E, T>,
+{
+    fn repr(schema: &Schema) -> Box<dyn Display> {
+        schema.make_lazy_repr(|schema| {
+            format!(
+                "repeated field (items: {value_repr})",
+                value_repr = <() as ValueRepr<E, T>>::repr(schema),
+            )
+        })
     }
 }
 
@@ -359,6 +418,20 @@ where
         } else {
             0
         }
+    }
+}
+
+impl<T, const N: usize, E> FieldRepr<Unpacked<E>, Option<[T; N]>> for ()
+where
+    (): EmptyState<E, [T; N]> + ValueRepr<E, T>,
+{
+    fn repr(schema: &Schema) -> Box<dyn Display> {
+        schema.make_lazy_repr(|schema| {
+            format!(
+                "{unpacked_repr}; exactly {N} items",
+                unpacked_repr = <() as FieldRepr<Unpacked<E>, [T]>>::repr(schema),
+            )
+        })
     }
 }
 

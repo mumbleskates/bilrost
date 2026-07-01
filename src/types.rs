@@ -1,18 +1,17 @@
-use alloc::borrow::Cow;
-use alloc::boxed::Box;
-use alloc::vec::Vec;
-use core::borrow::{Borrow, BorrowMut};
-use core::ops::{Deref, DerefMut};
-
-use bytes::{Buf, BufMut};
-
 use crate::buf::ReverseBuf;
+use crate::encoding::schema::{RegisterFields, Schema};
 use crate::encoding::{
     skip_field, Canonicity, Capped, DecodeContext, RawDistinguishedMessageBorrowDecoder,
     RawDistinguishedMessageDecoder, RawMessage, RawMessageBorrowDecoder, RawMessageDecoder,
     RestrictedDecodeContext, WireType,
 };
 use crate::DecodeError;
+use alloc::borrow::Cow;
+use alloc::boxed::Box;
+use alloc::vec::Vec;
+use bytes::{Buf, BufMut};
+use core::borrow::{Borrow, BorrowMut};
+use core::ops::{Deref, DerefMut};
 
 /// Newtype wrapper to act as a simple "bytes data" type in Bilrost. It transparently wraps a
 /// `Vec<u8>` and is fully supported by the `General` encoders.
@@ -142,6 +141,12 @@ impl proptest::arbitrary::Arbitrary for Blob {
         <Vec<u8> as proptest::arbitrary::Arbitrary>::Strategy,
         fn(Vec<u8>) -> Self,
     >;
+}
+
+impl RegisterFields for () {
+    fn register(schema: &Schema) {
+        schema.register_message::<()>("()", |_| {});
+    }
 }
 
 /// The empty tuple unit is the only native tuple type that implements Message because there are no

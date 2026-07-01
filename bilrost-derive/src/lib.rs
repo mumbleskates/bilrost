@@ -19,7 +19,7 @@ use crate::field::traits::{
     DecodeLifetime::{Borrowed, Owned},
     DecodeMode::{Distinguished, Relaxed},
     FieldBearer, SinglyTagged, Tagged,
-    WhereFor::{self, Decode, Encode},
+    WhereFor::{self, Decode, Encode, Schema},
 };
 use crate::field::{
     initializer_class_definition, parse_message_fields, tag_measurer, Field, FieldTarget, InitMode,
@@ -220,6 +220,15 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
                 Decode(lifetime, Relaxed),
             )
         });
+    let schema_where_clause = append_wheres_with_fields(
+        where_clause,
+        self_where
+            .clone()
+            .into_iter()
+            .chain([quote!(Self: ::core::any::Any)]),
+        &where_fields,
+        Schema,
+    );
 
     let self_instance = FieldTarget::MessageInstance(quote!(self));
     let fields = MessageFieldsSorted::new(&unsorted_fields);
@@ -283,6 +292,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         .iter()
         .map(|field| field.clear(&self_instance))
         .collect();
+    let field_schemas: Vec<_> = unsorted_fields.iter().map(|field| field.schema()).collect();
 
     let maybe_struct_update = if ignored_fields
         .iter()
@@ -416,6 +426,15 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
 
             fn clear(val: &mut __Self #ty_generics) {
                 <__Self #ty_generics as #crate_::encoding::RawMessage>::clear(val);
+            }
+        }
+
+        impl #impl_generics #crate_::encoding::schema::RegisterFields for __Self #ty_generics
+        #schema_where_clause {
+            fn register(schema: &#crate_::encoding::schema::Schema) {
+                schema.register_message::<Self>(stringify!(#ident), |fields| {
+                    #(#field_schemas)*
+                });
             }
         }
     };
@@ -962,6 +981,24 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
         }
 
         impl #unborrowed_generics
+        #crate_::encoding::schema::ValueRepr<
+            #crate_::encoding::GeneralGeneric<__G>,
+            #ident #ty_generics
+        > for () #where_clause {
+            fn repr(
+                schema: &#crate_::encoding::schema::Schema,
+            ) -> #crate_::alloc::boxed::Box<dyn ::core::fmt::Display> {
+                schema.register_enumeration::<Self>(stringify!(#ident), |fields| {
+                    #(fields.add_value(stringify!(#variant_idents), #discriminant_exprs);)*
+                });
+                schema.make_lazy_repr(|schema| #crate_::alloc::format!(
+                    "varint, unsigned; one of enumeration {enum_type}",
+                    enum_type = schema.type_reference::<Self>(),
+                ))
+            }
+        }
+
+        impl #unborrowed_generics
         #crate_::encoding::ValueEncoder<
             #crate_::encoding::GeneralGeneric<__G>,
             #ident #ty_generics
@@ -1250,6 +1287,8 @@ fn preprocess_oneof(input: &DeriveInput) -> Result<PreprocessedOneof<'_>, Error>
     })
 }
 
+// TODO: implement schemas here
+//  This will require allowing the message to register arbitrary inner messages for message arms
 fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
     let crate_ = crate_name();
     let input: DeriveInput = parse2(input)?;
