@@ -50,7 +50,7 @@ use bilrost::{Message, Oneof};
 /// }
 /// ```
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Message)]
-#[bilrost(distinguished)]
+#[bilrost(distinguished, schema)]
 pub struct Duration {
     /// Signed seconds of the span of time. Must be from -315,576,000,000 to +315,576,000,000
     /// inclusive. Note: these bounds are computed from: 60 sec/min * 60 min/hr * 24 hr/day *
@@ -82,7 +82,7 @@ pub struct Duration {
 ///
 /// Values of this type are not guaranteed to only exist in their normalized form.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Message)]
-#[bilrost(distinguished)]
+#[bilrost(distinguished, schema)]
 pub struct Timestamp {
     /// Represents seconds of UTC time since Unix epoch 1970-01-01T00:00:00Z.
     #[bilrost(1)]
@@ -109,6 +109,7 @@ impl Timestamp {
 /// unsigned, or floating point in 64 bits), a string, a boolean, a string-keyed associative map of
 /// other values, or a list of values.
 #[derive(Clone, Debug, PartialEq, Oneof, Message)]
+#[bilrost(schema)]
 pub enum Value {
     /// Represents a JSON null value.
     Null,
@@ -132,6 +133,7 @@ pub enum Value {
 
 /// `StructValue` represents a structured data value analogous to a JSON object value.
 #[derive(Clone, Debug, PartialEq, Message)]
+#[bilrost(schema)]
 pub struct StructValue {
     /// Unordered map of dynamically typed values.
     #[bilrost(tag = 1, recurses)]
@@ -140,6 +142,7 @@ pub struct StructValue {
 
 /// `ListValue` is a wrapper around a repeated list of values, analogous to a JSON list value.
 #[derive(Clone, Debug, PartialEq, Message)]
+#[bilrost(schema)]
 pub struct ListValue {
     /// Repeated field of dynamically typed values.
     #[bilrost(tag = 1, encoding = "packed", recurses)]
