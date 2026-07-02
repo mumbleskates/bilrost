@@ -136,6 +136,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     let mut distinguished = false;
     let mut borrow_only = false;
     let mut default_per_field = false;
+    let mut enable_schema = false;
     let mut default_expr: Option<Expr> = None;
     let mut unknown_attrs = Vec::new();
     for attr in bilrost_attrs(&input_attrs)? {
@@ -162,6 +163,8 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
                 "duplicated default (expression) attributes",
                 |t| quote!((#t)).to_string(),
             )?;
+        } else if word_attr(&attr, "schema") {
+            set_bool(&mut enable_schema, "duplicate schema attributes")?;
         } else {
             unknown_attrs.push(attr);
         }
@@ -169,6 +172,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     if default_per_field && default_expr.is_some() {
         bail!("default_per_field and default (expression) attributes are mutually exclusive");
     }
+    enable_schema = true; // TODO: delete this, it's here for testing
 
     if !unknown_attrs.is_empty() {
         bail!(
@@ -220,15 +224,6 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
                 Decode(lifetime, Relaxed),
             )
         });
-    let schema_where_clause = append_wheres_with_fields(
-        where_clause,
-        self_where
-            .clone()
-            .into_iter()
-            .chain([quote!(Self: ::core::any::Any)]),
-        &where_fields,
-        Schema,
-    );
 
     let self_instance = FieldTarget::MessageInstance(quote!(self));
     let fields = MessageFieldsSorted::new(&unsorted_fields);
@@ -292,10 +287,6 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         .iter()
         .map(|field| field.clear(&self_instance))
         .collect();
-    let field_schemas: Vec<_> = unsorted_fields
-        .iter()
-        .flat_map(|field| field.schema())
-        .collect();
 
     let maybe_struct_update = if ignored_fields
         .iter()
@@ -310,6 +301,33 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     } else {
         None
     };
+
+    let impl_schema = enable_schema.then(|| {
+        let schema_where_clause = append_wheres_with_fields(
+            where_clause,
+            self_where
+                .clone()
+                .into_iter()
+                .chain([quote!(Self: ::core::any::Any)]),
+            &where_fields,
+            Schema,
+        );
+        let field_schemas: Vec<_> = unsorted_fields
+            .iter()
+            .flat_map(|field| field.schema())
+            .collect();
+
+        quote! {
+            impl #impl_generics #crate_::encoding::schema::RegisterFields for __Self #ty_generics
+            #schema_where_clause {
+                fn register(schema: &#crate_::encoding::schema::Schema) {
+                    schema.register_message::<Self>(stringify!(#ident), |fields| {
+                        #(#field_schemas)*
+                    });
+                }
+            }
+        }
+    });
 
     let impl_owned_decoder = (!borrow_only).then(|| {
         quote! {
@@ -432,14 +450,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
             }
         }
 
-        impl #impl_generics #crate_::encoding::schema::RegisterFields for __Self #ty_generics
-        #schema_where_clause {
-            fn register(schema: &#crate_::encoding::schema::Schema) {
-                schema.register_message::<Self>(stringify!(#ident), |fields| {
-                    #(#field_schemas)*
-                });
-            }
-        }
+        #impl_schema
     };
 
     let distinguished_impls = distinguished.then(|| {
@@ -582,8 +593,10 @@ fn try_message_via_oneof(input: DeriveInput) -> Result<TokenStream, Error> {
         variants,
         distinguished,
         borrow_only,
+        enable_schema,
         empty_variant,
     } = preprocess_oneof(&input)?;
+    let enable_schema = enable_schema || true; // TODO: delete this it's here for testing
 
     let tag_measurer_ty = tag_measurer(&variants);
 
@@ -605,6 +618,35 @@ fn try_message_via_oneof(input: DeriveInput) -> Result<TokenStream, Error> {
         where_clause,
         [quote!(#ident #ty_generics: #crate_::encoding::OneofBorrowDecoder<'__a>)],
     );
+
+    let impl_schema = enable_schema.then(|| {
+        let schema_where_clause = append_wheres(
+            where_clause,
+            [
+                quote!(Self: ::core::any::Any),
+                quote!(Self: #crate_::encoding::Oneof),
+                quote!(Self: #crate_::encoding::schema::AddOneofFields),
+            ],
+        );
+
+        quote! {
+            impl #impl_generics #crate_::encoding::schema::RegisterFields for #ident #ty_generics
+            #schema_where_clause {
+                fn register(schema: &#crate_::encoding::schema::Schema) {
+                    schema.register_message::<Self>(stringify!(#ident), |fields| {
+                        fields.add_oneof(
+                            stringify!(#ident),
+                            <Self as #crate_::encoding::Oneof>::FIELD_TAGS,
+                        );
+                        <Self as #crate_::encoding::schema::AddOneofFields>::add_fields(
+                            schema,
+                            fields,
+                        );
+                    });
+                }
+            }
+        }
+    });
 
     let impl_owned_decoder = (!borrow_only).then(|| {
         quote! {
@@ -736,6 +778,8 @@ fn try_message_via_oneof(input: DeriveInput) -> Result<TokenStream, Error> {
                 }
             }
         }
+
+        #impl_schema
     };
 
     let distinguished_impls = distinguished.then(|| {
@@ -1193,6 +1237,7 @@ struct PreprocessedOneof<'a> {
     variants: Vec<OneofVariant>,
     distinguished: bool,
     borrow_only: bool,
+    enable_schema: bool,
     empty_variant: Option<Ident>,
 }
 
@@ -1209,6 +1254,7 @@ fn preprocess_oneof(input: &DeriveInput) -> Result<PreprocessedOneof<'_>, Error>
     let mut unknown_attrs = Vec::new();
     let mut distinguished = false;
     let mut borrow_only = false;
+    let mut enable_schema = false;
     for attr in bilrost_attrs(&input.attrs)? {
         if let Some(tags) = tag_list_attr(&attr, "reserved_tags", None)? {
             set_option_with_display(
@@ -1221,6 +1267,8 @@ fn preprocess_oneof(input: &DeriveInput) -> Result<PreprocessedOneof<'_>, Error>
             set_bool(&mut distinguished, "duplicated distinguished attributes")?;
         } else if word_attr(&attr, "borrowed_only") {
             set_bool(&mut borrow_only, "duplicated borrowed_only attributes")?;
+        } else if word_attr(&attr, "schema") {
+            set_bool(&mut enable_schema, "duplicate schema attributes")?;
         } else {
             unknown_attrs.push(attr);
         }
@@ -1286,12 +1334,11 @@ fn preprocess_oneof(input: &DeriveInput) -> Result<PreprocessedOneof<'_>, Error>
         variants,
         distinguished,
         borrow_only,
+        enable_schema,
         empty_variant,
     })
 }
 
-// TODO: implement schemas here
-//  This will require allowing the message to register arbitrary inner messages for message arms
 fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
     let crate_ = crate_name();
     let input: DeriveInput = parse2(input)?;
@@ -1304,8 +1351,11 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         variants,
         distinguished,
         borrow_only,
+        enable_schema,
         empty_variant,
     } = preprocess_oneof(&input)?;
+
+    let enable_schema = enable_schema || true; // TODO: delete this, it's here for testing
 
     let borrow_generics = prepend_to_generics(impl_generics, quote!('__a));
 
@@ -1350,28 +1400,6 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         .iter()
         .map(|variant| variant.encoded_len(&self_alias))
         .collect();
-
-    // registers the contents of any message variants
-    let submessage_schemas = {
-        let submessage_registrations: Vec<_> = variants
-            .iter()
-            .flat_map(|variant| variant.subtype_schema())
-            .collect();
-        if submessage_registrations.is_empty() {
-            None
-        } else {
-            Some(quote! {
-                schema.register_oneof_messages::<Self>(
-                    stringify!(#ident),
-                    |messages| {
-                        #(#submessage_registrations)*
-                    },
-                );
-            })
-        }
-    };
-    // registers the variants of the oneof as fields
-    let field_schemas: Vec<_> = variants.iter().map(|variant| variant.schema()).collect();
 
     let encoder_trait;
     let owned_decoder_trait;
@@ -1534,19 +1562,43 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         }
     });
 
-    let impl_schema = quote! {
-        impl #impl_generics #crate_::encoding::schema::AddOneofFields
-        for __Self #ty_generics #schema_where_clause
-        {
-            fn add_fields(
-                schema: &#crate_::encoding::schema::Schema,
-                fields: &mut #crate_::encoding::schema::MessageFields,
-            ) {
-                #submessage_schemas
-                #(#field_schemas)*
+    let impl_schema = enable_schema.then(|| {
+        // registers the contents of any message variants
+        let submessage_schemas = {
+            let submessage_registrations: Vec<_> = variants
+                .iter()
+                .flat_map(|variant| variant.subtype_schema())
+                .collect();
+            if submessage_registrations.is_empty() {
+                None
+            } else {
+                Some(quote! {
+                    schema.register_oneof_messages::<Self>(
+                        stringify!(#ident),
+                        |messages| {
+                            #(#submessage_registrations)*
+                        },
+                    );
+                })
+            }
+        };
+        // registers the variants of the oneof as fields
+        let field_schemas: Vec<_> = variants.iter().map(|variant| variant.schema()).collect();
+
+        quote! {
+            impl #impl_generics #crate_::encoding::schema::AddOneofFields
+            for __Self #ty_generics #schema_where_clause
+            {
+                fn add_fields(
+                    schema: &#crate_::encoding::schema::Schema,
+                    fields: &mut #crate_::encoding::schema::MessageFields,
+                ) {
+                    #submessage_schemas
+                    #(#field_schemas)*
+                }
             }
         }
-    };
+    });
 
     let impls = quote! {
         impl #impl_generics #crate_::encoding::#encoder_trait
