@@ -1,8 +1,9 @@
 use crate::buf::ReverseBuf;
+use crate::encoding::schema::ValueRepr;
 use crate::encoding::value_traits::empty_state_via_default;
 use crate::encoding::{
     delegate_value_encoding, encode_varint, encoded_len_varint, prepend_varint, Capped,
-    DecodeContext, DistinguishedValueDecoder, GeneralGeneric, RestrictedDecodeContext,
+    DecodeContext, DistinguishedValueDecoder, General, GeneralGeneric, RestrictedDecodeContext,
     ValueDecoder, ValueEncoder, WireType, Wiretyped,
 };
 use crate::DecodeErrorKind::InvalidValue;
@@ -14,6 +15,14 @@ empty_state_via_default!(smol_str::SmolStr);
 
 impl<const P: u8> Wiretyped<GeneralGeneric<P>, smol_str::SmolStr> for () {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
+}
+
+impl<const P: u8> ValueRepr<GeneralGeneric<P>, smol_str::SmolStr> for () {
+    fn repr(
+        schema: &crate::encoding::schema::Schema,
+    ) -> std::prelude::v1::Box<dyn core::fmt::Display> {
+        <() as ValueRepr<General, &str>>::repr(schema)
+    }
 }
 
 impl<const P: u8> ValueEncoder<GeneralGeneric<P>, smol_str::SmolStr> for () {
