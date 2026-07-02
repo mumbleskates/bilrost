@@ -407,8 +407,8 @@ impl OneofMessages {
     /// Adds a message variant to the oneof.
     pub fn add_message_variant(
         &mut self,
-        tag: u32,
         name: &str,
+        tag: u32,
         fields: impl Fn(&mut MessageFields),
     ) {
         let Entry::Vacant(entry) = self.variants.entry(tag) else {
@@ -429,8 +429,13 @@ pub trait FieldRepr<E, T: ?Sized> {
     fn repr(schema: &Schema) -> Box<dyn Display>;
 }
 
-/// Ability of a message or oneof to register its fields with a schema.
+/// Ability of a message to register its fields with a schema.
 // TODO: where does the name go
 pub trait RegisterFields {
     fn register(schema: &Schema);
+}
+
+/// Ability of a oneof to register its fields inline with the outer struct's fields.
+pub trait AddOneofFields {
+    fn add_fields(schema: &Schema, fields: &mut MessageFields);
 }

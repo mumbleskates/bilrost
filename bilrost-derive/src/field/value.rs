@@ -308,17 +308,7 @@ impl MessageField {
     }
 
     pub fn schema(&self, field_name: &str) -> TokenStream {
-        let crate_ = crate_name();
-        let tag = self.tag;
-        let encoding = &self.value.encoding;
-        let ty = &self.value.ty;
-        quote! {
-            fields.add_field(
-                #field_name,
-                #tag,
-                <() as #crate_::encoding::schema::FieldRepr<#encoding, #ty>>::repr(schema),
-            );
-        }
+        self.value.schema(self.tag, field_name)
     }
 }
 
@@ -365,6 +355,19 @@ impl ValueField {
             encoding,
             recurses,
         })
+    }
+
+    fn schema(&self, tag: u32, field_name: &str) -> TokenStream {
+        let crate_ = crate_name();
+        let ty = &self.ty;
+        let encoding = &self.encoding;
+        quote! {
+            fields.add_field(
+                #field_name,
+                #tag,
+                <() as #crate_::encoding::schema::FieldRepr<#encoding, #ty>>::repr(schema),
+            );
+        }
     }
 }
 
@@ -874,6 +877,49 @@ impl OneofVariant {
                 .collect()
         } else {
             vec![]
+        }
+    }
+
+    pub fn subtype_schema(&self) -> Option<TokenStream> {
+        let VariantContents::Message(fields) = &self.contents else {
+            return None;
+        };
+        let variant_name = self.variant_ident.to_string();
+        let tag = self.tag;
+        let field_schemas: Vec<_> = fields.iter().flat_map(|field| field.schema()).collect();
+        Some(quote! {
+            messages.add_message_variant(
+                #variant_name,
+                #tag,
+                |fields| {
+                    #(#field_schemas)*
+                },
+            );
+        })
+    }
+
+    pub fn schema(&self) -> TokenStream {
+        match &self.contents {
+            VariantContents::Value(field_in_variant) => field_in_variant
+                .value
+                .schema(self.tag, &self.variant_ident.to_string()),
+            VariantContents::Message(_) => {
+                let crate_ = crate_name();
+                let variant_name = self.variant_ident.to_string();
+                let tag = self.tag;
+                quote! {
+                    fields.add_field(
+                        #variant_name,
+                        #tag,
+                        schema.make_lazy_repr(|schema| {
+                            #crate_::alloc::format!(
+                                "delimited message {message_type}",
+                                message_type = schema.subtype_reference::<Self, #tag>(),
+                            )
+                        }),
+                    );
+                }
+            }
         }
     }
 }

@@ -164,7 +164,7 @@ impl OneofInclusion {
             Decode(Borrowed, Distinguished) => {
                 quote!(#ty: #crate_::encoding::DistinguishedOneofBorrowDecoder<'__a>)
             }
-            Schema => quote!(#ty: #crate_::encoding::schema::RegisterFields),
+            Schema => quote!(#ty: #crate_::encoding::schema::AddOneofFields),
         }]
     }
 
@@ -174,7 +174,7 @@ impl OneofInclusion {
         let ty = &self.ty;
         quote! {
             fields.add_oneof(#oneof_name, &[#(#tags),*]);
-            <#ty as #crate_::encoding::schema::RegisterFields>::register(schema);
+            <#ty as #crate_::encoding::schema::AddOneofFields>::add_fields(schema, fields);
         }
     }
 }

@@ -292,7 +292,10 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         .iter()
         .map(|field| field.clear(&self_instance))
         .collect();
-    let field_schemas: Vec<_> = unsorted_fields.iter().map(|field| field.schema()).collect();
+    let field_schemas: Vec<_> = unsorted_fields
+        .iter()
+        .flat_map(|field| field.schema())
+        .collect();
 
     let maybe_struct_update = if ignored_fields
         .iter()
@@ -1311,6 +1314,12 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         append_wheres_with_fields(where_clause, None, &variants, Decode(Owned, Relaxed));
     let borrowed_decoder_where_clause =
         append_wheres_with_fields(where_clause, None, &variants, Decode(Borrowed, Relaxed));
+    let schema_where_clause = append_wheres_with_fields(
+        where_clause,
+        Some(quote!(Self: ::core::any::Any)),
+        &variants,
+        Schema,
+    );
 
     let sorted_tags: Vec<u32> = variants
         .iter()
@@ -1341,6 +1350,28 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         .iter()
         .map(|variant| variant.encoded_len(&self_alias))
         .collect();
+
+    // registers the contents of any message variants
+    let submessage_schemas = {
+        let submessage_registrations: Vec<_> = variants
+            .iter()
+            .flat_map(|variant| variant.subtype_schema())
+            .collect();
+        if submessage_registrations.is_empty() {
+            None
+        } else {
+            Some(quote! {
+                schema.register_oneof_messages::<Self>(
+                    stringify!(#ident),
+                    |messages| {
+                        #(#submessage_registrations)*
+                    },
+                );
+            })
+        }
+    };
+    // registers the variants of the oneof as fields
+    let field_schemas: Vec<_> = variants.iter().map(|variant| variant.schema()).collect();
 
     let encoder_trait;
     let owned_decoder_trait;
@@ -1503,6 +1534,20 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         }
     });
 
+    let impl_schema = quote! {
+        impl #impl_generics #crate_::encoding::schema::AddOneofFields
+        for __Self #ty_generics #schema_where_clause
+        {
+            fn add_fields(
+                schema: &#crate_::encoding::schema::Schema,
+                fields: &mut #crate_::encoding::schema::MessageFields,
+            ) {
+                #submessage_schemas
+                #(#field_schemas)*
+            }
+        }
+    };
+
     let impls = quote! {
         impl #impl_generics #crate_::encoding::#encoder_trait
         for __Self #ty_generics #encoder_where_clause
@@ -1569,6 +1614,8 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
                 #decode_borrowed
             }
         }
+
+        #impl_schema
     };
 
     let distinguished_impls = distinguished.then(|| {
