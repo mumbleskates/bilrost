@@ -128,7 +128,8 @@ fn main() {
 
     #[derive(Debug, PartialEq, Message)]
     struct EquivalentMessage {
-        numeric: (i64, i64),
+        #[bilrost(encoding(packed))]
+        numeric: [i64; 2],
         #[bilrost(encoding(packed))]
         stringy: [String; 2],
     }
@@ -137,7 +138,7 @@ fn main() {
     assert_eq!(
         equivalent,
         Ok(EquivalentMessage {
-            numeric: (-100, 234),
+            numeric: [-100, 234],
             stringy: ["aardvark".to_string(), "after".to_string()],
         })
     );
