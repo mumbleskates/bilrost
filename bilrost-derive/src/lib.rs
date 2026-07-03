@@ -641,6 +641,7 @@ fn try_message_via_oneof(input: DeriveInput) -> Result<TokenStream, Error> {
                         <Self as #crate_::encoding::schema::AddOneofFields>::add_fields(
                             schema,
                             fields,
+                            None,
                         );
                     });
                 }
@@ -1592,6 +1593,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
                 fn add_fields(
                     schema: &#crate_::encoding::schema::Schema,
                     fields: &mut #crate_::encoding::schema::MessageFields,
+                    field_name: ::core::option::Option<&str>,
                 ) {
                     #submessage_schemas
                     #(#field_schemas)*

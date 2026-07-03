@@ -367,8 +367,8 @@ mod generic_oneof_grant_empty_state_impls {
     where
         T: AddOneofFields + NonEmptyOneof,
     {
-        fn add_fields(schema: &Schema, fields: &mut MessageFields) {
-            T::add_fields(schema, fields);
+        fn add_fields(schema: &Schema, fields: &mut MessageFields, field_name: Option<&str>) {
+            T::add_fields(schema, fields, field_name);
         }
     }
 }
@@ -603,8 +603,8 @@ mod generic_boxed_oneof_impls {
     where
         T: AddOneofFields + NonEmptyOneof,
     {
-        fn add_fields(schema: &Schema, fields: &mut MessageFields) {
-            T::add_fields(schema, fields);
+        fn add_fields(schema: &Schema, fields: &mut MessageFields, field_name: Option<&str>) {
+            T::add_fields(schema, fields, field_name);
         }
     }
 }

@@ -20,30 +20,44 @@ use alloc::string::String;
 use alloc::sync::Arc;
 use core::any::{type_name, Any, TypeId};
 use core::fmt::{Display, Formatter};
-use core::ops::DerefMut;
+use core::ops::{Deref, DerefMut};
 
 /// Common trait for interior mutability
 trait BorrowGuard<T> {
-    type Borrowed<'a>: DerefMut<Target = T>
+    type ReadGuard<'a>: Deref<Target = T>
+    where
+        Self: 'a,
+        T: 'a;
+    type WriteGuard<'a>: DerefMut<Target = T>
     where
         Self: 'a,
         T: 'a;
 
-    fn get_guarded(&self) -> Self::Borrowed<'_>;
+    fn get_guarded(&self) -> Self::WriteGuard<'_>;
+    fn read_guarded(&self) -> Self::ReadGuard<'_>;
 }
 
 #[cfg(feature = "threadsafe-schema")]
 mod guard {
-    pub(super) use spin::Mutex as Guard;
+    pub(super) use spin::RwLock as Guard;
 
     impl<T> super::BorrowGuard<T> for Guard<T> {
-        type Borrowed<'a>
-            = spin::MutexGuard<'a, T>
+        type ReadGuard<'a>
+            = spin::RwLockReadGuard<'a, T>
+        where
+            T: 'a;
+        type WriteGuard<'a>
+            = spin::RwLockWriteGuard<'a, T>
         where
             T: 'a;
 
-        fn get_guarded(&self) -> Self::Borrowed<'_> {
-            self.lock()
+        fn read_guarded(&self) -> Self::ReadGuard<'_> {
+            self.read()
+        }
+
+        fn get_guarded(&self) -> Self::WriteGuard<'_> {
+            self.try_write().unwrap()
+            //self.write()
         }
     }
 }
@@ -53,10 +67,18 @@ mod guard {
     pub(super) use core::cell::RefCell as Guard;
 
     impl<T> super::BorrowGuard<T> for Guard<T> {
-        type Borrowed<'a>
+        type ReadGuard<'a>
+            = core::cell::Ref<'a, T>
+        where
+            T: 'a;
+        type WriteGuard<'a>
             = core::cell::RefMut<'a, T>
         where
             T: 'a;
+
+        fn read_guarded(&self) -> Self::ReadGuard<'_> {
+            self.borrow()
+        }
 
         fn get_guarded(&self) -> Self::Borrowed<'_> {
             self.borrow_mut()
@@ -70,10 +92,11 @@ use guard::Guard;
 #[derive(Clone)]
 pub struct Schema(Arc<MessageSet>);
 
+#[derive(Default)]
 struct MessageSet {
     types: Guard<BTreeMap<TypeId, Arc<Guard<TypeInfo>>>>,
-    // TODO: pre-organize the types (or their names) for disambiguation and which index they will
-    //  be found at in the final printout
+    subtypes: Guard<BTreeMap<TypeId, Arc<Guard<OneofMessages>>>>,
+    type_index: Guard<BTreeMap<(TypeId, Option<u32>), usize>>,
     alternate_names: Guard<BTreeMap<TypeId, BTreeSet<String>>>,
     message_wrappers: Guard<BTreeMap<TypeId, TypeId>>,
 }
@@ -87,14 +110,7 @@ struct MessageSet {
 /// are registered.
 impl Schema {
     pub fn new() -> Self {
-        Self(
-            MessageSet {
-                types: Default::default(),
-                alternate_names: Default::default(),
-                message_wrappers: Default::default(),
-            }
-            .into(),
-        )
+        Self(MessageSet::default().into())
     }
 
     /// Registers a specific message type. May shortcut if this method has already been invoked
@@ -104,13 +120,17 @@ impl Schema {
         name: &str,
         fields: impl Fn(&mut MessageFields),
     ) {
+        // First check by a read-only lock whether the type is already registered
+        if self.0.types.read_guarded().contains_key(&TypeId::of::<M>()) {
+            return;
+        }
         let info = match self.0.types.get_guarded().entry(TypeId::of::<M>()) {
             Entry::Vacant(entry) => entry
                 .insert(Arc::new(Guard::new(TypeInfo::Message(MessageFields::new(
                     name,
                 )))))
                 .clone(),
-            Entry::Occupied(_) => return, // already registered
+            Entry::Occupied(_) => return, // already registered by a race
         };
 
         // Only after we've inserted the message info into the map do we populate its fields. This
@@ -128,6 +148,10 @@ impl Schema {
         name: &str,
         fields: impl Fn(&mut EnumInfo),
     ) {
+        // First check by a read-only lock whether the type is already registered
+        if self.0.types.read_guarded().contains_key(&TypeId::of::<E>()) {
+            return;
+        }
         let info = match self.0.types.get_guarded().entry(TypeId::of::<E>()) {
             Entry::Vacant(entry) => entry
                 .insert(Arc::new(Guard::new(TypeInfo::Enum(EnumInfo::new(name)))))
@@ -153,11 +177,18 @@ impl Schema {
         name: &str,
         variants: impl Fn(&mut OneofMessages),
     ) {
-        let info = match self.0.types.get_guarded().entry(TypeId::of::<T>()) {
+        // First check by a read-only lock whether the type is already registered
+        if self
+            .0
+            .subtypes
+            .read_guarded()
+            .contains_key(&TypeId::of::<T>())
+        {
+            return;
+        }
+        let info = match self.0.subtypes.get_guarded().entry(TypeId::of::<T>()) {
             Entry::Vacant(entry) => entry
-                .insert(Arc::new(Guard::new(TypeInfo::Oneof(OneofMessages::new(
-                    name,
-                )))))
+                .insert(Arc::new(Guard::new(OneofMessages::new(name))))
                 .clone(),
             Entry::Occupied(_) => return, // already registered
         };
@@ -166,18 +197,34 @@ impl Schema {
         // ensures that we are no longer holding the lock on `types` so other types can be
         // recursively registered.
         let mut info_ref = info.get_guarded();
-        let TypeInfo::Oneof(submsgs) = info_ref.deref_mut() else {
-            unreachable!();
-        };
-        variants(submsgs)
+        variants(info_ref.deref_mut())
+    }
+
+    fn wrapped_type_id(&self, type_id: TypeId) -> TypeId {
+        let mut effective_id = type_id;
+        let wrappers = self.0.message_wrappers.read_guarded();
+        while let Some(&wrapped_id) = wrappers.get(&effective_id) {
+            effective_id = wrapped_id;
+        }
+        effective_id
     }
 
     /// Registers that the type W wraps the message type M and should be treated as equivalent.
     pub fn register_message_wrapper<W: Any + ?Sized, M: Any + ?Sized>(&self) {
+        let wrapper_type_id = TypeId::of::<W>();
+        let referenced_type_id = TypeId::of::<M>();
+        // Dereference what "M" is already declared to wrap
+        let root_type_id = self.wrapped_type_id(referenced_type_id);
+
+        // if "M" already wraps "W", don't do anything. This way we can never create infinite loops
+        if root_type_id == wrapper_type_id {
+            return;
+        }
+
         self.0
             .message_wrappers
             .get_guarded()
-            .insert(TypeId::of::<W>(), TypeId::of::<M>());
+            .insert(wrapper_type_id, referenced_type_id);
     }
 
     /// Registers that a type T is known by the given name.
@@ -194,20 +241,21 @@ impl Schema {
     /// output of this function may differ as more types are added to the schema, so this should
     /// only be called when the whole schema is being rendered; see `make_lazy_repr`.
     pub fn type_reference<M: Any + ?Sized>(&self) -> String {
-        // TODO: this is a placeholder, we want to use the type's ordinal after they're organized
-        let m_id = TypeId::of::<M>();
-        let effective_id = self
-            .0
-            .message_wrappers
-            .get_guarded()
-            .get(&m_id)
-            .cloned()
-            .unwrap_or(m_id);
-        let name = self.0.types.get_guarded().get(&effective_id).map_or_else(
-            || "<unnamed>".to_owned(),
-            |info| info.get_guarded().name().to_owned(),
-        );
-        format!("{name} ({effective_id:?})")
+        let effective_id = self.wrapped_type_id(TypeId::of::<M>());
+        let types = self.0.types.read_guarded();
+        let Some(type_info) = types.get(&effective_id) else {
+            return format!(
+                "<!! type {ty_name:?} is not registered as a message !!>",
+                ty_name = type_name::<M>(),
+            );
+        };
+        let type_info = type_info.read_guarded();
+        let name = type_info.name();
+        if let Some(ordinal) = self.0.type_index.read_guarded().get(&(effective_id, None)) {
+            format!("{name} [{ordinal}]")
+        } else {
+            format!("{name} <!! no ordinal for {effective_id:?} !!>")
+        }
     }
 
     /// Name for a sub-type (message variant of a oneof enum) that disambiguates where it can be
@@ -216,25 +264,28 @@ impl Schema {
     /// see `make_lazy_repr`.
     pub fn subtype_reference<M: Any + ?Sized, const TAG: u32>(&self) -> String {
         // TODO: this is a placeholder, we want to use the type's ordinal after they're organized
-        let id = TypeId::of::<M>();
-        let name = self.0.types.get_guarded().get(&id).map_or_else(
-            || "<unnamed>".to_owned(),
-            |info| {
-                let info = info.get_guarded();
-                let TypeInfo::Oneof(variants) = &*info else {
-                    panic!(
-                        "type {ty_name:?} is not registered as a oneof with subtypes",
-                        ty_name = type_name::<M>(),
-                    );
-                };
-                let (variant_name, _) = variants
-                    .variants
-                    .get(&TAG)
-                    .expect("type {name:?} does not have a registered variant with tag {Tag}");
-                format!("{name}::{variant_name}", name = variants.oneof_name)
-            },
-        );
-        format!("{name} ({id:?})")
+        let id = self.wrapped_type_id(TypeId::of::<M>());
+        let subtypes = self.0.subtypes.read_guarded();
+        let Some(oneof_info) = subtypes.get(&id) else {
+            return format!(
+                "<!! type {ty_name:?} is not registered as a oneof with subtypes !!>",
+                ty_name = type_name::<M>(),
+            );
+        };
+        let oneof_info = oneof_info.read_guarded();
+        let Some(message) = oneof_info.variants.get(&TAG) else {
+            return format!(
+                "<!! type {ty_name:?} does not have a registered variant with tag {TAG} !!>",
+                ty_name = type_name::<M>()
+            );
+        };
+        let name = &oneof_info.oneof_name;
+        let variant_name = &message.message_name;
+        if let Some(ordinal) = self.0.type_index.read_guarded().get(&(id, Some(TAG))) {
+            format!("{name}::{variant_name} [{ordinal}]")
+        } else {
+            format!("{name}::{variant_name} <!! no ordinal for {id:?} !!>")
+        }
     }
 
     /// Returns a lazily-evaluated repr using the given closure. The closure won't be invoked until
@@ -268,34 +319,81 @@ impl Schema {
 
 impl Display for Schema {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        let mut type_indexes = BTreeMap::new();
-        for (msg_idx, (type_id, msg_info)) in self.0.types.get_guarded().iter().enumerate() {
-            // TODO: put this into the match'
-            type_indexes.insert(*type_id, msg_idx);
-            // TODO: build the indexes in the schema itself and use them in `type_reference`
-            if msg_idx > 0 {
-                writeln!(f)?;
+        let types = self.0.types.read_guarded();
+        let subtypes = self.0.subtypes.read_guarded();
+
+        #[derive(PartialEq, Eq, PartialOrd, Ord)]
+        struct TypeEntry {
+            type_name: String,
+            subtype_name: Option<String>,
+            type_id: TypeId,
+            subtype_tag: Option<u32>,
+        }
+
+        let mut ordered = BTreeSet::new();
+        for (&type_id, info) in types.iter() {
+            let info = info.read_guarded();
+            ordered.insert(TypeEntry {
+                type_name: info.name().to_owned(),
+                subtype_name: None,
+                type_id,
+                subtype_tag: None,
+            });
+        }
+        for (&type_id, info) in subtypes.iter() {
+            let info = info.read_guarded();
+            for (&subtype_tag, subinfo) in info.variants.iter() {
+                ordered.insert(TypeEntry {
+                    type_name: info.oneof_name.clone(),
+                    subtype_name: Some(subinfo.message_name.clone()),
+                    type_id,
+                    subtype_tag: Some(subtype_tag),
+                });
             }
-            let msg_info = msg_info.get_guarded();
-            match &*msg_info {
-                TypeInfo::Message(ty_msg) => {
-                    writeln!(f, "[{msg_idx}] {name} {{", name = msg_info.name())?;
-                    if ty_msg.fields.is_empty() {
-                        writeln!(f, "    // empty")?;
-                    } else {
-                        for (tag, field) in &ty_msg.fields {
-                            writeln!(
-                                f,
-                                "    {tag}: {field_name} ({repr}),",
-                                field_name = &field.name,
-                                repr = &field.repr,
-                            )?;
-                        }
-                    }
-                    writeln!(f, "}}")?;
+        }
+        // Update the index so that `type_reference` and `subtype_reference` will show the correct
+        // numbers during the render
+        {
+            let mut index = self.0.type_index.get_guarded();
+
+            *index = ordered
+                .iter()
+                .map(|entry| (entry.type_id, entry.subtype_tag))
+                .zip(1..)
+                .collect();
+        }
+
+        let mut first_print = true;
+        for (
+            TypeEntry {
+                type_id,
+                subtype_tag,
+                ..
+            },
+            ordinal,
+        ) in ordered.iter().zip(1..)
+        {
+            if first_print {
+                writeln!(f, "")?;
+                first_print = false;
+            }
+            match subtype_tag {
+                None => {
+                    writeln!(
+                        f,
+                        "[{ordinal}] {type_info}",
+                        type_info = types.get(type_id).unwrap().read_guarded(),
+                    )?;
                 }
-                TypeInfo::Enum(_ty_enum) => todo!(/* TODO */),
-                TypeInfo::Oneof(_ty_oneof) => todo!(/* TODO */),
+                Some(subtype_tag) => {
+                    write!(f, "[{ordinal}] ")?;
+                    subtypes
+                        .get(type_id)
+                        .unwrap()
+                        .read_guarded()
+                        .display_variant(f, *subtype_tag)?;
+                    writeln!(f, "")?;
+                }
             }
         }
         Ok(())
@@ -305,7 +403,6 @@ impl Display for Schema {
 enum TypeInfo {
     Message(MessageFields),
     Enum(EnumInfo),
-    Oneof(OneofMessages),
 }
 
 impl TypeInfo {
@@ -313,8 +410,25 @@ impl TypeInfo {
         match self {
             TypeInfo::Message(message_fields) => &message_fields.message_name,
             TypeInfo::Enum(enum_info) => &enum_info.enum_name,
-            TypeInfo::Oneof(oneof_messages) => &oneof_messages.oneof_name,
         }
+    }
+}
+
+impl Display for TypeInfo {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        match self {
+            TypeInfo::Message(ty_msg) => {
+                ty_msg.display(f, None)?;
+            }
+            TypeInfo::Enum(ty_enum) => {
+                writeln!(f, "enumeration {name} {{", name = ty_enum.enum_name)?;
+                for (value, name) in &ty_enum.values {
+                    writeln!(f, "    {value}: {name},")?;
+                }
+                writeln!(f, "}}")?;
+            }
+        }
+        Ok(())
     }
 }
 
@@ -365,6 +479,29 @@ impl MessageFields {
             panic!("message registered multiple oneof sets with the name {conflicting_name:?}");
         }
     }
+
+    fn display(&self, f: &mut Formatter<'_>, oneof_name: Option<&str>) -> core::fmt::Result {
+        // TODO: display info about oneofs in the message
+        write!(f, "message ")?;
+        if let Some(oneof_name) = oneof_name {
+            write!(f, "{oneof_name}::")?;
+        }
+        writeln!(f, "{name} {{", name = self.message_name)?;
+        if self.fields.is_empty() {
+            writeln!(f, "    // empty")?;
+        } else {
+            for (tag, field) in &self.fields {
+                writeln!(
+                    f,
+                    "    {tag}: {field_name} ({repr}),",
+                    field_name = field.name,
+                    repr = field.repr,
+                )?;
+            }
+        }
+        writeln!(f, "}}")?;
+        Ok(())
+    }
 }
 
 struct FieldInfo {
@@ -393,7 +530,7 @@ impl EnumInfo {
 
 pub struct OneofMessages {
     oneof_name: String,
-    variants: BTreeMap<u32, (String, MessageFields)>,
+    variants: BTreeMap<u32, MessageFields>,
 }
 
 impl OneofMessages {
@@ -414,8 +551,15 @@ impl OneofMessages {
         let Entry::Vacant(entry) = self.variants.entry(tag) else {
             panic!("multiple variants added with the tag {tag}");
         };
-        let (_, msg) = entry.insert((name.to_owned(), MessageFields::new(name)));
+        let msg = entry.insert(MessageFields::new(name));
         fields(msg);
+    }
+
+    fn display_variant(&self, f: &mut Formatter<'_>, tag: u32) -> core::fmt::Result {
+        self.variants
+            .get(&tag)
+            .expect("tried to display a nonexistent variant")
+            .display(f, Some(&self.oneof_name))
     }
 }
 
@@ -436,5 +580,5 @@ pub trait RegisterFields {
 
 /// Ability of a oneof to register its fields inline with the outer struct's fields.
 pub trait AddOneofFields {
-    fn add_fields(schema: &Schema, fields: &mut MessageFields);
+    fn add_fields(schema: &Schema, fields: &mut MessageFields, field_name: Option<&str>);
 }

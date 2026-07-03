@@ -1,0 +1,51 @@
+thread 'rustc' panicked at /rustc-dev/c397dae808f70caebab1fc4e11b3edf7e59f58c7/compiler/rustc_middle/src/ty/instance.rs:616:21:
+Box<dyn Any>
+stack backtrace:
+   0:     0x79b7026cf62b - <std[9825f2e6b8e19478]::backtrace::Backtrace>::create
+   1:     0x79b7026cf575 - <std[9825f2e6b8e19478]::backtrace::Backtrace>::force_capture
+   2:     0x79b7016cf9a5 - std[9825f2e6b8e19478]::panicking::update_hook::<alloc[c330bc42d7fbe3f9]::boxed::Box<rustc_driver_impl[86b904b42ab60ec6]::install_ice_hook::{closure#1}>>::{closure#0}
+   3:     0x79b7026e3422 - std[9825f2e6b8e19478]::panicking::panic_with_hook
+   4:     0x79b7016fc941 - std[9825f2e6b8e19478]::panicking::begin_panic::<rustc_errors[2062bb0638bd9044]::ExplicitBug>::{closure#0}
+   5:     0x79b7016f5826 - std[9825f2e6b8e19478]::sys::backtrace::__rust_end_short_backtrace::<std[9825f2e6b8e19478]::panicking::begin_panic<rustc_errors[2062bb0638bd9044]::ExplicitBug>::{closure#0}, !>
+   6:     0x79b7016f36f7 - std[9825f2e6b8e19478]::panicking::begin_panic::<rustc_errors[2062bb0638bd9044]::ExplicitBug>
+   7:     0x79b701707ad1 - <rustc_errors[2062bb0638bd9044]::diagnostic::BugAbort as rustc_errors[2062bb0638bd9044]::diagnostic::EmissionGuarantee>::emit_producing_guarantee
+   8:     0x79b701c53f7c - <rustc_errors[2062bb0638bd9044]::DiagCtxtHandle>::span_bug::<rustc_span[92f9b61efdf79936]::span_encoding::Span, alloc[c330bc42d7fbe3f9]::string::String>
+   9:     0x79b701c830b6 - rustc_middle[88f8ef47a2d07faa]::util::bug::opt_span_bug_fmt::<rustc_span[92f9b61efdf79936]::span_encoding::Span>::{closure#0}
+  10:     0x79b701c83242 - rustc_middle[88f8ef47a2d07faa]::ty::context::tls::with_opt::<rustc_middle[88f8ef47a2d07faa]::util::bug::opt_span_bug_fmt<rustc_span[92f9b61efdf79936]::span_encoding::Span>::{closure#0}, !>::{closure#0}
+  11:     0x79b701c6e98b - rustc_middle[88f8ef47a2d07faa]::ty::context::tls::with_context_opt::<rustc_middle[88f8ef47a2d07faa]::ty::context::tls::with_opt<rustc_middle[88f8ef47a2d07faa]::util::bug::opt_span_bug_fmt<rustc_span[92f9b61efdf79936]::span_encoding::Span>::{closure#0}, !>::{closure#0}, !>
+  12:     0x79b6ff689b98 - rustc_middle[88f8ef47a2d07faa]::util::bug::span_bug_fmt::<rustc_span[92f9b61efdf79936]::span_encoding::Span>
+  13:     0x79b703d773a8 - <rustc_middle[88f8ef47a2d07faa]::ty::instance::Instance>::expect_resolve
+  14:     0x79b7038e5d3e - <rustc_monomorphize[c84c4eeed0bdf8f5]::collector::MirUsedCollector as rustc_middle[88f8ef47a2d07faa]::mir::visit::Visitor>::visit_terminator
+  15:     0x79b7038df76b - rustc_monomorphize[c84c4eeed0bdf8f5]::collector::items_of_instance
+  16:     0x79b7038df251 - rustc_query_impl[f65037dd5affda9e]::query_impl::items_of_instance::invoke_provider_fn::__rust_begin_short_backtrace
+  17:     0x79b7038f7fc6 - rustc_query_impl[f65037dd5affda9e]::execution::try_execute_query::<rustc_middle[88f8ef47a2d07faa]::query::caches::DefaultCache<(rustc_middle[88f8ef47a2d07faa]::ty::instance::Instance, rustc_middle[88f8ef47a2d07faa]::mono::CollectionMode), rustc_middle[88f8ef47a2d07faa]::query::erase::ErasedData<[u8; 32usize]>>, true>
+  18:     0x79b7038f76a1 - rustc_query_impl[f65037dd5affda9e]::query_impl::items_of_instance::execute_query_incr::__rust_end_short_backtrace
+  19:     0x79b7038f3b94 - rustc_monomorphize[c84c4eeed0bdf8f5]::collector::collect_items_rec::{closure#0}
+  20:     0x79b7041f17ba - rustc_monomorphize[c84c4eeed0bdf8f5]::collector::collect_items_rec
+  21:     0x79b7041f32d9 - rustc_monomorphize[c84c4eeed0bdf8f5]::collector::collect_items_rec
+  22:     0x79b7041f32d9 - rustc_monomorphize[c84c4eeed0bdf8f5]::collector::collect_items_rec
+  23:     0x79b7041f32d9 - rustc_monomorphize[c84c4eeed0bdf8f5]::collector::collect_items_rec
+  24:     0x79b7035f2027 - rustc_monomorphize[c84c4eeed0bdf8f5]::collector::collect_crate_mono_items::{closure#1}::{closure#0}
+  25:     0x79b7039a1d35 - rustc_monomorphize[c84c4eeed0bdf8f5]::partitioning::collect_and_partition_mono_items
+  26:     0x79b703f3f228 - rustc_query_impl[f65037dd5affda9e]::query_impl::collect_and_partition_mono_items::invoke_provider_fn::__rust_begin_short_backtrace
+  27:     0x79b704359ac3 - rustc_query_impl[f65037dd5affda9e]::execution::try_execute_query::<rustc_middle[88f8ef47a2d07faa]::query::caches::SingleCache<rustc_middle[88f8ef47a2d07faa]::query::erase::ErasedData<[u8; 24usize]>>, true>
+  28:     0x79b704359457 - rustc_query_impl[f65037dd5affda9e]::query_impl::collect_and_partition_mono_items::execute_query_incr::__rust_end_short_backtrace
+  29:     0x79b7040a9d43 - rustc_codegen_ssa[4efb96efac72e5e4]::base::codegen_crate::<rustc_codegen_llvm[53adcfdd7943e5a2]::LlvmCodegenBackend, rustc_codegen_llvm[53adcfdd7943e5a2]::ModuleLlvm>
+  30:     0x79b7040a9a4d - <rustc_codegen_llvm[53adcfdd7943e5a2]::LlvmCodegenBackend as rustc_codegen_ssa[4efb96efac72e5e4]::traits::backend::CodegenBackend>::codegen_crate
+  31:     0x79b703e4de5c - <rustc_interface[3af1732d5ed36fcb]::queries::Linker>::codegen_and_build_linker
+  32:     0x79b703f93440 - rustc_interface[3af1732d5ed36fcb]::interface::run_compiler::<(), rustc_driver_impl[86b904b42ab60ec6]::run_compiler::{closure#0}>::{closure#1}
+  33:     0x79b703f505ba - std[9825f2e6b8e19478]::sys::backtrace::__rust_begin_short_backtrace::<rustc_interface[3af1732d5ed36fcb]::util::run_in_thread_with_globals<rustc_interface[3af1732d5ed36fcb]::util::run_in_thread_pool_with_globals<rustc_interface[3af1732d5ed36fcb]::interface::run_compiler<(), rustc_driver_impl[86b904b42ab60ec6]::run_compiler::{closure#0}>::{closure#1}, ()>::{closure#0}, ()>::{closure#0}::{closure#0}, ()>
+  34:     0x79b703f5036d - <std[9825f2e6b8e19478]::thread::lifecycle::spawn_unchecked<rustc_interface[3af1732d5ed36fcb]::util::run_in_thread_with_globals<rustc_interface[3af1732d5ed36fcb]::util::run_in_thread_pool_with_globals<rustc_interface[3af1732d5ed36fcb]::interface::run_compiler<(), rustc_driver_impl[86b904b42ab60ec6]::run_compiler::{closure#0}>::{closure#1}, ()>::{closure#0}, ()>::{closure#0}::{closure#0}, ()>::{closure#1} as core[98665f3f32c5c4a4]::ops::function::FnOnce<()>>::call_once::{shim:vtable#0}
+  35:     0x79b703f467fa - <std[9825f2e6b8e19478]::sys::thread::unix::Thread>::new::thread_start
+  36:     0x79b6fd8a40da - <unknown>
+  37:     0x79b6fd9377ac - <unknown>
+  38:                0x0 - <unknown>
+
+
+rustc version: 1.98.0-nightly (c397dae80 2026-07-02)
+platform: x86_64-unknown-linux-gnu
+
+query stack during panic:
+#0 [items_of_instance] collecting items used by `_::_::<impl at examples/schema.rs:15:35: 15:42>::register::{closure#0}`
+#1 [collect_and_partition_mono_items] collect_and_partition_mono_items
+end of query stack

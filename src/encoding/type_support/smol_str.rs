@@ -140,7 +140,6 @@ delegate_value_encoding!(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::buf::ReverseBuffer;
     use crate::encoding::test::check_type_test;
     use crate::encoding::General;
     use alloc::string::String;
@@ -169,9 +168,7 @@ mod test {
         ] {
             // Put the string data into a non-contiguous buf
             let (pre, post) = string_data.split_at(3);
-            let mut buf = ReverseBuffer::with_capacity(post.len());
-            buf.prepend_slice(post);
-            buf.prepend_slice(pre);
+            let mut buf = pre.chain(post);
             prepend_varint(buf.len() as u64, &mut buf);
             assert!(buf.contiguous().is_none());
             let mut val = Default::default();

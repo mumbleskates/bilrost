@@ -312,7 +312,7 @@ impl Field {
 
     pub fn schema(&self) -> Option<TokenStream> {
         match &self.content {
-            Value(scalar) => Some(scalar.schema(&self.ident.to_string())),
+            Value(scalar) => Some(scalar.schema(&self.ident.to_string(), false)),
             Oneof(oneof) => Some(oneof.schema(&self.ident.to_string())),
             Ignored(..) => None,
         }
