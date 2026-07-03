@@ -1,9 +1,9 @@
 //! This is the module that defines the core encoding implementation for bilrost, including the
 //! traits that dispatch it.
 //!
-//! ---
+//! <div class="warning">
 //!
-//! ⚠️ All of the things beneath this module are "under the hood" and are intended for consumption
+//! All of the things beneath this module are "under the hood" and are intended for consumption
 //! of `bilrost` itself, in the output of the derive macros of the exactly matching version of the
 //! library. Historically these have undergone significant evolution, and stability of outside use
 //! of anything in or under this module is to be considered **EXPERIMENTAL** until further notice.
@@ -11,7 +11,7 @@
 //! useful set of features for advanced external users to have a set of tools to work around
 //! annoyances and end up with a result that is as pleasing, ergonomic, and performant as possible.
 //!
-//! ---
+//! </div>
 //!
 //! There are a whole product of traits for encoding and decoding in bilrost, based on the type of
 //! value and the capability.
@@ -35,13 +35,13 @@
 //!
 //! ...And here are the names of the traits we define for all the above combinations:
 //!
-//! * Supported value with an empty state:
+//! * Value with an empty state:
 //!     * `Encoder<E, T>`
 //!     * `Decoder<E, T>`
 //!     * `DistinguishedDecoder<E, T>`
 //!     * `BorrowDecoder<'a, E, T>`
 //!     * `DistinguishedBorrowDecoder<'a, E, T>`
-//! * Any supported value:
+//! * Value with the ability to be nested:
 //!     * `ValueEncoder<E, T>`
 //!     * `ValueDecoder<E, T>`
 //!     * `DistinguishedValueDecoder<E, T>`
@@ -68,8 +68,6 @@
 //!
 //! These traits and their main generic implementations are defined in this module and in its
 //! `message` and `oneof` sub-modules.
-//!
-//! Values themselves often have the trait of being
 //!
 //! The traits for values are parametrized by "encodings", marker structs which denote *how* the
 //! value is to be encoded, whose implementations are also defined in sub-modules here. These
@@ -201,6 +199,8 @@ const VARINT_LIMIT: [u64; 9] = [
 
 /// Encodes an integer value into LEB128-bijective variable length format, and writes it to the
 /// buffer. The buffer must have enough remaining space (maximum 9 bytes).
+///
+/// See `encoded_len_varint` for notes on the logical structure here.
 #[cfg(any(
     all(
         feature = "auto-unroll-varint-encoding",
@@ -271,6 +271,8 @@ pub fn encode_varint<B: BufMut + ?Sized>(mut value: u64, buf: &mut B) {
 }
 
 /// Prepends an integer value in LEB128-bijective format to the given buffer.
+///
+/// See `encoded_len_varint` for notes on the logical structure here.
 #[cfg(any(
     all(
         feature = "auto-unroll-varint-encoding",
@@ -710,6 +712,21 @@ impl RestrictedDecodeContext {
 
 /// Returns the encoded length of the value in LEB128-bijective variable length format.
 /// The returned value will be between 1 and 9, inclusive.
+///
+/// Currently we branch this many times for a varint of a given length:
+/// -------------------
+/// 1 byte  | 1 branch
+/// 2 bytes | 4 branches
+/// 3 bytes | 4 branches
+/// 4 bytes | 4 branches
+/// 5 bytes | 4 branches
+/// 6 bytes | 4 branches
+/// 7 bytes | 4 branches
+/// 8 bytes | 4 branches
+/// 9 bytes | 4 branches
+///
+/// ...in effect, a fast-path check for 1-byte varints plus a hard-coded binary search on the other
+/// 8 possible lengths. The "unrolled" functions for encoding varints are structured similarly.
 #[inline(always)]
 pub const fn encoded_len_varint(value: u64) -> usize {
     if value < VARINT_LIMIT[1] {
