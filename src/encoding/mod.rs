@@ -90,7 +90,35 @@
 //!
 //! Type support for third party types and for many common aspects of core type implementations can
 //! be found in the `type_support` sub-module tree.
-
+//!
+//! In addition to the ability to encode and decode, values also have traits for initialized
+//! states:
+//!
+//! * `ForOverwrite<E, T>`: Cheaply create an owned value
+//! * `EmptyState<E, T>`: Create an owned value that is guaranteed to be empty, detect whether a
+//!   value is currently empty, and reset a mut value to an empty state
+//!
+//! For every value type implemented in `bilrost`, these traits are defined in terms of the
+//! encoding type `()`, which we call the "base empty state" implementation. All the encodings in
+//! the library delegate to this base implementation. However, it is possible for a third-party
+//! encoding type to implement empty states differently for its supported values rather than
+//! delegating this way; the logic of when a value is empty or not is entirely up to the encoding.
+//!
+//! Additionally, there are traits for homogenous collections and associative mappings. Anything
+//! that implements these traits will be naturally supported by the appropriate encoding (packed,
+//! unpacked, and map encodings):
+//!
+//! * `Collection`
+//! * `DistinguishedCollection`
+//! * `Mapping`
+//! * `DistinguishedMapping`
+//!
+//! Note that these traits must be able to provide iterators *and* reversed iterators, for purposes
+//! of encoding. These do not have to be double-ended, and these only need to truly be correct and
+//! the reverse of each other if the distinguished trait is implemented; otherwise, it doesn't
+//! really matter what order the items are produced in. Implementations of unordered collections
+//! and mappings like `std::collections::HashSet` never bother to iterate their items in any
+//! special order, nor do they support distinguished decoding as a result.
 use crate::buf::ReverseBuf;
 use crate::DecodeErrorKind::{
     InvalidVarint, NotCanonical, Oversize, TagOverflowed, Truncated, UnknownField, WrongWireType,
