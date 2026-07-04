@@ -361,33 +361,30 @@ impl ValueField {
         let crate_ = crate_name();
         let ty = &self.ty;
         let encoding = &self.encoding;
-        let add_field_direct = quote! {
-            fields.add_field(
-                #field_name,
-                #tag,
-                <() as #crate_::encoding::schema::FieldRepr<#encoding, #ty>>::repr(schema),
-            );
-        };
         if in_oneof {
             quote! {
                 // the 'field name' identifier here is the one that's passed in to
                 // AddOneofFields::add_fields, which tells us what the oneof enum value's name is
-                if let Some(field_name) = field_name {
-                    let field_name_with_variant = #crate_::alloc::format!(
-                        "{field_name} variant {variant_name}",
-                        variant_name = #field_name,
-                    );
-                    fields.add_field(
-                        &field_name_with_variant,
-                        #tag,
-                        <() as #crate_::encoding::schema::FieldRepr<#encoding, #ty>>::repr(schema),
-                    );
-                } else {
-                    #add_field_direct
-                }
+                let field_name_with_variant = field_name.map(|field_name| {
+                    let mut combined = #crate_::alloc::string::String::from(field_name);
+                    combined.push_str(" variant ");
+                    combined.push_str(#field_name);
+                    combined
+                });
+                fields.add_field(
+                    field_name_with_variant.as_deref().unwrap_or(#field_name),
+                    #tag,
+                    <() as #crate_::encoding::schema::FieldRepr<#encoding, #ty>>::repr(schema),
+                );
             }
         } else {
-            add_field_direct
+            quote! {
+                fields.add_field(
+                    #field_name,
+                    #tag,
+                    <() as #crate_::encoding::schema::FieldRepr<#encoding, #ty>>::repr(schema),
+                );
+            }
         }
     }
 }
