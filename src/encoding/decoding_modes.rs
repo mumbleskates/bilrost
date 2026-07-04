@@ -32,6 +32,7 @@ macro_rules! other_macro {
 //! * `lifetime`: lifetime required for the impl and for all listed decoding traits in addition to
 //!   the encoder
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! __invoke {
     ($($other_macro:ident)::+, owned $(, $($more_args:tt)*)?) => {
