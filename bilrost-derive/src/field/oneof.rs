@@ -174,7 +174,7 @@ impl OneofInclusion {
         let ty = &self.ty;
         quote! {
             fields.add_oneof(#oneof_name, &[#(#tags),*]);
-            <#ty as #crate_::encoding::schema::AddOneofFields>::add_fields(schema, fields);
+            <#ty as #crate_::encoding::schema::AddOneofFields>::add_fields(schema, fields, Some(#oneof_name));
         }
     }
 }
