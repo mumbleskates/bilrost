@@ -80,7 +80,7 @@ mod guard {
             self.borrow()
         }
 
-        fn get_guarded(&self) -> Self::Borrowed<'_> {
+        fn get_guarded(&self) -> Self::WriteGuard<'_> {
             self.borrow_mut()
         }
     }
@@ -120,11 +120,12 @@ impl Schema {
         name: &str,
         fields: impl Fn(&mut MessageFields),
     ) {
+        let ty_id = TypeId::of::<M>();
         // First check by a read-only lock whether the type is already registered
-        if self.0.types.read_guarded().contains_key(&TypeId::of::<M>()) {
+        if self.0.types.read_guarded().contains_key(&ty_id) {
             return;
         }
-        let info = match self.0.types.get_guarded().entry(TypeId::of::<M>()) {
+        let info = match self.0.types.get_guarded().entry(ty_id) {
             Entry::Vacant(entry) => entry
                 .insert(Arc::new(Guard::new(TypeInfo::Message(MessageFields::new(
                     name,
@@ -148,11 +149,12 @@ impl Schema {
         name: &str,
         fields: impl Fn(&mut EnumInfo),
     ) {
+        let ty_id = TypeId::of::<E>();
         // First check by a read-only lock whether the type is already registered
-        if self.0.types.read_guarded().contains_key(&TypeId::of::<E>()) {
+        if self.0.types.read_guarded().contains_key(&ty_id) {
             return;
         }
-        let info = match self.0.types.get_guarded().entry(TypeId::of::<E>()) {
+        let info = match self.0.types.get_guarded().entry(ty_id) {
             Entry::Vacant(entry) => entry
                 .insert(Arc::new(Guard::new(TypeInfo::Enum(EnumInfo::new(name)))))
                 .clone(),
