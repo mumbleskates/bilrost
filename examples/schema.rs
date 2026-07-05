@@ -13,7 +13,7 @@ use tinyvec::ArrayVec;
 /// could trigger bugs that occur in any message type in this file.  We verify
 /// this stays true in a unit test.
 #[derive(Clone, Debug, PartialEq, Message)]
-#[bilrost(reserved_tags(166-299, 320-1000, 1013-1999, 2013..))]
+#[bilrost(reserved_tags(166-299, 320-1000, 1013-1999, 2013-999999))]
 pub struct TestAllTypes {
     /// Singular
     #[bilrost(tag(130), encoding(varint))]
@@ -400,6 +400,8 @@ pub struct TestAllTypes {
     pub nonempty_oneof_field: Option<test_message::NonEmptyOneofField>,
     #[bilrost(oneof(2001-2012))]
     pub oneof_field: test_message::OneofField,
+    #[bilrost(tag(1000000))]
+    pub empty_tuple: (),
 }
 
 /// Nested message and enum types in `TestAllTypes`.
