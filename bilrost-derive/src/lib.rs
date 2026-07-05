@@ -1036,12 +1036,12 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
             fn repr(
                 schema: &#crate_::encoding::schema::Schema,
             ) -> #crate_::alloc::boxed::Box<dyn ::core::fmt::Display> {
-                schema.register_enumeration::<Self>(stringify!(#ident), |fields| {
+                schema.register_enumeration::<#ident #ty_generics>(stringify!(#ident), |fields| {
                     #(fields.add_value(stringify!(#variant_idents), #discriminant_exprs);)*
                 });
                 schema.make_lazy_repr(|schema| #crate_::alloc::format!(
                     "varint, unsigned; one of enumeration {enum_type}",
-                    enum_type = schema.type_reference::<Self>(),
+                    enum_type = schema.type_reference::<#ident #ty_generics>(),
                 ))
             }
         }
