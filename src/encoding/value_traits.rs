@@ -195,6 +195,8 @@ where
         Self::Key: 'a,
         Self::Value: 'a,
         Self: 'a;
+    /// Range for how many items may be contained
+    const BOUNDS: RangeInclusive<Option<usize>> = None..=None;
 
     fn len(&self) -> usize;
     fn iter(&self) -> Self::RefIter<'_>;

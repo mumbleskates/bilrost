@@ -263,6 +263,7 @@ where
             (None, Some(max)) => format!("; at most {max} items"),
             (Some(min), None) => format!("; at least {min} items"),
             (Some(min), Some(max)) if min == max => format!("; exactly {min} items"),
+            (Some(min), Some(max)) if min > max => panic!("invalid bounds"),
             (Some(min), Some(max)) => format!("; between {min} and {max} items"),
         };
         let restrictions = match C::RESTRICTIONS {
