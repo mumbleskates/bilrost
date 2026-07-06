@@ -172,7 +172,6 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     if default_per_field && default_expr.is_some() {
         bail!("default_per_field and default (expression) attributes are mutually exclusive");
     }
-    enable_schema = true; // TODO: delete this, it's here for testing
 
     if !unknown_attrs.is_empty() {
         bail!(
@@ -596,7 +595,6 @@ fn try_message_via_oneof(input: DeriveInput) -> Result<TokenStream, Error> {
         enable_schema,
         empty_variant,
     } = preprocess_oneof(&input)?;
-    let enable_schema = enable_schema || true; // TODO: delete this it's here for testing
 
     let tag_measurer_ty = tag_measurer(&variants);
 
@@ -1355,8 +1353,6 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         enable_schema,
         empty_variant,
     } = preprocess_oneof(&input)?;
-
-    let enable_schema = enable_schema || true; // TODO: delete this, it's here for testing
 
     let borrow_generics = prepend_to_generics(impl_generics, quote!('__a));
 
