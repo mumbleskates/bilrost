@@ -66,13 +66,9 @@ where
 {
     fn repr(schema: &Schema) -> Box<dyn Display> {
         schema.make_lazy_repr(|schema| {
-            let bounds = match (M::BOUNDS.start(), M::BOUNDS.end()) {
-                (None, None) => String::new(),
-                (None, Some(max)) => format!("; at most {max} items"),
-                (Some(min), None) => format!("; at least {min} items"),
-                (Some(min), Some(max)) if min == max => format!("; exactly {min} items"),
-                (Some(min), Some(max)) if min > max => panic!("invalid bounds"),
-                (Some(min), Some(max)) => format!("; between {min} and {max} items"),
+            let bounds = match M::BOUNDS.end {
+                None => String::new(),
+                Some(max) => format!("; at most {max} items"),
             };
             format!(
                 "delimited map (keys: ({key_repr}); values: ({value_repr}){bounds})",

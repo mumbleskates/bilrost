@@ -1,6 +1,6 @@
 use crate::encoding::implement_core_empty_state_rules;
 use crate::{Canonicity, DecodeErrorKind};
-use core::ops::RangeInclusive;
+use core::ops::RangeToInclusive;
 
 /// Trait for types that have a state that is considered "empty".
 ///
@@ -145,7 +145,7 @@ where
         Self::Item: 'a,
         Self: 'a;
     /// Range for how many items may be contained
-    const BOUNDS: RangeInclusive<Option<usize>> = None..=None;
+    const BOUNDS: RangeToInclusive<Option<usize>> = ..=None;
     /// Restrictions on the contained items, such as "unique".
     const RESTRICTIONS: Option<&'static str> = None;
 
@@ -164,6 +164,8 @@ where
     fn insert_distinguished(&mut self, item: Self::Item) -> Result<Canonicity, DecodeErrorKind>;
 }
 
+/// Marker trait to implement `DistinguishedCollection` the same as `Collection`, for collections
+/// which retain their items in order of appearance.
 pub(crate) trait TriviallyDistinguishedCollection {}
 
 impl<T> DistinguishedCollection for T
@@ -196,7 +198,7 @@ where
         Self::Value: 'a,
         Self: 'a;
     /// Range for how many items may be contained
-    const BOUNDS: RangeInclusive<Option<usize>> = None..=None;
+    const BOUNDS: RangeToInclusive<Option<usize>> = ..=None;
 
     fn len(&self) -> usize;
     fn iter(&self) -> Self::RefIter<'_>;

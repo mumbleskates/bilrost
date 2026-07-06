@@ -35,7 +35,7 @@ impl<T, const N: usize> Collection for arrayvec::ArrayVec<T, N> {
         Self::Item: 'a,
         Self: 'a;
 
-    const BOUNDS: core::ops::RangeInclusive<Option<usize>> = None..=Some(N);
+    const BOUNDS: core::ops::RangeToInclusive<Option<usize>> = ..=Some(N);
 
     #[inline]
     fn len(&self) -> usize {

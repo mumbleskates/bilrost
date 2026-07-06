@@ -37,7 +37,7 @@ impl<T, A: tinyvec::Array<Item = T>> Collection for tinyvec::ArrayVec<A> {
         Self::Item: 'a,
         Self: 'a;
 
-    const BOUNDS: core::ops::RangeInclusive<Option<usize>> = None..=Some(A::CAPACITY);
+    const BOUNDS: core::ops::RangeToInclusive<Option<usize>> = ..=Some(A::CAPACITY);
 
     #[inline]
     fn len(&self) -> usize {
