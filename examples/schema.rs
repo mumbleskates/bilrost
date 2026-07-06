@@ -13,7 +13,7 @@ use tinyvec::ArrayVec;
 /// could trigger bugs that occur in any message type in this file.  We verify
 /// this stays true in a unit test.
 #[derive(Clone, Debug, PartialEq, Message)]
-#[bilrost(reserved_tags(166-299, 320-1000, 1013-1999, 2013-999999))]
+#[bilrost(reserved_tags(166-299, 320-1000, 1013-1999, 2013-999999), schema)]
 pub struct TestAllTypes {
     /// Singular
     #[bilrost(tag(130), encoding(varint))]
@@ -409,6 +409,7 @@ pub mod test_message {
     use super::*;
 
     #[derive(Clone, Debug, PartialEq, Message)]
+    #[bilrost(schema)]
     pub struct NestedMessage {
         #[bilrost(1)]
         pub a: i32,
@@ -425,6 +426,7 @@ pub mod test_message {
         Max = u32::MAX,
     }
     #[derive(Clone, Debug, PartialEq, Oneof)]
+    #[bilrost(schema)]
     pub enum NonEmptyOneofField {
         #[bilrost(tag = 1001)]
         OneofUint32(u32),
@@ -460,6 +462,7 @@ pub mod test_message {
     }
 
     #[derive(Clone, Debug, PartialEq, Oneof, Message)]
+    #[bilrost(schema)]
     pub enum OneofField {
         Empty,
         #[bilrost(tag = 2001)]
@@ -497,7 +500,7 @@ pub mod test_message {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Message)]
-#[bilrost(distinguished, reserved_tags(87-100, 110-199, 210..))]
+#[bilrost(distinguished, reserved_tags(87-100, 110-199, 210..), schema)]
 pub struct TestDistinguished {
     /// Singular
     #[bilrost(tag(1), encoding(varint))]
@@ -696,7 +699,7 @@ pub mod test_distinguished {
     use super::*;
 
     #[derive(Clone, Debug, PartialEq, Eq, Message)]
-    #[bilrost(distinguished)]
+    #[bilrost(distinguished, schema)]
     pub struct NestedMessage {
         #[bilrost(1)]
         pub a: u64,
@@ -709,7 +712,7 @@ pub mod test_distinguished {
     pub use test_message::NestedEnum;
 
     #[derive(Clone, Debug, PartialEq, Eq, Oneof)]
-    #[bilrost(distinguished)]
+    #[bilrost(distinguished, schema)]
     pub enum NonEmptyOneofField {
         #[bilrost(tag = 101)]
         OneofUint32(u32),
@@ -739,7 +742,7 @@ pub mod test_distinguished {
     }
 
     #[derive(Clone, Debug, PartialEq, Eq, Oneof, Message)]
-    #[bilrost(distinguished)]
+    #[bilrost(distinguished, schema)]
     pub enum OneofField {
         Empty,
         #[bilrost(tag = 201)]
@@ -771,6 +774,7 @@ pub mod test_distinguished {
 }
 
 #[derive(Debug, PartialEq, Message)]
+#[bilrost(schema)]
 pub struct TestTypeSupport {
     #[cfg(feature = "chrono")]
     #[bilrost(1)]
@@ -823,7 +827,7 @@ pub struct TestTypeSupport {
 }
 
 #[derive(Debug, PartialEq, Eq, Message)]
-#[bilrost(distinguished)]
+#[bilrost(distinguished, schema)]
 pub struct TestTypeSupportDistinguished {
     #[bilrost(1)]
     core_duration: core::time::Duration,
@@ -872,7 +876,7 @@ pub struct TestTypeSupportDistinguished {
 }
 
 #[derive(Debug, PartialEq, Eq, Message)]
-#[bilrost(distinguished)]
+#[bilrost(distinguished, schema)]
 pub struct TestTypeSupportBorrowable<'a> {
     #[bilrost(1)]
     str: Cow<'a, str>,
@@ -888,7 +892,7 @@ pub struct TestTypeSupportBorrowable<'a> {
 }
 
 #[derive(Debug, PartialEq, Eq, Oneof, Message)]
-#[bilrost(distinguished)]
+#[bilrost(distinguished, schema)]
 pub enum TestOneofMessage<'a> {
     Empty,
     #[bilrost(1)]
@@ -902,7 +906,7 @@ pub enum TestOneofMessage<'a> {
 }
 
 #[derive(Debug, PartialEq, Eq, Message)]
-#[bilrost(distinguished)]
+#[bilrost(distinguished, schema)]
 pub struct TestOneofMessageMock<'a> {
     #[bilrost(1)]
     pub varint: Option<u64>,
