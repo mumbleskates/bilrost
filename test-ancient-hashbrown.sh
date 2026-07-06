@@ -14,5 +14,7 @@ HIGH_HASHBROWN_VERSION=$(cargo tree \
  --no-dedupe \
  | grep -P '^hashbrown\b' | sort -n | uniq | tail -n 1 | grep -Po '\d+\.\d+\.\d+$')
 
+export CARGO_TARGET_DIR=../target
+
 cargo update --package "hashbrown@$HIGH_HASHBROWN_VERSION" --precise 0.1.0
 cargo test
