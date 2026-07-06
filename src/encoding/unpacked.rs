@@ -252,28 +252,24 @@ pub(crate) mod borrowed {
     decoding_modes::__invoke!(define_decoders, borrowed);
 }
 
-impl<C, T, E> FieldRepr<Unpacked<E>, C> for ()
+impl<C, E> FieldRepr<Unpacked<E>, C> for ()
 where
-    C: Collection<Item = T>,
-    (): EmptyState<(), C> + ValueRepr<E, T>,
+    C: Collection,
+    (): EmptyState<(), C> + ValueRepr<E, C::Item>,
 {
     fn repr(schema: &Schema) -> Box<dyn Display> {
-        let bounds = match (C::BOUNDS.start(), C::BOUNDS.end()) {
-            (None, None) => String::new(),
-            (None, Some(max)) => format!("; at most {max} items"),
-            (Some(min), None) => format!("; at least {min} items"),
-            (Some(min), Some(max)) if min == max => format!("; exactly {min} items"),
-            (Some(min), Some(max)) if min > max => panic!("invalid bounds"),
-            (Some(min), Some(max)) => format!("; between {min} and {max} items"),
+        let bounds = match C::BOUNDS.end {
+            None => String::new(),
+            Some(max) => format!("; at most {max} items"),
         };
         let restrictions = match C::RESTRICTIONS {
-            Some(r) => format!("; items are {r}"),
             None => String::new(),
+            Some(r) => format!("; items are {r}"),
         };
         schema.make_lazy_repr(move |schema| {
             format!(
                 "{unpacked_repr}{bounds}{restrictions}",
-                unpacked_repr = <() as FieldRepr<Unpacked<E>, [T]>>::repr(schema),
+                unpacked_repr = <() as FieldRepr<Unpacked<E>, [C::Item]>>::repr(schema),
             )
         })
     }
