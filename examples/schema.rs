@@ -941,5 +941,9 @@ fn main() {
     TestOneofMessage::register(&schema);
     <()>::register(&schema);
 
-    println!("{schema}");
+    let schema_output = format!("{schema}");
+    print!("{schema_output}");
+    // make sure there's no error output in the schema
+    assert!(!schema_output.contains("!!"));
+    assert!(!schema_output.ends_with("\n\n"));
 }

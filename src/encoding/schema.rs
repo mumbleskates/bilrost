@@ -376,12 +376,13 @@ impl Display for Schema {
         ) in ordered.iter().zip(1..)
         {
             if first_print {
-                writeln!(f, "")?;
                 first_print = false;
+            } else {
+                writeln!(f, "")?;
             }
             match subtype_tag {
                 None => {
-                    writeln!(
+                    write!(
                         f,
                         "[{ordinal}] {type_info}",
                         type_info = types.get(type_id).unwrap().read_guarded(),
@@ -394,7 +395,6 @@ impl Display for Schema {
                         .unwrap()
                         .read_guarded()
                         .display_variant(f, *subtype_tag)?;
-                    writeln!(f, "")?;
                 }
             }
         }
