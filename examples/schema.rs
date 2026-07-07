@@ -2,6 +2,8 @@ use bilrost::encoding::schema::{RegisterFields, Schema};
 use bilrost::{Blob, Enumeration, Message, Oneof};
 use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
+use std::rc::Rc;
+use std::sync::Arc;
 #[cfg(feature = "tinyvec")]
 use tinyvec::ArrayVec;
 
@@ -13,7 +15,8 @@ use tinyvec::ArrayVec;
 /// could trigger bugs that occur in any message type in this file.  We verify
 /// this stays true in a unit test.
 #[derive(Clone, Debug, PartialEq, Message)]
-#[bilrost(reserved_tags(166-299, 320-1000, 1013-1999, 2013-999999), schema)]
+#[bilrost(reserved_tags(172-299, 320-1000, 1013-1999, 2013..))]
+#[bilrost(schema)]
 pub struct TestAllTypes {
     /// Singular
     #[bilrost(tag(130), encoding(varint))]
@@ -55,6 +58,12 @@ pub struct TestAllTypes {
     #[cfg(feature = "bytestring")]
     #[bilrost(115)]
     pub bytestring: bytestring::ByteString,
+    #[bilrost(166)]
+    pub arc_str: Arc<str>,
+    #[bilrost(167)]
+    pub rc_str: Rc<str>,
+    #[bilrost(168)]
+    pub box_str: Box<str>,
     #[bilrost(tag(13), encoding((general, general, fixed)))]
     pub tuple: (u64, String, u32),
     #[bilrost(tag(14), encoding(plainbytes))]
@@ -170,6 +179,12 @@ pub struct TestAllTypes {
     pub optional_bool: Option<bool>,
     #[bilrost(42)]
     pub optional_string: Option<String>,
+    #[bilrost(169)]
+    pub optional_arc_str: Option<Arc<str>>,
+    #[bilrost(170)]
+    pub optional_rc_str: Option<Rc<str>>,
+    #[bilrost(171)]
+    pub optional_box_str: Option<Box<str>>,
     #[bilrost(tag(43), encoding((general, general, fixed)))]
     pub optional_tuple: Option<(u64, String, u32)>,
     #[bilrost(tag(44), encoding(plainbytes))]
@@ -400,8 +415,6 @@ pub struct TestAllTypes {
     pub nonempty_oneof_field: Option<test_message::NonEmptyOneofField>,
     #[bilrost(oneof(2001-2012))]
     pub oneof_field: test_message::OneofField,
-    #[bilrost(tag(1000000))]
-    pub empty_tuple: (),
 }
 
 /// Nested message and enum types in `TestAllTypes`.
@@ -921,6 +934,12 @@ pub struct TestOneofMessageMock<'a> {
 fn main() {
     let schema = Schema::new();
     TestAllTypes::register(&schema);
+    TestDistinguished::register(&schema);
+    TestTypeSupport::register(&schema);
+    TestTypeSupportDistinguished::register(&schema);
+    TestTypeSupportBorrowable::register(&schema);
+    TestOneofMessage::register(&schema);
+    <()>::register(&schema);
 
     println!("{schema}");
 }
