@@ -187,9 +187,9 @@ pub struct ReverseBuffer {
     /// Total size of owned bytes in the chunks, including the uninitialized bytes at the front of
     /// the front chunk.
     capacity: usize,
-    /// Advisory size value for when the next chunk is allocated. If this value is positive it is an
-    /// exact size for the next allocation(s); otherwise it is a negated minimum added capacity that
-    /// was requested.
+    /// Advisory size value for when the next chunk is allocated. If planned_exact is true it is an
+    /// exact size for the next allocation(s); otherwise it is the minimum added capacity that was
+    /// requested.
     planned_allocation: usize,
     /// Whether the planned allocation will be of an exact size. If false, planned_allocation is
     /// only a minimum.

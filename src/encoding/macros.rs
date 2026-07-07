@@ -623,6 +623,7 @@ pub(crate) use implement_core_empty_state_rules;
 /// they also implement value decoding. Only a couple encodings want to do anything fancy, like
 /// accepting alternate wire-types in relaxed mode; the rest want to use this to blanket those
 /// definitions.
+#[doc(hidden)]
 #[macro_export]
 macro_rules! __impl_decoder_where_value_decoder {
     (
