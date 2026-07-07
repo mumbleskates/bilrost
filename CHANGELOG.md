@@ -4,6 +4,9 @@
 
 ### New features
 
+* Added support for string-data types `Arc<str>`, `Rc<str>`, and `Box<str>` via
+  the "general" encoding.
+
 ### Fixes
 
 ### Cleanups

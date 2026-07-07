@@ -1878,6 +1878,9 @@ Many alternative types are also available for both scalar values and containers!
 | `Vec<u8>`           | [`[u8; N]`][array][^plainbytearr]               | `plainbytes`        | yes           | (none)            |
 | `String`/`Vec<u8>`* | [`bstr::BString`][bstr][^bstrnote]              | general encodings   | yes           | "bstr"            |
 | `String`            | [`Cow<str>`][cow]                               | general encodings   | yes           | (none)            |
+| `String`            | [`Arc<str>`][arc]                               | general encodings   | yes           | (none)            |
+| `String`            | [`Rc<str>`][rc]                                 | general encodings   | yes           | (none)            |
+| `String`            | [`Box<str>`][box]                               | general encodings   | yes           | (none)            |
 | `String`            | [`bytestring::ByteString`][bytestring][^bzcopy] | general encodings   | yes           | "bytestring"      |
 | `String`            | [`smol_str::SmolStr`][smol_str]                 | general encodings   | yes           | "smol_str"        |
 
@@ -1927,6 +1930,8 @@ value.
 | `BTreeMap<T>`  | [`hashbrown::HashMap<T>`][hbmap][^hashnoncanon]       | no            | "hashbrown"       |
 | `BTreeSet<T>`  | [`hashbrown::HashSet<T>`][hbset][^hashnoncanon]       | no            | "hashbrown"       |
 
+[arc]: https://doc.rust-lang.org/std/sync/struct.Arc.html
+
 [array]: https://doc.rust-lang.org/std/primitive.array.html
 
 [arrayvec]: https://docs.rs/arrayvec/latest/arrayvec/struct.ArrayVec.html
@@ -1958,6 +1963,8 @@ value.
 [opt]: https://doc.rust-lang.org/std/option/enum.Option.html
 
 [prim]: https://doc.rust-lang.org/std/index.html#primitives
+
+[rc]: https://doc.rust-lang.org/std/rc/struct.Rc.html
 
 [slice]: https://doc.rust-lang.org/std/primitive.slice.html
 
