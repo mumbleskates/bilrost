@@ -521,8 +521,6 @@ impl Proxiable<SealedBilrostTag> for core::time::Duration {
         *self = core::time::Duration::new(secs, nanos as u32);
         Ok(())
     }
-
-    // TODO: schema: "delimited packed (items: varint, unsigned; at most 2 items, seconds and nanos, trailing zeros removed, nanos < 1000000000)"
 }
 
 impl DistinguishedProxiable<SealedBilrostTag> for core::time::Duration {
