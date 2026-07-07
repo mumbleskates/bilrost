@@ -1402,7 +1402,7 @@ where
     }
 }
 
-macro_rules! decode_pointered_str {
+macro_rules! read_pointered_str {
     (name: $fn_name:ident, ptr: $ptr:ident, deref_mut($val:ident) $deref_mut:expr) => {
         #[inline]
         pub(crate) fn $fn_name<B: Buf + ?Sized>(buf: Capped<B>) -> Result<$ptr<str>, DecodeError> {
@@ -1434,7 +1434,8 @@ macro_rules! decode_pointered_str {
             }
             #[cfg(any(not(rustc_1_82), feature = "forbid-unsafe"))]
             {
-                if let Some(whole_value_bytes) = string_data.chunk().get(..string_len) {
+                let mut buf = buf;
+                if let Some(whole_value_bytes) = buf.chunk().get(..string_len) {
                     // The data is available contiguously, so we can get away with copying it only
                     // once
                     let whole_value_str =
@@ -1443,14 +1444,15 @@ macro_rules! decode_pointered_str {
                     // We got the data by reading the chunk from the buf directly, so we must
                     // advance it manually as well.
                     buf.advance(string_len);
-                    res
+                    Ok(res)
                 } else {
                     // The data isn't available contiguously, and there aren't really any nice ways
                     // to create an appropriately sized Arc/Rc<str> until 1.82, so we just use a
                     // temporary Vec and copy it twice in the successful case.
                     let mut temp_vec = alloc::vec::Vec::with_capacity(string_len);
-                    temp_vec.put(string_data.take_all());
-                    let allocated_string_data = from_utf8(&temp_vec).map_err(|_| InvalidValue)?;
+                    temp_vec.put(buf.take_all());
+                    let allocated_string_data =
+                        str::from_utf8(&temp_vec).map_err(|_| InvalidValue)?;
                     Ok($ptr::from(allocated_string_data))
                 }
             }
@@ -1458,7 +1460,7 @@ macro_rules! decode_pointered_str {
     };
 }
 
-decode_pointered_str!(
+read_pointered_str!(
     name: read_arc_str,
     ptr: Arc,
     deref_mut(arc) {
@@ -1466,7 +1468,7 @@ decode_pointered_str!(
     }
 );
 
-decode_pointered_str!(
+read_pointered_str!(
     name: read_rc_str,
     ptr: Rc,
     deref_mut(rc) {
