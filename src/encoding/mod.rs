@@ -121,15 +121,21 @@
 //! special order, nor do they support distinguished decoding as a result.
 use crate::buf::ReverseBuf;
 use crate::DecodeErrorKind::{
-    InvalidVarint, NotCanonical, Oversize, TagOverflowed, Truncated, UnknownField, WrongWireType,
+    InvalidValue, InvalidVarint, NotCanonical, Oversize, TagOverflowed, Truncated, UnknownField,
+    WrongWireType,
 };
 use crate::{decode_length_delimiter, DecodeError, DecodeErrorKind};
+use alloc::boxed::Box;
+use alloc::rc::Rc;
+use alloc::string::String;
+use alloc::sync::Arc;
 use bytes::buf::Take;
 use bytes::{Buf, BufMut};
 use core::cmp::{min, Eq, Ordering, PartialEq};
 use core::default::Default;
 use core::fmt::Debug;
 use core::ops::{Deref, DerefMut};
+use core::str;
 
 pub(crate) mod decoding_modes;
 mod encoding_traits;
@@ -1394,4 +1400,91 @@ where
     fn help_get(field_val: Option<u32>) -> Option<Result<T, u32>> {
         field_val.map(Enumeration::try_from_number)
     }
+}
+
+macro_rules! decode_pointered_str {
+    (name: $fn_name:ident, ptr: $ptr:ident, deref_mut($val:ident) $deref_mut:expr) => {
+        #[inline]
+        pub(crate) fn $fn_name<B: Buf + ?Sized>(buf: Capped<B>) -> Result<$ptr<str>, DecodeError> {
+            let string_len = buf.remaining_before_cap();
+
+            #[cfg(all(rustc_1_82, not(feature = "forbid-unsafe")))]
+            {
+                // We could have another branch here where we validate a single str before copying
+                // when string_data is contiguous, but that is optimizing for the error path so
+                // let's avoid it. We have no unnecessary copies on the success path in this
+                // branch.
+
+                // We prefer this fast-path, when available: we create a preallocated pointer of
+                // the right size, copy the data into it, validate it, and then convert it directly
+                // into the result type which retains the pointer.
+                #[allow(clippy::incompatible_msrv)]
+                let mut $val = $ptr::new_uninit_slice(string_len);
+                let mut ptr_slice = $deref_mut;
+                ptr_slice.put(buf.take_all());
+                // Check that we wrote every byte in the buf
+                debug_assert!(ptr_slice.is_empty());
+                // SAFETY: we just wrote to the buf's entire contents
+                #[allow(clippy::incompatible_msrv)]
+                let $val = unsafe { $val.assume_init() };
+                // Validate that buf contains utf8
+                str::from_utf8(&$val).map_err(|_| InvalidValue)?;
+                // SAFETY: we just validated the contents of the arc are valid for str
+                Ok(unsafe { core::mem::transmute::<$ptr<[u8]>, $ptr<str>>($val) })
+            }
+            #[cfg(any(not(rustc_1_82), feature = "forbid-unsafe"))]
+            {
+                if let Some(whole_value_bytes) = string_data.chunk().get(..string_len) {
+                    // The data is available contiguously, so we can get away with copying it only
+                    // once
+                    let whole_value_str =
+                        str::from_utf8(whole_value_bytes).map_err(|_| InvalidValue)?;
+                    let res = $ptr::from(whole_value_str);
+                    // We got the data by reading the chunk from the buf directly, so we must
+                    // advance it manually as well.
+                    buf.advance(string_len);
+                    res
+                } else {
+                    // The data isn't available contiguously, and there aren't really any nice ways
+                    // to create an appropriately sized Arc/Rc<str> until 1.82, so we just use a
+                    // temporary Vec and copy it twice in the successful case.
+                    let mut temp_vec = alloc::vec::Vec::with_capacity(string_len);
+                    temp_vec.put(string_data.take_all());
+                    let allocated_string_data = from_utf8(&temp_vec).map_err(|_| InvalidValue)?;
+                    Ok($ptr::from(allocated_string_data))
+                }
+            }
+        }
+    };
+}
+
+decode_pointered_str!(
+    name: read_arc_str,
+    ptr: Arc,
+    deref_mut(arc) {
+        Arc::get_mut(&mut arc).unwrap()
+    }
+);
+
+decode_pointered_str!(
+    name: read_rc_str,
+    ptr: Rc,
+    deref_mut(rc) {
+        Rc::get_mut(&mut rc).unwrap()
+    }
+);
+
+pub(crate) fn read_box_str<B: Buf + ?Sized>(buf: Capped<B>) -> Result<Box<str>, DecodeError> {
+    let string_len = buf.remaining_before_cap();
+
+    // We could have another branch here where we validate a single str before copying when
+    // buf is contiguous, but that is optimizing for the error path so let's avoid it.
+
+    // Overall this function is much simpler, as the allocation of `Box` contains only its data,
+    // without any header.
+
+    let mut temp_vec = alloc::vec::Vec::with_capacity(string_len);
+    temp_vec.put(buf.take_all());
+    let temp_string = String::from_utf8(temp_vec).map_err(|_| InvalidValue)?;
+    Ok(temp_string.into_boxed_str())
 }

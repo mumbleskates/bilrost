@@ -5,10 +5,10 @@ use crate::encoding::schema::{Schema, ValueRepr};
 use crate::encoding::{
     delegate_encoding, delegate_proxied_encoding, delegate_value_encoding,
     encoding_implemented_via_value_encoding, encoding_uses_base_empty_state,
-    impl_cow_value_encoding, Canonicity, Capped, DecodeContext, DecodeError,
-    DistinguishedProxiable, DistinguishedValueBorrowDecoder, DistinguishedValueDecoder, EmptyState,
-    Fixed, Map, MessageEncoding, Packed, PlainBytes, Proxiable,
-    RawDistinguishedMessageBorrowDecoder, RawMessageBorrowDecoder, RawMessageDecoder,
+    impl_cow_value_encoding, read_arc_str, read_box_str, read_rc_str, Canonicity, Capped,
+    DecodeContext, DecodeError, DistinguishedProxiable, DistinguishedValueBorrowDecoder,
+    DistinguishedValueDecoder, EmptyState, Fixed, Map, MessageEncoding, Packed, PlainBytes,
+    Proxiable, RawDistinguishedMessageBorrowDecoder, RawMessageBorrowDecoder, RawMessageDecoder,
     RestrictedDecodeContext, Unpacked, ValueBorrowDecoder, ValueDecoder, ValueEncoder, Varint,
     WireType, Wiretyped,
 };
@@ -17,7 +17,9 @@ use crate::{Blob, DecodeErrorKind};
 use alloc::borrow::Cow;
 use alloc::boxed::Box;
 use alloc::collections::{BTreeMap, BTreeSet};
+use alloc::rc::Rc;
 use alloc::string::String;
+use alloc::sync::Arc;
 use alloc::vec::Vec;
 use bytes::{Buf, BufMut, Bytes};
 use core::fmt::Display;
@@ -239,7 +241,7 @@ impl<const P: u8> Wiretyped<GeneralGeneric<P>, String> for () {
 
 impl<const P: u8> ValueRepr<GeneralGeneric<P>, String> for () {
     fn repr(schema: &Schema) -> Box<dyn Display> {
-        <() as ValueRepr<GeneralGeneric<P>, &str>>::repr(schema)
+        <() as ValueRepr<General, &str>>::repr(schema)
     }
 }
 
@@ -353,6 +355,220 @@ mod string {
     check_type_test!(General, relaxed, String, WireType::LengthDelimited);
     check_type_test!(General, distinguished, String, WireType::LengthDelimited);
 }
+
+impl<const P: u8> Wiretyped<GeneralGeneric<P>, Arc<str>> for () {
+    const WIRE_TYPE: WireType = WireType::LengthDelimited;
+}
+
+impl<const P: u8> ValueRepr<GeneralGeneric<P>, Arc<str>> for () {
+    fn repr(schema: &Schema) -> Box<dyn Display> {
+        <() as ValueRepr<General, &str>>::repr(schema)
+    }
+}
+
+impl<const P: u8> ValueEncoder<GeneralGeneric<P>, Arc<str>> for () {
+    #[inline]
+    fn encode_value<B: BufMut + ?Sized>(value: &Arc<str>, buf: &mut B) {
+        <() as ValueEncoder<PlainBytes, _>>::encode_value(&value.as_bytes(), buf)
+    }
+
+    #[inline]
+    fn prepend_value<B: ReverseBuf + ?Sized>(value: &Arc<str>, buf: &mut B) {
+        <() as ValueEncoder<PlainBytes, _>>::prepend_value(&value.as_bytes(), buf)
+    }
+
+    #[inline]
+    fn value_encoded_len(value: &Arc<str>) -> usize {
+        <() as ValueEncoder<PlainBytes, _>>::value_encoded_len(&value.as_bytes())
+    }
+}
+
+impl<const P: u8> ValueDecoder<GeneralGeneric<P>, Arc<str>> for () {
+    #[inline]
+    fn decode_value<B: Buf + ?Sized>(
+        value: &mut Arc<str>,
+        mut buf: Capped<B>,
+        _ctx: DecodeContext,
+    ) -> Result<(), DecodeError> {
+        *value = read_arc_str(buf.take_length_delimited()?)?;
+        Ok(())
+    }
+}
+
+impl<const P: u8> DistinguishedValueDecoder<GeneralGeneric<P>, Arc<str>> for () {
+    const CHECKS_EMPTY: bool = false;
+
+    #[inline]
+    fn decode_value_distinguished<const ALLOW_EMPTY: bool>(
+        value: &mut Arc<str>,
+        buf: Capped<impl Buf + ?Sized>,
+        ctx: RestrictedDecodeContext,
+    ) -> Result<Canonicity, DecodeError> {
+        <() as ValueDecoder<GeneralGeneric<P>, _>>::decode_value(value, buf, ctx.into_inner())?;
+        Ok(Canonicity::Canonical)
+    }
+}
+
+delegate_value_encoding!(
+    encoding (GeneralGeneric<P>)
+    borrows type (Arc<str>) as owned
+    including distinguished
+    with generics (const P: u8)
+);
+
+#[cfg(test)]
+mod arc_str {
+    use super::{Arc, General};
+    use crate::encoding::test::{check_type_test, decode_noncontiguous_pointered_str};
+    check_type_test!(General, relaxed, Arc<str>, WireType::LengthDelimited);
+    check_type_test!(General, distinguished, Arc<str>, WireType::LengthDelimited);
+
+    #[test]
+    fn noncontiguous() {
+        decode_noncontiguous_pointered_str::<Arc<str>>();
+    }
+}
+
+impl<const P: u8> Wiretyped<GeneralGeneric<P>, Rc<str>> for () {
+    const WIRE_TYPE: WireType = WireType::LengthDelimited;
+}
+
+impl<const P: u8> ValueRepr<GeneralGeneric<P>, Rc<str>> for () {
+    fn repr(schema: &Schema) -> Box<dyn Display> {
+        <() as ValueRepr<General, &str>>::repr(schema)
+    }
+}
+
+impl<const P: u8> ValueEncoder<GeneralGeneric<P>, Rc<str>> for () {
+    #[inline]
+    fn encode_value<B: BufMut + ?Sized>(value: &Rc<str>, buf: &mut B) {
+        <() as ValueEncoder<PlainBytes, _>>::encode_value(&value.as_bytes(), buf)
+    }
+
+    #[inline]
+    fn prepend_value<B: ReverseBuf + ?Sized>(value: &Rc<str>, buf: &mut B) {
+        <() as ValueEncoder<PlainBytes, _>>::prepend_value(&value.as_bytes(), buf)
+    }
+
+    #[inline]
+    fn value_encoded_len(value: &Rc<str>) -> usize {
+        <() as ValueEncoder<PlainBytes, _>>::value_encoded_len(&value.as_bytes())
+    }
+}
+
+impl<const P: u8> ValueDecoder<GeneralGeneric<P>, Rc<str>> for () {
+    #[inline]
+    fn decode_value<B: Buf + ?Sized>(
+        value: &mut Rc<str>,
+        mut buf: Capped<B>,
+        _ctx: DecodeContext,
+    ) -> Result<(), DecodeError> {
+        *value = read_rc_str(buf.take_length_delimited()?)?;
+        Ok(())
+    }
+}
+
+impl<const P: u8> DistinguishedValueDecoder<GeneralGeneric<P>, Rc<str>> for () {
+    const CHECKS_EMPTY: bool = false;
+
+    #[inline]
+    fn decode_value_distinguished<const ALLOW_EMPTY: bool>(
+        value: &mut Rc<str>,
+        buf: Capped<impl Buf + ?Sized>,
+        ctx: RestrictedDecodeContext,
+    ) -> Result<Canonicity, DecodeError> {
+        <() as ValueDecoder<GeneralGeneric<P>, _>>::decode_value(value, buf, ctx.into_inner())?;
+        Ok(Canonicity::Canonical)
+    }
+}
+
+delegate_value_encoding!(
+    encoding (GeneralGeneric<P>)
+    borrows type (Rc<str>) as owned
+    including distinguished
+    with generics (const P: u8)
+);
+
+#[cfg(test)]
+mod rc_str {
+    use super::{General, Rc};
+    use crate::encoding::test::{check_type_test, decode_noncontiguous_pointered_str};
+    check_type_test!(General, relaxed, Rc<str>, WireType::LengthDelimited);
+    check_type_test!(General, distinguished, Rc<str>, WireType::LengthDelimited);
+
+    #[test]
+    fn noncontiguous() {
+        decode_noncontiguous_pointered_str::<Rc<str>>();
+    }
+}
+
+impl<const P: u8> Wiretyped<GeneralGeneric<P>, Box<str>> for () {
+    const WIRE_TYPE: WireType = WireType::LengthDelimited;
+}
+
+impl<const P: u8> ValueRepr<GeneralGeneric<P>, Box<str>> for () {
+    fn repr(schema: &Schema) -> Box<dyn Display> {
+        <() as ValueRepr<General, &str>>::repr(schema)
+    }
+}
+
+impl<const P: u8> ValueEncoder<GeneralGeneric<P>, Box<str>> for () {
+    #[inline]
+    fn encode_value<B: BufMut + ?Sized>(value: &Box<str>, buf: &mut B) {
+        <() as ValueEncoder<PlainBytes, _>>::encode_value(&value.as_bytes(), buf)
+    }
+
+    #[inline]
+    fn prepend_value<B: ReverseBuf + ?Sized>(value: &Box<str>, buf: &mut B) {
+        <() as ValueEncoder<PlainBytes, _>>::prepend_value(&value.as_bytes(), buf)
+    }
+
+    #[inline]
+    fn value_encoded_len(value: &Box<str>) -> usize {
+        <() as ValueEncoder<PlainBytes, _>>::value_encoded_len(&value.as_bytes())
+    }
+}
+
+impl<const P: u8> ValueDecoder<GeneralGeneric<P>, Box<str>> for () {
+    #[inline]
+    fn decode_value<B: Buf + ?Sized>(
+        value: &mut Box<str>,
+        mut buf: Capped<B>,
+        _ctx: DecodeContext,
+    ) -> Result<(), DecodeError> {
+        *value = read_box_str(buf.take_length_delimited()?)?;
+        Ok(())
+    }
+}
+
+impl<const P: u8> DistinguishedValueDecoder<GeneralGeneric<P>, Box<str>> for () {
+    const CHECKS_EMPTY: bool = false;
+
+    #[inline]
+    fn decode_value_distinguished<const ALLOW_EMPTY: bool>(
+        value: &mut Box<str>,
+        buf: Capped<impl Buf + ?Sized>,
+        ctx: RestrictedDecodeContext,
+    ) -> Result<Canonicity, DecodeError> {
+        <() as ValueDecoder<GeneralGeneric<P>, _>>::decode_value(value, buf, ctx.into_inner())?;
+        Ok(Canonicity::Canonical)
+    }
+}
+
+#[cfg(test)]
+mod box_str {
+    use super::{General, Rc};
+    use crate::encoding::test::check_type_test;
+    check_type_test!(General, relaxed, Rc<str>, WireType::LengthDelimited);
+    check_type_test!(General, distinguished, Rc<str>, WireType::LengthDelimited);
+}
+
+delegate_value_encoding!(
+    encoding (GeneralGeneric<P>)
+    borrows type (Box<str>) as owned
+    including distinguished
+    with generics (const P: u8)
+);
 
 impl_cow_value_encoding!(
     borrowed str,
