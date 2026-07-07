@@ -19,6 +19,7 @@ use alloc::vec::Vec;
 use bytes::{Buf, BufMut};
 use core::fmt::Debug;
 use core::ops::Deref;
+use core::str;
 use proptest::{prelude::*, test_runner::TestCaseResult};
 
 /// Generalized proptest macro. Kind must be either `relaxed` or `distinguished`.
