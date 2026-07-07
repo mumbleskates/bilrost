@@ -24,6 +24,8 @@ use std::default::Default;
 use std::fmt::Debug;
 use std::iter;
 use std::marker::PhantomData;
+use std::rc::Rc;
+use std::sync::Arc;
 
 trait IntoOpaqueMessage<'a> {
     fn into_opaque_message(self) -> OpaqueMessage<'a>;
@@ -2150,6 +2152,9 @@ fn parsing_strings() {
     }
 
     parsing_string_type!(owned String);
+    parsing_string_type!(owned Arc<str>);
+    parsing_string_type!(owned Rc<str>);
+    parsing_string_type!(owned Box<str>);
     parsing_string_type!(owned Cow<str>);
     #[cfg(feature = "bytestring")]
     parsing_string_type!(owned bytestring::ByteString);
