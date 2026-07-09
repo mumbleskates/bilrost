@@ -320,9 +320,13 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
             impl #impl_generics #crate_::encoding::schema::RegisterFields for __Self #ty_generics
             #schema_where_clause {
                 fn register(schema: &#crate_::encoding::schema::Schema) {
-                    schema.register_message::<Self>(stringify!(#ident), |fields| {
-                        #(#field_schemas)*
-                    });
+                    #crate_::encoding::schema::PopulateSchema::register_message::<Self>(
+                        schema,
+                        stringify!(#ident),
+                        |fields| {
+                            #(#field_schemas)*
+                        },
+                    );
                 }
             }
         }
@@ -631,17 +635,21 @@ fn try_message_via_oneof(input: DeriveInput) -> Result<TokenStream, Error> {
             impl #impl_generics #crate_::encoding::schema::RegisterFields for #ident #ty_generics
             #schema_where_clause {
                 fn register(schema: &#crate_::encoding::schema::Schema) {
-                    schema.register_message::<Self>(stringify!(#ident), |fields| {
-                        fields.add_oneof(
-                            stringify!(#ident),
-                            <Self as #crate_::encoding::Oneof>::FIELD_TAGS,
-                        );
-                        <Self as #crate_::encoding::schema::AddOneofFields>::add_fields(
-                            schema,
-                            fields,
-                            None,
-                        );
-                    });
+                    #crate_::encoding::schema::PopulateSchema::register_message::<Self>(
+                        schema,
+                        stringify!(#ident),
+                        |fields| {
+                            fields.add_oneof(
+                                stringify!(#ident),
+                                <Self as #crate_::encoding::Oneof>::FIELD_TAGS,
+                            );
+                            <Self as #crate_::encoding::schema::AddOneofFields>::add_fields(
+                                schema,
+                                fields,
+                                None,
+                            );
+                        },
+                    );
                 }
             }
         }
@@ -1034,13 +1042,27 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
             fn repr(
                 schema: &#crate_::encoding::schema::Schema,
             ) -> #crate_::alloc::boxed::Box<dyn ::core::fmt::Display> {
-                schema.register_enumeration::<#ident #ty_generics>(stringify!(#ident), |fields| {
-                    #(fields.add_value(stringify!(#variant_idents), #discriminant_exprs);)*
-                });
-                schema.make_lazy_repr(|schema| #crate_::alloc::format!(
-                    "varint, unsigned; one of enumeration {enum_type}",
-                    enum_type = schema.type_reference::<#ident #ty_generics>(),
-                ))
+                #crate_::encoding::schema::PopulateSchema::register_enumeration::<
+                    #ident #ty_generics
+                >(
+                    schema,
+                    stringify!(#ident),
+                    |fields| {
+                        #(fields.add_value(stringify!(#variant_idents), #discriminant_exprs);)*
+                    },
+                );
+                #crate_::encoding::schema::PopulateSchema::make_lazy_repr(
+                    schema,
+                    |schema| {
+                        #crate_::alloc::format!(
+                            "varint, unsigned; one of enumeration {enum_type}",
+                            enum_type =
+                                #crate_::encoding::schema::PopulateSchema::type_reference::<
+                                    #ident #ty_generics
+                                >(schema),
+                        )
+                    },
+                )
             }
         }
 
@@ -1570,7 +1592,8 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
                 None
             } else {
                 Some(quote! {
-                    schema.register_oneof_messages::<Self>(
+                    #crate_::encoding::schema::PopulateSchema::register_oneof_messages::<Self>(
+                        schema,
                         stringify!(#ident),
                         |messages| {
                             #(#submessage_registrations)*

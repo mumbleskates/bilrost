@@ -931,12 +931,16 @@ impl OneofVariant {
                     fields.add_field(
                         #variant_name,
                         #tag,
-                        schema.make_lazy_repr(|schema| {
-                            #crate_::alloc::format!(
+                        #crate_::encoding::schema::PopulateSchema::make_lazy_repr(
+                            schema,
+                            |schema| #crate_::alloc::format!(
                                 "delimited message {message_type}",
-                                message_type = schema.subtype_reference::<Self, #tag>(),
-                            )
-                        }),
+                                message_type =
+                                    #crate_::encoding::schema::PopulateSchema::subtype_reference::<
+                                        Self, #tag
+                                    >(schema),
+                            ),
+                        ),
                     );
                 }
             }

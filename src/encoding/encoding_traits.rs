@@ -1,6 +1,6 @@
 use crate::buf::ReverseBuf;
-use crate::encoding::schema::RegisterFields;
 use crate::encoding::schema::{FieldRepr, Schema, ValueRepr};
+use crate::encoding::schema::{PopulateSchema, RegisterFields};
 use crate::encoding::{
     check_wire_type, Capped, DecodeContext, ForOverwrite, RestrictedDecodeContext, TagMeasurer,
     TagRevWriter, TagWriter, WireType,

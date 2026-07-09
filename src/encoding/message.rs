@@ -1,5 +1,5 @@
 use crate::buf::ReverseBuf;
-use crate::encoding::schema::{RegisterFields, Schema, ValueRepr};
+use crate::encoding::schema::{PopulateSchema, RegisterFields, Schema, ValueRepr};
 use crate::encoding::{
     encode_varint, encoded_len_varint, implement_core_empty_state_rules, prepend_varint,
     Canonicity, Capped, DecodeContext, DistinguishedValueBorrowDecoder, DistinguishedValueDecoder,

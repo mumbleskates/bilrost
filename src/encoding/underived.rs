@@ -22,17 +22,26 @@ macro_rules! underived_schema {
                 schema: &$crate::encoding::schema::Schema,
             ) -> $crate::alloc::boxed::Box<dyn ::core::fmt::Display>
             {
-                schema.register_message::<$message_struct>($aka, |fields| {
-                    $(fields.add_field(
-                        stringify!($field_name),
-                        $tag,
-                        <() as $crate::encoding::schema::FieldRepr<$encoding, $ty>>::repr(schema),
-                    );)*
-                });
-                schema.make_lazy_repr(|schema| ::alloc::format!(
-                    "delimited message {message_type}",
-                    message_type = schema.type_reference::<$message_struct>(),
-                ))
+                $crate::encoding::schema::PopulateSchema::register_message::<$message_struct>(
+                    schema,
+                    $aka,
+                    |fields| {
+                        $(fields.add_field(
+                            stringify!($field_name),
+                            $tag,
+                            <() as $crate::encoding::schema::FieldRepr<$encoding, $ty>>::repr(schema),
+                        );)*
+                    },
+                );
+                $crate::encoding::schema::PopulateSchema::make_lazy_repr(
+                    schema,
+                    |schema| ::alloc::format!(
+                        "delimited message {message_type}",
+                        message_type = $crate::encoding::schema::PopulateSchema::type_reference::<
+                            $message_struct
+                        >(schema),
+                    ),
+                )
             }
         }
     };

@@ -16,7 +16,7 @@
 //! fields.
 
 use crate::buf::ReverseBuf;
-use crate::encoding::schema::{FieldRepr, Schema, ValueRepr};
+use crate::encoding::schema::{FieldRepr, PopulateSchema, Schema, ValueRepr};
 use crate::encoding::{
     delegate_value_encoding, encode_varint, encoded_len_varint,
     encoding_implemented_via_value_encoding, implement_core_empty_state_rules, prepend_varint,

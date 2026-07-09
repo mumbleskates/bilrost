@@ -88,6 +88,46 @@ mod guard {
 
 use guard::Guard;
 
+pub trait PopulateSchema {
+    /// Registers a specific message type. May shortcut if this method has already been invoked
+    /// for the same type.
+    fn register_message<M: Any + ?Sized>(&self, name: &str, fields: impl Fn(&mut MessageFields));
+
+    /// Registers a specific type as an enumeration.
+    fn register_enumeration<E: Any + ?Sized>(&self, name: &str, fields: impl Fn(&mut EnumInfo));
+
+    /// Registers the message variants of a oneof enum. A oneof may have several variants that each
+    /// encode as messages, and they should each be registered on the `OneofMessages` value
+    /// provided to the `variants` closure.
+    fn register_oneof_messages<T: Any + ?Sized>(
+        &self,
+        name: &str,
+        variants: impl Fn(&mut OneofMessages),
+    );
+
+    /// Registers that the type W wraps the message type M and should be treated as equivalent.
+    fn register_message_wrapper<W: Any + ?Sized, M: Any + ?Sized>(&self);
+
+    /// Name for a type that disambiguates where it can be found in the entire schema output. The
+    /// output of this function may differ as more types are added to the schema, so this should
+    /// only be called when the whole schema is being rendered; see `make_lazy_repr`.
+    fn type_reference<M: Any + ?Sized>(&self) -> String;
+
+    /// Name for a sub-type (message variant of a oneof enum) that disambiguates where it can be
+    /// found in the entire schema output. The output of this function may differ as more types are
+    /// added to the schema, so this should only be called when the whole schema is being rendered;
+    /// see `make_lazy_repr`.
+    fn subtype_reference<M: Any + ?Sized, const TAG: u32>(&self) -> String;
+
+    /// Returns a lazily-evaluated repr using the given closure. The closure won't be invoked until
+    /// the schema is displayed, so `schema.type_reference::<T>()` can correctly specify the name
+    /// of the type `T`.
+    fn make_lazy_repr<A, D>(&self, a: A) -> Box<dyn Display>
+    where
+        A: 'static + Fn(&Schema) -> D,
+        D: Display;
+}
+
 /// A collected internally-complete set of message definitions.
 #[derive(Clone)]
 pub struct Schema(Arc<MessageSet>);
@@ -97,7 +137,6 @@ struct MessageSet {
     types: Guard<BTreeMap<TypeId, Arc<Guard<TypeInfo>>>>,
     subtypes: Guard<BTreeMap<TypeId, Arc<Guard<OneofMessages>>>>,
     type_index: Guard<BTreeMap<(TypeId, Option<u32>), usize>>,
-    alternate_names: Guard<BTreeMap<TypeId, BTreeSet<String>>>,
     message_wrappers: Guard<BTreeMap<TypeId, TypeId>>,
 }
 
@@ -113,13 +152,18 @@ impl Schema {
         Self(MessageSet::default().into())
     }
 
-    /// Registers a specific message type. May shortcut if this method has already been invoked
-    /// for the same type.
-    pub fn register_message<M: Any + ?Sized>(
-        &self,
-        name: &str,
-        fields: impl Fn(&mut MessageFields),
-    ) {
+    fn wrapped_type_id(&self, type_id: TypeId) -> TypeId {
+        let mut effective_id = type_id;
+        let wrappers = self.0.message_wrappers.read_guarded();
+        while let Some(&wrapped_id) = wrappers.get(&effective_id) {
+            effective_id = wrapped_id;
+        }
+        effective_id
+    }
+}
+
+impl PopulateSchema for Schema {
+    fn register_message<M: Any + ?Sized>(&self, name: &str, fields: impl Fn(&mut MessageFields)) {
         let ty_id = TypeId::of::<M>();
         // First check by a read-only lock whether the type is already registered
         if self.0.types.read_guarded().contains_key(&ty_id) {
@@ -144,11 +188,7 @@ impl Schema {
         fields(msg)
     }
 
-    pub fn register_enumeration<E: Any + ?Sized>(
-        &self,
-        name: &str,
-        fields: impl Fn(&mut EnumInfo),
-    ) {
+    fn register_enumeration<E: Any + ?Sized>(&self, name: &str, fields: impl Fn(&mut EnumInfo)) {
         let ty_id = TypeId::of::<E>();
         // First check by a read-only lock whether the type is already registered
         if self.0.types.read_guarded().contains_key(&ty_id) {
@@ -171,10 +211,7 @@ impl Schema {
         fields(enum_info)
     }
 
-    /// Registers the message variants of a oneof enum. A oneof may have several variants that each
-    /// encode as messages, and they should each be registered on the `OneofMessages` value
-    /// provided to the `variants` closure.
-    pub fn register_oneof_messages<T: Any + ?Sized>(
+    fn register_oneof_messages<T: Any + ?Sized>(
         &self,
         name: &str,
         variants: impl Fn(&mut OneofMessages),
@@ -202,17 +239,7 @@ impl Schema {
         variants(info_ref.deref_mut())
     }
 
-    fn wrapped_type_id(&self, type_id: TypeId) -> TypeId {
-        let mut effective_id = type_id;
-        let wrappers = self.0.message_wrappers.read_guarded();
-        while let Some(&wrapped_id) = wrappers.get(&effective_id) {
-            effective_id = wrapped_id;
-        }
-        effective_id
-    }
-
-    /// Registers that the type W wraps the message type M and should be treated as equivalent.
-    pub fn register_message_wrapper<W: Any + ?Sized, M: Any + ?Sized>(&self) {
+    fn register_message_wrapper<W: Any + ?Sized, M: Any + ?Sized>(&self) {
         let wrapper_type_id = TypeId::of::<W>();
         let referenced_type_id = TypeId::of::<M>();
         // Dereference what "M" is already declared to wrap
@@ -229,20 +256,7 @@ impl Schema {
             .insert(wrapper_type_id, referenced_type_id);
     }
 
-    /// Registers that a type T is known by the given name.
-    pub fn register_type_alias<T: Any + ?Sized>(&self, name: &str) {
-        self.0
-            .alternate_names
-            .get_guarded()
-            .entry(TypeId::of::<T>())
-            .or_default()
-            .insert(name.to_owned());
-    }
-
-    /// Name for a type that disambiguates where it can be found in the entire schema output. The
-    /// output of this function may differ as more types are added to the schema, so this should
-    /// only be called when the whole schema is being rendered; see `make_lazy_repr`.
-    pub fn type_reference<M: Any + ?Sized>(&self) -> String {
+    fn type_reference<M: Any + ?Sized>(&self) -> String {
         let effective_id = self.wrapped_type_id(TypeId::of::<M>());
         let types = self.0.types.read_guarded();
         let Some(type_info) = types.get(&effective_id) else {
@@ -260,11 +274,7 @@ impl Schema {
         }
     }
 
-    /// Name for a sub-type (message variant of a oneof enum) that disambiguates where it can be
-    /// found in the entire schema output. The output of this function may differ as more types are
-    /// added to the schema, so this should only be called when the whole schema is being rendered;
-    /// see `make_lazy_repr`.
-    pub fn subtype_reference<M: Any + ?Sized, const TAG: u32>(&self) -> String {
+    fn subtype_reference<M: Any + ?Sized, const TAG: u32>(&self) -> String {
         // TODO: this is a placeholder, we want to use the type's ordinal after they're organized
         let id = self.wrapped_type_id(TypeId::of::<M>());
         let subtypes = self.0.subtypes.read_guarded();
@@ -290,10 +300,7 @@ impl Schema {
         }
     }
 
-    /// Returns a lazily-evaluated repr using the given closure. The closure won't be invoked until
-    /// the schema is displayed, so `schema.type_reference::<T>()` can correctly specify the name
-    /// of the type `T`.
-    pub fn make_lazy_repr<A, D>(&self, a: A) -> Box<dyn Display>
+    fn make_lazy_repr<A, D>(&self, a: A) -> Box<dyn Display>
     where
         A: 'static + Fn(&Schema) -> D,
         D: Display,
