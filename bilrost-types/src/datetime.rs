@@ -9,6 +9,10 @@ use alloc::string::ToString;
 use crate::Duration;
 use crate::Timestamp;
 
+// TODO: implement checked_add/sub(Duration) for Timestamp
+// TODO: implement difference(Timestamp) for Timestamp
+// TODO: implement checked_add/sub(Duration) for Duration
+
 /// A point in time, represented as a date and time in the UTC timezone.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct DateTime {
