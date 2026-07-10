@@ -171,3 +171,6 @@ test-suite-extra = [
 
 # Enables pprof profiling in benchmarks.
 pprof = ["dep:pprof"]
+
+[package.metadata.docs.rs]
+features = ["derive", "std", "third-party-type-support"]
