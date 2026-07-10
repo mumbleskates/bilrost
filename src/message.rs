@@ -2,6 +2,8 @@ use crate::buf::{ReverseBuf, ReverseBuffer};
 use crate::encoding::message::{
     borrow_merge, borrow_merge_distinguished, merge, merge_distinguished,
 };
+#[cfg(debug_assertions)]
+use crate::encoding::paranoid_buf_asserts::Counted;
 use crate::encoding::{
     encode_varint, encoded_len_varint, prepend_varint, Capped, DecodeContext,
     RawDistinguishedMessageBorrowDecoder, RawDistinguishedMessageDecoder, RawMessage,
@@ -751,12 +753,28 @@ impl<T> OwnedMessage for T
 where
     T: RawMessageDecoder + Sized,
 {
-    fn decode<B: Buf>(mut buf: B) -> Result<Self, DecodeError> {
-        Self::decode_capped(Capped::new(&mut buf))
+    fn decode<B: Buf>(#[allow(unused_mut)] mut buf: B) -> Result<Self, DecodeError> {
+        #[cfg(debug_assertions)]
+        {
+            Self::decode_capped(Capped::new(&mut Counted::new(buf)))
+        }
+        #[cfg(not(debug_assertions))]
+        {
+            Self::decode_capped(Capped::new(&mut buf))
+        }
     }
 
-    fn decode_length_delimited<B: Buf>(mut buf: B) -> Result<Self, DecodeError> {
-        Self::decode_capped(Capped::new_length_delimited(&mut buf)?)
+    fn decode_length_delimited<B: Buf>(
+        #[allow(unused_mut)] mut buf: B,
+    ) -> Result<Self, DecodeError> {
+        #[cfg(debug_assertions)]
+        {
+            Self::decode_capped(Capped::new_length_delimited(&mut Counted::new(buf))?)
+        }
+        #[cfg(not(debug_assertions))]
+        {
+            Self::decode_capped(Capped::new_length_delimited(&mut buf)?)
+        }
     }
 
     #[doc(hidden)]
@@ -766,12 +784,29 @@ where
         Ok(message)
     }
 
-    fn replace_from<B: Buf>(&mut self, mut buf: B) -> Result<(), DecodeError> {
-        self.replace_from_capped(Capped::new(&mut buf))
+    fn replace_from<B: Buf>(&mut self, #[allow(unused_mut)] mut buf: B) -> Result<(), DecodeError> {
+        #[cfg(debug_assertions)]
+        {
+            self.replace_from_capped(Capped::new(&mut Counted::new(buf)))
+        }
+        #[cfg(not(debug_assertions))]
+        {
+            self.replace_from_capped(Capped::new(&mut buf))
+        }
     }
 
-    fn replace_from_length_delimited<B: Buf>(&mut self, mut buf: B) -> Result<(), DecodeError> {
-        self.replace_from_capped(Capped::new_length_delimited(&mut buf)?)
+    fn replace_from_length_delimited<B: Buf>(
+        &mut self,
+        #[allow(unused_mut)] mut buf: B,
+    ) -> Result<(), DecodeError> {
+        #[cfg(debug_assertions)]
+        {
+            self.replace_from_capped(Capped::new_length_delimited(&mut Counted::new(buf))?)
+        }
+        #[cfg(not(debug_assertions))]
+        {
+            self.replace_from_capped(Capped::new_length_delimited(&mut buf)?)
+        }
     }
 
     #[doc(hidden)]
@@ -867,17 +902,34 @@ where
     }
 
     fn decode_restricted<B: Buf>(
-        mut buf: B,
+        #[allow(unused_mut)] mut buf: B,
         restrict_to: Canonicity,
     ) -> Result<(Self, Canonicity), DecodeError> {
-        Self::decode_restricted_capped(Capped::new(&mut buf), restrict_to)
+        #[cfg(debug_assertions)]
+        {
+            Self::decode_restricted_capped(Capped::new(&mut Counted::new(buf)), restrict_to)
+        }
+        #[cfg(not(debug_assertions))]
+        {
+            Self::decode_restricted_capped(Capped::new(&mut buf), restrict_to)
+        }
     }
 
     fn decode_restricted_length_delimited<B: Buf>(
-        mut buf: B,
+        #[allow(unused_mut)] mut buf: B,
         restrict_to: Canonicity,
     ) -> Result<(Self, Canonicity), DecodeError> {
-        Self::decode_restricted_capped(Capped::new_length_delimited(&mut buf)?, restrict_to)
+        #[cfg(debug_assertions)]
+        {
+            Self::decode_restricted_capped(
+                Capped::new_length_delimited(&mut Counted::new(buf))?,
+                restrict_to,
+            )
+        }
+        #[cfg(not(debug_assertions))]
+        {
+            Self::decode_restricted_capped(Capped::new_length_delimited(&mut buf)?, restrict_to)
+        }
     }
 
     fn decode_restricted_capped<B: Buf + ?Sized>(
@@ -896,18 +948,38 @@ where
 
     fn replace_restricted_from<B: Buf>(
         &mut self,
-        mut buf: B,
+        #[allow(unused_mut)] mut buf: B,
         restrict_to: Canonicity,
     ) -> Result<Canonicity, DecodeError> {
-        self.replace_restricted_from_capped(Capped::new(&mut buf), restrict_to)
+        #[cfg(debug_assertions)]
+        {
+            self.replace_restricted_from_capped(Capped::new(&mut Counted::new(buf)), restrict_to)
+        }
+        #[cfg(not(debug_assertions))]
+        {
+            self.replace_restricted_from_capped(Capped::new(&mut buf), restrict_to)
+        }
     }
 
     fn replace_restricted_from_length_delimited<B: Buf>(
         &mut self,
-        mut buf: B,
+        #[allow(unused_mut)] mut buf: B,
         restrict_to: Canonicity,
     ) -> Result<Canonicity, DecodeError> {
-        self.replace_restricted_from_capped(Capped::new_length_delimited(&mut buf)?, restrict_to)
+        #[cfg(debug_assertions)]
+        {
+            self.replace_restricted_from_capped(
+                Capped::new_length_delimited(&mut Counted::new(buf))?,
+                restrict_to,
+            )
+        }
+        #[cfg(not(debug_assertions))]
+        {
+            self.replace_restricted_from_capped(
+                Capped::new_length_delimited(&mut buf)?,
+                restrict_to,
+            )
+        }
     }
 
     fn replace_restricted_from_capped<B: Buf + ?Sized>(

@@ -1152,6 +1152,54 @@ impl<B: Buf + ?Sized> DerefMut for Capped<'_, B> {
     }
 }
 
+#[cfg(debug_assertions)]
+pub(crate) mod paranoid_buf_asserts {
+    use bytes::Buf;
+
+    /// Buf wrapper with extra assertions around its length.
+    pub(crate) struct Counted<B: Buf> {
+        tracked_remaining: usize,
+        buf: B,
+    }
+
+    impl<B: Buf> Counted<B> {
+        pub(crate) fn new(buf: B) -> Self {
+            Self {
+                tracked_remaining: buf.remaining(),
+                buf,
+            }
+        }
+    }
+
+    /// This implementation adds an extra layer of guards around the possibility that a Buf impl
+    /// could lie about its remaining bytes. The implementation of Capped, and therefore of most
+    /// of our decoding, depends heavily on this invariant in Buf's contract always holding.
+    impl<B: Buf> Buf for Counted<B> {
+        #[inline]
+        fn remaining(&self) -> usize {
+            assert_eq!(self.buf.remaining(), self.tracked_remaining);
+            self.tracked_remaining
+        }
+
+        #[inline]
+        fn chunk(&self) -> &[u8] {
+            let chunk = self.buf.chunk();
+            assert!(chunk.len() <= self.tracked_remaining);
+            chunk
+        }
+
+        #[inline]
+        fn advance(&mut self, cnt: usize) {
+            self.buf.advance(cnt);
+            self.tracked_remaining = self
+                .tracked_remaining
+                .checked_sub(cnt)
+                .expect("advanced too far");
+            assert_eq!(self.buf.remaining(), self.tracked_remaining);
+        }
+    }
+}
+
 /// Returns `Some` if there are more bytes in the buffer and the next data in the buffer begins
 /// with a "repeated" field key (a key with a tag delta of zero). If the repeated field key is found
 /// it is consumed; if it does not exist, the buffer is unchanged.
