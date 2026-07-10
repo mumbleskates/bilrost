@@ -2,6 +2,11 @@
 
 ### Breaking changes
 
+* Possible breaking change: Removed some unused and unnecessary `*_capped_dyn`
+  decoding methods from the public `Message` traits. These methods were already
+  hidden in the documentation, and defining them as concrete dyn-compatible
+  methods never found a use case.
+
 ### New features
 
 * Added support for string-data types `Arc<str>`, `Rc<str>`, and `Box<str>` via

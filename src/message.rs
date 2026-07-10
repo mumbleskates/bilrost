@@ -136,11 +136,6 @@ pub trait OwnedMessage: Message {
     /// Decodes the non-ignored fields of this message, replacing their values from a
     /// length-delimited value encoded in the buffer.
     fn replace_from_length_delimited_dyn(&mut self, buf: &mut dyn Buf) -> Result<(), DecodeError>;
-
-    /// Decodes the non-ignored fields of this message, replacing their values from the given capped
-    /// buffer.
-    #[doc(hidden)]
-    fn replace_from_capped_dyn(&mut self, buf: Capped<dyn Buf>) -> Result<(), DecodeError>;
 }
 
 /// An enhanced trait for owned Bilrost messages that promise a distinguished representation.
@@ -246,14 +241,6 @@ pub trait DistinguishedOwnedMessage: OwnedMessage {
         buf: &mut dyn Buf,
     ) -> Result<Canonicity, DecodeError>;
 
-    /// Decodes the non-ignored fields of this message, replacing their values from the given capped
-    /// buffer in distinguished mode.
-    #[doc(hidden)]
-    fn replace_distinguished_from_capped_dyn(
-        &mut self,
-        buf: Capped<dyn Buf>,
-    ) -> Result<Canonicity, DecodeError>;
-
     // ------------ Restricted mode ------------
 
     /// Decodes an instance of the message from a buffer in restricted mode.
@@ -348,15 +335,6 @@ pub trait DistinguishedOwnedMessage: OwnedMessage {
         restrict_to: Canonicity,
     ) -> Result<Canonicity, DecodeError>;
 
-    /// Decodes the non-ignored fields of this message, replacing their values from the given capped
-    /// buffer in restricted mode.
-    #[doc(hidden)]
-    fn replace_restricted_from_capped_dyn(
-        &mut self,
-        buf: Capped<dyn Buf>,
-        restrict_to: Canonicity,
-    ) -> Result<Canonicity, DecodeError>;
-
     // ------------ Canonical mode ------------
 
     /// Decodes an instance of the message from a buffer in canonical mode.
@@ -424,14 +402,6 @@ pub trait DistinguishedOwnedMessage: OwnedMessage {
     fn replace_canonical_from_length_delimited_dyn(
         &mut self,
         buf: &mut dyn Buf,
-    ) -> Result<(), DecodeError>;
-
-    /// Decodes the non-ignored fields of this message, replacing their values from the given capped
-    /// buffer in canonical mode.
-    #[doc(hidden)]
-    fn replace_canonical_from_capped_dyn(
-        &mut self,
-        buf: Capped<dyn Buf>,
     ) -> Result<(), DecodeError>;
 }
 
@@ -829,11 +799,6 @@ where
     fn replace_from_length_delimited_dyn(&mut self, buf: &mut dyn Buf) -> Result<(), DecodeError> {
         self.replace_from_length_delimited(buf)
     }
-
-    #[doc(hidden)]
-    fn replace_from_capped_dyn(&mut self, buf: Capped<dyn Buf>) -> Result<(), DecodeError> {
-        self.replace_from_capped(buf)
-    }
 }
 
 impl<T> DistinguishedOwnedMessage for T
@@ -899,14 +864,6 @@ where
         buf: &mut dyn Buf,
     ) -> Result<Canonicity, DecodeError> {
         self.replace_restricted_from_length_delimited(buf, NotCanonical)
-    }
-
-    #[doc(hidden)]
-    fn replace_distinguished_from_capped_dyn(
-        &mut self,
-        buf: Capped<dyn Buf>,
-    ) -> Result<Canonicity, DecodeError> {
-        self.replace_restricted_from_capped(buf, NotCanonical)
     }
 
     fn decode_restricted<B: Buf>(
@@ -1003,14 +960,6 @@ where
         self.replace_restricted_from_length_delimited(buf, restrict_to)
     }
 
-    fn replace_restricted_from_capped_dyn(
-        &mut self,
-        buf: Capped<dyn Buf>,
-        restrict_to: Canonicity,
-    ) -> Result<Canonicity, DecodeError> {
-        self.replace_restricted_from_capped(buf, restrict_to)
-    }
-
     fn decode_canonical<B: Buf>(buf: B) -> Result<Self, DecodeError> {
         Self::decode_restricted(buf, Canonical).map(|(val, _)| val)
     }
@@ -1066,15 +1015,6 @@ where
         buf: &mut dyn Buf,
     ) -> Result<(), DecodeError> {
         self.replace_restricted_from_length_delimited(buf, Canonical)
-            .map(|_| ())
-    }
-
-    #[doc(hidden)]
-    fn replace_canonical_from_capped_dyn(
-        &mut self,
-        buf: Capped<dyn Buf>,
-    ) -> Result<(), DecodeError> {
-        self.replace_restricted_from_capped(buf, Canonical)
             .map(|_| ())
     }
 }
