@@ -42,6 +42,7 @@ mod attrs;
 mod field;
 
 fn crate_name() -> TokenStream {
+    // TODO: make the crate name controllable with a lazy lock
     quote!(::bilrost)
 }
 
