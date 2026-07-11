@@ -160,6 +160,11 @@ impl Schema {
         }
         effective_id
     }
+
+    /// Adds the message type `M`, and all its sub-messages, to this schema.
+    pub fn register<M: RegisterMessage>(&self) {
+        M::register(self);
+    }
 }
 
 impl PopulateSchema for Schema {

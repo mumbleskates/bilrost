@@ -1,5 +1,4 @@
-use bilrost::encoding::schema::{RegisterMessage, Schema};
-use bilrost::{Blob, Enumeration, Message, Oneof};
+use bilrost::{Blob, Enumeration, Message, Oneof, Schema};
 use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
 use std::rc::Rc;
@@ -933,13 +932,13 @@ pub struct TestOneofMessageMock<'a> {
 
 fn main() {
     let schema = Schema::new();
-    TestAllTypes::register(&schema);
-    TestDistinguished::register(&schema);
-    TestTypeSupport::register(&schema);
-    TestTypeSupportDistinguished::register(&schema);
-    TestTypeSupportBorrowable::register(&schema);
-    TestOneofMessage::register(&schema);
-    <()>::register(&schema);
+    schema.register::<TestAllTypes>();
+    schema.register::<TestDistinguished>();
+    schema.register::<TestTypeSupport>();
+    schema.register::<TestTypeSupportDistinguished>();
+    schema.register::<TestTypeSupportBorrowable>();
+    schema.register::<TestOneofMessage>();
+    schema.register::<()>();
 
     let schema_output = format!("{schema}");
     print!("{schema_output}");
