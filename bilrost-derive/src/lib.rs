@@ -317,7 +317,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
             .collect();
 
         quote! {
-            impl #impl_generics #crate_::encoding::schema::RegisterFields for __Self #ty_generics
+            impl #impl_generics #crate_::encoding::schema::RegisterMessage for __Self #ty_generics
             #schema_where_clause {
                 fn register(schema: &#crate_::encoding::schema::Schema) {
                     #crate_::encoding::schema::PopulateSchema::register_message::<Self>(
@@ -632,7 +632,7 @@ fn try_message_via_oneof(input: DeriveInput) -> Result<TokenStream, Error> {
         );
 
         quote! {
-            impl #impl_generics #crate_::encoding::schema::RegisterFields for #ident #ty_generics
+            impl #impl_generics #crate_::encoding::schema::RegisterMessage for #ident #ty_generics
             #schema_where_clause {
                 fn register(schema: &#crate_::encoding::schema::Schema) {
                     #crate_::encoding::schema::PopulateSchema::register_message::<Self>(

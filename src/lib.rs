@@ -27,13 +27,13 @@ pub mod encoding;
 #[doc(hidden)]
 mod iter;
 
+pub use crate::encoding::schema::Schema;
 pub use crate::encoding::{Canonicity, Enumeration, WithCanonicity};
 pub use crate::error::{DecodeError, DecodeErrorKind, EncodeError};
 pub use crate::message::{
     BorrowedMessage, DistinguishedBorrowedMessage, DistinguishedOwnedMessage, Message, OwnedMessage,
 };
-
-pub use types::Blob;
+pub use crate::types::Blob;
 
 use bytes::{Buf, BufMut};
 #[cfg(feature = "extended-diagnostics")]

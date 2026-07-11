@@ -1,4 +1,4 @@
-use bilrost::encoding::schema::{RegisterFields, Schema};
+use bilrost::encoding::schema::{RegisterMessage, Schema};
 use bilrost::{Blob, Enumeration, Message, Oneof};
 use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};

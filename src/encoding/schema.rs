@@ -583,7 +583,7 @@ pub trait FieldRepr<E, T: ?Sized> {
 }
 
 /// Ability of a message to register its fields with a schema.
-pub trait RegisterFields {
+pub trait RegisterMessage {
     fn register(schema: &Schema);
 }
 

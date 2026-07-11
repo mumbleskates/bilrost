@@ -1,6 +1,6 @@
 use crate::buf::ReverseBuf;
 use crate::encoding::schema::{FieldRepr, Schema, ValueRepr};
-use crate::encoding::schema::{PopulateSchema, RegisterFields};
+use crate::encoding::schema::{PopulateSchema, RegisterMessage};
 use crate::encoding::{
     check_wire_type, Capped, DecodeContext, ForOverwrite, RestrictedDecodeContext, TagMeasurer,
     TagRevWriter, TagWriter, WireType,
@@ -346,9 +346,9 @@ where
 mod generic_optional {
     use super::*;
 
-    impl<T> RegisterFields for Option<T>
+    impl<T> RegisterMessage for Option<T>
     where
-        T: Any + RegisterFields,
+        T: Any + RegisterMessage,
     {
         fn register(schema: &Schema) {
             schema.register_message_wrapper::<Option<T>, T>();

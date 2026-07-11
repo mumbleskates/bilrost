@@ -1,5 +1,5 @@
 use crate::buf::ReverseBuf;
-use crate::encoding::schema::{PopulateSchema, RegisterFields, Schema};
+use crate::encoding::schema::{PopulateSchema, RegisterMessage, Schema};
 use crate::encoding::{
     skip_field, Canonicity, Capped, DecodeContext, RawDistinguishedMessageBorrowDecoder,
     RawDistinguishedMessageDecoder, RawMessage, RawMessageBorrowDecoder, RawMessageDecoder,
@@ -143,7 +143,7 @@ impl proptest::arbitrary::Arbitrary for Blob {
     >;
 }
 
-impl RegisterFields for () {
+impl RegisterMessage for () {
     fn register(schema: &Schema) {
         schema.register_message::<()>("()", |_| {});
     }

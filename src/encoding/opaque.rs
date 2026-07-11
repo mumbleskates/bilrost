@@ -1,5 +1,5 @@
 use crate::buf::ReverseBuf;
-use crate::encoding::schema::{PopulateSchema, RegisterFields, Schema};
+use crate::encoding::schema::{PopulateSchema, RegisterMessage, Schema};
 use crate::encoding::{
     encode_varint, encoded_len_varint, prepend_varint, Capped, DecodeContext,
     RawDistinguishedMessageBorrowDecoder, RawDistinguishedMessageDecoder, RawMessage,
@@ -385,7 +385,7 @@ impl<'a> FromIterator<(u32, OpaqueValue<'a>)> for OpaqueMessage<'a> {
     }
 }
 
-impl RegisterFields for OpaqueMessage<'static> {
+impl RegisterMessage for OpaqueMessage<'static> {
     fn register(schema: &Schema) {
         schema.register_message::<Self>("OpaqueMessage", |_| {});
     }

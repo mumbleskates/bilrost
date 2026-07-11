@@ -1,5 +1,5 @@
 use crate::buf::ReverseBuf;
-use crate::encoding::schema::{PopulateSchema, RegisterFields, Schema, ValueRepr};
+use crate::encoding::schema::{PopulateSchema, RegisterMessage, Schema, ValueRepr};
 use crate::encoding::{
     encode_varint, encoded_len_varint, implement_core_empty_state_rules, prepend_varint,
     Canonicity, Capped, DecodeContext, DistinguishedValueBorrowDecoder, DistinguishedValueDecoder,
@@ -211,9 +211,9 @@ pub trait RawDistinguishedMessageBorrowDecoder<'a>: RawMessage + Eq {
         Self: Sized;
 }
 
-impl<T> RegisterFields for Box<T>
+impl<T> RegisterMessage for Box<T>
 where
-    T: Any + RawMessage + RegisterFields,
+    T: Any + RawMessage + RegisterMessage,
 {
     fn register(schema: &Schema) {
         schema.register_message_wrapper::<Self, T>();
@@ -365,7 +365,7 @@ where
 
 impl<T> ValueRepr<MessageEncoding, T> for ()
 where
-    T: Any + RawMessage + RegisterFields,
+    T: Any + RawMessage + RegisterMessage,
 {
     fn repr(schema: &Schema) -> Box<dyn Display> {
         T::register(schema);
