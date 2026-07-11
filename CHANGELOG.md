@@ -16,6 +16,14 @@
 
 ### Cleanups
 
+* Added some additional assertions when `debug_asserts` are enabled to
+  proactively detect bad implementations of `bytes::Buf` that have an
+  inconsistent `remaining()` method.
+
+  It has always been a dire error that invalidates `bilrost`'s guarantees to
+  decode from a `Buf` with an incorrect remaining implementation, we just check
+  more often now.
+
 ## v0.1015.0
 
 ### Breaking changes
