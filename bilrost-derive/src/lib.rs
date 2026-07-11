@@ -137,7 +137,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     let mut borrow_only = false;
     let mut default_per_field = false;
     let mut enable_schema = false;
-    let mut default_expr: Option<Expr> = None;
+    let mut struct_update_expr: Option<Expr> = None;
     let mut unknown_attrs = Vec::new();
     for attr in bilrost_attrs(&input_attrs)? {
         if let Some(tags) = tag_list_attr(&attr, "reserved_tags", None)? {
@@ -158,7 +158,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
             )?;
         } else if let Some(expr) = named_attr(&attr, "default")? {
             set_option_with_display(
-                &mut default_expr,
+                &mut struct_update_expr,
                 expr,
                 "duplicated default (expression) attributes",
                 |t| quote!((#t)).to_string(),
@@ -169,7 +169,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
             unknown_attrs.push(attr);
         }
     }
-    if default_per_field && default_expr.is_some() {
+    if default_per_field && struct_update_expr.is_some() {
         bail!("default_per_field and default (expression) attributes are mutually exclusive");
     }
 
@@ -180,16 +180,15 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         )
     }
 
-    let init_mode = match default_per_field {
+    let ignored_field_init_mode = match default_per_field {
         true => InitMode::DefaultPerField,
         false => InitMode::FromStructUpdate,
     };
 
     // Parse field data
+    let fields = parse_message_fields(data_struct.fields, ignored_field_init_mode, reserved_tags)?;
     let (ignored_fields, unsorted_fields): (Vec<_>, Vec<_>) =
-        parse_message_fields(data_struct.fields, init_mode, reserved_tags)?
-            .into_iter()
-            .partition(Field::is_ignored);
+        fields.into_iter().partition(Field::is_ignored);
 
     if distinguished && !ignored_fields.is_empty() {
         bail!("messages with ignored fields cannot be distinguished");
@@ -200,7 +199,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     let self_where = if ignored_fields
         .iter()
         .any(Field::ignored_and_uses_struct_update_syntax)
-        && default_expr.is_none()
+        && struct_update_expr.is_none()
     {
         // When there are ignored fields that we are taking from ..<Self as Default>, the whole
         // message impl should be bounded by Self: Default
@@ -292,11 +291,11 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         .any(Field::ignored_and_uses_struct_update_syntax)
     {
         // initialize ignored fields from our struct-update expression:
-        let default_expr = default_expr.map_or(
-            quote!(::core::default::Default::default()),
-            |expr| quote!(#expr),
-        );
-        Some(quote!(..#default_expr))
+        Some(if struct_update_expr.is_some() {
+            quote!(..__BilrostInitializer::<Self>::struct_update())
+        } else {
+            quote!(..::core::default::Default::default())
+        })
     } else {
         None
     };
@@ -563,6 +562,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         ignored_fields
             .iter()
             .flat_map(|field| field.initializer_method(None)),
+        struct_update_expr,
         &impl_generics,
     );
     let expanded = quote! {
@@ -1820,6 +1820,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
     let aliases = encoder_alias_header();
     let initializer_class = initializer_class_definition(
         variants.iter().flat_map(OneofVariant::initializer_methods),
+        None,
         impl_generics,
     );
     Ok(quote! {

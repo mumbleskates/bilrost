@@ -136,13 +136,24 @@ impl FieldBearer for IgnoredField {
 /// initializer expressions for ignored fields.
 pub fn initializer_class_definition(
     methods: impl IntoIterator<Item = TokenStream>,
+    struct_update_expr: Option<Expr>,
     generics: &Generics,
 ) -> Option<TokenStream> {
-    let mut all_methods = methods.into_iter().peekable();
+    let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
+    let mut all_methods = methods
+        .into_iter()
+        .chain(struct_update_expr.iter().map(|expr| {
+            quote! {
+                #[inline]
+                fn struct_update() -> __Self #type_generics {
+                    #expr
+                }
+            }
+        }))
+        .peekable();
     if all_methods.peek().is_none() {
         return None;
     }
-    let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
     Some(quote! {
         struct __BilrostInitializer<T>(T);
         impl #impl_generics __BilrostInitializer<__Self #type_generics> #where_clause {
