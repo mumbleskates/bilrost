@@ -34,8 +34,8 @@ use itertools::Itertools;
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 use syn::{
-    parse2, Attribute, Data, DeriveInput, Expr, Fields, Generics, Ident, Meta, Pat, TypeGenerics,
-    Variant, WhereClause,
+    parse2, Attribute, Data, DeriveInput, Expr, Fields, Generics, Ident, Meta, Pat, Variant,
+    WhereClause,
 };
 
 mod attrs;
@@ -106,10 +106,13 @@ fn append_wheres_with_fields(
     )
 }
 
-/// Adds the given identifier to the generics list
-fn prepend_to_generics(generics: &Generics, ident: TokenStream) -> TokenStream {
-    let params = &generics.params;
-    quote!(<#ident, #params>)
+/// Adds the given generics to the generics list. `to_add` must be a list of generic terms
+fn combine_generics(generics: &Generics, to_add: TokenStream) -> TokenStream {
+    let mut new_generics: Generics = parse2(quote!(<#to_add>)).expect("invalid generic terms");
+    new_generics.params.extend(generics.params.iter().cloned());
+    // wrap the generics in ImplGenerics, which puts lifetime params first when rendered
+    let (wrapped, _, _) = new_generics.split_for_impl();
+    quote!(#wrapped)
 }
 
 fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
@@ -119,7 +122,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     let DeriveInput {
         ident,
         attrs: input_attrs,
-        generics: impl_generics,
+        generics,
         data: Data::Struct(data_struct),
         ..
     } = input
@@ -195,7 +198,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         bail!("messages with ignored fields cannot be distinguished");
     }
 
-    let (_, ty_generics, where_clause) = impl_generics.split_for_impl();
+    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
     let self_where = if ignored_fields
         .iter()
@@ -209,7 +212,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         None
     };
 
-    let borrow_generics = prepend_to_generics(&impl_generics, quote!('__a));
+    let borrow_generics = combine_generics(&generics, quote!('__a));
 
     let where_fields = vec![unsorted_fields.as_slice(), ignored_fields.as_slice()];
     let encoder_where_clause =
@@ -564,7 +567,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
             .iter()
             .flat_map(|field| field.initializer_method(None)),
         struct_update_expr,
-        &impl_generics,
+        &generics,
     );
     let expanded = quote! {
         const _: () = {
@@ -591,9 +594,7 @@ fn try_message_via_oneof(input: DeriveInput) -> Result<TokenStream, Error> {
     let crate_ = crate_name();
     let PreprocessedOneof {
         ident,
-        impl_generics,
-        ty_generics,
-        where_clause,
+        generics,
         variants,
         distinguished,
         borrow_only,
@@ -601,13 +602,15 @@ fn try_message_via_oneof(input: DeriveInput) -> Result<TokenStream, Error> {
         empty_variant,
     } = preprocess_oneof(&input)?;
 
+    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+
     let tag_measurer_ty = tag_measurer(&variants);
 
     if empty_variant.is_none() {
         bail!("Message can only be derived for Oneof enums that have an empty variant.")
     }
 
-    let borrow_generics = prepend_to_generics(impl_generics, quote!('__a));
+    let borrow_generics = combine_generics(&generics, quote!('__a));
 
     let encoder_where_clause = append_wheres(
         where_clause,
@@ -893,8 +896,8 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
 
     let generics = &input.generics;
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
-    let unborrowed_generics = prepend_to_generics(generics, quote!(const __G: u8));
-    let borrow_generics = prepend_to_generics(generics, quote!('__a, const __G: u8));
+    let unborrowed_generics = combine_generics(generics, quote!(const __G: u8));
+    let borrow_generics = combine_generics(generics, quote!('__a, const __G: u8));
 
     let punctuated_variants = match input.data {
         Data::Enum(enum_) => enum_.variants,
@@ -1251,11 +1254,9 @@ fn variant_attr(attrs: &Vec<Attribute>) -> Result<Option<Expr>, Error> {
     Ok(result)
 }
 
-struct PreprocessedOneof<'a> {
+struct PreprocessedOneof {
     ident: Ident,
-    impl_generics: &'a Generics,
-    ty_generics: TypeGenerics<'a>,
-    where_clause: Option<&'a WhereClause>,
+    generics: Generics,
     variants: Vec<OneofVariant>,
     distinguished: bool,
     borrow_only: bool,
@@ -1263,14 +1264,15 @@ struct PreprocessedOneof<'a> {
     empty_variant: Option<Ident>,
 }
 
-fn preprocess_oneof(input: &DeriveInput) -> Result<PreprocessedOneof<'_>, Error> {
-    let ident = input.ident.clone();
-
+fn preprocess_oneof(input: &DeriveInput) -> Result<PreprocessedOneof, Error> {
     let input_variants = match &input.data {
         Data::Enum(enum_) => enum_.variants.clone(),
         Data::Struct(..) => bail!("Oneof can not be derived for a struct"),
         Data::Union(..) => bail!("Oneof can not be derived for a union"),
     };
+
+    let ident = input.ident.clone();
+    let generics = input.generics.clone();
 
     let mut reserved_tags = None;
     let mut unknown_attrs = Vec::new();
@@ -1345,14 +1347,9 @@ fn preprocess_oneof(input: &DeriveInput) -> Result<PreprocessedOneof<'_>, Error>
         }
     }
 
-    let generics = &input.generics;
-    let (_, ty_generics, where_clause) = generics.split_for_impl();
-
     Ok(PreprocessedOneof {
         ident,
-        impl_generics: generics,
-        ty_generics,
-        where_clause,
+        generics,
         variants,
         distinguished,
         borrow_only,
@@ -1367,9 +1364,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
 
     let PreprocessedOneof {
         ident,
-        impl_generics,
-        ty_generics,
-        where_clause,
+        generics,
         variants,
         distinguished,
         borrow_only,
@@ -1377,7 +1372,8 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         empty_variant,
     } = preprocess_oneof(&input)?;
 
-    let borrow_generics = prepend_to_generics(impl_generics, quote!('__a));
+    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+    let borrow_generics = combine_generics(&generics, quote!('__a));
 
     let encoder_where_clause = append_wheres_with_fields(where_clause, None, &variants, Encode);
     let owned_decoder_where_clause =
@@ -1822,7 +1818,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
     let initializer_class = initializer_class_definition(
         variants.iter().flat_map(OneofVariant::initializer_methods),
         None,
-        impl_generics,
+        &generics,
     );
     Ok(quote! {
         const _: () = {
