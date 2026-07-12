@@ -16,7 +16,7 @@ pub use bytes;
 
 #[cfg(feature = "derive")]
 #[doc(hidden)]
-pub use bilrost_derive::{Enumeration, Message, Oneof};
+pub use bilrost_derive::{Enumeration, Message, Oneof, Schema};
 
 pub mod buf;
 mod error;

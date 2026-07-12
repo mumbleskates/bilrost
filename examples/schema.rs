@@ -13,9 +13,8 @@ use tinyvec::ArrayVec;
 /// submessages of this message.  So for example, a fuzz test of TestAllTypes
 /// could trigger bugs that occur in any message type in this file.  We verify
 /// this stays true in a unit test.
-#[derive(Clone, Debug, PartialEq, Message)]
+#[derive(Clone, Debug, PartialEq, Message, Schema)]
 #[bilrost(reserved_tags(172-299, 320-1000, 1013-1999, 2013..))]
-#[bilrost(schema)]
 pub struct TestAllTypes {
     /// Singular
     #[bilrost(tag(130), encoding(varint))]
@@ -420,8 +419,7 @@ pub struct TestAllTypes {
 pub mod test_message {
     use super::*;
 
-    #[derive(Clone, Debug, PartialEq, Message)]
-    #[bilrost(schema)]
+    #[derive(Clone, Debug, PartialEq, Message, Schema)]
     pub struct NestedMessage {
         #[bilrost(1)]
         pub a: i32,
@@ -437,8 +435,7 @@ pub mod test_message {
         Baz = 2,
         Max = u32::MAX,
     }
-    #[derive(Clone, Debug, PartialEq, Oneof)]
-    #[bilrost(schema)]
+    #[derive(Clone, Debug, PartialEq, Oneof, Schema)]
     pub enum NonEmptyOneofField {
         #[bilrost(tag = 1001)]
         OneofUint32(u32),
@@ -473,8 +470,7 @@ pub mod test_message {
         OneofUnit,
     }
 
-    #[derive(Clone, Debug, PartialEq, Oneof, Message)]
-    #[bilrost(schema)]
+    #[derive(Clone, Debug, PartialEq, Oneof, Message, Schema)]
     pub enum OneofField {
         Empty,
         #[bilrost(tag = 2001)]
@@ -511,8 +507,8 @@ pub mod test_message {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Message)]
-#[bilrost(distinguished, reserved_tags(87-100, 110-199, 210..), schema)]
+#[derive(Clone, Debug, PartialEq, Eq, Message, Schema)]
+#[bilrost(distinguished, reserved_tags(87-100, 110-199, 210..))]
 pub struct TestDistinguished {
     /// Singular
     #[bilrost(tag(1), encoding(varint))]
@@ -710,8 +706,8 @@ pub struct TestDistinguished {
 pub mod test_distinguished {
     use super::*;
 
-    #[derive(Clone, Debug, PartialEq, Eq, Message)]
-    #[bilrost(distinguished, schema)]
+    #[derive(Clone, Debug, PartialEq, Eq, Message, Schema)]
+    #[bilrost(distinguished)]
     pub struct NestedMessage {
         #[bilrost(1)]
         pub a: u64,
@@ -723,8 +719,8 @@ pub mod test_distinguished {
 
     pub use test_message::NestedEnum;
 
-    #[derive(Clone, Debug, PartialEq, Eq, Oneof)]
-    #[bilrost(distinguished, schema)]
+    #[derive(Clone, Debug, PartialEq, Eq, Oneof, Schema)]
+    #[bilrost(distinguished)]
     pub enum NonEmptyOneofField {
         #[bilrost(tag = 101)]
         OneofUint32(u32),
@@ -753,8 +749,8 @@ pub mod test_distinguished {
         OneofUnit,
     }
 
-    #[derive(Clone, Debug, PartialEq, Eq, Oneof, Message)]
-    #[bilrost(distinguished, schema)]
+    #[derive(Clone, Debug, PartialEq, Eq, Oneof, Message, Schema)]
+    #[bilrost(distinguished)]
     pub enum OneofField {
         Empty,
         #[bilrost(tag = 201)]
@@ -785,8 +781,7 @@ pub mod test_distinguished {
     }
 }
 
-#[derive(Debug, PartialEq, Message)]
-#[bilrost(schema)]
+#[derive(Debug, PartialEq, Message, Schema)]
 pub struct TestTypeSupport {
     #[cfg(feature = "chrono")]
     #[bilrost(1)]
@@ -838,8 +833,8 @@ pub struct TestTypeSupport {
     smol_str: smol_str::SmolStr,
 }
 
-#[derive(Debug, PartialEq, Eq, Message)]
-#[bilrost(distinguished, schema)]
+#[derive(Debug, PartialEq, Eq, Message, Schema)]
+#[bilrost(distinguished)]
 pub struct TestTypeSupportDistinguished {
     #[bilrost(1)]
     core_duration: core::time::Duration,
@@ -887,8 +882,8 @@ pub struct TestTypeSupportDistinguished {
     smol_str: smol_str::SmolStr,
 }
 
-#[derive(Debug, PartialEq, Eq, Message)]
-#[bilrost(distinguished, schema)]
+#[derive(Debug, PartialEq, Eq, Message, Schema)]
+#[bilrost(distinguished)]
 pub struct TestTypeSupportBorrowable<'a> {
     #[bilrost(1)]
     str: Cow<'a, str>,
@@ -903,8 +898,8 @@ pub struct TestTypeSupportBorrowable<'a> {
     bigger_array: Cow<'a, [u8; 16]>,
 }
 
-#[derive(Debug, PartialEq, Eq, Oneof, Message)]
-#[bilrost(distinguished, schema)]
+#[derive(Debug, PartialEq, Eq, Oneof, Message, Schema)]
+#[bilrost(distinguished)]
 pub enum TestOneofMessage<'a> {
     Empty,
     #[bilrost(1)]
@@ -917,8 +912,8 @@ pub enum TestOneofMessage<'a> {
     Fixed8(u64),
 }
 
-#[derive(Debug, PartialEq, Eq, Message)]
-#[bilrost(distinguished, schema)]
+#[derive(Debug, PartialEq, Eq, Message, Schema)]
+#[bilrost(distinguished)]
 pub struct TestOneofMessageMock<'a> {
     #[bilrost(1)]
     pub varint: Option<u64>,
