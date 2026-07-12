@@ -115,10 +115,17 @@ fn combine_generics(generics: &Generics, to_add: TokenStream) -> TokenStream {
     quote!(#wrapped)
 }
 
-fn try_message(input: TokenStream) -> Result<TokenStream> {
-    let crate_ = crate_name();
-    let input: DeriveInput = parse2(input)?;
+struct PreprocessedMessageStruct {
+    ident: Ident,
+    generics: Generics,
+    fields: Vec<Field>,
+    distinguished: bool,
+    borrow_only: bool,
+    enable_schema: bool,
+    struct_update_expr: Option<Expr>,
+}
 
+fn preprocess_message_struct(input: DeriveInput) -> Result<PreprocessedMessageStruct> {
     let DeriveInput {
         ident,
         attrs: input_attrs,
@@ -127,12 +134,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream> {
         ..
     } = input
     else {
-        // `enum` types are only derived as `Message` in terms of their `Oneof` implementation
-        if matches!(input.data, Data::Enum(..)) {
-            return try_message_via_oneof(input);
-        } else {
-            bail!("Message can only be derived for a struct or an enum");
-        }
+        panic!("non-struct derive input sent to preprocess_message_struct");
     };
 
     // Process attributes
@@ -191,6 +193,38 @@ fn try_message(input: TokenStream) -> Result<TokenStream> {
 
     // Parse field data
     let fields = parse_message_fields(data_struct.fields, ignored_field_init_mode, reserved_tags)?;
+
+    Ok(PreprocessedMessageStruct {
+        ident,
+        generics,
+        fields,
+        distinguished,
+        borrow_only,
+        enable_schema,
+        struct_update_expr,
+    })
+}
+
+fn try_message(input: TokenStream) -> Result<TokenStream> {
+    let crate_ = crate_name();
+    let input: DeriveInput = parse2(input)?;
+
+    match &input.data {
+        Data::Enum(..) => return try_message_via_oneof(input),
+        Data::Struct(..) => {}
+        _ => bail!("Message can only be derived for a struct or an enum"),
+    }
+
+    let PreprocessedMessageStruct {
+        ident,
+        generics,
+        fields,
+        distinguished,
+        borrow_only,
+        enable_schema,
+        struct_update_expr,
+    } = preprocess_message_struct(input)?;
+
     let (ignored_fields, unsorted_fields): (Vec<_>, Vec<_>) =
         fields.into_iter().partition(Field::is_ignored);
 
