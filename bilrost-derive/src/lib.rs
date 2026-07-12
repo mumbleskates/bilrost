@@ -29,7 +29,7 @@ use alloc::collections::BTreeMap;
 use alloc::string::ToString;
 use alloc::vec;
 use alloc::vec::Vec;
-use eyre::{bail, eyre as err, Report as Error};
+use eyre::{bail, eyre as err, Result};
 use itertools::Itertools;
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
@@ -115,7 +115,7 @@ fn combine_generics(generics: &Generics, to_add: TokenStream) -> TokenStream {
     quote!(#wrapped)
 }
 
-fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
+fn try_message(input: TokenStream) -> Result<TokenStream> {
     let crate_ = crate_name();
     let input: DeriveInput = parse2(input)?;
 
@@ -590,7 +590,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     Ok(expanded)
 }
 
-fn try_message_via_oneof(input: DeriveInput) -> Result<TokenStream, Error> {
+fn try_message_via_oneof(input: DeriveInput) -> Result<TokenStream> {
     let crate_ = crate_name();
     let PreprocessedOneof {
         ident,
@@ -889,7 +889,7 @@ pub fn message(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     try_message(input.into()).unwrap().into()
 }
 
-fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
+fn try_enumeration(input: TokenStream) -> Result<TokenStream> {
     let crate_ = crate_name();
     let input: DeriveInput = parse2(input)?;
     let ident = input.ident;
@@ -1115,7 +1115,7 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
                 value: &mut #ident #ty_generics,
                 mut buf: #crate_::encoding::Capped<__B>,
                 _ctx: #crate_::encoding::DecodeContext,
-            ) -> Result<(), #crate_::DecodeError> {
+            ) -> ::core::result::Result<(), #crate_::DecodeError> {
                 let decoded = buf.decode_varint()?;
                 let ::core::result::Result::Ok(in_range) = u32::try_from(decoded) else {
                     return ::core::result::Result::Err(
@@ -1145,7 +1145,7 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
                 value: &mut #ident #ty_generics,
                 buf: #crate_::encoding::Capped<impl #crate_::bytes::Buf + ?Sized>,
                 ctx: #crate_::encoding::RestrictedDecodeContext,
-            ) -> Result<#crate_::Canonicity, #crate_::DecodeError> {
+            ) -> ::core::result::Result<#crate_::Canonicity, #crate_::DecodeError> {
                 <() as #crate_::encoding::ValueDecoder<
                     #crate_::encoding::GeneralGeneric<__G>, #ident #ty_generics
                 >>::decode_value(
@@ -1168,7 +1168,7 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
                 value: &mut #ident #ty_generics,
                 mut buf: #crate_::encoding::Capped<&'__a [u8]>,
                 ctx: #crate_::encoding::DecodeContext,
-            ) -> Result<(), #crate_::DecodeError> {
+            ) -> ::core::result::Result<(), #crate_::DecodeError> {
                 <() as #crate_::encoding::ValueDecoder<
                     #crate_::encoding::GeneralGeneric<__G>, #ident #ty_generics
                 >>::decode_value(
@@ -1192,7 +1192,7 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
                 value: &mut #ident #ty_generics,
                 buf: #crate_::encoding::Capped<&'__a [u8]>,
                 ctx: #crate_::encoding::RestrictedDecodeContext,
-            ) -> Result<#crate_::Canonicity, #crate_::DecodeError> {
+            ) -> ::core::result::Result<#crate_::Canonicity, #crate_::DecodeError> {
                 <() as #crate_::encoding::ValueDecoder<
                     #crate_::encoding::GeneralGeneric<__G>, #ident #ty_generics
                 >>::decode_value(
@@ -1220,7 +1220,7 @@ fn is_zero_discriminant(expr: &Expr) -> bool {
 }
 
 /// Get the numeric variant value for an enumeration from attrs.
-fn variant_attr(attrs: &Vec<Attribute>) -> Result<Option<Expr>, Error> {
+fn variant_attr(attrs: &Vec<Attribute>) -> Result<Option<Expr>> {
     let mut result: Option<Expr> = None;
     for attr in attrs {
         if attr.meta.path().is_ident("bilrost") {
@@ -1264,7 +1264,7 @@ struct PreprocessedOneof {
     empty_variant: Option<Ident>,
 }
 
-fn preprocess_oneof(input: &DeriveInput) -> Result<PreprocessedOneof, Error> {
+fn preprocess_oneof(input: &DeriveInput) -> Result<PreprocessedOneof> {
     let input_variants = match &input.data {
         Data::Enum(enum_) => enum_.variants.clone(),
         Data::Struct(..) => bail!("Oneof can not be derived for a struct"),
@@ -1358,7 +1358,7 @@ fn preprocess_oneof(input: &DeriveInput) -> Result<PreprocessedOneof, Error> {
     })
 }
 
-fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
+fn try_oneof(input: TokenStream) -> Result<TokenStream> {
     let crate_ = crate_name();
     let input: DeriveInput = parse2(input)?;
 

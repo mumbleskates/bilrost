@@ -9,7 +9,7 @@ use crate::field::traits::{
 use alloc::boxed::Box;
 use alloc::vec;
 use alloc::vec::Vec;
-use eyre::{bail, Report as Error};
+use eyre::{bail, Result};
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 use syn::{Meta, Type};
@@ -21,7 +21,7 @@ pub struct OneofInclusion {
 }
 
 impl OneofInclusion {
-    pub fn new(ty: &Type, attrs: &[Meta]) -> Result<Option<Box<OneofInclusion>>, Error> {
+    pub fn new(ty: &Type, attrs: &[Meta]) -> Result<Option<Box<OneofInclusion>>> {
         let mut oneof_tags = None;
         let mut unknown_attrs = Vec::new();
 

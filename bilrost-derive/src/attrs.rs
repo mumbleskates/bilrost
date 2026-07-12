@@ -4,7 +4,7 @@ use alloc::vec::Vec;
 use core::any::type_name;
 use core::fmt::Debug;
 use core::ops::RangeInclusive;
-use eyre::{bail, eyre as err, Report as Error};
+use eyre::{bail, eyre as err, Result};
 use itertools::Itertools;
 use quote::quote;
 use syn::parse::ParseStream;
@@ -16,7 +16,7 @@ use syn::{
 };
 
 /// Get the items belonging to the 'bilrost' list attribute, e.g. `#[bilrost(foo, bar="baz")]`.
-pub fn bilrost_attrs(attrs: &[Attribute]) -> Result<Vec<Meta>, Error> {
+pub fn bilrost_attrs(attrs: &[Attribute]) -> Result<Vec<Meta>> {
     let mut result = Vec::new();
     for attr in attrs {
         if let Meta::List(meta_list) = &attr.meta {
@@ -42,7 +42,7 @@ pub fn bilrost_attrs(attrs: &[Attribute]) -> Result<Vec<Meta>, Error> {
     Ok(result)
 }
 
-pub fn tag_attr(attr: &Meta) -> Result<Option<u32>, Error> {
+pub fn tag_attr(attr: &Meta) -> Result<Option<u32>> {
     if !attr.path().is_ident("tag") {
         return Ok(None);
     }
@@ -67,7 +67,7 @@ pub fn tag_attr(attr: &Meta) -> Result<Option<u32>, Error> {
 pub struct TagList(Vec<RangeInclusive<u32>>);
 
 impl TagList {
-    fn validate(&mut self, range_size_limit: Option<usize>) -> Result<(), Error> {
+    fn validate(&mut self, range_size_limit: Option<usize>) -> Result<()> {
         for range in &self.0 {
             if range.is_empty() {
                 bail!(
@@ -190,7 +190,7 @@ pub fn tag_list_attr(
     attr: &Meta,
     name: &str,
     range_size_limit: Option<usize>,
-) -> Result<Option<TagList>, Error> {
+) -> Result<Option<TagList>> {
     if !attr.path().is_ident(name) {
         return Ok(None);
     }
@@ -210,7 +210,7 @@ pub fn tag_list_attr(
     Ok(Some(tag_list))
 }
 
-pub fn named_attr<T: parse::Parse>(attr: &Meta, attr_name: &str) -> Result<Option<T>, Error> {
+pub fn named_attr<T: parse::Parse>(attr: &Meta, attr_name: &str) -> Result<Option<T>> {
     if !attr.path().is_ident(attr_name) {
         return Ok(None);
     }
@@ -252,7 +252,7 @@ pub fn word_attr(attr: &Meta, key: &str) -> bool {
     }
 }
 
-pub fn set_option<T: Debug>(option: &mut Option<T>, value: T, message: &str) -> Result<(), Error> {
+pub fn set_option<T: Debug>(option: &mut Option<T>, value: T, message: &str) -> Result<()> {
     set_option_with_display(option, value, message, |val| format!("{val:?}"))
 }
 
@@ -261,7 +261,7 @@ pub fn set_option_with_display<T>(
     value: T,
     message: &str,
     display: impl Fn(&T) -> String,
-) -> Result<(), Error>
+) -> Result<()>
 where
     T: Debug,
 {
@@ -276,7 +276,7 @@ where
     Ok(())
 }
 
-pub fn set_bool(b: &mut bool, message: &str) -> Result<(), Error> {
+pub fn set_bool(b: &mut bool, message: &str) -> Result<()> {
     if *b {
         bail!("{message}");
     } else {

@@ -17,7 +17,7 @@ use alloc::format;
 use alloc::string::ToString;
 use alloc::vec;
 use alloc::vec::Vec;
-use eyre::{bail, eyre as err, Report as Error};
+use eyre::{bail, eyre as err, Result};
 use itertools::Itertools;
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, ToTokens};
@@ -77,7 +77,7 @@ impl MessageField {
         ty: &Type,
         attrs: Vec<Meta>,
         inferred_tag: Option<u32>,
-    ) -> Result<Box<MessageField>, Error> {
+    ) -> Result<Box<MessageField>> {
         let mut tag = None;
         let mut enumeration_ty: Option<Type> = None;
         let mut remaining_attrs = vec![];
@@ -319,11 +319,7 @@ impl SinglyTagged for MessageField {
 }
 
 impl ValueField {
-    fn new(
-        ty: &Type,
-        attrs: Vec<Meta>,
-        implicit_default_encoding: &str,
-    ) -> Result<ValueField, Error> {
+    fn new(ty: &Type, attrs: Vec<Meta>, implicit_default_encoding: &str) -> Result<ValueField> {
         let mut encoding = None;
         let mut recurses = false;
         let mut unknown_attrs = Vec::new();
@@ -394,7 +390,7 @@ impl OneofVariant {
     /// within a Message.
     ///
     /// Returns `Ok` for data variants, and `Err` with just the ident for an empty variant.
-    pub fn new(variant: Variant) -> Result<Option<OneofVariant>, Error> {
+    pub fn new(variant: Variant) -> Result<Option<OneofVariant>> {
         let mut tag = None; // tag number
         let mut message = false; // whether this variant is marked as a "message" variant
         let mut empty = false; // whether this unit is marked as an "empty" variant

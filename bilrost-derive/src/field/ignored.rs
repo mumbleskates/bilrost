@@ -4,7 +4,7 @@ use crate::field::traits::{FieldBearer, WhereFor};
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 use alloc::{format, vec};
-use eyre::{bail, Report as Error};
+use eyre::{bail, Result};
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{parse_str, Expr, Generics, Ident, Meta, Type};
@@ -45,7 +45,7 @@ impl IgnoredField {
         ty: &Type,
         attrs: &[Meta],
         default_init_mode: InitMode,
-    ) -> Result<Option<Box<Self>>, Error> {
+    ) -> Result<Option<Box<Self>>> {
         let mut ignore_attr = None;
         for attr in attrs {
             let this_attr = if word_attr(attr, "ignore") {

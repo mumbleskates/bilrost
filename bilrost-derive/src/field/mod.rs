@@ -11,7 +11,7 @@ use core::iter::repeat;
 use core::mem::take;
 use core::ops::Deref;
 use core::{iter, slice};
-use eyre::{bail, eyre as err, Report as Error};
+use eyre::{bail, eyre as err, Result};
 use itertools::{repeat_n, Either, Itertools};
 use proc_macro2::{Ident, TokenStream};
 use quote::{quote, ToTokens};
@@ -58,7 +58,7 @@ pub fn parse_message_fields(
     fields: syn::Fields,
     init_mode: InitMode,
     reserved: Option<TagList>,
-) -> Result<Vec<Field>, Error> {
+) -> Result<Vec<Field>> {
     let mut next_tag = Some(match fields {
         // tuple structs begin field numbering at zero
         syn::Fields::Unnamed(..) => 0,
@@ -91,7 +91,7 @@ pub fn parse_message_fields(
             }
             Ok(field)
         })
-        .collect::<Result<Vec<_>, Error>>()?;
+        .collect::<Result<Vec<_>>>()?;
 
     // Index all fields by their tag(s) and check them against the forbidden tag ranges
     let all_tags: BTreeMap<u32, &Field> = unsorted_fields
@@ -140,7 +140,7 @@ impl Field {
         attrs: &[Attribute],
         inferred_tag: Option<u32>,
         init_mode: InitMode,
-    ) -> Result<Field, Error> {
+    ) -> Result<Field> {
         let attrs = bilrost_attrs(attrs)?;
 
         Ok(Field {
