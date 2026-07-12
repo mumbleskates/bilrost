@@ -46,21 +46,21 @@ pub fn tag_attr(attr: &Meta) -> Result<Option<u32>> {
     if !attr.path().is_ident("tag") {
         return Ok(None);
     }
-    match attr {
+    Ok(Some(match attr {
         // tag(1)
-        Meta::List(meta_list) => Ok(Some(meta_list.parse_args::<LitInt>()?.base10_parse()?)),
+        Meta::List(meta_list) => meta_list.parse_args::<LitInt>()?.base10_parse()?,
         Meta::NameValue(MetaNameValue {
             value: Expr::Lit(expr),
             ..
         }) => match &expr.lit {
             // tag = "1"
-            Lit::Str(lit) => lit.value().parse::<u32>().map_err(Error::from).map(Some),
+            Lit::Str(lit) => lit.parse::<LitInt>()?.base10_parse()?,
             // tag = 1
-            Lit::Int(lit) => Ok(Some(lit.base10_parse()?)),
+            Lit::Int(lit) => lit.base10_parse()?,
             _ => bail!("invalid tag attribute: {attr}", attr = quote!(#attr)),
         },
         _ => bail!("invalid tag attribute: {attr}", attr = quote!(#attr)),
-    }
+    }))
 }
 
 #[derive(Debug, Default)]
