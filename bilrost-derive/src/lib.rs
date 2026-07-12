@@ -348,10 +348,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream> {
             &where_fields,
             Schema,
         );
-        let field_schemas: Vec<_> = unsorted_fields
-            .iter()
-            .flat_map(|field| field.schema())
-            .collect();
+        let field_schemas: Vec<_> = unsorted_fields.iter().flat_map(Field::schema).collect();
 
         quote! {
             impl #impl_generics #crate_::encoding::schema::RegisterMessage for __Self #ty_generics
@@ -634,7 +631,7 @@ fn try_message_via_oneof(input: DeriveInput) -> Result<TokenStream> {
         borrow_only,
         enable_schema,
         empty_variant,
-    } = preprocess_oneof(&input)?;
+    } = preprocess_oneof(input)?;
 
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
@@ -670,7 +667,7 @@ fn try_message_via_oneof(input: DeriveInput) -> Result<TokenStream> {
         );
 
         quote! {
-            impl #impl_generics #crate_::encoding::schema::RegisterMessage for #ident #ty_generics
+            impl #impl_generics #crate_::encoding::schema::RegisterMessage for __Self #ty_generics
             #schema_where_clause {
                 fn register(schema: &#crate_::encoding::schema::Schema) {
                     #crate_::encoding::schema::PopulateSchema::register_message::<Self>(
@@ -1298,15 +1295,15 @@ struct PreprocessedOneof {
     empty_variant: Option<Ident>,
 }
 
-fn preprocess_oneof(input: &DeriveInput) -> Result<PreprocessedOneof> {
+fn preprocess_oneof(input: DeriveInput) -> Result<PreprocessedOneof> {
     let input_variants = match &input.data {
         Data::Enum(enum_) => enum_.variants.clone(),
         Data::Struct(..) => bail!("Oneof can not be derived for a struct"),
         Data::Union(..) => bail!("Oneof can not be derived for a union"),
     };
 
-    let ident = input.ident.clone();
-    let generics = input.generics.clone();
+    let ident = input.ident;
+    let generics = input.generics;
 
     let mut reserved_tags = None;
     let mut unknown_attrs = Vec::new();
@@ -1404,7 +1401,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream> {
         borrow_only,
         enable_schema,
         empty_variant,
-    } = preprocess_oneof(&input)?;
+    } = preprocess_oneof(input)?;
 
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
     let borrow_generics = combine_generics(&generics, quote!('__a));
@@ -1874,6 +1871,208 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream> {
 #[proc_macro_derive(Oneof, attributes(bilrost))]
 pub fn oneof(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     try_oneof(input.into()).unwrap().into()
+}
+
+fn try_schema(input: TokenStream) -> Result<TokenStream> {
+    let input: DeriveInput = parse2(input)?;
+
+    match &input.data {
+        Data::Struct(..) => try_struct_schema(input),
+        Data::Enum(..) => try_enum_schema(input),
+        Data::Union(..) => bail!("schema cannot be derived for a union type"),
+    }
+}
+
+fn try_struct_schema(input: DeriveInput) -> Result<TokenStream> {
+    let PreprocessedMessageStruct {
+        ident,
+        generics,
+        fields,
+        distinguished: _,
+        borrow_only: _,
+        enable_schema: _,
+        struct_update_expr,
+    } = preprocess_message_struct(input)?;
+
+    let crate_ = crate_name();
+
+    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+
+    let (ignored_fields, implemented_fields): (Vec<_>, Vec<_>) =
+        fields.into_iter().partition(Field::is_ignored);
+
+    let self_where = if ignored_fields
+        .iter()
+        .any(Field::ignored_and_uses_struct_update_syntax)
+        && struct_update_expr.is_none()
+    {
+        // When there are ignored fields that we are taking from ..<Self as Default>, the whole
+        // message impl should be bounded by Self: Default
+        Some(quote!(Self: ::core::default::Default))
+    } else {
+        None
+    };
+
+    let schema_where_clause = append_wheres_with_fields(
+        where_clause,
+        self_where
+            .into_iter()
+            .chain([quote!(Self: ::core::any::Any)]),
+        &implemented_fields,
+        Schema,
+    );
+
+    let field_schemas: Vec<_> = implemented_fields.iter().flat_map(Field::schema).collect();
+
+    let impls = quote! {
+        impl #impl_generics #crate_::encoding::schema::RegisterMessage for __Self #ty_generics
+        #schema_where_clause {
+            fn register(schema: &#crate_::encoding::schema::Schema) {
+                #crate_::encoding::schema::PopulateSchema::register_message::<Self>(
+                    schema,
+                    stringify!(#ident),
+                    |fields| {
+                        #(#field_schemas)*
+                    },
+                );
+            }
+        }
+    };
+
+    let aliases = encoder_alias_header();
+    let expanded = quote! {
+        const _: () = {
+            use #ident as __Self;
+
+            const _: () = {
+                #aliases
+
+                #impls
+            };
+        };
+    };
+
+    Ok(expanded)
+}
+
+fn try_enum_schema(input: DeriveInput) -> Result<TokenStream> {
+    let PreprocessedOneof {
+        ident,
+        generics,
+        variants,
+        distinguished: _,
+        borrow_only: _,
+        enable_schema: _,
+        empty_variant,
+    } = preprocess_oneof(input)?;
+
+    let crate_ = crate_name();
+
+    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+
+    let schema_where_clause = append_wheres_with_fields(
+        where_clause,
+        Some(quote!(Self: ::core::any::Any)),
+        &variants,
+        Schema,
+    );
+
+    let submessage_schemas = {
+        let submessage_registrations: Vec<_> = variants
+            .iter()
+            .flat_map(|variant| variant.subtype_schema())
+            .collect();
+        if submessage_registrations.is_empty() {
+            None
+        } else {
+            Some(quote! {
+                #crate_::encoding::schema::PopulateSchema::register_oneof_messages::<Self>(
+                    schema,
+                    stringify!(#ident),
+                    |messages| {
+                        #(#submessage_registrations)*
+                    },
+                );
+            })
+        }
+    };
+    // registers the variants of the oneof as fields
+    let field_schemas: Vec<_> = variants.iter().map(|variant| variant.schema()).collect();
+
+    // We always emit the AddOneofFields impl for the oneof.
+    let as_oneof_impls = quote! {
+        impl #impl_generics #crate_::encoding::schema::AddOneofFields
+        for __Self #ty_generics #schema_where_clause
+        {
+            fn add_fields(
+                schema: &#crate_::encoding::schema::Schema,
+                fields: &mut #crate_::encoding::schema::MessageFields,
+                field_name: ::core::option::Option<&str>,
+            ) {
+                #submessage_schemas
+                #(#field_schemas)*
+            }
+        }
+    };
+
+    // We only emit the RegisterMessage impl if the oneof *can* be a Message (that is, if it has an
+    // empty variant)
+    let as_message_impls = empty_variant.map(|_| {
+        let schema_where_clause = append_wheres(
+            where_clause,
+            [
+                quote!(Self: ::core::any::Any),
+                quote!(Self: #crate_::encoding::Oneof),
+                quote!(Self: #crate_::encoding::schema::AddOneofFields),
+            ],
+        );
+
+        quote! {
+            impl #impl_generics #crate_::encoding::schema::RegisterMessage
+            for __Self #ty_generics #schema_where_clause
+            {
+                fn register(schema: &#crate_::encoding::schema::Schema) {
+                    #crate_::encoding::schema::PopulateSchema::register_message::<Self>(
+                        schema,
+                        stringify!(#ident),
+                        |fields| {
+                            fields.add_oneof(
+                                stringify!(#ident),
+                                <Self as #crate_::encoding::Oneof>::FIELD_TAGS,
+                            );
+                            <Self as #crate_::encoding::schema::AddOneofFields>::add_fields(
+                                schema,
+                                fields,
+                                None,
+                            );
+                        },
+                    );
+                }
+            }
+        }
+    });
+
+    let aliases = encoder_alias_header();
+    let expanded = quote! {
+        const _: () = {
+            use #ident as __Self;
+
+            const _: () = {
+                #aliases
+
+                #as_oneof_impls
+
+                #as_message_impls
+            };
+        };
+    };
+
+    Ok(expanded)
+}
+
+#[proc_macro_derive(Schema, attributes(bilrost))]
+pub fn schema(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    try_schema(input.into()).unwrap().into()
 }
 
 #[cfg(test)]
