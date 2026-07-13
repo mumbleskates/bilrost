@@ -53,6 +53,36 @@ impl Context {
     }
 }
 
+fn version_assert(ctx: &Context) -> TokenStream {
+    let crate_ = &ctx.crate_name;
+    let derive_version = core::env!("CARGO_PKG_VERSION");
+    let error_msg = alloc::format!(
+        "derive version {derive_version} does not match library version at {path}",
+        path = quote!(#crate_),
+    );
+    quote! {
+        let derive_version = #derive_version;
+        let library_version = #crate_::encoding::VERSION;
+        let different = if derive_version.len() != library_version.len() {
+            true
+        } else {
+            let mut i = 0;
+            let mut different = false;
+            while i < derive_version.len() {
+                if derive_version.as_bytes()[i] != library_version.as_bytes()[i] {
+                    different = true;
+                    break;
+                }
+                i += 1;
+            }
+            different
+        };
+        if different {
+            panic!(#error_msg);
+        }
+    }
+}
+
 /// Defines the common aliases for encoder types available to every bilrost derive.
 ///
 /// The standard encoders are all made available in scope with lower-cased names, making them
@@ -322,7 +352,8 @@ fn try_message(input: TokenStream) -> Result<TokenStream> {
 
     let static_guards = unsorted_fields
         .iter()
-        .filter_map(|field| field.tag_list_guard(ctx));
+        .filter_map(|field| field.tag_list_guard(ctx))
+        .chain([version_assert(ctx)]);
 
     let empties: Vec<_> = unsorted_fields
         .iter()
@@ -623,6 +654,7 @@ fn try_message_via_oneof(input: DeriveInput) -> Result<TokenStream> {
 
     let ctx = &Context::new(crate_name);
     let crate_ = &ctx.crate_name;
+    let version_guard = version_assert(ctx);
 
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
@@ -682,7 +714,7 @@ fn try_message_via_oneof(input: DeriveInput) -> Result<TokenStream> {
     let impls = quote! {
         impl #impl_generics #crate_::encoding::RawMessage
         for #ident #ty_generics #encoder_where_clause {
-            const __ASSERTIONS: () = ();
+            const __ASSERTIONS: () = { #version_guard };
 
             #[inline(always)]
             fn empty() -> Self {

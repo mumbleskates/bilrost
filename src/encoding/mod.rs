@@ -137,6 +137,8 @@ use core::fmt::Debug;
 use core::ops::{Deref, DerefMut};
 use core::str;
 
+pub const VERSION: &str = core::env!("CARGO_PKG_VERSION");
+
 pub(crate) mod decoding_modes;
 mod encoding_traits;
 mod fixed;
