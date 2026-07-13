@@ -1,6 +1,6 @@
 [package]
 name = "bilrost"
-version = "0.1016.0-dev"
+version.workspace = true
 authors = [
     "Kent Ross <k@mad.cash>",
 ]
@@ -11,9 +11,8 @@ readme = "README.md"
 description = "A compact protobuf-like serializer and deserializer for the Rust Language."
 keywords = ["serialization", "no-std", "derive", "encoding"]
 categories = ["encoding", "no-std"]
-edition = "2021"
-resolver = "2"
-rust-version = "1.65"
+edition.workspace = true
+rust-version.workspace = true
 
 [workspace]
 members = [
@@ -24,6 +23,12 @@ members = [
 exclude = [
     "old-hashbrown-check",
 ]
+resolver = "2"
+
+[workspace.package]
+version = "0.1016.0-dev"
+edition = "2021"
+rust-version = "1.65"
 
 [lib]
 # https://bheisler.github.io/criterion.rs/book/faq.html#cargo-bench-gives-unrecognized-option-errors-for-valid-command-line-options
