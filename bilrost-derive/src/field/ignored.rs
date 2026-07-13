@@ -1,6 +1,7 @@
 use crate::attrs::{named_attr, word_attr};
 use crate::field::ident_string;
 use crate::field::traits::{FieldBearer, WhereFor};
+use crate::Context;
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 use alloc::{format, vec};
@@ -121,7 +122,7 @@ impl IgnoredField {
 }
 
 impl FieldBearer for IgnoredField {
-    fn where_terms(&self, _purpose: WhereFor) -> Vec<TokenStream> {
+    fn where_terms(&self, _purpose: WhereFor, _ctx: &Context) -> Vec<TokenStream> {
         match self.init_mode {
             InitMode::FromStructUpdate | InitMode::Override(..) => vec![],
             InitMode::DefaultPerField => {

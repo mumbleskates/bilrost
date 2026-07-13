@@ -1,11 +1,11 @@
 use crate::attrs::{set_option_with_display, tag_list_attr, TagList};
-use crate::crate_name;
 use crate::field::traits::{
     DecodeLifetime::{self, Borrowed, Owned},
     DecodeMode::{self, Distinguished, Relaxed},
     Tagged,
     WhereFor::{self, Decode, Encode, Schema},
 };
+use crate::Context;
 use alloc::boxed::Box;
 use alloc::vec;
 use alloc::vec::Vec;
@@ -61,8 +61,8 @@ impl OneofInclusion {
 
     /// Returns a statement which encodes the oneof field. `target` should be a reference to the
     /// field value.
-    pub fn encode(&self, target: TokenStream) -> TokenStream {
-        let crate_ = crate_name();
+    pub fn encode(&self, target: TokenStream, ctx: &Context) -> TokenStream {
+        let crate_ = &ctx.crate_name;
         quote! {
             #crate_::encoding::Oneof::oneof_encode(#target, buf, tw);
         }
@@ -70,8 +70,8 @@ impl OneofInclusion {
 
     /// Returns a statement which prepends the oneof field. `target` should be a reference to the
     /// field value.
-    pub fn prepend(&self, target: TokenStream) -> TokenStream {
-        let crate_ = crate_name();
+    pub fn prepend(&self, target: TokenStream, ctx: &Context) -> TokenStream {
+        let crate_ = &ctx.crate_name;
         quote! {
             #crate_::encoding::Oneof::oneof_prepend(#target, buf, tw);
         }
@@ -84,8 +84,9 @@ impl OneofInclusion {
         target: TokenStream,
         lifetime: DecodeLifetime,
         mode: DecodeMode,
+        ctx: &Context,
     ) -> TokenStream {
-        let crate_ = crate_name();
+        let crate_ = &ctx.crate_name;
         let (trait_name, call) = match (lifetime, mode) {
             (Owned, Relaxed) => (quote!(OneofDecoder), quote!(oneof_decode_field)),
             (Borrowed, Relaxed) => (
@@ -106,23 +107,23 @@ impl OneofInclusion {
 
     /// Returns an expression which evaluates to the encoded length of the oneof field. `target`
     /// should be a reference to the field value.
-    pub fn encoded_len(&self, target: TokenStream) -> TokenStream {
-        let crate_ = crate_name();
+    pub fn encoded_len(&self, target: TokenStream, ctx: &Context) -> TokenStream {
+        let crate_ = &ctx.crate_name;
         quote!(#crate_::encoding::Oneof::oneof_encoded_len(#target, tm))
     }
 
     /// Returns an expression which initializes the field's type as a guaranteed empty value with
     /// its encoding.
-    pub fn empty(&self) -> TokenStream {
-        let crate_ = crate_name();
+    pub fn empty(&self, ctx: &Context) -> TokenStream {
+        let crate_ = &ctx.crate_name;
         let ty = &self.ty;
         quote!(<#ty as #crate_::encoding::Oneof>::empty())
     }
 
     /// Returns an expression which returns whether the field is considered empty in the encoding.
     /// `target` should be a reference to the field value.
-    pub fn is_empty(&self, target: TokenStream) -> TokenStream {
-        let crate_ = crate_name();
+    pub fn is_empty(&self, target: TokenStream, ctx: &Context) -> TokenStream {
+        let crate_ = &ctx.crate_name;
         let ty = &self.ty;
         quote!(
             <#ty as #crate_::encoding::Oneof>::is_empty(#target)
@@ -131,8 +132,8 @@ impl OneofInclusion {
 
     /// Returns an expression which resets the field's value to empty with its encoding. `target`
     /// should be a reference to the field value.
-    pub fn clear(&self, target: TokenStream) -> TokenStream {
-        let crate_ = crate_name();
+    pub fn clear(&self, target: TokenStream, ctx: &Context) -> TokenStream {
+        let crate_ = &ctx.crate_name;
         let ty = &self.ty;
         quote! {
             <#ty as #crate_::encoding::Oneof>::clear(#target);
@@ -141,14 +142,14 @@ impl OneofInclusion {
 
     /// Returns an expression which evaluates to an Option<u32> of the tag of the (maybe) present
     /// field in the oneof. `target` should be a reference to the field value.
-    pub fn current_tag(&self, target: impl ToTokens) -> TokenStream {
-        let crate_ = crate_name();
+    pub fn current_tag(&self, target: impl ToTokens, ctx: &Context) -> TokenStream {
+        let crate_ = &ctx.crate_name;
         quote!(#crate_::encoding::Oneof::oneof_current_tag(#target))
     }
 
     /// Returns the where clause constraint term for the field really implementing the oneof trait.
-    pub fn where_terms(&self, purpose: WhereFor) -> Vec<TokenStream> {
-        let crate_ = crate_name();
+    pub fn where_terms(&self, purpose: WhereFor, ctx: &Context) -> Vec<TokenStream> {
+        let crate_ = &ctx.crate_name;
         let ty = &self.ty;
         vec![match purpose {
             Encode => quote!(#ty: #crate_::encoding::Oneof),
@@ -168,8 +169,8 @@ impl OneofInclusion {
         }]
     }
 
-    pub fn schema(&self, oneof_name: &str) -> TokenStream {
-        let crate_ = crate_name();
+    pub fn schema(&self, oneof_name: &str, ctx: &Context) -> TokenStream {
+        let crate_ = &ctx.crate_name;
         let tags = &self.tags;
         let ty = &self.ty;
         quote! {

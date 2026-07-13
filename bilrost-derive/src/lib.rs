@@ -34,16 +34,23 @@ use itertools::Itertools;
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 use syn::{
-    parse2, Attribute, Data, DeriveInput, Expr, Fields, Generics, Ident, Meta, Pat, Variant,
+    parse2, Attribute, Data, DeriveInput, Expr, Fields, Generics, Ident, Meta, Pat, Path, Variant,
     WhereClause,
 };
 
 mod attrs;
 mod field;
 
-fn crate_name() -> TokenStream {
-    // TODO: make the crate name controllable with a lazy lock
-    quote!(::bilrost)
+struct Context {
+    crate_name: Path,
+}
+
+impl Context {
+    fn new(crate_name: Option<Path>) -> Self {
+        Context {
+            crate_name: crate_name.unwrap_or_else(|| parse2(quote!(::bilrost)).unwrap()),
+        }
+    }
 }
 
 /// Defines the common aliases for encoder types available to every bilrost derive.
@@ -51,8 +58,8 @@ fn crate_name() -> TokenStream {
 /// The standard encoders are all made available in scope with lower-cased names, making them
 /// simultaneously easier to spell when writing the field attributes and making them less likely to
 /// shadow custom encoder types.
-fn encoder_alias_header() -> TokenStream {
-    let crate_ = crate_name();
+fn encoder_alias_header(ctx: &Context) -> TokenStream {
+    let crate_ = &ctx.crate_name;
     quote! {
         use #crate_::encoding::{
             Fixed as fixed,
@@ -99,10 +106,13 @@ fn append_wheres_with_fields(
     wheres: impl IntoIterator<Item = TokenStream>,
     fields: impl FieldBearer,
     field_purpose: WhereFor,
+    ctx: &Context,
 ) -> Option<TokenStream> {
     append_wheres(
         where_clause,
-        wheres.into_iter().chain(fields.where_terms(field_purpose)),
+        wheres
+            .into_iter()
+            .chain(fields.where_terms(field_purpose, ctx)),
     )
 }
 
@@ -201,7 +211,6 @@ fn preprocess_message_struct(input: DeriveInput) -> Result<PreprocessedMessageSt
 }
 
 fn try_message(input: TokenStream) -> Result<TokenStream> {
-    let crate_ = crate_name();
     let input: DeriveInput = parse2(input)?;
 
     match &input.data {
@@ -218,6 +227,9 @@ fn try_message(input: TokenStream) -> Result<TokenStream> {
         borrow_only,
         struct_update_expr,
     } = preprocess_message_struct(input)?;
+
+    let ctx = &Context::new(None); // TODO: populate
+    let crate_ = &ctx.crate_name;
 
     let (ignored_fields, unsorted_fields): (Vec<_>, Vec<_>) =
         fields.into_iter().partition(Field::is_ignored);
@@ -244,7 +256,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream> {
 
     let where_fields = vec![unsorted_fields.as_slice(), ignored_fields.as_slice()];
     let encoder_where_clause =
-        append_wheres_with_fields(where_clause, self_where.clone(), &where_fields, Encode);
+        append_wheres_with_fields(where_clause, self_where.clone(), &where_fields, Encode, ctx);
     let [owned_decoder_where_clause, borrowed_decoder_where_clause] =
         [Owned, Borrowed].map(|lifetime| {
             append_wheres_with_fields(
@@ -252,20 +264,21 @@ fn try_message(input: TokenStream) -> Result<TokenStream> {
                 self_where.clone(),
                 &where_fields,
                 Decode(lifetime, Relaxed),
+                ctx,
             )
         });
 
     let self_instance = FieldTarget::MessageInstance(quote!(self));
     let fields = MessageFieldsSorted::new(&unsorted_fields);
-    let encoded_len = fields.encoded_len(&self_instance);
-    let encode = fields.encode(&self_instance);
-    let prepend = fields.prepend(&self_instance);
+    let encoded_len = fields.encoded_len(&self_instance, ctx);
+    let encode = fields.encode(&self_instance, ctx);
+    let prepend = fields.prepend(&self_instance, ctx);
 
     let [decode_owned, decode_borrowed] = [Owned, Borrowed].map(|lifetime| {
         let ident_str = ident.to_string();
         let self_instance = self_instance.clone();
         unsorted_fields.iter().map(move |field| {
-            let decode = field.decode(&self_instance, lifetime, Relaxed);
+            let decode = field.decode(&self_instance, lifetime, Relaxed, ctx);
             let tags = field.tags().into_iter().map(|tag| quote!(#tag));
             let tags = Itertools::intersperse(tags, quote!(|));
             let field_ident_str = field.ident().to_string();
@@ -283,7 +296,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream> {
 
     let methods = unsorted_fields
         .iter()
-        .flat_map(|field| field.methods())
+        .flat_map(|field| field.methods(ctx))
         .collect::<Vec<_>>();
     let methods = if methods.is_empty() {
         None
@@ -298,24 +311,24 @@ fn try_message(input: TokenStream) -> Result<TokenStream> {
 
     let static_guards = unsorted_fields
         .iter()
-        .filter_map(|field| field.tag_list_guard());
+        .filter_map(|field| field.tag_list_guard(ctx));
 
     let empties: Vec<_> = unsorted_fields
         .iter()
         .chain(ignored_fields.iter())
         .flat_map(|field| {
-            let empty = field.empty(None)?;
+            let empty = field.empty(None, ctx)?;
             let ident = field.ident();
             Some(quote!(#ident: #empty))
         })
         .collect();
     let is_empties: Vec<_> = unsorted_fields
         .iter()
-        .map(|field| field.is_empty(&self_instance))
+        .map(|field| field.is_empty(&self_instance, ctx))
         .collect();
     let clears: Vec<_> = unsorted_fields
         .iter()
-        .map(|field| field.clear(&self_instance))
+        .map(|field| field.clear(&self_instance, ctx))
         .collect();
 
     let maybe_struct_update = if ignored_fields
@@ -468,6 +481,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream> {
                     distinguished_self_where.clone(),
                     &where_fields,
                     Decode(lifetime, Distinguished),
+                    ctx,
                 )
             });
 
@@ -475,7 +489,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream> {
             let ident_str = ident.to_string();
             let self_instance = self_instance.clone();
             unsorted_fields.iter().map(move |field| {
-                let decode = field.decode(&self_instance, lifetime, Distinguished);
+                let decode = field.decode(&self_instance, lifetime, Distinguished, ctx);
                 let tags = field.tags().into_iter().map(|tag| quote!(#tag));
                 let tags = Itertools::intersperse(tags, quote!(|));
                 let field_ident_str = field.ident().to_string();
@@ -556,7 +570,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream> {
         }
     });
 
-    let aliases = encoder_alias_header();
+    let aliases = encoder_alias_header(ctx);
     let initializer_class = initializer_class_definition(
         ignored_fields
             .iter()
@@ -586,7 +600,6 @@ fn try_message(input: TokenStream) -> Result<TokenStream> {
 }
 
 fn try_message_via_oneof(input: DeriveInput) -> Result<TokenStream> {
-    let crate_ = crate_name();
     let PreprocessedOneof {
         ident,
         generics,
@@ -596,9 +609,12 @@ fn try_message_via_oneof(input: DeriveInput) -> Result<TokenStream> {
         empty_variant,
     } = preprocess_oneof(input)?;
 
+    let ctx = &Context::new(None); // TODO: populate
+    let crate_ = &ctx.crate_name;
+
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
-    let tag_measurer_ty = tag_measurer(&variants);
+    let tag_measurer_ty = tag_measurer(&variants)(ctx);
 
     if empty_variant.is_none() {
         bail!("Message can only be derived for Oneof enums that have an empty variant.")
@@ -848,9 +864,11 @@ pub fn message(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 }
 
 fn try_enumeration(input: TokenStream) -> Result<TokenStream> {
-    let crate_ = crate_name();
     let input: DeriveInput = parse2(input)?;
     let ident = input.ident;
+
+    let ctx = &Context::new(None); // TODO: populate
+    let crate_ = &ctx.crate_name;
 
     let generics = &input.generics;
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
@@ -1312,7 +1330,6 @@ fn preprocess_oneof(input: DeriveInput) -> Result<PreprocessedOneof> {
 }
 
 fn try_oneof(input: TokenStream) -> Result<TokenStream> {
-    let crate_ = crate_name();
     let input: DeriveInput = parse2(input)?;
 
     let PreprocessedOneof {
@@ -1324,14 +1341,23 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream> {
         empty_variant,
     } = preprocess_oneof(input)?;
 
+    let ctx = &Context::new(None); // TODO: populate
+    let crate_ = &ctx.crate_name;
+
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
     let borrow_generics = combine_generics(&generics, quote!('__a));
 
-    let encoder_where_clause = append_wheres_with_fields(where_clause, None, &variants, Encode);
+    let encoder_where_clause =
+        append_wheres_with_fields(where_clause, None, &variants, Encode, ctx);
     let owned_decoder_where_clause =
-        append_wheres_with_fields(where_clause, None, &variants, Decode(Owned, Relaxed));
-    let borrowed_decoder_where_clause =
-        append_wheres_with_fields(where_clause, None, &variants, Decode(Borrowed, Relaxed));
+        append_wheres_with_fields(where_clause, None, &variants, Decode(Owned, Relaxed), ctx);
+    let borrowed_decoder_where_clause = append_wheres_with_fields(
+        where_clause,
+        None,
+        &variants,
+        Decode(Borrowed, Relaxed),
+        ctx,
+    );
 
     let sorted_tags: Vec<u32> = variants
         .iter()
@@ -1350,17 +1376,17 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream> {
 
     let mut encode: Vec<TokenStream> = variants
         .iter()
-        .map(|variant| variant.encode(&self_alias))
+        .map(|variant| variant.encode(&self_alias, ctx))
         .collect();
 
     let mut prepend: Vec<TokenStream> = variants
         .iter()
-        .map(|variant| variant.prepend(&self_alias))
+        .map(|variant| variant.prepend(&self_alias, ctx))
         .collect();
 
     let mut encoded_len: Vec<TokenStream> = variants
         .iter()
-        .map(|variant| variant.encoded_len(&self_alias))
+        .map(|variant| variant.encoded_len(&self_alias, ctx))
         .collect();
 
     let encoder_trait;
@@ -1443,7 +1469,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream> {
         let ident_str = ident.to_string();
         let arms = variants
             .iter()
-            .map(|variant| variant.decode(&self_alias, lifetime, mode));
+            .map(|variant| variant.decode(&self_alias, lifetime, mode, ctx));
         quote! {
             match tag {
                 #(#arms,)*
@@ -1615,6 +1641,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream> {
                         [quote!(Self: #crate_::encoding::Oneof)],
                         &variants,
                         Decode(lifetime, Distinguished),
+                        ctx,
                     )
                 });
         } else {
@@ -1631,6 +1658,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream> {
                         None,
                         &variants,
                         Decode(lifetime, Distinguished),
+                        ctx,
                     )
                 });
         };
@@ -1718,7 +1746,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream> {
         }
     });
 
-    let aliases = encoder_alias_header();
+    let aliases = encoder_alias_header(ctx);
     let initializer_class = initializer_class_definition(
         variants.iter().flat_map(OneofVariant::initializer_methods),
         None,
@@ -1766,7 +1794,8 @@ fn try_struct_schema(input: DeriveInput) -> Result<TokenStream> {
         struct_update_expr,
     } = preprocess_message_struct(input)?;
 
-    let crate_ = crate_name();
+    let ctx = &Context::new(None); // TODO: populate
+    let crate_ = &ctx.crate_name;
 
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
@@ -1792,9 +1821,13 @@ fn try_struct_schema(input: DeriveInput) -> Result<TokenStream> {
             .chain([quote!(Self: ::core::any::Any)]),
         &implemented_fields,
         ForSchema,
+        ctx,
     );
 
-    let field_schemas: Vec<_> = implemented_fields.iter().flat_map(Field::schema).collect();
+    let field_schemas: Vec<_> = implemented_fields
+        .iter()
+        .flat_map(|field| field.schema(ctx))
+        .collect();
 
     let impls = quote! {
         impl #impl_generics #crate_::encoding::schema::RegisterMessage for __Self #ty_generics
@@ -1811,7 +1844,7 @@ fn try_struct_schema(input: DeriveInput) -> Result<TokenStream> {
         }
     };
 
-    let aliases = encoder_alias_header();
+    let aliases = encoder_alias_header(ctx);
     let expanded = quote! {
         const _: () = {
             use #ident as __Self;
@@ -1837,7 +1870,8 @@ fn try_enum_schema(input: DeriveInput) -> Result<TokenStream> {
         empty_variant,
     } = preprocess_oneof(input)?;
 
-    let crate_ = crate_name();
+    let ctx = &Context::new(None); // TODO: populate
+    let crate_ = &ctx.crate_name;
 
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
@@ -1846,12 +1880,13 @@ fn try_enum_schema(input: DeriveInput) -> Result<TokenStream> {
         Some(quote!(Self: ::core::any::Any)),
         &variants,
         ForSchema,
+        ctx,
     );
 
     let submessage_schemas = {
         let submessage_registrations: Vec<_> = variants
             .iter()
-            .flat_map(|variant| variant.subtype_schema())
+            .flat_map(|variant| variant.subtype_schema(ctx))
             .collect();
         if submessage_registrations.is_empty() {
             None
@@ -1868,7 +1903,7 @@ fn try_enum_schema(input: DeriveInput) -> Result<TokenStream> {
         }
     };
     // registers the variants of the oneof as fields
-    let field_schemas: Vec<_> = variants.iter().map(|variant| variant.schema()).collect();
+    let field_schemas: Vec<_> = variants.iter().map(|variant| variant.schema(ctx)).collect();
 
     // We always emit the AddOneofFields impl for the oneof.
     let as_oneof_impls = quote! {
@@ -1914,7 +1949,7 @@ fn try_enum_schema(input: DeriveInput) -> Result<TokenStream> {
         }
     });
 
-    let aliases = encoder_alias_header();
+    let aliases = encoder_alias_header(ctx);
     let expanded = quote! {
         const _: () = {
             use #ident as __Self;
