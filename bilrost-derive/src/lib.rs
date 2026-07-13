@@ -15,6 +15,7 @@ extern crate alloc;
 use crate::attrs::{
     bilrost_attrs, named_attr, set_bool, set_option_with_display, tag_list_attr, word_attr, TagList,
 };
+use crate::context::Context;
 use crate::field::traits::{
     DecodeLifetime::{Borrowed, Owned},
     DecodeMode::{Distinguished, Relaxed},
@@ -41,14 +42,18 @@ use syn::{
 mod attrs;
 mod field;
 
-struct Context {
-    crate_name: Path,
-}
+mod context {
+    use super::*;
 
-impl Context {
-    fn new(crate_name: Option<Path>) -> Self {
-        Context {
-            crate_name: crate_name.unwrap_or_else(|| parse2(quote!(::bilrost)).unwrap()),
+    pub struct Context {
+        pub crate_name: Path,
+    }
+
+    impl Context {
+        pub fn new(crate_name: Option<Path>) -> Self {
+            Context {
+                crate_name: crate_name.unwrap_or_else(|| parse2(quote!(::bilrost)).unwrap()),
+            }
         }
     }
 }
