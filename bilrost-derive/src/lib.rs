@@ -132,6 +132,7 @@ struct PreprocessedMessageStruct {
     distinguished: bool,
     borrow_only: bool,
     struct_update_expr: Option<Expr>,
+    crate_name: Option<Path>,
 }
 
 fn preprocess_message_struct(input: DeriveInput) -> Result<PreprocessedMessageStruct> {
@@ -152,6 +153,7 @@ fn preprocess_message_struct(input: DeriveInput) -> Result<PreprocessedMessageSt
     let mut borrow_only = false;
     let mut default_per_field = false;
     let mut struct_update_expr: Option<Expr> = None;
+    let mut crate_name: Option<Path> = None;
     let mut unknown_attrs = Vec::new();
     for attr in bilrost_attrs(&input_attrs)? {
         if let Some(tags) = tag_list_attr(&attr, "reserved_tags", None)? {
@@ -176,6 +178,13 @@ fn preprocess_message_struct(input: DeriveInput) -> Result<PreprocessedMessageSt
                 expr,
                 "duplicated default (expression) attributes",
                 |t| quote!((#t)).to_string(),
+            )?;
+        } else if let Some(path) = named_attr(&attr, "crate")? {
+            set_option_with_display(
+                &mut crate_name,
+                path,
+                "duplicated crate path attributes",
+                |t| quote!(#t).to_string(),
             )?;
         } else {
             unknown_attrs.push(attr);
@@ -207,6 +216,7 @@ fn preprocess_message_struct(input: DeriveInput) -> Result<PreprocessedMessageSt
         distinguished,
         borrow_only,
         struct_update_expr,
+        crate_name,
     })
 }
 
@@ -226,9 +236,10 @@ fn try_message(input: TokenStream) -> Result<TokenStream> {
         distinguished,
         borrow_only,
         struct_update_expr,
+        crate_name,
     } = preprocess_message_struct(input)?;
 
-    let ctx = &Context::new(None); // TODO: populate
+    let ctx = &Context::new(crate_name);
     let crate_ = &ctx.crate_name;
 
     let (ignored_fields, unsorted_fields): (Vec<_>, Vec<_>) =
@@ -607,9 +618,10 @@ fn try_message_via_oneof(input: DeriveInput) -> Result<TokenStream> {
         distinguished,
         borrow_only,
         empty_variant,
+        crate_name,
     } = preprocess_oneof(input)?;
 
-    let ctx = &Context::new(None); // TODO: populate
+    let ctx = &Context::new(crate_name);
     let crate_ = &ctx.crate_name;
 
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
@@ -867,7 +879,29 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream> {
     let input: DeriveInput = parse2(input)?;
     let ident = input.ident;
 
-    let ctx = &Context::new(None); // TODO: populate
+    // Process attributes
+    let mut crate_name: Option<Path> = None;
+    let mut unknown_attrs = Vec::new();
+    for attr in bilrost_attrs(&input.attrs)? {
+        if let Some(path) = named_attr(&attr, "crate")? {
+            set_option_with_display(
+                &mut crate_name,
+                path,
+                "duplicated crate path attributes",
+                |t| quote!(#t).to_string(),
+            )?;
+        } else {
+            unknown_attrs.push(attr);
+        }
+    }
+    if !unknown_attrs.is_empty() {
+        bail!(
+            "unknown attribute(s) for enumeration: {attrs}",
+            attrs = quote!(#(#unknown_attrs),*),
+        )
+    }
+
+    let ctx = &Context::new(crate_name);
     let crate_ = &ctx.crate_name;
 
     let generics = &input.generics;
@@ -1237,6 +1271,7 @@ struct PreprocessedOneof {
     distinguished: bool,
     borrow_only: bool,
     empty_variant: Option<Ident>,
+    crate_name: Option<Path>,
 }
 
 fn preprocess_oneof(input: DeriveInput) -> Result<PreprocessedOneof> {
@@ -1253,6 +1288,7 @@ fn preprocess_oneof(input: DeriveInput) -> Result<PreprocessedOneof> {
     let mut unknown_attrs = Vec::new();
     let mut distinguished = false;
     let mut borrow_only = false;
+    let mut crate_name: Option<Path> = None;
     for attr in bilrost_attrs(&input.attrs)? {
         if let Some(tags) = tag_list_attr(&attr, "reserved_tags", None)? {
             set_option_with_display(
@@ -1265,6 +1301,13 @@ fn preprocess_oneof(input: DeriveInput) -> Result<PreprocessedOneof> {
             set_bool(&mut distinguished, "duplicated distinguished attributes")?;
         } else if word_attr(&attr, "borrowed_only") {
             set_bool(&mut borrow_only, "duplicated borrowed_only attributes")?;
+        } else if let Some(path) = named_attr(&attr, "crate")? {
+            set_option_with_display(
+                &mut crate_name,
+                path,
+                "duplicated crate path attributes",
+                |t| quote!(#t).to_string(),
+            )?;
         } else {
             unknown_attrs.push(attr);
         }
@@ -1326,6 +1369,7 @@ fn preprocess_oneof(input: DeriveInput) -> Result<PreprocessedOneof> {
         distinguished,
         borrow_only,
         empty_variant,
+        crate_name,
     })
 }
 
@@ -1339,9 +1383,10 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream> {
         distinguished,
         borrow_only,
         empty_variant,
+        crate_name,
     } = preprocess_oneof(input)?;
 
-    let ctx = &Context::new(None); // TODO: populate
+    let ctx = &Context::new(crate_name);
     let crate_ = &ctx.crate_name;
 
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
@@ -1792,9 +1837,10 @@ fn try_struct_schema(input: DeriveInput) -> Result<TokenStream> {
         distinguished: _,
         borrow_only: _,
         struct_update_expr,
+        crate_name,
     } = preprocess_message_struct(input)?;
 
-    let ctx = &Context::new(None); // TODO: populate
+    let ctx = &Context::new(crate_name);
     let crate_ = &ctx.crate_name;
 
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
@@ -1868,9 +1914,10 @@ fn try_enum_schema(input: DeriveInput) -> Result<TokenStream> {
         distinguished: _,
         borrow_only: _,
         empty_variant,
+        crate_name,
     } = preprocess_oneof(input)?;
 
-    let ctx = &Context::new(None); // TODO: populate
+    let ctx = &Context::new(crate_name);
     let crate_ = &ctx.crate_name;
 
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
