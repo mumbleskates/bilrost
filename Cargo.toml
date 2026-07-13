@@ -18,6 +18,7 @@ rust-version.workspace = true
 members = [
     "bilrost-derive",
     "bilrost-types",
+    "custom-crate-name-test",
     "fuzz/common",
 ]
 exclude = [
