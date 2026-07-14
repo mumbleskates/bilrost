@@ -1,4 +1,4 @@
-use crate::attrs::{bilrost_attrs, TagList};
+use crate::attrs::{bilrost_attrs, set_option, string_attr, TagList};
 use crate::field::traits::{DecodeLifetime, DecodeMode, FieldBearer, Tagged, WhereFor};
 use crate::Context;
 use alloc::boxed::Box;
@@ -28,6 +28,7 @@ pub use value::OneofVariant;
 #[derive(Clone)]
 pub struct Field {
     ident: TokenStream,
+    schema_field_name: String,
     content: MessageFieldContent,
 }
 
@@ -148,23 +149,46 @@ impl Field {
         inferred_tag: Option<u32>,
         init_mode: InitMode,
     ) -> Result<Field> {
-        let attrs = bilrost_attrs(attrs)?;
+        let mut schema_field_name = None;
+        // filtered attrs that don't match the below universal attrs we check for
+        let mut filtered_attrs = vec![];
+        for attr in bilrost_attrs(attrs)? {
+            if let Some(name) = string_attr(&attr, "name")? {
+                set_option(
+                    &mut schema_field_name,
+                    name,
+                    "duplicate field name attributes",
+                )?;
+            } else {
+                filtered_attrs.push(attr);
+            }
+        }
 
         Ok(Field {
-            content: if let Some(field) = ignored::IgnoredField::new(ty, &attrs, init_mode)? {
+            content: if let Some(field) =
+                ignored::IgnoredField::new(ty, &filtered_attrs, init_mode)?
+            {
+                if schema_field_name.is_some() {
+                    bail!("ignored fields cannot also have a name");
+                }
                 Ignored(field)
-            } else if let Some(field) = oneof::OneofInclusion::new(ty, &attrs)? {
+            } else if let Some(field) = oneof::OneofInclusion::new(ty, &filtered_attrs)? {
                 Oneof(field)
             } else {
-                Value(value::MessageField::new(ty, attrs, inferred_tag)?)
+                Value(value::MessageField::new(ty, filtered_attrs, inferred_tag)?)
             },
             ident: ident.clone(),
+            schema_field_name: schema_field_name.unwrap_or_else(|| ident.to_string()),
         })
     }
 
     /// Returns the ident of the field within its struct or variant.
     pub fn ident(&self) -> &TokenStream {
         &self.ident
+    }
+
+    pub fn schema_field_name(&self) -> &str {
+        &self.schema_field_name
     }
 
     pub fn ty(&self) -> &Type {
@@ -317,8 +341,8 @@ impl Field {
 
     pub fn schema(&self, ctx: &Context) -> Option<TokenStream> {
         match &self.content {
-            Value(scalar) => Some(scalar.schema(&self.ident.to_string(), false, ctx)),
-            Oneof(oneof) => Some(oneof.schema(&self.ident.to_string(), ctx)),
+            Value(scalar) => Some(scalar.schema(self.schema_field_name(), false, ctx)),
+            Oneof(oneof) => Some(oneof.schema(self.schema_field_name(), ctx)),
             Ignored(..) => None,
         }
     }

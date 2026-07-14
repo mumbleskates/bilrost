@@ -337,12 +337,12 @@ fn try_message(input: TokenStream) -> Result<TokenStream> {
             let decode = field.decode(&self_instance, lifetime, Relaxed, ctx);
             let tags = field.tags().into_iter().map(|tag| quote!(#tag));
             let tags = Itertools::intersperse(tags, quote!(|));
-            let field_ident_str = field.ident().to_string();
+            let schema_field_name = field.schema_field_name();
 
             quote! {
                 #(#tags)* => {
                     if let ::core::result::Result::Err(mut error) = #decode {
-                        error.push(#schema_type_name, #field_ident_str);
+                        error.push(#schema_type_name, #schema_field_name);
                         return ::core::result::Result::Err(error);
                     }
                 }
@@ -543,13 +543,13 @@ fn try_message(input: TokenStream) -> Result<TokenStream> {
             });
 
         let [decode_owned, decode_borrowed] = [Owned, Borrowed].map(|lifetime| {
-            let schema_type_name = schema_type_name.clone();
-            let self_instance = self_instance.clone();
+            let schema_type_name = &schema_type_name;
+            let self_instance = &self_instance;
             unsorted_fields.iter().map(move |field| {
-                let decode = field.decode(&self_instance, lifetime, Distinguished, ctx);
+                let decode = field.decode(self_instance, lifetime, Distinguished, ctx);
                 let tags = field.tags().into_iter().map(|tag| quote!(#tag));
                 let tags = Itertools::intersperse(tags, quote!(|));
-                let field_ident_str = field.ident().to_string();
+                let schema_field_name = field.schema_field_name();
 
                 quote! {
                     #(#tags)* => {
@@ -558,7 +558,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream> {
                                 canon.update(new_canon);
                             }
                             ::core::result::Result::Err(mut error) => {
-                                error.push(#schema_type_name, #field_ident_str);
+                                error.push(#schema_type_name, #schema_field_name);
                                 return ::core::result::Result::Err(error);
                             }
                         }
@@ -1537,9 +1537,9 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream> {
 
     let variant_name_arms = variants.iter().map(|variant| {
         let tag = variant.tag();
-        let variant_ident_str = variant.ident().to_string();
+        let schema_variant_name = variant.schema_variant_name();
         quote! {
-            #tag => (#schema_type_name, #variant_ident_str),
+            #tag => (#schema_type_name, #schema_variant_name),
         }
     });
 

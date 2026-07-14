@@ -11,10 +11,10 @@ use crate::field::traits::{
 use crate::field::{
     ident_string, parse_message_fields, Field, FieldTarget, InitMode, MessageFieldsSorted,
 };
-use crate::Context;
+use crate::{string_attr, Context};
 use alloc::boxed::Box;
 use alloc::format;
-use alloc::string::ToString;
+use alloc::string::{String, ToString};
 use alloc::vec;
 use alloc::vec::Vec;
 use eyre::{bail, eyre as err, Result};
@@ -50,6 +50,7 @@ struct ValueField {
 pub struct OneofVariant {
     tag: u32,
     variant_ident: Ident,
+    schema_variant_name: String,
     contents: VariantContents,
 }
 
@@ -391,21 +392,26 @@ impl OneofVariant {
     /// Parses values specifically for within a Oneof variant, which works differently than fields
     /// within a Message.
     ///
-    /// Returns `Ok` for data variants, and `Err` with just the ident for an empty variant.
+    /// Returns `Ok(Some)` for data variants, and `Ok(None)` for empty variants.
     pub fn new(variant: Variant) -> Result<Option<OneofVariant>> {
         let mut tag = None; // tag number
         let mut message = false; // whether this variant is marked as a "message" variant
         let mut empty = false; // whether this unit is marked as an "empty" variant
+        let mut schema_variant_name = None;
         let mut other_attrs = vec![];
-        let our_attrs = bilrost_attrs(&variant.attrs)?;
-
-        for attr in our_attrs {
+        for attr in bilrost_attrs(&variant.attrs)? {
             if let Some(t) = tag_attr(&attr)? {
                 set_option(&mut tag, t, "duplicate tag attributes")?;
             } else if word_attr(&attr, "message") {
                 set_bool(&mut message, "duplicate message attributes")?;
             } else if word_attr(&attr, "empty") {
                 set_bool(&mut empty, "duplicate empty attributes")?;
+            } else if let Some(name) = string_attr(&attr, "name")? {
+                set_option(
+                    &mut schema_variant_name,
+                    name,
+                    "duplicate variant name attributes",
+                )?;
             } else {
                 other_attrs.push(attr);
             }
@@ -419,10 +425,13 @@ impl OneofVariant {
                     Fields::Unnamed(fields) => fields.unnamed.is_empty(),
                     Fields::Unit => true,
                 } {
+                    if schema_variant_name.is_some() {
+                        bail!("empty variants cannot also have a name");
+                    }
                     Ok(None)
                 } else {
-                    // Return a error message depending on whether the variant is explicitly marked
-                    // empty
+                    // The variant has one or more fields. Return a error message depending on
+                    // whether the variant is explicitly marked empty
                     if empty {
                         bail!(
                             "Oneof variant {variant_ident} is marked 'empty' but it has fields",
@@ -485,6 +494,8 @@ impl OneofVariant {
                 Ok(Some(OneofVariant {
                     tag,
                     variant_ident: variant.ident.clone(),
+                    schema_variant_name: schema_variant_name
+                        .unwrap_or_else(|| variant.ident.to_string()),
                     contents: VariantContents::Value(Box::new(FieldInVariant {
                         value: ValueField::new(&field.ty, other_attrs, "general_packed")?,
                         ident_within_variant: field
@@ -553,6 +564,8 @@ impl OneofVariant {
 
                 Ok(Some(OneofVariant {
                     tag,
+                    schema_variant_name: schema_variant_name
+                        .unwrap_or_else(|| variant.ident.to_string()),
                     variant_ident: variant.ident,
                     contents: VariantContents::Message(variant_fields),
                 }))
@@ -562,6 +575,10 @@ impl OneofVariant {
 
     pub fn ident(&self) -> &Ident {
         &self.variant_ident
+    }
+
+    pub fn schema_variant_name(&self) -> &str {
+        &self.schema_variant_name
     }
 
     pub fn has_ignored_fields(&self) -> bool {
@@ -792,7 +809,7 @@ impl OneofVariant {
                 )
             }
             VariantContents::Message(fields) => {
-                let variant_ident_str = self.variant_ident.to_string();
+                let schema_variant_name = &self.schema_variant_name;
                 let field_arms: Vec<_> = fields
                     .iter()
                     .filter_map(|field| {
@@ -803,11 +820,11 @@ impl OneofVariant {
                         let tags = Itertools::intersperse(tags, quote!(|));
                         let decode =
                             field.decode(&FieldTarget::FreeVariantFields, lifetime, mode, ctx);
-                        let field_ident_str = field.ident.to_string();
+                        let schema_field_name = field.schema_field_name();
                         Some(quote!(#(#tags)* => match #decode {
                             ::core::result::Result::Ok(res) => ::core::result::Result::Ok(res),
                             ::core::result::Result::Err(mut error) => {
-                                error.push(#variant_ident_str, #field_ident_str);
+                                error.push(#schema_variant_name, #schema_field_name);
                                 ::core::result::Result::Err(error)
                             }
                         }))
@@ -915,12 +932,12 @@ impl OneofVariant {
         let VariantContents::Message(fields) = &self.contents else {
             return None;
         };
-        let variant_name = self.variant_ident.to_string();
+        let schema_variant_name = self.schema_variant_name();
         let tag = self.tag;
         let field_schemas: Vec<_> = fields.iter().flat_map(|field| field.schema(ctx)).collect();
         Some(quote! {
             messages.add_message_variant(
-                #variant_name,
+                #schema_variant_name,
                 #tag,
                 |fields| {
                     #(#field_schemas)*
@@ -934,11 +951,11 @@ impl OneofVariant {
             VariantContents::Value(field_in_variant) => {
                 field_in_variant
                     .value
-                    .schema(self.tag, &self.variant_ident.to_string(), true, ctx)
+                    .schema(self.tag, self.schema_variant_name(), true, ctx)
             }
             VariantContents::Message(_) => {
                 let crate_ = &ctx.crate_name;
-                let variant_name = self.variant_ident.to_string();
+                let schema_variant_name = self.schema_variant_name();
                 let tag = self.tag;
                 quote! {
                     // the 'field name' identifier here is the one that's passed in to
@@ -947,11 +964,11 @@ impl OneofVariant {
                     let field_name_with_variant = field_name.map(|field_name| {
                         let mut combined = #crate_::alloc::string::String::from(field_name);
                         combined.push_str(" variant ");
-                        combined.push_str(#variant_name);
+                        combined.push_str(#schema_variant_name);
                         combined
                     });
                     fields.add_field(
-                        field_name_with_variant.as_deref().unwrap_or(#variant_name),
+                        field_name_with_variant.as_deref().unwrap_or(#schema_variant_name),
                         #tag,
                         #crate_::encoding::schema::PopulateSchema::make_lazy_repr(
                             schema,

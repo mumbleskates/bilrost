@@ -30,7 +30,7 @@ impl OneofInclusion {
                 set_option_with_display(
                     &mut oneof_tags,
                     tags,
-                    "duplicate oneof attribute",
+                    "duplicate oneof attributes",
                     TagList::display,
                 )?;
             } else {
@@ -169,13 +169,17 @@ impl OneofInclusion {
         }]
     }
 
-    pub fn schema(&self, oneof_name: &str, ctx: &Context) -> TokenStream {
+    pub fn schema(&self, oneof_field_schema_name: &str, ctx: &Context) -> TokenStream {
         let crate_ = &ctx.crate_name;
         let tags = &self.tags;
         let ty = &self.ty;
         quote! {
-            fields.add_oneof(#oneof_name, &[#(#tags),*]);
-            <#ty as #crate_::encoding::schema::AddOneofFields>::add_fields(schema, fields, Some(#oneof_name));
+            fields.add_oneof(#oneof_field_schema_name, &[#(#tags),*]);
+            <#ty as #crate_::encoding::schema::AddOneofFields>::add_fields(
+                schema,
+                fields,
+                Some(#oneof_field_schema_name),
+            );
         }
     }
 }
