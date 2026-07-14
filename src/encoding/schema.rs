@@ -178,6 +178,7 @@ impl PopulateSchema for Schema {
             Entry::Vacant(entry) => entry
                 .insert(Arc::new(Guard::new(TypeInfo::Message(MessageFields::new(
                     name,
+                    type_name::<M>(),
                 )))))
                 .clone(),
             Entry::Occupied(_) => return, // already registered by a race
@@ -201,7 +202,10 @@ impl PopulateSchema for Schema {
         }
         let info = match self.0.types.get_guarded().entry(ty_id) {
             Entry::Vacant(entry) => entry
-                .insert(Arc::new(Guard::new(TypeInfo::Enum(EnumInfo::new(name)))))
+                .insert(Arc::new(Guard::new(TypeInfo::Enum(EnumInfo::new(
+                    name,
+                    type_name::<E>(),
+                )))))
                 .clone(),
             Entry::Occupied(_) => return, // already registered
         };
@@ -232,7 +236,10 @@ impl PopulateSchema for Schema {
         }
         let info = match self.0.subtypes.get_guarded().entry(TypeId::of::<T>()) {
             Entry::Vacant(entry) => entry
-                .insert(Arc::new(Guard::new(OneofMessages::new(name))))
+                .insert(Arc::new(Guard::new(OneofMessages::new(
+                    name,
+                    type_name::<T>(),
+                ))))
                 .clone(),
             Entry::Occupied(_) => return, // already registered
         };
@@ -338,8 +345,9 @@ impl Display for Schema {
 
         #[derive(PartialEq, Eq, PartialOrd, Ord)]
         struct TypeEntry {
-            type_name: String,
+            friendly_name: String,
             subtype_name: Option<String>,
+            ty_name: &'static str,
             type_id: TypeId,
             subtype_tag: Option<u32>,
         }
@@ -348,8 +356,9 @@ impl Display for Schema {
         for (&type_id, info) in types.iter() {
             let info = info.read_guarded();
             ordered.insert(TypeEntry {
-                type_name: info.name().to_owned(),
+                friendly_name: info.name().to_owned(),
                 subtype_name: None,
+                ty_name: info.ty_name(),
                 type_id,
                 subtype_tag: None,
             });
@@ -358,8 +367,9 @@ impl Display for Schema {
             let info = info.read_guarded();
             for (&subtype_tag, subinfo) in info.variants.iter() {
                 ordered.insert(TypeEntry {
-                    type_name: info.oneof_name.clone(),
+                    friendly_name: info.oneof_name.clone(),
                     subtype_name: Some(subinfo.message_name.clone()),
+                    ty_name: info.ty_name,
                     type_id,
                     subtype_tag: Some(subtype_tag),
                 });
@@ -394,19 +404,15 @@ impl Display for Schema {
             }
             match subtype_tag {
                 None => {
-                    write!(
-                        f,
-                        "[{ordinal}] {type_info}",
-                        type_info = types.get(type_id).unwrap().read_guarded(),
-                    )?;
+                    let info = types.get(type_id).unwrap().read_guarded();
+                    writeln!(f, "// {ty_name}", ty_name = info.ty_name())?;
+                    write!(f, "[{ordinal}] {type_info}", type_info = info,)?;
                 }
                 Some(subtype_tag) => {
-                    write!(f, "[{ordinal}] ")?;
-                    subtypes
-                        .get(type_id)
-                        .unwrap()
-                        .read_guarded()
-                        .display_variant(f, *subtype_tag)?;
+                    let oneof = subtypes.get(type_id).unwrap().read_guarded();
+                    writeln!(f, "// {ty_name}", ty_name = oneof.ty_name)?;
+                    write!(f, "[{ordinal}] ",)?;
+                    oneof.display_variant(f, *subtype_tag)?;
                 }
             }
         }
@@ -424,6 +430,13 @@ impl TypeInfo {
         match self {
             TypeInfo::Message(message_fields) => &message_fields.message_name,
             TypeInfo::Enum(enum_info) => &enum_info.enum_name,
+        }
+    }
+
+    fn ty_name(&self) -> &'static str {
+        match self {
+            TypeInfo::Message(message_fields) => message_fields.ty_name,
+            TypeInfo::Enum(enum_info) => enum_info.ty_name,
         }
     }
 }
@@ -449,14 +462,16 @@ impl Display for TypeInfo {
 /// Collected information about a specific message type and its fields.
 pub struct MessageFields {
     message_name: String,
+    ty_name: &'static str,
     fields: BTreeMap<u32, FieldInfo>,
     oneofs: BTreeMap<String, BTreeSet<u32>>,
 }
 
 impl MessageFields {
-    fn new(name: &str) -> Self {
+    fn new(name: &str, ty_name: &'static str) -> Self {
         Self {
             message_name: name.to_owned(),
+            ty_name,
             fields: Default::default(),
             oneofs: Default::default(),
         }
@@ -525,13 +540,15 @@ struct FieldInfo {
 
 pub struct EnumInfo {
     enum_name: String,
+    ty_name: &'static str,
     values: BTreeMap<u32, String>,
 }
 
 impl EnumInfo {
-    fn new(name: &str) -> Self {
+    fn new(name: &str, ty_name: &'static str) -> Self {
         Self {
             enum_name: name.to_owned(),
+            ty_name,
             values: Default::default(),
         }
     }
@@ -544,13 +561,15 @@ impl EnumInfo {
 
 pub struct OneofMessages {
     oneof_name: String,
+    ty_name: &'static str,
     variants: BTreeMap<u32, MessageFields>,
 }
 
 impl OneofMessages {
-    fn new(name: &str) -> Self {
+    fn new(name: &str, ty_name: &'static str) -> Self {
         Self {
             oneof_name: name.to_owned(),
+            ty_name,
             variants: Default::default(),
         }
     }
@@ -565,7 +584,7 @@ impl OneofMessages {
         let Entry::Vacant(entry) = self.variants.entry(tag) else {
             panic!("multiple variants added with the tag {tag}");
         };
-        let msg = entry.insert(MessageFields::new(name));
+        let msg = entry.insert(MessageFields::new(name, self.ty_name));
         fields(msg);
     }
 
