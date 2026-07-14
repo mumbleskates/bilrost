@@ -972,6 +972,7 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream> {
         Data::Union(..) => bail!("Enumeration can not be derived for a union"),
     };
 
+    // TODO: make enum variants accept a schema rename attribute as well
     struct EnumVariant {
         variant_ident: Ident,
         discriminant_expr: Expr,
