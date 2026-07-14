@@ -358,8 +358,10 @@ impl ValueField {
         let crate_ = &ctx.crate_name;
         let ty = &self.ty;
         let encoding = &self.encoding;
+        let prelude;
+        let final_field_name;
         if in_oneof {
-            quote! {
+            prelude = Some(quote! {
                 // the 'field name' identifier here is the one that's passed in to
                 // AddOneofFields::add_fields, which tells us what the oneof enum value's name is
                 let field_name_with_variant = field_name.map(|field_name| {
@@ -368,20 +370,19 @@ impl ValueField {
                     combined.push_str(#field_name);
                     combined
                 });
-                fields.add_field(
-                    field_name_with_variant.as_deref().unwrap_or(#field_name),
-                    #tag,
-                    <() as #crate_::encoding::schema::FieldRepr<#encoding, #ty>>::repr(schema),
-                );
-            }
+            });
+            final_field_name = quote!(field_name_with_variant.as_deref().unwrap_or(#field_name));
         } else {
-            quote! {
-                fields.add_field(
-                    #field_name,
-                    #tag,
-                    <() as #crate_::encoding::schema::FieldRepr<#encoding, #ty>>::repr(schema),
-                );
-            }
+            prelude = None;
+            final_field_name = quote!(#field_name);
+        }
+        quote! {
+            #prelude
+            fields.add_field(
+                #final_field_name,
+                #tag,
+                <() as #crate_::encoding::schema::FieldRepr<#encoding, #ty>>::repr(schema),
+            );
         }
     }
 }
@@ -932,8 +933,17 @@ impl OneofVariant {
                 let variant_name = self.variant_ident.to_string();
                 let tag = self.tag;
                 quote! {
+                    // the 'field name' identifier here is the one that's passed in to
+                    // AddOneofFields::add_fields, which tells us what the oneof enum value's
+                    // name is
+                    let field_name_with_variant = field_name.map(|field_name| {
+                        let mut combined = #crate_::alloc::string::String::from(field_name);
+                        combined.push_str(" variant ");
+                        combined.push_str(#variant_name);
+                        combined
+                    });
                     fields.add_field(
-                        #variant_name,
+                        field_name_with_variant.as_deref().unwrap_or(#variant_name),
                         #tag,
                         #crate_::encoding::schema::PopulateSchema::make_lazy_repr(
                             schema,
