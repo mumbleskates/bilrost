@@ -2647,6 +2647,26 @@ mod test {
     }
 
     #[test]
+    fn test_rejects_attributes_on_value_variant() {
+        let output = try_oneof(quote!(
+            enum A {
+                #[bilrost(1)]
+                A {
+                    #[bilrost(encoding(fixed))]
+                    val: u64,
+                },
+            }
+        ));
+        assert_eq!(
+            output
+                .expect_err("attributes on value variant not detected")
+                .to_string(),
+            "bilrost attributes found on the field inside variant A; those attributes should \
+            probably go on the variant instead, or the variant should be a message variant"
+        );
+    }
+
+    #[test]
     fn test_rejects_struct_and_union_enumerations() {
         let output = try_enumeration(quote!(
             struct X {

@@ -474,6 +474,14 @@ impl OneofVariant {
                     );
                 }
                 let field = fields.first().unwrap();
+                if !bilrost_attrs(&field.attrs)?.is_empty() {
+                    bail!(
+                        "bilrost attributes found on the field inside variant {variant_ident}; \
+                        those attributes should probably go on the variant instead, or the \
+                        variant should be a message variant",
+                        variant_ident = variant.ident,
+                    );
+                }
                 Ok(Some(OneofVariant {
                     tag,
                     variant_ident: variant.ident.clone(),
