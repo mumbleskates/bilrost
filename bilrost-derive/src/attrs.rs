@@ -11,8 +11,8 @@ use syn::parse::ParseStream;
 use syn::punctuated::Punctuated;
 use syn::token::Comma;
 use syn::{
-    parse, parse2, Attribute, BinOp, Expr, ExprBinary, ExprLit, ExprRange, Lit, LitInt, Meta,
-    MetaList, MetaNameValue, RangeLimits, Token,
+    parse, parse2, Attribute, BinOp, Expr, ExprBinary, ExprLit, ExprRange, Lit, LitInt, LitStr,
+    Meta, MetaList, MetaNameValue, RangeLimits, Token,
 };
 
 /// Get the items belonging to the 'bilrost' list attribute, e.g. `#[bilrost(foo, bar="baz")]`.
@@ -249,6 +249,30 @@ pub fn word_attr(attr: &Meta, key: &str) -> bool {
         path.is_ident(key)
     } else {
         false
+    }
+}
+
+/// Checks if an attribute provides a string literal
+pub fn string_attr(attr: &Meta, key: &str) -> Result<Option<String>> {
+    if !attr.path().is_ident(key) {
+        return Ok(None);
+    }
+    match attr {
+        // name("string value here")
+        Meta::List(MetaList { tokens, .. }) => {
+            let lit_str: LitStr = parse2(tokens.clone())?;
+            Ok(Some(lit_str.value()))
+        }
+        // name = "string value here"
+        Meta::NameValue(MetaNameValue {
+            value:
+                Expr::Lit(ExprLit {
+                    lit: Lit::Str(lit_str),
+                    ..
+                }),
+            ..
+        }) => Ok(Some(lit_str.value())),
+        _ => bail!("invalid {key} attribute: {attr}", attr = quote!(attr)),
     }
 }
 

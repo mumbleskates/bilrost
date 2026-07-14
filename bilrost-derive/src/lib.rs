@@ -13,7 +13,8 @@
 extern crate alloc;
 
 use crate::attrs::{
-    bilrost_attrs, named_attr, set_bool, set_option_with_display, tag_list_attr, word_attr, TagList,
+    bilrost_attrs, named_attr, set_bool, set_option, set_option_with_display, string_attr,
+    tag_list_attr, word_attr, TagList,
 };
 use crate::context::Context;
 use crate::field::traits::{
@@ -27,7 +28,7 @@ use crate::field::{
     MessageFieldsSorted, OneofVariant,
 };
 use alloc::collections::BTreeMap;
-use alloc::string::ToString;
+use alloc::string::{String, ToString};
 use alloc::vec;
 use alloc::vec::Vec;
 use eyre::{bail, eyre as err, Result};
@@ -168,6 +169,7 @@ struct PreprocessedMessageStruct {
     borrow_only: bool,
     struct_update_expr: Option<Expr>,
     crate_name: Option<Path>,
+    schema_type_name: String,
 }
 
 fn preprocess_message_struct(input: DeriveInput) -> Result<PreprocessedMessageStruct> {
@@ -189,6 +191,7 @@ fn preprocess_message_struct(input: DeriveInput) -> Result<PreprocessedMessageSt
     let mut default_per_field = false;
     let mut struct_update_expr: Option<Expr> = None;
     let mut crate_name: Option<Path> = None;
+    let mut schema_type_name = None;
     let mut unknown_attrs = Vec::new();
     for attr in bilrost_attrs(&input_attrs)? {
         if let Some(tags) = tag_list_attr(&attr, "reserved_tags", None)? {
@@ -221,6 +224,12 @@ fn preprocess_message_struct(input: DeriveInput) -> Result<PreprocessedMessageSt
                 "duplicated crate path attributes",
                 |t| quote!(#t).to_string(),
             )?;
+        } else if let Some(name) = string_attr(&attr, "name")? {
+            set_option(
+                &mut schema_type_name,
+                name,
+                "duplicated message name attributes",
+            )?;
         } else {
             unknown_attrs.push(attr);
         }
@@ -244,6 +253,8 @@ fn preprocess_message_struct(input: DeriveInput) -> Result<PreprocessedMessageSt
     // Parse field data
     let fields = parse_message_fields(data_struct.fields, ignored_field_init_mode, reserved_tags)?;
 
+    let schema_type_name = schema_type_name.unwrap_or_else(|| ident.to_string());
+
     Ok(PreprocessedMessageStruct {
         ident,
         generics,
@@ -252,6 +263,7 @@ fn preprocess_message_struct(input: DeriveInput) -> Result<PreprocessedMessageSt
         borrow_only,
         struct_update_expr,
         crate_name,
+        schema_type_name,
     })
 }
 
@@ -272,6 +284,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream> {
         borrow_only,
         struct_update_expr,
         crate_name,
+        schema_type_name,
     } = preprocess_message_struct(input)?;
 
     let ctx = &Context::new(crate_name);
@@ -321,8 +334,8 @@ fn try_message(input: TokenStream) -> Result<TokenStream> {
     let prepend = fields.prepend(&self_instance, ctx);
 
     let [decode_owned, decode_borrowed] = [Owned, Borrowed].map(|lifetime| {
-        let ident_str = ident.to_string();
         let self_instance = self_instance.clone();
+        let schema_type_name = schema_type_name.clone();
         unsorted_fields.iter().map(move |field| {
             let decode = field.decode(&self_instance, lifetime, Relaxed, ctx);
             let tags = field.tags().into_iter().map(|tag| quote!(#tag));
@@ -332,7 +345,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream> {
             quote! {
                 #(#tags)* => {
                     if let ::core::result::Result::Err(mut error) = #decode {
-                        error.push(#ident_str, #field_ident_str);
+                        error.push(#schema_type_name, #field_ident_str);
                         return ::core::result::Result::Err(error);
                     }
                 }
@@ -533,7 +546,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream> {
             });
 
         let [decode_owned, decode_borrowed] = [Owned, Borrowed].map(|lifetime| {
-            let ident_str = ident.to_string();
+            let schema_type_name = schema_type_name.clone();
             let self_instance = self_instance.clone();
             unsorted_fields.iter().map(move |field| {
                 let decode = field.decode(&self_instance, lifetime, Distinguished, ctx);
@@ -548,7 +561,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream> {
                                 canon.update(new_canon);
                             }
                             ::core::result::Result::Err(mut error) => {
-                                error.push(#ident_str, #field_ident_str);
+                                error.push(#schema_type_name, #field_ident_str);
                                 return ::core::result::Result::Err(error);
                             }
                         }
@@ -655,6 +668,7 @@ fn try_message_via_oneof(input: DeriveInput) -> Result<TokenStream> {
         borrow_only,
         empty_variant,
         crate_name,
+        schema_type_name: _,
     } = preprocess_oneof(input)?;
 
     let ctx = &Context::new(crate_name);
@@ -918,6 +932,7 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream> {
 
     // Process attributes
     let mut crate_name: Option<Path> = None;
+    let mut schema_type_name = None;
     let mut unknown_attrs = Vec::new();
     for attr in bilrost_attrs(&input.attrs)? {
         if let Some(path) = named_attr(&attr, "crate")? {
@@ -926,6 +941,12 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream> {
                 path,
                 "duplicated crate path attributes",
                 |t| quote!(#t).to_string(),
+            )?;
+        } else if let Some(name) = string_attr(&attr, "name")? {
+            set_option(
+                &mut schema_type_name,
+                name,
+                "duplicated enumeration name attributes",
             )?;
         } else {
             unknown_attrs.push(attr);
@@ -937,6 +958,8 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream> {
             attrs = quote!(#(#unknown_attrs),*),
         )
     }
+
+    let schema_type_name = schema_type_name.unwrap_or_else(|| ident.to_string());
 
     let ctx = &Context::new(crate_name);
     let crate_ = &ctx.crate_name;
@@ -1097,7 +1120,7 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream> {
                     #ident #ty_generics
                 >(
                     schema,
-                    stringify!(#ident),
+                    #schema_type_name,
                     |fields| {
                         #(fields.add_value(stringify!(#variant_idents), #discriminant_exprs);)*
                     },
@@ -1309,6 +1332,7 @@ struct PreprocessedOneof {
     borrow_only: bool,
     empty_variant: Option<Ident>,
     crate_name: Option<Path>,
+    schema_type_name: String,
 }
 
 fn preprocess_oneof(input: DeriveInput) -> Result<PreprocessedOneof> {
@@ -1326,6 +1350,7 @@ fn preprocess_oneof(input: DeriveInput) -> Result<PreprocessedOneof> {
     let mut distinguished = false;
     let mut borrow_only = false;
     let mut crate_name: Option<Path> = None;
+    let mut schema_type_name = None;
     for attr in bilrost_attrs(&input.attrs)? {
         if let Some(tags) = tag_list_attr(&attr, "reserved_tags", None)? {
             set_option_with_display(
@@ -1344,6 +1369,12 @@ fn preprocess_oneof(input: DeriveInput) -> Result<PreprocessedOneof> {
                 path,
                 "duplicated crate path attributes",
                 |t| quote!(#t).to_string(),
+            )?;
+        } else if let Some(name) = string_attr(&attr, "name")? {
+            set_option(
+                &mut schema_type_name,
+                name,
+                "duplicated message name attributes",
             )?;
         } else {
             unknown_attrs.push(attr);
@@ -1399,6 +1430,8 @@ fn preprocess_oneof(input: DeriveInput) -> Result<PreprocessedOneof> {
         }
     }
 
+    let schema_type_name = schema_type_name.unwrap_or_else(|| ident.to_string());
+
     Ok(PreprocessedOneof {
         ident,
         generics,
@@ -1407,6 +1440,7 @@ fn preprocess_oneof(input: DeriveInput) -> Result<PreprocessedOneof> {
         borrow_only,
         empty_variant,
         crate_name,
+        schema_type_name,
     })
 }
 
@@ -1421,6 +1455,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream> {
         borrow_only,
         empty_variant,
         crate_name,
+        schema_type_name,
     } = preprocess_oneof(input)?;
 
     let ctx = &Context::new(crate_name);
@@ -1540,10 +1575,9 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream> {
 
     let variant_name_arms = variants.iter().map(|variant| {
         let tag = variant.tag();
-        let ident_str = ident.to_string();
         let variant_ident_str = variant.ident().to_string();
         quote! {
-            #tag => (#ident_str, #variant_ident_str),
+            #tag => (#schema_type_name, #variant_ident_str),
         }
     });
 
@@ -1875,6 +1909,7 @@ fn try_struct_schema(input: DeriveInput) -> Result<TokenStream> {
         borrow_only: _,
         struct_update_expr,
         crate_name,
+        schema_type_name,
     } = preprocess_message_struct(input)?;
 
     let ctx = &Context::new(crate_name);
@@ -1918,7 +1953,7 @@ fn try_struct_schema(input: DeriveInput) -> Result<TokenStream> {
             fn register(schema: &#crate_::encoding::schema::Schema) {
                 #crate_::encoding::schema::PopulateSchema::register_message::<Self>(
                     schema,
-                    stringify!(#ident),
+                    #schema_type_name,
                     |fields| {
                         #(#field_schemas)*
                     },
@@ -1952,6 +1987,7 @@ fn try_enum_schema(input: DeriveInput) -> Result<TokenStream> {
         borrow_only: _,
         empty_variant,
         crate_name,
+        schema_type_name,
     } = preprocess_oneof(input)?;
 
     let ctx = &Context::new(crate_name);
@@ -1978,7 +2014,7 @@ fn try_enum_schema(input: DeriveInput) -> Result<TokenStream> {
             Some(quote! {
                 #crate_::encoding::schema::PopulateSchema::register_oneof_messages::<Self>(
                     schema,
-                    stringify!(#ident),
+                    #schema_type_name,
                     |messages| {
                         #(#submessage_registrations)*
                     },
@@ -2015,10 +2051,10 @@ fn try_enum_schema(input: DeriveInput) -> Result<TokenStream> {
                 fn register(schema: &#crate_::encoding::schema::Schema) {
                     #crate_::encoding::schema::PopulateSchema::register_message::<Self>(
                         schema,
-                        stringify!(#ident),
+                        #schema_type_name,
                         |fields| {
                             fields.add_oneof(
-                                stringify!(#ident),
+                                #schema_type_name,
                                 <Self as #crate_::encoding::Oneof>::FIELD_TAGS,
                             );
                             <Self as #crate_::encoding::schema::AddOneofFields>::add_fields(
