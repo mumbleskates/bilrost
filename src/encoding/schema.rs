@@ -613,5 +613,7 @@ pub trait RegisterMessage {
 
 /// Ability of a oneof to register its fields inline with the outer struct's fields.
 pub trait AddOneofFields {
+    /// If field_name is populated, it will be the name of the field containing the oneof's
+    /// variants and we should incorporate that into the names of the fields we add.
     fn add_fields(schema: &Schema, fields: &mut MessageFields, field_name: Option<&str>);
 }
