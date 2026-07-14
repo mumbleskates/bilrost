@@ -165,6 +165,10 @@ impl Schema {
     pub fn register<M: RegisterMessage>(&self) {
         M::register(self);
     }
+
+    pub fn with_rust_types(&self) -> impl Display {
+        WithRustTypes(self.clone())
+    }
 }
 
 impl PopulateSchema for Schema {
@@ -338,8 +342,8 @@ impl PopulateSchema for Schema {
     }
 }
 
-impl Display for Schema {
-    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+impl Schema {
+    fn display(&self, f: &mut Formatter<'_>, show_rust_types: bool) -> core::fmt::Result {
         let types = self.0.types.read_guarded();
         let subtypes = self.0.subtypes.read_guarded();
 
@@ -405,18 +409,36 @@ impl Display for Schema {
             match subtype_tag {
                 None => {
                     let info = types.get(type_id).unwrap().read_guarded();
-                    writeln!(f, "// {ty_name}", ty_name = info.ty_name())?;
+                    if show_rust_types {
+                        writeln!(f, "// rust: {ty_name}", ty_name = info.ty_name())?;
+                    }
                     write!(f, "[{ordinal}] {type_info}", type_info = info,)?;
                 }
                 Some(subtype_tag) => {
                     let oneof = subtypes.get(type_id).unwrap().read_guarded();
-                    writeln!(f, "// {ty_name}", ty_name = oneof.ty_name)?;
+                    if show_rust_types {
+                        writeln!(f, "// rust: {ty_name}", ty_name = oneof.ty_name)?;
+                    }
                     write!(f, "[{ordinal}] ",)?;
                     oneof.display_variant(f, *subtype_tag)?;
                 }
             }
         }
         Ok(())
+    }
+}
+
+impl Display for Schema {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        self.display(f, false)
+    }
+}
+
+struct WithRustTypes(Schema);
+
+impl Display for WithRustTypes {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        self.0.display(f, true)
     }
 }
 
