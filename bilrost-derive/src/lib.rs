@@ -10,11 +10,9 @@
 //!
 //! [bilrost]: https://docs.rs/bilrost
 
-extern crate alloc;
-
 use crate::attrs::{
     bilrost_attrs, named_attr, set_bool, set_option, set_option_with_display, string_attr,
-    tag_list_attr, word_attr, TagList,
+    tag_list_attr, variant_attr, word_attr, TagList,
 };
 use crate::context::Context;
 use crate::field::traits::{
@@ -35,10 +33,9 @@ use eyre::{bail, eyre as err, Result};
 use itertools::Itertools;
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
-use syn::{
-    parse2, Attribute, Data, DeriveInput, Expr, Fields, Generics, Ident, Meta, Pat, Path, Variant,
-    WhereClause,
-};
+use syn::{parse2, Data, DeriveInput, Expr, Fields, Generics, Ident, Path, Variant, WhereClause};
+
+extern crate alloc;
 
 mod attrs;
 mod field;
@@ -1287,41 +1284,6 @@ pub fn enumeration(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 /// definitely zero.
 fn is_zero_discriminant(expr: &Expr) -> bool {
     expr.to_token_stream().to_string() == "0"
-}
-
-/// Get the numeric variant value for an enumeration from attrs.
-fn variant_attr(attrs: &Vec<Attribute>) -> Result<Option<Expr>> {
-    let mut result: Option<Expr> = None;
-    for attr in attrs {
-        if attr.meta.path().is_ident("bilrost") {
-            // attribute values for enumerations don't have to be exactly numeric literals, but they
-            // will need to be used both as a literal-equivalent u32 value and as the match pattern
-            // for the variant's corresponding value.
-            let Some(expr) = match &attr.meta {
-                Meta::List(list) => parse2::<Expr>(list.tokens.clone()).ok(),
-                Meta::NameValue(name_value) => Some(name_value.value.clone()),
-                _ => None,
-            }
-            .filter(|expr| {
-                // it's a valid expression; also make sure that it parses successfully as a
-                // single-variant pattern
-                syn::parse::Parser::parse2(Pat::parse_single, expr.to_token_stream()).is_ok()
-            }) else {
-                bail!(
-                    "attribute on enumeration variant must be valid as both an expression and a \
-                    match pattern for u32"
-                );
-            };
-
-            set_option_with_display(
-                &mut result,
-                expr,
-                "duplicate value attributes on enumeration variant",
-                |t| quote!((#t)).to_string(),
-            )?;
-        }
-    }
-    Ok(result)
 }
 
 struct PreprocessedOneof {

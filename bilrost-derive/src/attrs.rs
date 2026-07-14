@@ -1,18 +1,18 @@
 use alloc::format;
-use alloc::string::String;
+use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::any::type_name;
 use core::fmt::Debug;
 use core::ops::RangeInclusive;
 use eyre::{bail, eyre as err, Result};
 use itertools::Itertools;
-use quote::quote;
+use quote::{quote, ToTokens};
 use syn::parse::ParseStream;
 use syn::punctuated::Punctuated;
 use syn::token::Comma;
 use syn::{
     parse, parse2, Attribute, BinOp, Expr, ExprBinary, ExprLit, ExprRange, Lit, LitInt, LitStr,
-    Meta, MetaList, MetaNameValue, RangeLimits, Token,
+    Meta, MetaList, MetaNameValue, Pat, RangeLimits, Token,
 };
 
 /// Get the items belonging to the 'bilrost' list attribute, e.g. `#[bilrost(foo, bar="baz")]`.
@@ -241,6 +241,41 @@ pub fn named_attr<T: parse::Parse>(attr: &Meta, attr_name: &str) -> Result<Optio
             attr = quote!(#attr),
         )
     })
+}
+
+/// Get the numeric variant value for an enumeration from attrs.
+pub fn variant_attr(attrs: &Vec<Attribute>) -> Result<Option<Expr>> {
+    let mut result: Option<Expr> = None;
+    for attr in attrs {
+        if attr.meta.path().is_ident("bilrost") {
+            // attribute values for enumerations don't have to be exactly numeric literals, but they
+            // will need to be used both as a literal-equivalent u32 value and as the match pattern
+            // for the variant's corresponding value.
+            let Some(expr) = match &attr.meta {
+                Meta::List(list) => parse2::<Expr>(list.tokens.clone()).ok(),
+                Meta::NameValue(name_value) => Some(name_value.value.clone()),
+                _ => None,
+            }
+            .filter(|expr| {
+                // it's a valid expression; also make sure that it parses successfully as a
+                // single-variant pattern
+                syn::parse::Parser::parse2(Pat::parse_single, expr.to_token_stream()).is_ok()
+            }) else {
+                bail!(
+                    "attribute on enumeration variant must be valid as both an expression and a \
+                    match pattern for u32"
+                );
+            };
+
+            set_option_with_display(
+                &mut result,
+                expr,
+                "duplicate value attributes on enumeration variant",
+                |t| quote!((#t)).to_string(),
+            )?;
+        }
+    }
+    Ok(result)
 }
 
 /// Checks if an attribute matches a word.
