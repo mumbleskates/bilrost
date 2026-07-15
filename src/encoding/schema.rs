@@ -28,7 +28,7 @@ mod guard {
     pub(super) use spin::RwLock as Guard;
 
     /// Trait to masquerade RwLock like RefCell's api
-    trait BorrowGuard<T> {
+    pub(super) trait BorrowGuard<T> {
         type ReadGuard<'a>: Deref<Target = T>
         where
             Self: 'a,
@@ -53,15 +53,15 @@ mod guard {
         where
             T: 'a;
 
-        fn borrow_mut(&self) -> Self::WriteGuard<'_> {
+        fn borrow_mut(&self) -> spin::RwLockWriteGuard<'_, T> {
             self.write()
         }
 
-        fn borrow(&self) -> Self::ReadGuard<'_> {
+        fn borrow(&self) -> spin::RwLockReadGuard<'_, T> {
             self.read()
         }
 
-        fn try_borrow(&self) -> Result<Self::ReadGuard<'_>, ()> {
+        fn try_borrow(&self) -> Result<spin::RwLockReadGuard<'_, T>, ()> {
             self.try_read().ok_or(())
         }
     }
