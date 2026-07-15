@@ -14,7 +14,7 @@ use bilrost::DecodeErrorKind::{
 };
 use bilrost::{
     BorrowedMessage, DecodeErrorKind, DistinguishedBorrowedMessage, DistinguishedOwnedMessage,
-    Enumeration, Message, Oneof, OwnedMessage,
+    Enumeration, Message, Oneof, OwnedMessage, Schema,
 };
 use core::mem;
 use itertools::{repeat_n, Itertools};
@@ -4688,6 +4688,81 @@ fn enumeration_value_limits() {
     assert::decodes!(owned distinguished, [(0, OV::u32(10))], Bar(Foo::T));
     assert::decodes!(owned distinguished, [(0, OV::u32(11))], Bar(Foo::E));
     assert::decodes!(owned distinguished, [(0, OV::u32(u32::MAX))], Bar(Foo::Z));
+}
+
+#[test]
+fn enumeration_value_attributes() {
+    const EIGHT: u32 = 8;
+    const NINE: u32 = 9;
+    const TEN: u32 = 10;
+    const ELEVEN: u32 = 11;
+
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Enumeration)]
+    enum FooEnum {
+        PlainZero = 0,
+        #[bilrost(name = "Renamed2")]
+        Renamed = 1,
+        #[bilrost(2)]
+        AttrVal2,
+        #[bilrost = 3]
+        AttrVal3,
+        #[bilrost(val = 4)]
+        AttrVal4,
+        #[bilrost(val = 5)]
+        AttrOverridesVal = 999,
+        #[bilrost(val = 6, name = "RenamedAndVal2")]
+        RenamedAndVal,
+        // When both attributes are there, we can write the value like `val(1)`
+        #[bilrost(val(7), name("RenamedAndValAlt2"))]
+        RenamedAndValAlt,
+        #[bilrost(EIGHT)]
+        ConstShorthand,
+        #[bilrost(val = NINE)]
+        ConstExplicit,
+        #[bilrost(val = TEN, name = "ConstRenamed2")]
+        ConstRenamed,
+        #[bilrost(val(ELEVEN), name("ConstRenamedAlt2"))]
+        ConstRenamedAlt,
+    }
+    use FooEnum::*;
+
+    #[derive(Debug, PartialEq, Eq, Message, Schema)]
+    #[bilrost(distinguished)]
+    struct Foo(#[bilrost(encoding(packed))] Vec<FooEnum>);
+
+    assert::decodes!(
+        owned distinguished, [
+            (0, OV::packed((0..=11).into_iter().map(|n| OV::u32(n)))),
+        ],
+        Foo(vec![
+            PlainZero,
+            Renamed,
+            AttrVal2,
+            AttrVal3,
+            AttrVal4,
+            AttrOverridesVal,
+            RenamedAndVal,
+            RenamedAndValAlt,
+            ConstShorthand,
+            ConstExplicit,
+            ConstRenamed,
+            ConstRenamedAlt,
+        ])
+    );
+
+    let schema = Schema::new();
+    schema.register::<Foo>();
+    let schema = format!("{schema}");
+    for renamed in [
+        "Renamed2",
+        "RenamedAndVal2",
+        "RenamedAndValAlt2",
+        "ConstRenamed2",
+        "ConstRenamedAlt2",
+    ] {
+        assert!(schema.contains(renamed));
+    }
+    assert!(!schema.contains("!!"));
 }
 
 // Nested message tests

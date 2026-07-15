@@ -101,7 +101,7 @@ time = { version = ">=0.3.0", default-features = false, features = ["rand"] }
 yoke = { version = ">=0.7.1,<0.9", features = ["derive"] }
 
 [features]
-default = ["auto-optimize", "derive", "detailed-errors", "threadsafe-schema", "std"]
+default = ["auto-optimize", "derive", "detailed-errors", "std"]
 derive = ["dep:bilrost-derive"]
 detailed-errors = ["dep:thin-vec"]
 extended-diagnostics = ["dep:const_panic"]
@@ -177,6 +177,7 @@ full-test-suite = [
 
 # Extra parameters to outside crates that may affect our encoding and decoding we should test for.
 test-suite-extra = [
+    "threadsafe-schema",
     "time",
     "time/large-dates",
 ]

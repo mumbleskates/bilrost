@@ -20,26 +20,28 @@ use alloc::string::String;
 use alloc::sync::Arc;
 use core::any::{type_name, Any, TypeId};
 use core::fmt::{Display, Formatter};
-use core::ops::{Deref, DerefMut};
-
-/// Common trait for interior mutability
-trait BorrowGuard<T> {
-    type ReadGuard<'a>: Deref<Target = T>
-    where
-        Self: 'a,
-        T: 'a;
-    type WriteGuard<'a>: DerefMut<Target = T>
-    where
-        Self: 'a,
-        T: 'a;
-
-    fn get_guarded(&self) -> Self::WriteGuard<'_>;
-    fn read_guarded(&self) -> Self::ReadGuard<'_>;
-}
+use core::ops::DerefMut;
 
 #[cfg(feature = "threadsafe-schema")]
 mod guard {
+    use core::ops::{Deref, DerefMut};
     pub(super) use spin::RwLock as Guard;
+
+    /// Trait to masquerade RwLock like RefCell's api
+    trait BorrowGuard<T> {
+        type ReadGuard<'a>: Deref<Target = T>
+        where
+            Self: 'a,
+            T: 'a;
+        type WriteGuard<'a>: DerefMut<Target = T>
+        where
+            Self: 'a,
+            T: 'a;
+
+        fn borrow_mut(&self) -> Self::WriteGuard<'_>;
+        fn borrow(&self) -> Self::ReadGuard<'_>;
+        fn try_borrow(&self) -> Result<Self::ReadGuard<'_>, ()>;
+    }
 
     impl<T> super::BorrowGuard<T> for Guard<T> {
         type ReadGuard<'a>
@@ -51,42 +53,24 @@ mod guard {
         where
             T: 'a;
 
-        fn read_guarded(&self) -> Self::ReadGuard<'_> {
+        fn borrow_mut(&self) -> Self::WriteGuard<'_> {
+            self.write()
+        }
+
+        fn borrow(&self) -> Self::ReadGuard<'_> {
             self.read()
         }
 
-        fn get_guarded(&self) -> Self::WriteGuard<'_> {
-            self.try_write().unwrap()
-            //self.write()
+        fn try_borrow(&self) -> Result<Self::ReadGuard<'_>, ()> {
+            self.try_read().ok_or(())
         }
     }
 }
 
 #[cfg(not(feature = "threadsafe-schema"))]
-mod guard {
-    pub(super) use core::cell::RefCell as Guard;
-
-    impl<T> super::BorrowGuard<T> for Guard<T> {
-        type ReadGuard<'a>
-            = core::cell::Ref<'a, T>
-        where
-            T: 'a;
-        type WriteGuard<'a>
-            = core::cell::RefMut<'a, T>
-        where
-            T: 'a;
-
-        fn read_guarded(&self) -> Self::ReadGuard<'_> {
-            self.borrow()
-        }
-
-        fn get_guarded(&self) -> Self::WriteGuard<'_> {
-            self.borrow_mut()
-        }
-    }
-}
-
-use guard::Guard;
+use core::cell::RefCell as Guard;
+#[cfg(feature = "threadsafe-schema")]
+use guard::{BorrowGuard, Guard};
 
 pub trait PopulateSchema {
     /// Registers a specific message type. May shortcut if this method has already been invoked
@@ -154,7 +138,7 @@ impl Schema {
 
     fn wrapped_type_id(&self, type_id: TypeId) -> TypeId {
         let mut effective_id = type_id;
-        let wrappers = self.0.message_wrappers.read_guarded();
+        let wrappers = self.0.message_wrappers.borrow();
         while let Some(&wrapped_id) = wrappers.get(&effective_id) {
             effective_id = wrapped_id;
         }
@@ -175,10 +159,10 @@ impl PopulateSchema for Schema {
     fn register_message<M: Any + ?Sized>(&self, name: &str, fields: impl Fn(&mut MessageFields)) {
         let ty_id = TypeId::of::<M>();
         // First check by a read-only lock whether the type is already registered
-        if self.0.types.read_guarded().contains_key(&ty_id) {
+        if self.0.types.borrow().contains_key(&ty_id) {
             return;
         }
-        let info = match self.0.types.get_guarded().entry(ty_id) {
+        let info = match self.0.types.borrow_mut().entry(ty_id) {
             Entry::Vacant(entry) => entry
                 .insert(Arc::new(Guard::new(TypeInfo::Message(MessageFields::new(
                     name,
@@ -191,7 +175,7 @@ impl PopulateSchema for Schema {
         // Only after we've inserted the message info into the map do we populate its fields. This
         // ensures that we are no longer holding the lock on `types` so other types can be
         // recursively registered.
-        let mut info_ref = info.get_guarded();
+        let mut info_ref = info.borrow_mut();
         let TypeInfo::Message(msg) = info_ref.deref_mut() else {
             unreachable!();
         };
@@ -201,10 +185,10 @@ impl PopulateSchema for Schema {
     fn register_enumeration<E: Any + ?Sized>(&self, name: &str, fields: impl Fn(&mut EnumInfo)) {
         let ty_id = TypeId::of::<E>();
         // First check by a read-only lock whether the type is already registered
-        if self.0.types.read_guarded().contains_key(&ty_id) {
+        if self.0.types.borrow().contains_key(&ty_id) {
             return;
         }
-        let info = match self.0.types.get_guarded().entry(ty_id) {
+        let info = match self.0.types.borrow_mut().entry(ty_id) {
             Entry::Vacant(entry) => entry
                 .insert(Arc::new(Guard::new(TypeInfo::Enum(EnumInfo::new(
                     name,
@@ -217,7 +201,7 @@ impl PopulateSchema for Schema {
         // Only after we've inserted the enum info into the map do we populate its fields. This
         // ensures that we are no longer holding the lock on `types` so other types can be
         // recursively registered.
-        let mut info_ref = info.get_guarded();
+        let mut info_ref = info.borrow_mut();
         let TypeInfo::Enum(enum_info) = info_ref.deref_mut() else {
             unreachable!();
         };
@@ -230,15 +214,10 @@ impl PopulateSchema for Schema {
         variants: impl Fn(&mut OneofMessages),
     ) {
         // First check by a read-only lock whether the type is already registered
-        if self
-            .0
-            .subtypes
-            .read_guarded()
-            .contains_key(&TypeId::of::<T>())
-        {
+        if self.0.subtypes.borrow().contains_key(&TypeId::of::<T>()) {
             return;
         }
-        let info = match self.0.subtypes.get_guarded().entry(TypeId::of::<T>()) {
+        let info = match self.0.subtypes.borrow_mut().entry(TypeId::of::<T>()) {
             Entry::Vacant(entry) => entry
                 .insert(Arc::new(Guard::new(OneofMessages::new(
                     name,
@@ -251,7 +230,7 @@ impl PopulateSchema for Schema {
         // Only after we've inserted the oneof info into the map do we populate its variants. This
         // ensures that we are no longer holding the lock on `types` so other types can be
         // recursively registered.
-        let mut info_ref = info.get_guarded();
+        let mut info_ref = info.borrow_mut();
         variants(info_ref.deref_mut())
     }
 
@@ -268,22 +247,24 @@ impl PopulateSchema for Schema {
 
         self.0
             .message_wrappers
-            .get_guarded()
+            .borrow_mut()
             .insert(wrapper_type_id, referenced_type_id);
     }
 
     fn type_reference<M: Any + ?Sized>(&self) -> String {
         let effective_id = self.wrapped_type_id(TypeId::of::<M>());
-        let types = self.0.types.read_guarded();
+        let types = self.0.types.borrow();
         let Some(type_info) = types.get(&effective_id) else {
             return format!(
                 "<!! type {ty_name:?} is not registered as a message !!>",
                 ty_name = type_name::<M>(),
             );
         };
-        let type_info = type_info.read_guarded();
+        let Ok(type_info) = type_info.try_borrow() else {
+            return "<!! type info under construction !!>".to_owned();
+        };
         let name = type_info.name();
-        if let Some(ordinal) = self.0.type_index.read_guarded().get(&(effective_id, None)) {
+        if let Some(ordinal) = self.0.type_index.borrow().get(&(effective_id, None)) {
             format!("{name} [{ordinal}]")
         } else {
             format!("{name} <!! no ordinal for {effective_id:?} !!>")
@@ -293,14 +274,16 @@ impl PopulateSchema for Schema {
     fn subtype_reference<M: Any + ?Sized, const TAG: u32>(&self) -> String {
         // TODO: this is a placeholder, we want to use the type's ordinal after they're organized
         let id = self.wrapped_type_id(TypeId::of::<M>());
-        let subtypes = self.0.subtypes.read_guarded();
+        let subtypes = self.0.subtypes.borrow();
         let Some(oneof_info) = subtypes.get(&id) else {
             return format!(
                 "<!! type {ty_name:?} is not registered as a oneof with subtypes !!>",
                 ty_name = type_name::<M>(),
             );
         };
-        let oneof_info = oneof_info.read_guarded();
+        let Ok(oneof_info) = oneof_info.try_borrow() else {
+            return "<!! subtype info under construction !!>".to_owned();
+        };
         let Some(message) = oneof_info.variants.get(&TAG) else {
             return format!(
                 "<!! type {ty_name:?} does not have a registered variant with tag {TAG} !!>",
@@ -309,7 +292,7 @@ impl PopulateSchema for Schema {
         };
         let name = &oneof_info.oneof_name;
         let variant_name = &message.message_name;
-        if let Some(ordinal) = self.0.type_index.read_guarded().get(&(id, Some(TAG))) {
+        if let Some(ordinal) = self.0.type_index.borrow().get(&(id, Some(TAG))) {
             format!("{name}::{variant_name} [{ordinal}]")
         } else {
             format!("{name}::{variant_name} <!! no ordinal for {id:?} !!>")
@@ -335,6 +318,10 @@ impl PopulateSchema for Schema {
             }
         }
 
+        // These reprs must be invoked at least once to ensure that any registrations inside them
+        // still take place eagerly.
+        let _ = a(self);
+
         Box::new(LazyRepr {
             schema: self.clone(),
             func: a,
@@ -344,8 +331,8 @@ impl PopulateSchema for Schema {
 
 impl Schema {
     fn display(&self, f: &mut Formatter<'_>, show_rust_types: bool) -> core::fmt::Result {
-        let types = self.0.types.read_guarded();
-        let subtypes = self.0.subtypes.read_guarded();
+        let types = self.0.types.borrow();
+        let subtypes = self.0.subtypes.borrow();
 
         #[derive(PartialEq, Eq, PartialOrd, Ord)]
         struct TypeEntry {
@@ -358,7 +345,7 @@ impl Schema {
 
         let mut ordered = BTreeSet::new();
         for (&type_id, info) in types.iter() {
-            let info = info.read_guarded();
+            let info = info.borrow();
             ordered.insert(TypeEntry {
                 friendly_name: info.name().to_owned(),
                 subtype_name: None,
@@ -368,7 +355,7 @@ impl Schema {
             });
         }
         for (&type_id, info) in subtypes.iter() {
-            let info = info.read_guarded();
+            let info = info.borrow();
             for (&subtype_tag, subinfo) in info.variants.iter() {
                 ordered.insert(TypeEntry {
                     friendly_name: info.oneof_name.clone(),
@@ -382,7 +369,7 @@ impl Schema {
         // Update the index so that `type_reference` and `subtype_reference` will show the correct
         // numbers during the render
         {
-            let mut index = self.0.type_index.get_guarded();
+            let mut index = self.0.type_index.borrow_mut();
 
             *index = ordered
                 .iter()
@@ -408,14 +395,14 @@ impl Schema {
             }
             match subtype_tag {
                 None => {
-                    let info = types.get(type_id).unwrap().read_guarded();
+                    let info = types.get(type_id).unwrap().borrow();
                     if show_rust_types {
                         writeln!(f, "// rust: {ty_name}", ty_name = info.ty_name())?;
                     }
                     write!(f, "[{ordinal}] {type_info}", type_info = info,)?;
                 }
                 Some(subtype_tag) => {
-                    let oneof = subtypes.get(type_id).unwrap().read_guarded();
+                    let oneof = subtypes.get(type_id).unwrap().borrow();
                     if show_rust_types {
                         writeln!(f, "// rust: {ty_name}", ty_name = oneof.ty_name)?;
                     }
