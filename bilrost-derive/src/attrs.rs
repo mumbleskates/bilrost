@@ -63,7 +63,9 @@ pub fn bilrost_attrs(
                 };
                 result.push(replacement);
             }
-            _ => bail!("empty bilrost attribute"),
+            _ => {
+                // we don't do anything with bare #[bilrost] attrs
+            }
         }
     }
     Ok(result)
