@@ -1,4 +1,4 @@
-use crate::attrs::{bilrost_attrs, set_option, string_attr, TagList};
+use crate::attrs::{bilrost_attrs, set_option, shorthand_tag, string_attr, TagList};
 use crate::field::traits::{DecodeLifetime, DecodeMode, FieldBearer, Tagged, WhereFor};
 use crate::Context;
 use alloc::boxed::Box;
@@ -152,7 +152,7 @@ impl Field {
         let mut schema_field_name = None;
         // filtered attrs that don't match the below universal attrs we check for
         let mut filtered_attrs = vec![];
-        for attr in bilrost_attrs(attrs)? {
+        for attr in bilrost_attrs(attrs, Some(shorthand_tag))? {
             if let Some(name) = string_attr(&attr, "name")? {
                 set_option(
                     &mut schema_field_name,

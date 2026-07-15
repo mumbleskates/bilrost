@@ -1,6 +1,6 @@
 use crate::attrs::{
-    bilrost_attrs, named_attr, set_bool, set_option, set_option_with_display, tag_attr,
-    tag_list_attr, word_attr, TagList,
+    bilrost_attrs, named_attr, set_bool, set_option, set_option_with_display, shorthand_tag,
+    tag_attr, tag_list_attr, word_attr, TagList,
 };
 use crate::field::traits::{
     DecodeLifetime::{self, Borrowed, Owned},
@@ -399,7 +399,7 @@ impl OneofVariant {
         let mut empty = false; // whether this unit is marked as an "empty" variant
         let mut schema_variant_name = None;
         let mut other_attrs = vec![];
-        for attr in bilrost_attrs(&variant.attrs)? {
+        for attr in bilrost_attrs(&variant.attrs, Some(shorthand_tag))? {
             if let Some(t) = tag_attr(&attr)? {
                 set_option(&mut tag, t, "duplicate tag attributes")?;
             } else if word_attr(&attr, "message") {
@@ -483,7 +483,7 @@ impl OneofVariant {
                     );
                 }
                 let field = fields.first().unwrap();
-                if !bilrost_attrs(&field.attrs)?.is_empty() {
+                if !bilrost_attrs(&field.attrs, None)?.is_empty() {
                     bail!(
                         "bilrost attributes found on the field inside variant {variant_ident}; \
                         those attributes should probably go on the variant instead, or the \

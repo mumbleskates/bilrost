@@ -11,8 +11,8 @@
 //! [bilrost]: https://docs.rs/bilrost
 
 use crate::attrs::{
-    bilrost_attrs, named_attr, set_bool, set_option, set_option_with_display, string_attr,
-    tag_list_attr, variant_attr, word_attr, TagList,
+    bilrost_attrs, enum_val_attr, named_attr, set_bool, set_option, set_option_with_display,
+    shorthand_enum_val, string_attr, tag_list_attr, word_attr, TagList,
 };
 use crate::context::Context;
 use crate::field::traits::{
@@ -190,7 +190,7 @@ fn preprocess_message_struct(input: DeriveInput) -> Result<PreprocessedMessageSt
     let mut crate_name: Option<Path> = None;
     let mut schema_type_name = None;
     let mut unknown_attrs = Vec::new();
-    for attr in bilrost_attrs(&input_attrs)? {
+    for attr in bilrost_attrs(&input_attrs, None)? {
         if let Some(tags) = tag_list_attr(&attr, "reserved_tags", None)? {
             set_option_with_display(
                 &mut reserved_tags,
@@ -931,7 +931,7 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream> {
     let mut crate_name: Option<Path> = None;
     let mut schema_type_name = None;
     let mut unknown_attrs = Vec::new();
-    for attr in bilrost_attrs(&input.attrs)? {
+    for attr in bilrost_attrs(&input.attrs, None)? {
         if let Some(path) = named_attr(&attr, "crate")? {
             set_option_with_display(
                 &mut crate_name,
@@ -975,6 +975,7 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream> {
     // TODO: make enum variants accept a schema rename attribute as well
     struct EnumVariant {
         variant_ident: Ident,
+        schema_variant_name: String,
         discriminant_expr: Expr,
     }
 
@@ -996,16 +997,47 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream> {
             bail!("Enumeration variants may not have fields");
         }
 
-        let discriminant_expr = variant_attr(&attrs)?
+        let mut variant_val: Option<Expr> = None;
+        let mut schema_variant_name = None;
+        let mut unknown_attrs = vec![];
+        for attr in bilrost_attrs(&attrs, Some(shorthand_enum_val))? {
+            if let Some(expr) = enum_val_attr(&attr)? {
+                set_option_with_display(
+                    &mut variant_val,
+                    expr,
+                    "duplicate value attributes on enumeration variant",
+                    |t| quote!((#t)).to_string(),
+                )?;
+            } else if let Some(name) = string_attr(&attr, "name")? {
+                set_option(
+                    &mut schema_variant_name,
+                    name,
+                    "duplicate variant name attributes",
+                )?;
+            } else {
+                unknown_attrs.push(attr);
+            }
+        }
+        if !unknown_attrs.is_empty() {
+            bail!(
+                "unknown attribute(s) for Enumeration variant: {}",
+                quote!(#(#unknown_attrs),*)
+            )
+        }
+
+        let schema_variant_name = schema_variant_name.unwrap_or_else(|| variant_ident.to_string());
+        let discriminant_expr = variant_val
             .or(discriminant.map(|(_, expr)| expr))
             .ok_or_else(|| {
                 err!(
-                    "Enumeration variants must have a discriminant or a #[bilrost(..)] attribute \
-                    with a constant value"
+                    "Enumeration variants must have a discriminant or a #[bilrost(val = ..)] \
+                    attribute (shorthand #[bilrost(..)]) with a constant value"
                 )
             })?;
+
         variants.push(EnumVariant {
             variant_ident,
+            schema_variant_name,
             discriminant_expr,
         });
     }
@@ -1025,6 +1057,10 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream> {
     let variant_idents: Vec<_> = variants
         .iter()
         .map(|variant| &variant.variant_ident)
+        .collect();
+    let schema_variant_names: Vec<_> = variants
+        .iter()
+        .map(|variant| &variant.schema_variant_name)
         .collect();
     let discriminant_exprs: Vec<_> = variants
         .iter()
@@ -1120,7 +1156,7 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream> {
                     schema,
                     #schema_type_name,
                     |fields| {
-                        #(fields.add_value(stringify!(#variant_idents), #discriminant_exprs);)*
+                        #(fields.add_value(#schema_variant_names, #discriminant_exprs);)*
                     },
                 );
                 #crate_::encoding::schema::PopulateSchema::make_lazy_repr(
@@ -1314,7 +1350,7 @@ fn preprocess_oneof(input: DeriveInput) -> Result<PreprocessedOneof> {
     let mut borrow_only = false;
     let mut crate_name: Option<Path> = None;
     let mut schema_type_name = None;
-    for attr in bilrost_attrs(&input.attrs)? {
+    for attr in bilrost_attrs(&input.attrs, None)? {
         if let Some(tags) = tag_list_attr(&attr, "reserved_tags", None)? {
             set_option_with_display(
                 &mut reserved_tags,
@@ -2438,7 +2474,7 @@ mod test {
                 #[bilrost(oneof(2, 3))] B,
                 u32,
                 #[bilrost(encoding = "::custom <Z>")] String,
-                #[bilrost(tag(1000))] i64,
+                #[bilrost = 1000] i64,
                 bool,
             );
         })
@@ -2450,7 +2486,7 @@ mod test {
                 #[bilrost(oneof(2, 3))] B,
                 u32,
                 #[bilrost(encoding(::custom<Z>))] String,
-                #[bilrost(1000)] i64,
+                #[bilrost = 1000] i64,
                 #[bilrost()] bool,
             );
         })
@@ -2744,8 +2780,8 @@ mod test {
             output
                 .expect_err("variant without discriminant not detected")
                 .to_string(),
-            "Enumeration variants must have a discriminant or a #[bilrost(..)] attribute with a \
-            constant value"
+            "Enumeration variants must have a discriminant or a #[bilrost(val = ..)] attribute \
+            (shorthand #[bilrost(..)]) with a constant value"
         );
     }
 
