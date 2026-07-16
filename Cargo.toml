@@ -18,13 +18,13 @@ rust-version.workspace = true
 members = [
     "bilrost-derive",
     "bilrost-types",
-    "custom-crate-name-test",
-    "derived-schema-test",
     "fuzz/common",
+    "test-custom-crate-name",
+    "test-derived-schema",
     "test-types"
 ]
 exclude = [
-    "old-hashbrown-check",
+    "test-old-hashbrown",
 ]
 resolver = "2"
 

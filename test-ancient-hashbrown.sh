@@ -4,7 +4,7 @@
 
 set -euxo pipefail
 
-cd "$(dirname "$0")/old-hashbrown-check"
+cd "$(dirname "$0")/test-old-hashbrown"
 
 HIGH_HASHBROWN_VERSION=$(cargo tree \
  --quiet \
