@@ -1,0 +1,12 @@
+[package]
+name = "derived-schema-test"
+version = "0.0.0"
+publish = false
+edition.workspace = true
+
+[dependencies]
+bilrost = { path = ".." }
+common = {path = "../fuzz/common" }
+
+[features]
+test-suite-extra = ["bilrost/threadsafe-schema"]
