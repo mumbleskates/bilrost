@@ -19,7 +19,7 @@ use bilrost::{
 use core::mem;
 use itertools::{repeat_n, Itertools};
 use std::borrow::Cow;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::default::Default;
 use std::fmt::Debug;
 use std::iter;
@@ -1331,7 +1331,6 @@ fn field_clearing() {
     use smallvec::SmallVec;
     #[cfg(feature = "smol_str")]
     use smol_str::SmolStr;
-    use std::collections::{BTreeMap, BTreeSet};
     #[cfg(feature = "std")]
     use std::collections::{HashMap, HashSet};
     #[cfg(feature = "thin-vec")]
@@ -2429,7 +2428,6 @@ fn decoding_maps() {
     )];
 
     {
-        use std::collections::BTreeMap;
         assert::decodes!(
             owned distinguished,
             valid_map,
@@ -5660,7 +5658,6 @@ fn implicit_encoding_ergonomics() {
     // As of 0.1013, fields with no annotated encodings should *by default* have a packed encoding
     // when they're placed in a oneof variant. Previously they needed to be explicitly annotated,
     // otherwise there would be a pretty confusing error.
-    use std::collections::{BTreeMap, BTreeSet};
 
     {
         #[derive(Oneof)]
