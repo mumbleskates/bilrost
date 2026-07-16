@@ -2,6 +2,32 @@
 //! test crate so that we can depend on the common test-types crate, which enables a bunch of
 //! features for type support that we don't want to always have enabled in our other integration
 //! tests.
+//!
+//! ```rust,compile_fail
+//! // The assertion in the Schema derive fires either when the call is instantiated.
+//! //
+//! // We don't derive Message for this to ensure that the const assertions in that impl don't
+//! // run either. Currently (rust 1.99) it still works if we make the oneof field's type generic,
+//! // but it's allowable for the compiler to monomorphize those constants as soon as the type is
+//! // named so we want to be sure that we're at least testing the actual asserts in the Schema
+//! // derive and not just failing to compile due to the asserts in the other derive.
+//! #[derive(Schema)]
+//! struct Foo {
+//!     #[bilrost(oneof(1))]
+//!     #[allow(dead_code)]
+//!     bar: Bar,
+//! }
+//!
+//! #[derive(Oneof, Schema)]
+//! enum Bar {
+//!     Nothing,
+//!     #[bilrost(2)]
+//!     Something(u64),
+//! }
+//!
+//! let schema = Schema::new();
+//! schema.register::<Foo>();
+//! ```
 
 #![cfg(test)]
 use bilrost::{Enumeration, Message, Oneof, Schema};

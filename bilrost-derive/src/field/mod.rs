@@ -342,7 +342,7 @@ impl Field {
     pub fn schema(&self, ctx: &Context) -> Option<TokenStream> {
         match &self.content {
             Value(scalar) => Some(scalar.schema(self.schema_field_name(), false, ctx)),
-            Oneof(oneof) => Some(oneof.schema(self.schema_field_name(), ctx)),
+            Oneof(oneof) => Some(oneof.schema(self.ident(), self.schema_field_name(), ctx)),
             Ignored(..) => None,
         }
     }

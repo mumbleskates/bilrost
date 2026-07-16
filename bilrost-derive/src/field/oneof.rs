@@ -7,8 +7,8 @@ use crate::field::traits::{
 };
 use crate::Context;
 use alloc::boxed::Box;
-use alloc::vec;
 use alloc::vec::Vec;
+use alloc::{format, vec};
 use eyre::{bail, Result};
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
@@ -151,29 +151,46 @@ impl OneofInclusion {
     pub fn where_terms(&self, purpose: WhereFor, ctx: &Context) -> Vec<TokenStream> {
         let crate_ = &ctx.crate_name;
         let ty = &self.ty;
-        vec![match purpose {
-            Encode => quote!(#ty: #crate_::encoding::Oneof),
+        match purpose {
+            Encode => vec![quote!(#ty: #crate_::encoding::Oneof)],
             Decode(Owned, Relaxed) => {
-                quote!(#ty: #crate_::encoding::OneofDecoder)
+                vec![quote!(#ty: #crate_::encoding::OneofDecoder)]
             }
             Decode(Borrowed, Relaxed) => {
-                quote!(#ty: #crate_::encoding::OneofBorrowDecoder<'__a>)
+                vec![quote!(#ty: #crate_::encoding::OneofBorrowDecoder<'__a>)]
             }
             Decode(Owned, Distinguished) => {
-                quote!(#ty: #crate_::encoding::DistinguishedOneofDecoder)
+                vec![quote!(#ty: #crate_::encoding::DistinguishedOneofDecoder)]
             }
             Decode(Borrowed, Distinguished) => {
-                quote!(#ty: #crate_::encoding::DistinguishedOneofBorrowDecoder<'__a>)
+                vec![quote!(#ty: #crate_::encoding::DistinguishedOneofBorrowDecoder<'__a>)]
             }
-            Schema => quote!(#ty: #crate_::encoding::schema::AddOneofFields),
-        }]
+            Schema => vec![
+                quote!(#ty: #crate_::encoding::schema::AddOneofFields),
+                quote!(#ty: #crate_::encoding::Oneof),
+            ],
+        }
     }
 
-    pub fn schema(&self, oneof_field_schema_name: &str, ctx: &Context) -> TokenStream {
+    pub fn schema(
+        &self,
+        field_ident: &TokenStream,
+        oneof_field_schema_name: &str,
+        ctx: &Context,
+    ) -> TokenStream {
         let crate_ = &ctx.crate_name;
         let tags = &self.tags;
         let ty = &self.ty;
+        let description = format!(
+            "tags don't match for oneof field {field_ident} with type {oneof_ty_name}",
+            oneof_ty_name = ty.to_token_stream(),
+        );
         quote! {
+            const _: () = #crate_::assert_tags_are_equal(
+                #description,
+                <#ty as #crate_::encoding::Oneof>::FIELD_TAGS,
+                &[#(#tags),*],
+            );
             fields.add_oneof(#oneof_field_schema_name, &[#(#tags),*]);
             <#ty as #crate_::encoding::schema::AddOneofFields>::add_fields(
                 schema,
