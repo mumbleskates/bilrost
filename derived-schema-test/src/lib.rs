@@ -1,10 +1,15 @@
+//! These are the integration tests for schema functionality. We write them here in a different
+//! test crate so that we can depend on the common test-types crate, which enables a bunch of
+//! features for type support that we don't want to always have enabled in our other integration
+//! tests.
+
 #![cfg(test)]
 use bilrost::{Enumeration, Message, Oneof, Schema};
+use std::collections::BTreeMap;
 use test_types::{
     TestAllTypes, TestDistinguished, TestOneofMessage, TestTypeSupport, TestTypeSupportBorrowable,
     TestTypeSupportDistinguished,
 };
-use std::collections::BTreeMap;
 
 #[test]
 fn schema_output() {
