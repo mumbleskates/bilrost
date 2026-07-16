@@ -1878,11 +1878,16 @@ Many alternative types are also available for both scalar values and containers!
 | `Vec<u8>`           | [`[u8; N]`][array][^plainbytearr]               | `plainbytes`        | yes           | (none)            |
 | `String`/`Vec<u8>`* | [`bstr::BString`][bstr][^bstrnote]              | general encodings   | yes           | "bstr"            |
 | `String`            | [`Cow<str>`][cow]                               | general encodings   | yes           | (none)            |
-| `String`            | [`Arc<str>`][arc]                               | general encodings   | yes           | (none)            |
-| `String`            | [`Rc<str>`][rc]                                 | general encodings   | yes           | (none)            |
+| `String`            | [`Arc<str>`][arc][^rc_inefficient]              | general encodings   | yes           | (none)            |
+| `String`            | [`Rc<str>`][rc][^rc_inefficient]                | general encodings   | yes           | (none)            |
 | `String`            | [`Box<str>`][box]                               | general encodings   | yes           | (none)            |
 | `String`            | [`bytestring::ByteString`][bytestring][^bzcopy] | general encodings   | yes           | "bytestring"      |
 | `String`            | [`smol_str::SmolStr`][smol_str]                 | general encodings   | yes           | "smol_str"        |
+
+[^rc_inefficient]: `Arc<str>` and `Rc<str>` are supported for completeness, but
+they may not be very efficient as both of those types allocate memory even when
+they are empty. Depending on optimizations, this may cause useless allocations
+that are immediately discarded during decoding.
 
 And several types have borrowed variants that are available for
 [borrowed decoding](#borrowed-messages) only:
