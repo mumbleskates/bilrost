@@ -10,56 +10,52 @@ use regex::Regex;
 use std::fmt::Debug;
 use std::str::{from_utf8, FromStr};
 
-pub mod test_messages;
-
 pub fn test_message(data: &[u8]) {
-    check_fuzz_result(roundtrip::<test_messages::TestAllTypes>(data));
-    check_fuzz_result(roundtrip_distinguished::<test_messages::TestDistinguished>(
+    check_fuzz_result(roundtrip::<test_types::TestAllTypes>(data));
+    check_fuzz_result(roundtrip_distinguished::<test_types::TestDistinguished>(
         data,
     ));
     #[cfg(feature = "compare-borrowed")]
     {
-        check_fuzz_result(fuzz_borrowing::<test_messages::TestAllTypes>(data));
-        check_fuzz_result(fuzz_borrowing_distinguished::<
-            test_messages::TestDistinguished,
-        >(data));
+        check_fuzz_result(fuzz_borrowing::<test_types::TestAllTypes>(data));
+        check_fuzz_result(fuzz_borrowing_distinguished::<test_types::TestDistinguished>(data));
     }
 }
 
 pub fn test_type_support(data: &[u8]) {
-    check_fuzz_result(roundtrip::<test_messages::TestTypeSupport>(data));
+    check_fuzz_result(roundtrip::<test_types::TestTypeSupport>(data));
     check_fuzz_result(roundtrip_distinguished::<
-        test_messages::TestTypeSupportDistinguished,
+        test_types::TestTypeSupportDistinguished,
     >(data));
     #[cfg(feature = "compare-borrowed")]
     {
-        check_fuzz_result(fuzz_borrowing::<test_messages::TestTypeSupport>(data));
+        check_fuzz_result(fuzz_borrowing::<test_types::TestTypeSupport>(data));
         check_fuzz_result(fuzz_borrowing_distinguished::<
-            test_messages::TestTypeSupportDistinguished,
+            test_types::TestTypeSupportDistinguished,
         >(data));
     }
 }
 
 pub fn test_borrowed_support(data: &[u8]) {
-    check_fuzz_result(roundtrip::<test_messages::TestTypeSupportBorrowable>(data));
+    check_fuzz_result(roundtrip::<test_types::TestTypeSupportBorrowable>(data));
     check_fuzz_result(roundtrip_distinguished::<
-        test_messages::TestTypeSupportBorrowable,
+        test_types::TestTypeSupportBorrowable,
     >(data));
     #[cfg(feature = "compare-borrowed")]
     {
-        check_fuzz_result(fuzz_borrowing::<test_messages::TestTypeSupportBorrowable>(
+        check_fuzz_result(fuzz_borrowing::<test_types::TestTypeSupportBorrowable>(
             data,
         ));
         check_fuzz_result(fuzz_borrowing_distinguished::<
-            test_messages::TestTypeSupportBorrowable,
+            test_types::TestTypeSupportBorrowable,
         >(data));
     }
 }
 
 pub fn test_message_via_oneof(data: &[u8]) {
-    match test_messages::TestOneofMessage::decode_borrowed(data) {
+    match test_types::TestOneofMessage::decode_borrowed(data) {
         Ok(oneof) => {
-            let mock = test_messages::TestOneofMessageMock::decode_borrowed(data)
+            let mock = test_types::TestOneofMessageMock::decode_borrowed(data)
                 .expect("oneof decoded but mock didn't");
             // make sure at most one field is set in the mock struct
             assert!(
@@ -84,7 +80,7 @@ pub fn test_message_via_oneof(data: &[u8]) {
             }
             other_kind => {
                 assert!(matches!(
-                    test_messages::TestOneofMessageMock::decode_borrowed(data),
+                    test_types::TestOneofMessageMock::decode_borrowed(data),
                     Err(err) if err.kind() == other_kind
                 ));
                 return;
@@ -92,10 +88,10 @@ pub fn test_message_via_oneof(data: &[u8]) {
         },
     }
 
-    match test_messages::TestOneofMessage::decode_distinguished_borrowed(data) {
+    match test_types::TestOneofMessage::decode_distinguished_borrowed(data) {
         Ok((_, oneof_canon)) => {
             let (mock, mock_canon) =
-                test_messages::TestOneofMessageMock::decode_distinguished_borrowed(data)
+                test_types::TestOneofMessageMock::decode_distinguished_borrowed(data)
                     .expect("oneof decoded distinguished but mock didn't");
             assert_eq!(oneof_canon, mock_canon);
             // make sure at most one field is set in the mock struct
@@ -119,7 +115,7 @@ pub fn test_message_via_oneof(data: &[u8]) {
             }
             other_kind => {
                 assert!(matches!(
-                    test_messages::TestOneofMessageMock::decode_distinguished_borrowed(data),
+                    test_types::TestOneofMessageMock::decode_distinguished_borrowed(data),
                     Err(err) if err.kind() == other_kind
                 ));
             }

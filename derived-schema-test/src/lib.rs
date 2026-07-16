@@ -1,6 +1,6 @@
 #![cfg(test)]
 use bilrost::{Enumeration, Message, Oneof, Schema};
-use common::test_messages::{
+use test_types::{
     TestAllTypes, TestDistinguished, TestOneofMessage, TestTypeSupport, TestTypeSupportBorrowable,
     TestTypeSupportDistinguished,
 };

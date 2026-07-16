@@ -7,11 +7,6 @@ use tinyvec::ArrayVec;
 
 /// This proto includes every type of field in both singular and repeated
 /// forms.
-///
-/// Also, crucially, all messages and enums in this file are eventually
-/// submessages of this message.  So for example, a fuzz test of TestAllTypes
-/// could trigger bugs that occur in any message type in this file.  We verify
-/// this stays true in a unit test.
 #[derive(Clone, Debug, PartialEq, Message, Schema)]
 #[bilrost(reserved_tags(172-299, 320-1000, 1013-1999, 2013..))]
 pub struct TestAllTypes {

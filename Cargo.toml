@@ -21,6 +21,7 @@ members = [
     "custom-crate-name-test",
     "derived-schema-test",
     "fuzz/common",
+    "test-types"
 ]
 exclude = [
     "old-hashbrown-check",
@@ -58,11 +59,6 @@ harness = false # just run the binary
 name = "proxy_third_party_type"
 test = true
 harness = false # just run the binary
-
-[[example]]
-name = "schema"
-test = true
-harness = false
 
 [dependencies]
 arrayvec = { version = ">=0.6.0,<0.8", default-features = false, optional = true }
