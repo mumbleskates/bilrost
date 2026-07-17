@@ -239,7 +239,7 @@ fn preprocess_message_struct(input: DeriveInput) -> Result<PreprocessedMessageSt
         bail!(
             "unknown attribute(s) for message: {attrs}",
             attrs = quote!(#(#unknown_attrs),*),
-        )
+        );
     }
 
     let ignored_field_init_mode = match default_per_field {
@@ -270,7 +270,9 @@ fn try_message(input: TokenStream) -> Result<TokenStream> {
     match &input.data {
         Data::Enum(..) => return try_message_via_oneof(input),
         Data::Struct(..) => {}
-        _ => bail!("Message can only be derived for a struct or an enum"),
+        _ => {
+            bail!("Message can only be derived for a struct or an enum");
+        }
     }
 
     let PreprocessedMessageStruct {
@@ -677,7 +679,7 @@ fn try_message_via_oneof(input: DeriveInput) -> Result<TokenStream> {
     let tag_measurer_ty = tag_measurer(&variants)(ctx);
 
     if empty_variant.is_none() {
-        bail!("Message can only be derived for Oneof enums that have an empty variant.")
+        bail!("Message can only be derived for Oneof enums that have an empty variant.");
     }
 
     let borrow_generics = combine_generics(&generics, quote!('__a));
@@ -953,7 +955,7 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream> {
         bail!(
             "unknown attribute(s) for enumeration: {attrs}",
             attrs = quote!(#(#unknown_attrs),*),
-        )
+        );
     }
 
     let schema_type_name = schema_type_name.unwrap_or_else(|| ident.to_string());
@@ -968,8 +970,12 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream> {
 
     let punctuated_variants = match input.data {
         Data::Enum(enum_) => enum_.variants,
-        Data::Struct(_) => bail!("Enumeration can not be derived for a struct"),
-        Data::Union(..) => bail!("Enumeration can not be derived for a union"),
+        Data::Struct(_) => {
+            bail!("Enumeration can not be derived for a struct");
+        }
+        Data::Union(..) => {
+            bail!("Enumeration can not be derived for a union");
+        }
     };
 
     // TODO: make enum variants accept a schema rename attribute as well
@@ -1022,7 +1028,7 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream> {
             bail!(
                 "unknown attribute(s) for Enumeration variant: {}",
                 quote!(#(#unknown_attrs),*)
-            )
+            );
         }
 
         let schema_variant_name = schema_variant_name.unwrap_or_else(|| variant_ident.to_string());
@@ -1337,8 +1343,12 @@ struct PreprocessedOneof {
 fn preprocess_oneof(input: DeriveInput) -> Result<PreprocessedOneof> {
     let input_variants = match &input.data {
         Data::Enum(enum_) => enum_.variants.clone(),
-        Data::Struct(..) => bail!("Oneof can not be derived for a struct"),
-        Data::Union(..) => bail!("Oneof can not be derived for a union"),
+        Data::Struct(..) => {
+            bail!("Oneof can not be derived for a struct");
+        }
+        Data::Union(..) => {
+            bail!("Oneof can not be derived for a union");
+        }
     };
 
     let ident = input.ident;
@@ -1384,7 +1394,7 @@ fn preprocess_oneof(input: DeriveInput) -> Result<PreprocessedOneof> {
         bail!(
             "unknown attribute(s) for oneof-message: {}",
             quote!(#(#unknown_attrs),*)
-        )
+        );
     }
 
     // Oneof enums have either zero or one unit variant. If there is no such variant, the Oneof
@@ -1895,7 +1905,9 @@ fn try_schema(input: TokenStream) -> Result<TokenStream> {
     match &input.data {
         Data::Struct(..) => try_struct_schema(input),
         Data::Enum(..) => try_enum_schema(input),
-        Data::Union(..) => bail!("schema cannot be derived for a union type"),
+        Data::Union(..) => {
+            bail!("schema cannot be derived for a union type");
+        }
     }
 }
 

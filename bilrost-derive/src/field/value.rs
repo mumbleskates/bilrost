@@ -102,7 +102,9 @@ impl MessageField {
 
         let tag = match tag.or(inferred_tag) {
             Some(tag) => tag,
-            None => bail!("missing tag attribute"),
+            None => {
+                bail!("missing tag attribute");
+            }
         };
 
         Ok(Box::new(MessageField {
@@ -342,7 +344,7 @@ impl ValueField {
             bail!(
                 "unknown attribute(s) for field: {attrs}",
                 attrs = quote!(#(#unknown_attrs),*),
-            )
+            );
         }
 
         let encoding =
@@ -468,11 +470,13 @@ impl OneofVariant {
                 let fields = match &variant.fields {
                     Fields::Named(fields) => &fields.named,
                     Fields::Unnamed(fields) => &fields.unnamed,
-                    Fields::Unit => bail!(
-                        "Oneof value variants must have exactly one field, but variant \
+                    Fields::Unit => {
+                        bail!(
+                            "Oneof value variants must have exactly one field, but variant \
                         {variant_ident} has no fields",
-                        variant_ident = variant.ident
-                    ),
+                            variant_ident = variant.ident
+                        );
+                    }
                 };
                 if fields.len() != 1 {
                     bail!(
