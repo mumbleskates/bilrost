@@ -255,7 +255,7 @@ pub(crate) mod borrowed {
 impl<C, E> FieldRepr<Unpacked<E>, C> for ()
 where
     C: Collection,
-    (): EmptyState<(), C> + ValueRepr<E, C::Item>,
+    (): EmptyState<(), C> + Encoder<Unpacked<E>, C> + ValueRepr<E, C::Item>,
 {
     fn repr(schema: &Schema) -> Box<dyn Display> {
         let bounds = match C::BOUNDS.end {

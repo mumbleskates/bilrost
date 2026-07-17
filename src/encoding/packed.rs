@@ -30,7 +30,7 @@ impl<E, T: ?Sized> Wiretyped<Packed<E>, T> for () {
 impl<C, E> ValueRepr<Packed<E>, C> for ()
 where
     C: Collection,
-    (): EmptyState<(), C> + ValueRepr<E, C::Item>,
+    (): EmptyState<(), C> + ForOverwrite<E, C::Item> + ValueRepr<E, C::Item>,
 {
     fn repr(schema: &Schema) -> Box<dyn Display> {
         let bounds = match C::BOUNDS.end {
@@ -86,7 +86,7 @@ where
 
 impl<T, E> FieldRepr<Packed<E>, T> for ()
 where
-    (): ValueRepr<Packed<E>, T>,
+    (): Encoder<Packed<E>, T> + ValueRepr<Packed<E>, T>,
 {
     fn repr(schema: &Schema) -> Box<dyn Display> {
         <() as ValueRepr<Packed<E>, T>>::repr(schema)
