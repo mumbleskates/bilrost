@@ -1,6 +1,5 @@
 use crate::buf::ReverseBuf;
-use crate::encoding::schema::{FieldRepr, Schema, ValueRepr};
-use crate::encoding::schema::{PopulateSchema, RegisterMessage};
+use crate::encoding::schema::{FieldRepr, PopulateSchema, RegisterMessage, Schema, ValueRepr};
 use crate::encoding::{
     check_wire_type, Capped, DecodeContext, ForOverwrite, RestrictedDecodeContext, TagMeasurer,
     TagRevWriter, TagWriter, WireType,
@@ -358,7 +357,7 @@ mod generic_optional {
 
     impl<T, E> FieldRepr<E, Option<T>> for ()
     where
-        (): ValueRepr<E, T>,
+        (): Encoder<E, Option<T>> + ValueRepr<E, T>,
     {
         fn repr(schema: &Schema) -> Box<dyn Display> {
             <() as ValueRepr<E, T>>::repr(schema)

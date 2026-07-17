@@ -56,7 +56,7 @@ where
 
 impl<T, Estart, Eend> ValueRepr<(Estart, Eend), Range<T>> for ()
 where
-    (): ValueRepr<(Estart, Eend), (T, T)>,
+    (): ValueEncoder<(Estart, Eend), Range<T>> + ValueRepr<(Estart, Eend), (T, T)>,
 {
     fn repr(schema: &Schema) -> Box<dyn Display> {
         <() as ValueRepr<(Estart, Eend), (T, T)>>::repr(schema)
@@ -243,7 +243,7 @@ where
 
 impl<T, Estart, Eend> ValueRepr<(Estart, Eend), RangeInclusive<T>> for ()
 where
-    (): ValueRepr<(Estart, Eend), (T, T)>,
+    (): ValueEncoder<(Estart, Eend), RangeInclusive<T>> + ValueRepr<(Estart, Eend), (T, T)>,
 {
     fn repr(schema: &Schema) -> Box<dyn Display> {
         <() as ValueRepr<(Estart, Eend), (T, T)>>::repr(schema)

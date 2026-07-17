@@ -102,6 +102,7 @@ macro_rules! impl_tuple {
         impl<$($letters,)* $($encodings,)*> ValueRepr<($($encodings,)*), ($($letters,)*)> for ()
         where
             TupleIdentity<($($encodings,)*), ($($letters,)*)>: Any,
+            (): ValueEncoder<($($encodings,)*), ($($letters,)*)>,
             $((): FieldRepr<$encodings, $letters>,)*
         {
             fn repr(schema: &Schema) -> Box<dyn Display> {

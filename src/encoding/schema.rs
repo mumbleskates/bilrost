@@ -11,6 +11,7 @@
 //!  * Finally, once all relevant message types are registered, the schema can be Displayed, which
 //!    will output all the collected information.
 
+use crate::encoding::{Encoder, ValueEncoder};
 use alloc::borrow::ToOwned;
 use alloc::boxed::Box;
 use alloc::collections::btree_map::Entry;
@@ -606,12 +607,12 @@ impl OneofMessages {
 }
 
 /// Representation of a value type T when encoded by the encoding E.
-pub trait ValueRepr<E, T: ?Sized> {
+pub trait ValueRepr<E, T: ?Sized>: ValueEncoder<E, T> {
     fn repr(schema: &Schema) -> Box<dyn Display>;
 }
 
 /// Representation of a field type T when encoded by the encoding E.
-pub trait FieldRepr<E, T: ?Sized> {
+pub trait FieldRepr<E, T: ?Sized>: Encoder<E, T> {
     fn repr(schema: &Schema) -> Box<dyn Display>;
 }
 

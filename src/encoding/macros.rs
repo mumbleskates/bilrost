@@ -709,6 +709,7 @@ macro_rules! encoding_implemented_via_value_encoding {
     ) => {
         impl<T $(, $($generics)*)?> $crate::encoding::schema::FieldRepr<$encoding, T> for ()
         where
+            (): $crate::encoding::Encoder<$encoding, T>,
             (): $crate::encoding::schema::ValueRepr<$encoding, T>,
             $($($where_clause)*)?
         {
