@@ -2289,7 +2289,7 @@ Several outstanding examples of very similar varint encodings exist:
 ##### Mathematics
 
 Bilrost's varint representation is a base 128 [bijective numeration][bn] scheme
-with a continuation bit. In such a numbering scheme, each possible values in a
+with a continuation bit. In such a numbering scheme, each possible value in a
 given scheme is greater than each possible value with fewer digits. (Many people
 are already unknowingly familiar with bijective numeration via the column names
 in spreadsheet software: A, B, ... Y, Z, AA, AB, ...)
