@@ -644,67 +644,91 @@ impl_tuple!(
 
 delegate_value_encoding!(
     delegate from (GeneralGeneric<P>) to ((General,))
-    for type ((A,)) including distinguished
+    for type ((A,))
+    including distinguished
+    including schema
     with generics (const P: u8, A)
 );
 delegate_value_encoding!(
     delegate from (GeneralGeneric<P>) to ((General, General))
-    for type ((A, B)) including distinguished
+    for type ((A, B))
+    including distinguished
+    including schema
     with generics (const P: u8, A, B)
 );
 delegate_value_encoding!(
     delegate from (GeneralGeneric<P>) to ((General, General, General))
-    for type ((A, B, C)) including distinguished
+    for type ((A, B, C))
+    including distinguished
+    including schema
     with generics (const P: u8, A, B, C)
 );
 delegate_value_encoding!(
     delegate from (GeneralGeneric<P>) to ((General, General, General, General))
-    for type ((A, B, C, D)) including distinguished
+    for type ((A, B, C, D))
+    including distinguished
+    including schema
     with generics (const P: u8, A, B, C, D)
 );
 delegate_value_encoding!(
     delegate from (GeneralGeneric<P>) to ((General, General, General, General, General))
-    for type ((A, B, C, D, E)) including distinguished
+    for type ((A, B, C, D, E))
+    including distinguished
+    including schema
     with generics (const P: u8, A, B, C, D, E)
 );
 delegate_value_encoding!(
     delegate from (GeneralGeneric<P>) to ((General, General, General, General, General, General))
-    for type ((A, B, C, D, E, F)) including distinguished
+    for type ((A, B, C, D, E, F))
+    including distinguished
+    including schema
     with generics (const P: u8, A, B, C, D, E, F)
 );
 delegate_value_encoding!(
     delegate from (GeneralGeneric<P>) to ((General, General, General, General, General, General,
                                            General))
-    for type ((A, B, C, D, E, F, G)) including distinguished
+    for type ((A, B, C, D, E, F, G))
+    including distinguished
+    including schema
     with generics (const P: u8, A, B, C, D, E, F, G)
 );
 delegate_value_encoding!(
     delegate from (GeneralGeneric<P>) to ((General, General, General, General, General, General,
                                            General, General))
-    for type ((A, B, C, D, E, F, G, H)) including distinguished
+    for type ((A, B, C, D, E, F, G, H))
+    including distinguished
+    including schema
     with generics (const P: u8, A, B, C, D, E, F, G, H)
 );
 delegate_value_encoding!(
     delegate from (GeneralGeneric<P>) to ((General, General, General, General, General, General,
                                            General, General, General))
-    for type ((A, B, C, D, E, F, G, H, I)) including distinguished
+    for type ((A, B, C, D, E, F, G, H, I))
+    including distinguished
+    including schema
     with generics (const P: u8, A, B, C, D, E, F, G, H, I)
 );
 delegate_value_encoding!(
     delegate from (GeneralGeneric<P>) to ((General, General, General, General, General, General,
                                            General, General, General, General))
-    for type ((A, B, C, D, E, F, G, H, I, J)) including distinguished
+    for type ((A, B, C, D, E, F, G, H, I, J))
+    including distinguished
+    including schema
     with generics (const P: u8, A, B, C, D, E, F, G, H, I, J)
 );
 delegate_value_encoding!(
     delegate from (GeneralGeneric<P>) to ((General, General, General, General, General, General,
                                            General, General, General, General, General))
-    for type ((A, B, C, D, E, F, G, H, I, J, K)) including distinguished
+    for type ((A, B, C, D, E, F, G, H, I, J, K))
+    including distinguished
+    including schema
     with generics (const P: u8, A, B, C, D, E, F, G, H, I, J, K)
 );
 delegate_value_encoding!(
     delegate from (GeneralGeneric<P>) to ((General, General, General, General, General, General,
                                            General, General, General, General, General, General))
-    for type ((A, B, C, D, E, F, G, H, I, J, K, L)) including distinguished
+    for type ((A, B, C, D, E, F, G, H, I, J, K, L))
+    including distinguished
+    including schema
     with generics (const P: u8, A, B, C, D, E, F, G, H, I, J, K, L)
 );

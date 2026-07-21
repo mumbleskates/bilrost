@@ -148,23 +148,27 @@ delegate_encoding!(
     delegate from (PlainBytes) to (crate::encoding::Unpacked<PlainBytes>)
     for type (Vec<Vec<u8>>)
     including distinguished
+    including schema
 );
 delegate_encoding!(
     delegate from (PlainBytes) to (crate::encoding::Unpacked<PlainBytes>)
     for type (Vec<Cow<'a, [u8]>>)
     including distinguished
+    including schema
     with generics ('a)
 );
 delegate_encoding!(
     delegate from (PlainBytes) to (crate::encoding::Unpacked<PlainBytes>)
     for type (Vec<&'a [u8]>)
     including distinguished
+    including schema
     with generics ('a)
 );
 delegate_encoding!(
     delegate from (PlainBytes) to (crate::encoding::Unpacked<PlainBytes>)
     for type (Vec<&'a [u8; N]>)
     including distinguished
+    including schema
     with generics ('a, const N: usize)
 );
 

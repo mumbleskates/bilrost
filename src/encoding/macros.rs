@@ -4,13 +4,13 @@
 #[macro_export]
 macro_rules! delegate_encoding {
     (
-        delegate from ($from_ty:ty) to ($to_ty:ty) for type ($value_ty:ty)
+        delegate schema from ($from_ty:ty) to ($to_ty:ty) for type ($value_ty:ty)
         $(with where clause ($($where_clause:tt)*))?
         $(with generics ($($value_generics:tt)*))?
     ) => {
         impl$(<$($value_generics)*>)? $crate::encoding::schema::FieldRepr<$from_ty, $value_ty>
         for ()
-        where
+            where
             (): $crate::encoding::schema::FieldRepr<$to_ty, $value_ty>,
             $($($where_clause)*)?
         {
@@ -20,7 +20,31 @@ macro_rules! delegate_encoding {
                 <() as $crate::encoding::schema::FieldRepr<$to_ty, $value_ty>>::repr(schema)
             }
         }
+    };
 
+    (
+        delegate from ($from_ty:ty) to ($to_ty:ty) for type ($value_ty:ty)
+        including schema
+        $(with where clause ($($where_clause:tt)*))?
+        $(with generics ($($value_generics:tt)*))?
+    ) => {
+        $crate::delegate_encoding!(
+            delegate schema from ($from_ty) to ($to_ty) for type ($value_ty)
+            $(with where clause ($($where_clause)*))?
+            $(with generics ($($value_generics)*))?
+        );
+        $crate::delegate_encoding!(
+            delegate from ($from_ty) to ($to_ty) for type ($value_ty)
+            $(with where clause ($($where_clause)*))?
+            $(with generics ($($value_generics)*))?
+        );
+    };
+
+    (
+        delegate from ($from_ty:ty) to ($to_ty:ty) for type ($value_ty:ty)
+        $(with where clause ($($where_clause:tt)*))?
+        $(with generics ($($value_generics:tt)*))?
+    ) => {
         impl$(<$($value_generics)*>)? $crate::encoding::Encoder<$from_ty, $value_ty> for ()
         where
             (): $crate::encoding::Encoder<$to_ty, $value_ty>,
@@ -103,6 +127,26 @@ macro_rules! delegate_encoding {
     (
         delegate from ($from_ty:ty) to ($to_ty:ty) for type ($value_ty:ty)
         including distinguished
+        including schema
+        $(with where clause ($($where_clause:tt)*))?
+        $(with generics ($($value_generics:tt)*))?
+    ) => {
+        $crate::delegate_encoding!(
+            delegate schema from ($from_ty) to ($to_ty) for type ($value_ty)
+            $(with where clause ($($where_clause)*))?
+            $(with generics ($($value_generics)*))?
+        );
+        $crate::delegate_encoding!(
+            delegate from ($from_ty) to ($to_ty) for type ($value_ty)
+            including distinguished
+            $(with where clause ($($where_clause)*))?
+            $(with generics ($($value_generics)*))?
+        );
+    };
+
+    (
+        delegate from ($from_ty:ty) to ($to_ty:ty) for type ($value_ty:ty)
+        including distinguished
         $(with where clause ($($where_clause:tt)*))?
         $(with generics ($($value_generics:tt)*))?
     ) => {
@@ -180,7 +224,7 @@ pub use delegate_encoding;
 #[macro_export]
 macro_rules! delegate_value_encoding {
     (
-        delegate from ($from_ty:ty) to ($to_ty:ty) for type ($value_ty:ty)
+        delegate schema from ($from_ty:ty) to ($to_ty:ty) for type ($value_ty:ty)
         $(with where clause ($($where_clause:tt)+))?
         $(with generics ($($value_generics:tt)*))?
     ) => {
@@ -189,14 +233,38 @@ macro_rules! delegate_value_encoding {
             where
             (): $crate::encoding::schema::ValueRepr<$to_ty, $value_ty>,
             $($($where_clause)*)?
-        {
-            fn repr(
-                schema: &$crate::encoding::schema::Schema
-            ) -> $crate::alloc::boxed::Box<dyn ::core::fmt::Display> {
-                <() as $crate::encoding::schema::ValueRepr<$to_ty, $value_ty>>::repr(schema)
+            {
+                fn repr(
+                    schema: &$crate::encoding::schema::Schema
+                ) -> $crate::alloc::boxed::Box<dyn ::core::fmt::Display> {
+                    <() as $crate::encoding::schema::ValueRepr<$to_ty, $value_ty>>::repr(schema)
+                }
             }
-        }
+    };
 
+    (
+        delegate from ($from_ty:ty) to ($to_ty:ty) for type ($value_ty:ty)
+        including schema
+        $(with where clause ($($where_clause:tt)+))?
+        $(with generics ($($value_generics:tt)*))?
+    ) => {
+        $crate::delegate_value_encoding!(
+            delegate from ($from_ty) to ($to_ty) for type ($value_ty)
+            $(with where clause ($($where_clause)*))?
+            $(with generics ($($value_generics)*))?
+        );
+        $crate::delegate_value_encoding!(
+            delegate schema from ($from_ty) to ($to_ty) for type ($value_ty)
+            $(with where clause ($($where_clause)*))?
+            $(with generics ($($value_generics)*))?
+        );
+    };
+
+    (
+        delegate from ($from_ty:ty) to ($to_ty:ty) for type ($value_ty:ty)
+        $(with where clause ($($where_clause:tt)+))?
+        $(with generics ($($value_generics:tt)*))?
+    ) => {
         impl$(<$($value_generics)*>)? $crate::encoding::Wiretyped<$from_ty, $value_ty> for ()
         where
             (): $crate::encoding::Wiretyped<$to_ty, $value_ty>,
@@ -275,6 +343,28 @@ macro_rules! delegate_value_encoding {
                 )
             }
         }
+    };
+
+    (
+        delegate from ($from_ty:ty) to ($to_ty:ty) for type ($value_ty:ty)
+        including distinguished
+        including schema
+        $(with where clause for relaxed ($($relaxed_where:tt)+))?
+        $(with where clause for distinguished ($($distinguished_where:tt)+))?
+        $(with generics ($($value_generics:tt)*))?
+    ) => {
+        $crate::delegate_value_encoding!(
+            delegate schema from ($from_ty) to ($to_ty) for type ($value_ty)
+            $(with where clause ($($relaxed_where)*))?
+            $(with generics ($($value_generics)*))?
+        );
+        $crate::delegate_value_encoding!(
+            delegate from ($from_ty) to ($to_ty) for type ($value_ty)
+            including distinguished
+            $(with where clause for relaxed ($($relaxed_where)+))?
+            $(with where clause for distinguished ($($distinguished_where)+))?
+            $(with generics ($($value_generics)*))?
+        );
     };
 
     (
@@ -416,6 +506,7 @@ macro_rules! delegate_proxied_encoding {
         to encode proxied type ($value_ty:ty)
         $(using proxy tag ($proxy_tag:ty))?
         with encoding ($from:ty)
+        including schema
         $(with where clause ($($where_clause:tt)+))?
         $(with generics ($($impl_generics:tt)*))?
     ) => {
@@ -427,6 +518,47 @@ macro_rules! delegate_proxied_encoding {
             $(with generics ($($impl_generics)*))?
         );
     };
+
+    (
+        use encoding ($to:ty)
+        to encode proxied type ($value_ty:ty)
+        $(using proxy tag ($proxy_tag:ty))?
+        with encoding ($from:ty)
+        including distinguished
+        including schema
+        $(with where clause for relaxed ($($relaxed_where:tt)*))?
+        $(with where clause for distinguished ($($distinguished_where:tt)*))?
+        $(with generics ($($impl_generics:tt)*))?
+    ) => {
+        $crate::delegate_value_encoding!(
+            delegate from ($from)
+            to ($crate::encoding::Proxied<$to $(, $proxy_tag)?>)
+            for type ($value_ty)
+            including distinguished
+            including schema
+            $(with where clause for relaxed ($($relaxed_where)*))?
+            $(with where clause for distinguished ($($distinguished_where)*))?
+            $(with generics ($($impl_generics)*))?
+        );
+    };
+
+    (
+        use encoding ($to:ty)
+        to encode proxied type ($value_ty:ty)
+        $(using proxy tag ($proxy_tag:ty))?
+        with encoding ($from:ty)
+        $(with where clause ($($where_clause:tt)+))?
+        $(with generics ($($impl_generics:tt)*))?
+    ) => {
+        $crate::delegate_value_encoding!(
+            delegate from ($from)
+            to ($crate::encoding::Proxied<$to $(, $proxy_tag)?>)
+            for type ($value_ty)
+            $(with where clause ($($where_clause)*))?
+            $(with generics ($($impl_generics)*))?
+        );
+    };
+
     (
         use encoding ($to:ty)
         to encode proxied type ($value_ty:ty)
@@ -453,6 +585,48 @@ macro_rules! delegate_proxied_encoding {
         to encode proxied type ($value_ty:ty)
         $(using proxy tag ($proxy_tag:ty))?
         with general encodings
+        including schema
+        $(with where clause ($($where_clause:tt)+))?
+        $(with generics ($($impl_generics:tt)*))?
+    ) => {
+        $crate::delegate_value_encoding!(
+            delegate from ($crate::encoding::GeneralGeneric<__G>)
+            to ($crate::encoding::Proxied<$to $(, $proxy_tag)?>)
+            for type ($value_ty)
+            including schema
+            $(with where clause ($($where_clause)*))?
+            with generics (const __G: u8, $($($impl_generics)*)?)
+        );
+    };
+
+    (
+        use encoding ($to:ty)
+        to encode proxied type ($value_ty:ty)
+        $(using proxy tag ($proxy_tag:ty))?
+        with general encodings
+        including distinguished
+        including schema
+        $(with where clause for relaxed ($($relaxed_where:tt)*))?
+        $(with where clause for distinguished ($($distinguished_where:tt)*))?
+        $(with generics ($($impl_generics:tt)*))?
+    ) => {
+        $crate::delegate_value_encoding!(
+            delegate from ($crate::encoding::GeneralGeneric<__G>)
+            to ($crate::encoding::Proxied<$to $(, $proxy_tag)?>)
+            for type ($value_ty)
+            including distinguished
+            including schema
+            $(with where clause for relaxed ($($relaxed_where)*))?
+            $(with where clause for distinguished ($($distinguished_where)*))?
+            with generics (const __G: u8, $($($impl_generics)*)?)
+        );
+    };
+
+    (
+        use encoding ($to:ty)
+        to encode proxied type ($value_ty:ty)
+        $(using proxy tag ($proxy_tag:ty))?
+        with general encodings
         $(with where clause ($($where_clause:tt)+))?
         $(with generics ($($impl_generics:tt)*))?
     ) => {
@@ -464,6 +638,7 @@ macro_rules! delegate_proxied_encoding {
             with generics (const __G: u8, $($($impl_generics)*)?)
         );
     };
+
     (
         use encoding ($to:ty)
         to encode proxied type ($value_ty:ty)

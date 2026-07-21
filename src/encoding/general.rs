@@ -53,40 +53,47 @@ encoding_implemented_via_value_encoding!(GeneralGeneric<P>, with generics (const
 delegate_encoding!(
     delegate from (General) to (Unpacked) for type (Vec<T>)
     including distinguished
+    including schema
     with generics (T)
 );
 delegate_encoding!(
     delegate from (General) to (Unpacked) for type (Cow<'a, [T]>)
     including distinguished
+    including schema
     with where clause (T: Clone)
     with generics ('a, T: 'a)
 );
 delegate_encoding!(
     delegate from (General) to (Unpacked) for type (BTreeSet<T>)
     including distinguished
+    including schema
     with generics (T)
 );
 
 delegate_value_encoding!(
     delegate from (GeneralPacked) to (Packed) for type (Vec<T>)
     including distinguished
+    including schema
     with generics (T)
 );
 delegate_value_encoding!(
     delegate from (GeneralPacked) to (Packed) for type (Cow<'a, [T]>)
     including distinguished
+    including schema
     with where clause for relaxed (T: Clone)
     with generics ('a, T: 'a)
 );
 delegate_value_encoding!(
     delegate from (GeneralPacked) to (Packed) for type (BTreeSet<T>)
     including distinguished
+    including schema
     with generics (T)
 );
 
 delegate_value_encoding!(
     delegate from (GeneralGeneric<P>) to (Map) for type (BTreeMap<K, V>)
     including distinguished
+    including schema
     with where clause for relaxed (K: Ord)
     with where clause for distinguished (V: Eq)
     with generics (const P: u8, K, V)
@@ -98,79 +105,112 @@ delegate_value_encoding!(
     delegate from (GeneralGeneric<P>) to ((General, General))
     for type (core::ops::Range<T>)
     including distinguished
+    including schema
     with generics (const P: u8, T)
 );
 delegate_value_encoding!(
     delegate from (GeneralGeneric<P>) to ((General, General))
     for type (core::ops::RangeInclusive<T>)
     including distinguished
+    including schema
     with generics (const P: u8, T)
 );
 
 // General encodes bool and integers as varints.
 delegate_value_encoding!(delegate from (GeneralGeneric<P>) to (Varint) for type (bool)
     including distinguished
+    including schema
     with generics (const P: u8));
 delegate_value_encoding!(delegate from (GeneralGeneric<P>) to (Varint) for type (u16)
     including distinguished
+    including schema
     with generics (const P: u8));
 delegate_value_encoding!(delegate from (GeneralGeneric<P>) to (Varint) for type (i16)
     including distinguished
+    including schema
     with generics (const P: u8));
 delegate_value_encoding!(delegate from (GeneralGeneric<P>) to (Varint) for type (u32)
     including distinguished
+    including schema
     with generics (const P: u8));
 delegate_value_encoding!(delegate from (GeneralGeneric<P>) to (Varint) for type (i32)
     including distinguished
+    including schema
     with generics (const P: u8));
 delegate_value_encoding!(delegate from (GeneralGeneric<P>) to (Varint) for type (u64)
     including distinguished
+    including schema
     with generics (const P: u8));
 delegate_value_encoding!(delegate from (GeneralGeneric<P>) to (Varint) for type (i64)
     including distinguished
+    including schema
     with generics (const P: u8));
 delegate_value_encoding!(delegate from (GeneralGeneric<P>) to (Varint) for type (usize)
     including distinguished
+    including schema
     with generics (const P: u8));
 delegate_value_encoding!(delegate from (GeneralGeneric<P>) to (Varint) for type (isize)
     including distinguished
+    including schema
     with generics (const P: u8));
 
 delegate_value_encoding!(delegate from (GeneralGeneric<P>) to (Varint)
-    for type (core::num::NonZeroU8) including distinguished
+    for type (core::num::NonZeroU8)
+    including distinguished
+    including schema
     with generics (const P: u8));
 delegate_value_encoding!(delegate from (GeneralGeneric<P>) to (Varint)
-    for type (core::num::NonZeroI8) including distinguished
+    for type (core::num::NonZeroI8)
+    including distinguished
+    including schema
     with generics (const P: u8));
 delegate_value_encoding!(delegate from (GeneralGeneric<P>) to (Varint)
-    for type (core::num::NonZeroU16) including distinguished
+    for type (core::num::NonZeroU16)
+    including distinguished
+    including schema
     with generics (const P: u8));
 delegate_value_encoding!(delegate from (GeneralGeneric<P>) to (Varint)
-    for type (core::num::NonZeroI16) including distinguished
+    for type (core::num::NonZeroI16)
+    including distinguished
+    including schema
     with generics (const P: u8));
 delegate_value_encoding!(delegate from (GeneralGeneric<P>) to (Varint)
-    for type (core::num::NonZeroU32) including distinguished
+    for type (core::num::NonZeroU32)
+    including distinguished
+    including schema
     with generics (const P: u8));
 delegate_value_encoding!(delegate from (GeneralGeneric<P>) to (Varint)
-    for type (core::num::NonZeroI32) including distinguished
+    for type (core::num::NonZeroI32)
+    including distinguished
+    including schema
     with generics (const P: u8));
 delegate_value_encoding!(delegate from (GeneralGeneric<P>) to (Varint)
-    for type (core::num::NonZeroU64) including distinguished
+    for type (core::num::NonZeroU64)
+    including distinguished
+    including schema
     with generics (const P: u8));
 delegate_value_encoding!(delegate from (GeneralGeneric<P>) to (Varint)
-    for type (core::num::NonZeroI64) including distinguished
+    for type (core::num::NonZeroI64)
+    including distinguished
+    including schema
     with generics (const P: u8));
 delegate_value_encoding!(delegate from (GeneralGeneric<P>) to (Varint)
-    for type (core::num::NonZeroUsize) including distinguished
+    for type (core::num::NonZeroUsize)
+    including distinguished
+    including schema
     with generics (const P: u8));
 delegate_value_encoding!(delegate from (GeneralGeneric<P>) to (Varint)
-    for type (core::num::NonZeroIsize) including distinguished
+    for type (core::num::NonZeroIsize)
+    including distinguished
+    including schema
     with generics (const P: u8));
 
 // General also encodes floating point values.
 delegate_value_encoding!(delegate from (GeneralGeneric<P>) to (Fixed) for type (f32)
+    including schema
     with generics (const P: u8));
 delegate_value_encoding!(delegate from (GeneralGeneric<P>) to (Fixed) for type (f64)
+    including schema
     with generics (const P: u8));
 
 impl<const P: u8> Wiretyped<GeneralGeneric<P>, &str> for () {
@@ -755,7 +795,9 @@ impl DistinguishedProxiable<SealedBilrostTag> for core::time::Duration {
 delegate_proxied_encoding!(
     use encoding (Packed<Varint>) to encode proxied type (core::time::Duration)
     using proxy tag (SealedBilrostTag)
-    with general encodings including distinguished
+    with general encodings
+    including distinguished
+    including schema
 );
 
 #[cfg(test)]

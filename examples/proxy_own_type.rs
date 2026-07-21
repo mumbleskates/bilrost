@@ -171,24 +171,32 @@ mod implement_encoding_for_those_structs {
     bilrost::delegate_proxied_encoding!(
         use encoding (bilrost::encoding::Varint)
         to encode proxied type (AlwaysEven)
-        with general encodings including distinguished
+        with general encodings
+        including distinguished
+        including schema
     );
     bilrost::delegate_proxied_encoding!(
         use encoding (bilrost::encoding::Varint)
         to encode proxied type (AlwaysOdd) using proxy tag (Tag)
-        with general encodings including distinguished
+        with general encodings
+        including distinguished
+        including schema
     );
 
     // We can also delegate these to our own encoding, perhaps with a different default meaning.
     bilrost::delegate_proxied_encoding!(
         use encoding(bilrost::encoding::Fixed)
         to encode proxied type (AlwaysEven)
-        with encoding (super::CustomEncoding) including distinguished
+        with encoding (super::CustomEncoding)
+        including distinguished
+        including schema
     );
     bilrost::delegate_proxied_encoding!(
         use encoding(bilrost::encoding::Fixed)
         to encode proxied type (AlwaysOdd) using proxy tag (Tag)
-        with encoding (super::CustomEncoding) including distinguished
+        with encoding (super::CustomEncoding)
+        including distinguished
+        including schema
     );
 }
 
