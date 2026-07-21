@@ -1,4 +1,4 @@
-use bilrost::{Message, OwnedMessage};
+use bilrost::{Message, OwnedMessage, Schema};
 use std::ops::RangeInclusive;
 
 struct CustomEncoding;
@@ -102,13 +102,15 @@ mod implement_encoding_for_range {
     bilrost::delegate_proxied_encoding!(
         use encoding (bilrost::encoding::Packed)
         to encode proxied type (RangeInclusive<T>) using proxy tag (Tag)
-        with encoding (CustomEncoding) including distinguished
+        with encoding (CustomEncoding)
+        including distinguished
+        including schema
         with generics (T)
     );
 }
 
 fn main() {
-    #[derive(Debug, PartialEq, Message)]
+    #[derive(Debug, PartialEq, Message, Schema)]
     struct MessageContainingRange {
         #[bilrost(encoding(CustomEncoding))]
         numeric: RangeInclusive<i64>,
@@ -126,7 +128,8 @@ fn main() {
     println!("decoded: {round_tripped:#?}");
     assert_eq!(round_tripped.as_ref(), Ok(&msg));
 
-    #[derive(Debug, PartialEq, Message)]
+    #[derive(Debug, PartialEq, Message, Schema)]
+    #[bilrost(name = "MessageContainingRange")]
     struct EquivalentMessage {
         #[bilrost(encoding(packed))]
         numeric: [i64; 2],
@@ -142,4 +145,15 @@ fn main() {
             stringy: ["aardvark".to_string(), "after".to_string()],
         })
     );
+
+    // Because we've set the "name" of the equivalent message, and because they are encoded the
+    // same way, both of these messages have the exact same schema representation.
+    let schema1 = Schema::new();
+    schema1.register::<MessageContainingRange>();
+    let schema2 = Schema::new();
+    schema2.register::<EquivalentMessage>();
+
+    assert_eq!(format!("{schema1}"), format!("{schema2}"));
+
+    println!("{schema1}");
 }

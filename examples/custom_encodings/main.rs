@@ -1,4 +1,4 @@
-use bilrost::{Message, OwnedMessage};
+use bilrost::{Message, OwnedMessage, Schema};
 use std::sync::Arc;
 
 /// `arc_encoding::ArcEncoding` implements a custom encoding from outside the `bilrost` crate, for
@@ -14,7 +14,7 @@ mod arc_encoding;
 use arc_encoding::{Arced, ArcedSlice};
 
 fn main() {
-    #[derive(Debug, Default, Message)]
+    #[derive(Debug, Default, Message, Schema)]
     struct Plain {
         #[bilrost(tag(1), encoding(varint))]
         scalar: Option<u64>,
@@ -25,7 +25,7 @@ fn main() {
         tree_children: Vec<Box<Self>>,
     }
 
-    #[derive(Clone, Debug, Message)]
+    #[derive(Clone, Debug, Message, Schema)]
     struct DemoCustom {
         #[bilrost(tag(1), encoding(Arced<varint>))] // Any field can be wrapped in Arc
         scalar: Option<Arc<u64>>,
@@ -72,4 +72,11 @@ fn main() {
     let output = DemoCustom::decode(encoded.as_slice()).expect("should decode");
     println!("output: {output:#?}");
     assert_eq!(encoded, output.encode_to_vec());
+
+    let schema = Schema::new();
+    schema.register::<Plain>();
+    schema.register::<DemoCustom>();
+    println!();
+    println!("schema:");
+    println!("{schema}");
 }
