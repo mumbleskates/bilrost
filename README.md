@@ -541,11 +541,16 @@ We can now import and use its traits and derive macros. The main three are:
   variant as a sub-message (see the [example section](
   #variants-with-multiple-fields) and the [documentation](
   #embedding-messages-in-oneofs) about the "message" attribute).
+* [`Schema`](#schema-support): This derive implements support for rendering the
+  effective representation and interpretation for messages. This can be applied
+  to both messages and oneofs, as long as each field's encoding and each
+  message and oneof contained within also supports schema rendering.
+  `Enumeration` types always support schema rendering by default, and no
+  additional derives should be applied.
 
-  Types with
-  `Oneof` derived do not have `bilrost` APIs useful to library users except when
-  they are included in a `Message` struct (or [have `Message` derived
-  themselves](#deriving-message-for-enums)).
+  Types with `Oneof` derived do not have `bilrost` APIs useful to library users
+  except when they are included in a `Message` struct (or [have `Message`
+  derived themselves](#deriving-message-for-enums)).
 
 And then there are the five traits for the different [message encoding and
 decoding](#encoding-and-decoding-messages) capabilities:
@@ -741,7 +746,7 @@ When a oneof enum type has the empty variant, it can only be included in a
 message directly; when it has none, it can only be included when it's nested
 within an `Option` so that `None` stands for the empty state.
 
-#### Repeated values in Oneof fields
+##### Repeated values in Oneof fields
 
 Oneof variants must contain values that encode as a single field on the wire.
 This means that collection types like `Vec`, `HashSet`, arrays, etc. must always
@@ -753,7 +758,7 @@ This is the same requirement that is needed to make these types re-nest in any
 other collection or `Option`; see the notes and table in the section on
 [encodings for container types](#containers).
 
-#### Boxing Oneof fields
+##### Boxing Oneof fields
 
 It's possible to store oneof enums out-of-line from your struct by indirecting
 them with `Box`, which is transparent to all oneof traits:
@@ -778,7 +783,7 @@ struct Tiny {
 }
 ```
 
-#### Variants with multiple fields
+##### Variants with multiple fields
 
 Using the "message" attribute, enum variants work as if they held a message
 struct that looked like the variant.
@@ -955,6 +960,90 @@ types that are fully represented as an enum with one field per variant this way,
 deriving both `Oneof` and `Message` makes it easy to accidentally include the
 oneof as a sub-message field rather than as an "embedded" oneof that represents
 a set of fields in the message that shouldn't coexist.
+
+#### Schema support
+
+Optionally, support for outputting the effective schema of messages can also be
+derived. This enables registering each message (or at least each topmost
+message, since contained messages are automatically registered) with a `Schema`
+object that can be printed out to explain the representation of each message,
+field, and enumeration that was registered or transitively involved.
+
+This can be useful to validate the expected representation of a message's
+fields, and it also can be expected to be equivalent between two messages that
+share the same representation for all their fields. For example, `String`,
+`&str`, and `Cow<str>` all have the same exact representation, and if a field's
+type is changed between types that are represented equivalently when encoded
+"on the wire" the schema output should not change.
+
+`Message` and `Oneof` types must always derive `Schema` to include schema
+support, and `Enumeration` types inherently support it and do not require
+additional derives. Each encoded type must also have schema support for the
+encoded type built into the chosen encoding. All encodings shipped with
+`bilrost` should include schema support for all their supported types already,
+but custom encodings might not implement it which would prevent the derive from
+functioning.
+
+`Schema` objects are shareable & cloneable references to an accumulating set of
+schema information for all types that have been registered so far. They are
+only buildable at runtime, should not affect encoding performance or behavior,
+and are designed to be useful as a development aid rather than performant.
+
+An example usage would be to have an additional binary in a project, or a test,
+that registers all the project's relevant `bilrost`-encodable messages and then
+displays or compares the output.
+
+The actual schema text itself can be displayed in two ways: `Schema` objects
+themselves implement `Display`, and the same text with annotations of the exact
+Rust types of the messages and enumerations inside can be seen by the `Display`
+implementation of the value returned by `schema.with_rust_types()`, which can
+be helpful to disambiguate when there may be many different types with
+similar names.
+
+<details><summary>Schema example:</summary>
+
+```rust,
+# use bilrost::{Enumeration, Message, Oneof, Schema};
+#[derive(PartialEq, Eq, Enumeration)]
+enum Enum {
+    Val = 0,
+}
+
+#[derive(Message, Oneof, Schema)]
+enum MessageType {
+    #[bilrost(empty)]
+    Empty,
+    #[bilrost(tag(1), message)]
+    Variant {
+        #[bilrost(tag(1))]
+        field: Enum,
+    },
+    #[bilrost(tag(2))]
+    Number(u32),
+}
+
+let schema = Schema::new();
+schema.register::<MessageType>();
+assert_eq!(format!("{schema}"), "\
+[1] enumeration Enum {
+    0: Val,
+}
+
+[2] message MessageType {
+    1: variant Variant (delimited message MessageType::Variant [3]),
+    2: variant Number (varint, unsigned; in 32 bit range),
+}
+
+[3] message MessageType::Variant {
+    1: field (varint, unsigned; one of enumeration Enum [1]),
+}
+")
+```
+
+</details>
+
+The names of items in the schema can also be [changed via attributes](
+#changing-names-in-the-schema).
 
 #### Encodings
 
@@ -1190,6 +1279,56 @@ struct Tree {
 
 * **"borrowed_only"**: [disables](#disabling-owned-decoding-traits) derivation
   of owned decoding implementations.
+
+##### Changing names in the schema
+
+* **"name"**: Changes the name of a message struct, oneof, enumeration, oneof
+  or enumeration variant, or message field in the schema output.
+
+<details><summary>Example changing names in the schema output:</summary>
+
+```rust,
+# use bilrost::{Enumeration, Message, Oneof, Schema};
+#[derive(PartialEq, Eq, Enumeration)]
+#[bilrost(name = "RenamedEnum")]
+enum Enum {
+    #[bilrost(name = "RenamedVal")]
+    Val = 0,
+}
+
+#[derive(Message, Oneof, Schema)]
+#[bilrost(name = "RenamedMessage")]
+enum MessageType {
+    #[bilrost(empty)]
+    Empty,
+    #[bilrost(tag(1), message, name = "RenamedVariant")]
+    Variant {
+        #[bilrost(tag(1), name = "renamed_field")]
+        field: Enum,
+    },
+    #[bilrost(tag(2), name = "RenamedNumber")]
+    Number(u32),
+}
+
+let schema = Schema::new();
+schema.register::<MessageType>();
+assert_eq!(format!("{schema}"), "\
+[1] enumeration RenamedEnum {
+    0: RenamedVal,
+}
+
+[2] message RenamedMessage {
+    1: variant RenamedVariant (delimited message RenamedMessage::RenamedVariant [3]),
+    2: variant RenamedNumber (varint, unsigned; in 32 bit range),
+}
+
+[3] message RenamedMessage::RenamedVariant {
+    1: renamed_field (varint, unsigned; one of enumeration RenamedEnum [1]),
+}
+")
+```
+
+</details>
 
 ### Deriving distinguished decoding
 
@@ -2626,6 +2765,8 @@ of key changes.
 * Bilrost has first-class support for distinguished canonical encoding
 * Bilrost removes some mistake-prone choices
 * Bilrost does not have a giant ecosystem
+* Bilrost can [emit schemas from code](#schema-support), rather than the other
+  way around
 
 <details><summary>In greater detail</summary>
 
