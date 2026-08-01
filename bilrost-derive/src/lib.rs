@@ -978,7 +978,6 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream> {
         }
     };
 
-    // TODO: make enum variants accept a schema rename attribute as well
     struct EnumVariant {
         variant_ident: Ident,
         schema_variant_name: String,
