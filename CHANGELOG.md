@@ -17,12 +17,6 @@
   no major reason we can't support them.
 * Added support for a "crate" attribute that enables using `bilrost` from a
   different path or crate name.
-* Added extra assertions in `#[cfg(debug_asserts)]` that fail if `bilrost` is
-  ever used with a `bytes::Buf` implementor with an incorrect or inconsistent
-  `remaining()`. The only time this is known to happen currently is when a
-  `Buf` is longer than `usize::MAX` bytes long. This is probably rarely an
-  issue in practice, but please be aware that decoding messages larger than
-  `usize::MAX` bytes is very likely to fail or produce incorrect results.
 
 ### Fixes
 
@@ -35,6 +29,13 @@
   It has always been a dire error that invalidates `bilrost`'s guarantees to
   decode from a `Buf` with an incorrect remaining implementation, we just check
   more often now.
+
+  Under typical usage this is unlikely to ever happen; with the implementations
+  provided by `bytes` and `bilrost` this should only possibly occur when a
+  `Buf` contains more than `usize::MAX` bytes, usually by repeating segments
+  internally. `Buf::remaining()` implementations typically saturate on
+  overflow, but `bilrost` always expects that the remaining bytes count should
+  decrease the exact number of bytes the `Buf` is advanced.
 * Fixed some newly-linted issues with semicolons in macros in the derive crate.
 * Organized the unpublished crates in the source that are used for tests to all
   share a "test-" prefix.
