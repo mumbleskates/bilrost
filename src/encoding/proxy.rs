@@ -71,7 +71,6 @@ where
     (): ValueEncoder<Proxied<E, Tag>, T> + ValueRepr<E, T::Proxy>,
 {
     fn repr(schema: &Schema) -> Box<dyn Display> {
-        // TODO: put a method on Proxiable that describes the representation
         <() as ValueRepr<E, T::Proxy>>::repr(schema)
     }
 }
