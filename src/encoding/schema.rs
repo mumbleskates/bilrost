@@ -243,7 +243,6 @@ impl PopulateSchema for Schema {
     /// guaranteed to output the correct type name and ordinal to reference the message type in
     /// question.
     fn subtype_reference<M: Any + ?Sized, const TAG: u32>(&self) -> String {
-        // TODO: this is a placeholder, we want to use the type's ordinal after they're organized
         let id = self.wrapped_type_id(TypeId::of::<M>());
         let subtypes = self.0.subtypes.borrow();
         let Some(oneof_info) = subtypes.get(&id) else {
@@ -494,7 +493,7 @@ impl MessageFields {
     }
 
     fn display(&self, f: &mut Formatter<'_>, oneof_name: Option<&str>) -> core::fmt::Result {
-        // TODO: display info about oneofs in the message
+        // TODO: display info about oneofs in the message, other than the "variant" prefixes?
         write!(f, "message ")?;
         if let Some(oneof_name) = oneof_name {
             write!(f, "{oneof_name}::")?;
