@@ -106,9 +106,6 @@ macro_rules! impl_tuple {
             $((): FieldRepr<$encodings, $letters>,)*
         {
             fn repr(schema: &Schema) -> Box<dyn Display> {
-                // TODO: possibly there's a better way to name the type here. any::type_name
-                //  is one example of something that can get the actual names of the tuple members
-                //  but we might not want to do that.
                 schema.register_message::<
                     TupleIdentity<($($encodings,)*), ($($letters,)*)>
                 >($name, |fields| {
