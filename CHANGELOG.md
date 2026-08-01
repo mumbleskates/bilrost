@@ -9,8 +9,21 @@
 
 ### New features
 
+* Headline feature: Added support for rendering the schema of encodable
+  messages, which outputs the essential details of the values' representation
+  in encoded data rather than the types that are used to store it.
 * Added support for string-data types `Arc<str>`, `Rc<str>`, and `Box<str>` via
-  the "general" encoding.
+  the "general" encoding. These aren't necessarily very efficient, but there's
+  no major reason we can't support them.
+* Added support for a "crate" attribute that enables using `bilrost` from a
+  different path or crate name.
+* Added extra assertions in `#[cfg(debug_asserts)]` that fail if `bilrost` is
+  ever used with a `bytes::Buf` implementor with an incorrect or inconsistent
+  `remaining()`. The only time this is known to happen currently is when a
+  `Buf` is `chain`-ed to be more than `usize::MAX` bytes long, or is otherwise
+  more than `usize::MAX` bytes. This is probably rarely an issue in practice,
+  but please be aware that decoding messages larger than `usize::MAX` bytes is
+  very likely to fail or produce incorrect results.
 
 ### Fixes
 
@@ -23,6 +36,11 @@
   It has always been a dire error that invalidates `bilrost`'s guarantees to
   decode from a `Buf` with an incorrect remaining implementation, we just check
   more often now.
+* Fixed some newly-linted issues with semicolons in macros in the derive crate.
+* Organized the unpublished crates in the source that are used for tests to all
+  share a "test-" prefix.
+* Enable more features on docs.rs so the documentation of internal impls is
+  more complete.
 
 ## v0.1015.0
 
