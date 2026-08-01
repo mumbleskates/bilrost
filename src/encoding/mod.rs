@@ -1160,14 +1160,14 @@ pub(crate) mod paranoid_buf_asserts {
 
     /// Buf wrapper with extra assertions around its length.
     pub(crate) struct Counted<B: Buf> {
-        tracked_remaining: u64,
+        tracked_remaining: usize,
         buf: B,
     }
 
     impl<B: Buf> Counted<B> {
         pub(crate) fn new(buf: B) -> Self {
             Self {
-                tracked_remaining: buf.remaining() as u64,
+                tracked_remaining: buf.remaining(),
                 buf,
             }
         }
@@ -1179,14 +1179,14 @@ pub(crate) mod paranoid_buf_asserts {
     impl<B: Buf> Buf for Counted<B> {
         #[inline]
         fn remaining(&self) -> usize {
-            assert_eq!(self.buf.remaining() as u64, self.tracked_remaining);
+            assert_eq!(self.buf.remaining(), self.tracked_remaining);
             self.buf.remaining()
         }
 
         #[inline]
         fn chunk(&self) -> &[u8] {
             let chunk = self.buf.chunk();
-            assert!(chunk.len() as u64 <= self.tracked_remaining);
+            assert!(chunk.len() <= self.tracked_remaining);
             chunk
         }
 
@@ -1195,9 +1195,9 @@ pub(crate) mod paranoid_buf_asserts {
             self.buf.advance(cnt);
             self.tracked_remaining = self
                 .tracked_remaining
-                .checked_sub(cnt as u64)
+                .checked_sub(cnt)
                 .expect("advanced too far");
-            assert_eq!(self.buf.remaining() as u64, self.tracked_remaining);
+            assert_eq!(self.buf.remaining(), self.tracked_remaining);
         }
     }
 }
