@@ -127,12 +127,8 @@ struct MessageSet {
 
 /// Receptacle for a full schema that can record the schemas of many messages.
 ///
-/// This trait is usable from a const reference with interior mutability because when messages
-/// register the appearance of their fields' reprs they will sometimes capture references to the
-/// whole schema so that they can get the name of a type. We want the overall schema not to be
-/// frozen in place as we collect these reprs even as their potential output changes and more types
-/// are registered.
 impl Schema {
+    /// Create a new schema object.
     pub fn new() -> Self {
         Self(MessageSet::default().into())
     }
@@ -151,12 +147,22 @@ impl Schema {
         M::register(self);
     }
 
+    /// Returns a `Display`able object that renders this same schema with exact Rust type
+    /// annotations for each message and enumeration type from the compiler.
     pub fn with_rust_types(&self) -> impl Display {
         WithRustTypes(self.clone())
     }
 }
 
+/// Methods to actually populate a schema's data for messages and so forth.
+///
+/// This trait is usable from a const reference with interior mutability because when messages
+/// register the appearance of their fields' reprs they will sometimes capture references to the
+/// whole schema so that they can get the name of a type. We want the overall schema not to be
+/// frozen in place as we collect these reprs even as their potential output changes and more types
+/// are registered.
 impl PopulateSchema for Schema {
+    /// Idempotently calls the given closure to populate information about a Message's fields.
     fn register_message<M: Any + ?Sized>(&self, name: &str, fields: impl Fn(&mut MessageFields)) {
         let ty_id = TypeId::of::<M>();
         // First check by a read-only lock whether the type is already registered
@@ -183,6 +189,7 @@ impl PopulateSchema for Schema {
         fields(msg)
     }
 
+    /// Idempotently calls the given closure to populate information about an Enumeration's values.
     fn register_enumeration<E: Any + ?Sized>(&self, name: &str, fields: impl Fn(&mut EnumInfo)) {
         let ty_id = TypeId::of::<E>();
         // First check by a read-only lock whether the type is already registered
@@ -209,6 +216,8 @@ impl PopulateSchema for Schema {
         fields(enum_info)
     }
 
+    /// Idempotently calls the given closure to populate information about a oneof type's message
+    /// variants.
     fn register_oneof_messages<T: Any + ?Sized>(
         &self,
         name: &str,
@@ -235,6 +244,8 @@ impl PopulateSchema for Schema {
         variants(info_ref.deref_mut())
     }
 
+    /// Registers the given type `W` to be equivalent to the message type `M`. This enables
+    /// the schema to still find message types even when they are wrapped in e.g. `Box`.
     fn register_message_wrapper<W: Any + ?Sized, M: Any + ?Sized>(&self) {
         let wrapper_type_id = TypeId::of::<W>();
         let referenced_type_id = TypeId::of::<M>();
@@ -252,6 +263,9 @@ impl PopulateSchema for Schema {
             .insert(wrapper_type_id, referenced_type_id);
     }
 
+    /// Returns a friendly string for the given message's type. When the schema is rendering its
+    /// full output and all types have already been registered, this should be guaranteed to output
+    /// the correct type name and ordinal to reference the message type in question.
     fn type_reference<M: Any + ?Sized>(&self) -> String {
         let effective_id = self.wrapped_type_id(TypeId::of::<M>());
         let types = self.0.types.borrow();
@@ -272,6 +286,10 @@ impl PopulateSchema for Schema {
         }
     }
 
+    /// Returns a friendly string for the given oneof variant message's type. When the schema is
+    /// rendering its full output and all types have already been registered, this should be
+    /// guaranteed to output the correct type name and ordinal to reference the message type in
+    /// question.
     fn subtype_reference<M: Any + ?Sized, const TAG: u32>(&self) -> String {
         // TODO: this is a placeholder, we want to use the type's ordinal after they're organized
         let id = self.wrapped_type_id(TypeId::of::<M>());
@@ -300,6 +318,10 @@ impl PopulateSchema for Schema {
         }
     }
 
+    /// Creates a lazily-evaluated displayable object for the given closure which will receive a
+    /// reference to this Schema when it's called. This allows calling `type_reference()` and
+    /// `subtype_reference()` after the types in question have already been registered so they will
+    /// display correctly.
     fn make_lazy_repr<A, D>(&self, a: A) -> Box<dyn Display>
     where
         A: 'static + Fn(&Schema) -> D,
