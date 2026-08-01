@@ -27,4 +27,4 @@ time = "0.3"
 tinyvec = "1"
 
 [features]
-test-suite-extra = ["bilrost/threadsafe-schema"]
+test-suite-extra = []

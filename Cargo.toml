@@ -71,7 +71,6 @@ const_panic = { version = "0.2.12", default-features = false, features = ["non_b
 hashbrown = { version = ">=0.1.0,<0.18", default-features = false, optional = true }
 smallvec = { version = ">=1.6.1,<2", default-features = false, features = ["const_generics"], optional = true }
 smol_str = { version = ">=0.1.24,<0.4", default-features = false, optional = true }
-spin = { version = "0.10.0", default-features = false, features = ["rwlock"], optional = true }
 thin-vec = { version = "^0.2", default-features = false, optional = true }
 time = { version = "^0.3.0", default-features = false, optional = true }
 tinyvec = { version = "^1", default-features = false, features = ["alloc", "rustc_1_57"], optional = true }
@@ -106,7 +105,6 @@ extended-diagnostics = ["dep:const_panic"]
 forbid-unsafe = []
 no-recursion-limit = []
 std = []
-threadsafe-schema = ["dep:spin"]
 
 third-party-type-support = [
     "arrayvec",
@@ -175,7 +173,6 @@ full-test-suite = [
 
 # Extra parameters to outside crates that may affect our encoding and decoding we should test for.
 test-suite-extra = [
-    "threadsafe-schema",
     "time",
     "time/large-dates",
 ]

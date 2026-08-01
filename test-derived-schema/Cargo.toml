@@ -9,4 +9,4 @@ bilrost = { path = ".." }
 test-types = { path = "../test-types" }
 
 [features]
-test-suite-extra = ["bilrost/threadsafe-schema"]
+test-suite-extra = []

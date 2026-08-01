@@ -23,55 +23,7 @@ use core::any::{type_name, Any, TypeId};
 use core::fmt::{Display, Formatter};
 use core::ops::DerefMut;
 
-#[cfg(feature = "threadsafe-schema")]
-mod guard {
-    use core::ops::{Deref, DerefMut};
-    pub(super) use spin::RwLock as Guard;
-
-    /// Trait to masquerade RwLock like RefCell's api
-    pub(super) trait BorrowGuard<T> {
-        type ReadGuard<'a>: Deref<Target = T>
-        where
-            Self: 'a,
-            T: 'a;
-        type WriteGuard<'a>: DerefMut<Target = T>
-        where
-            Self: 'a,
-            T: 'a;
-
-        fn borrow_mut(&self) -> Self::WriteGuard<'_>;
-        fn borrow(&self) -> Self::ReadGuard<'_>;
-        fn try_borrow(&self) -> Result<Self::ReadGuard<'_>, ()>;
-    }
-
-    impl<T> super::BorrowGuard<T> for Guard<T> {
-        type ReadGuard<'a>
-            = spin::RwLockReadGuard<'a, T>
-        where
-            T: 'a;
-        type WriteGuard<'a>
-            = spin::RwLockWriteGuard<'a, T>
-        where
-            T: 'a;
-
-        fn borrow_mut(&self) -> spin::RwLockWriteGuard<'_, T> {
-            self.write()
-        }
-
-        fn borrow(&self) -> spin::RwLockReadGuard<'_, T> {
-            self.read()
-        }
-
-        fn try_borrow(&self) -> Result<spin::RwLockReadGuard<'_, T>, ()> {
-            self.try_read().ok_or(())
-        }
-    }
-}
-
-#[cfg(not(feature = "threadsafe-schema"))]
 use core::cell::RefCell as Guard;
-#[cfg(feature = "threadsafe-schema")]
-use guard::{BorrowGuard, Guard};
 
 pub trait PopulateSchema {
     /// Registers a specific message type. May shortcut if this method has already been invoked
