@@ -1330,6 +1330,13 @@ assert_eq!(format!("{schema}"), "\
 
 </details>
 
+##### Using `bilrost` under a different crate name
+
+* **"crate"**: When provided on the target of a `Message`, `Oneof`, or
+  `Enumeration` derive, changes the path that the derived code will use to
+  access the `bilrost` library. This defaults to `::bilrost` but can be set to
+  any path the crate is available in scope.
+
 ### Deriving distinguished decoding
 
 Deriving distinguished decoding traits for messages and oneofs in addition to
