@@ -20,10 +20,9 @@
 * Added extra assertions in `#[cfg(debug_asserts)]` that fail if `bilrost` is
   ever used with a `bytes::Buf` implementor with an incorrect or inconsistent
   `remaining()`. The only time this is known to happen currently is when a
-  `Buf` is `chain`-ed to be more than `usize::MAX` bytes long, or is otherwise
-  more than `usize::MAX` bytes. This is probably rarely an issue in practice,
-  but please be aware that decoding messages larger than `usize::MAX` bytes is
-  very likely to fail or produce incorrect results.
+  `Buf` is longer than `usize::MAX` bytes long. This is probably rarely an
+  issue in practice, but please be aware that decoding messages larger than
+  `usize::MAX` bytes is very likely to fail or produce incorrect results.
 
 ### Fixes
 
