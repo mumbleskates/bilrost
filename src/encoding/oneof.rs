@@ -1,4 +1,5 @@
 use crate::buf::ReverseBuf;
+use crate::encoding::schema::{AddOneofFields, MessageFields, Schema};
 use crate::encoding::{
     Capped, DecodeContext, RestrictedDecodeContext, TagMeasurer, TagRevWriter, TagWriter, WireType,
 };
@@ -361,6 +362,15 @@ mod generic_oneof_grant_empty_state_impls {
             })
         }
     }
+
+    impl<T> AddOneofFields for Option<T>
+    where
+        T: AddOneofFields + NonEmptyOneof,
+    {
+        fn add_fields(schema: &Schema, fields: &mut MessageFields, field_name: Option<&str>) {
+            T::add_fields(schema, fields, field_name);
+        }
+    }
 }
 
 /// These are the impls that make the oneof trait transparent to Box
@@ -586,6 +596,15 @@ mod generic_boxed_oneof_impls {
                 tag, wire_type, buf, ctx,
             )
             .map(|(val, canon)| (Box::new(val), canon))
+        }
+    }
+
+    impl<T> AddOneofFields for Box<T>
+    where
+        T: AddOneofFields + NonEmptyOneof,
+    {
+        fn add_fields(schema: &Schema, fields: &mut MessageFields, field_name: Option<&str>) {
+            T::add_fields(schema, fields, field_name);
         }
     }
 }

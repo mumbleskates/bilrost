@@ -1,4 +1,5 @@
 use crate::buf::ReverseBuf;
+use crate::encoding::schema::{PopulateSchema, Schema, ValueRepr};
 use crate::encoding::value_traits::{DistinguishedMapping, Mapping};
 use crate::encoding::{
     decoding_modes, encode_varint, encoded_len_varint, encoding_implemented_via_value_encoding,
@@ -8,7 +9,11 @@ use crate::encoding::{
     WireType, Wiretyped,
 };
 use crate::DecodeErrorKind::Truncated;
+use alloc::boxed::Box;
+use alloc::format;
+use alloc::string::String;
 use bytes::{Buf, BufMut};
+use core::fmt::Display;
 
 pub struct Map<KE = GeneralPacked, VE = GeneralPacked>(KE, VE);
 
@@ -54,14 +59,30 @@ where
     )
 }
 
+impl<M, K, V, KE, VE> ValueRepr<Map<KE, VE>, M> for ()
+where
+    M: Mapping<Key = K, Value = V>,
+    (): EmptyState<(), M> + ValueRepr<KE, K> + ValueRepr<VE, V>,
+{
+    fn repr(schema: &Schema) -> Box<dyn Display> {
+        schema.make_lazy_repr(|schema| {
+            let bounds = match M::BOUNDS.end {
+                None => String::new(),
+                Some(max) => format!("; at most {max} items"),
+            };
+            format!(
+                "delimited map (keys: ({key_repr}); values: ({value_repr}){bounds})",
+                key_repr = <() as ValueRepr<KE, K>>::repr(schema),
+                value_repr = <() as ValueRepr<VE, V>>::repr(schema),
+            )
+        })
+    }
+}
+
 impl<M, K, V, KE, VE> ValueEncoder<Map<KE, VE>, M> for ()
 where
     M: Mapping<Key = K, Value = V>,
-    (): EmptyState<(), M>
-        + ForOverwrite<KE, K>
-        + ValueEncoder<KE, K>
-        + ForOverwrite<VE, V>
-        + ValueEncoder<VE, V>,
+    (): EmptyState<(), M> + ValueEncoder<KE, K> + ValueEncoder<VE, V>,
 {
     fn encode_value<B: BufMut + ?Sized>(value: &M, buf: &mut B) {
         encode_varint(map_encoded_length::<M, KE, VE>(value) as u64, buf);

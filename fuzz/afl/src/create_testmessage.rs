@@ -1,6 +1,6 @@
 use bilrost::encoding::EmptyState;
 use bilrost::Message;
-use common::test_messages::{test_distinguished, test_message, TestAllTypes, TestDistinguished};
+use test_types::{test_distinguished, test_message, TestAllTypes, TestDistinguished};
 
 fn main() {
     let msg = TestAllTypes {

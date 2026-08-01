@@ -1,4 +1,5 @@
 use crate::buf::ReverseBuf;
+use crate::encoding::schema::{Schema, ValueRepr};
 use crate::encoding::underived::{
     underived_decode, underived_decode_distinguished, underived_encode, underived_encoded_len,
     underived_prepend,
@@ -10,7 +11,9 @@ use crate::encoding::{
     WireType, Wiretyped,
 };
 use crate::{Canonicity, DecodeError};
+use alloc::boxed::Box;
 use bytes::{Buf, BufMut};
+use core::fmt::Display;
 use core::mem;
 use core::ops::{Range, RangeInclusive};
 
@@ -48,6 +51,15 @@ where
     fn clear(val: &mut Range<T>) {
         <() as EmptyState<Estart, T>>::clear(&mut val.start);
         <() as EmptyState<Eend, T>>::clear(&mut val.end);
+    }
+}
+
+impl<T, Estart, Eend> ValueRepr<(Estart, Eend), Range<T>> for ()
+where
+    (): ValueEncoder<(Estart, Eend), Range<T>> + ValueRepr<(Estart, Eend), (T, T)>,
+{
+    fn repr(schema: &Schema) -> Box<dyn Display> {
+        <() as ValueRepr<(Estart, Eend), (T, T)>>::repr(schema)
     }
 }
 
@@ -226,6 +238,15 @@ where
         <() as EmptyState<Eend, T>>::clear(&mut end);
 
         drop(mem::replace(val, start..=end));
+    }
+}
+
+impl<T, Estart, Eend> ValueRepr<(Estart, Eend), RangeInclusive<T>> for ()
+where
+    (): ValueEncoder<(Estart, Eend), RangeInclusive<T>> + ValueRepr<(Estart, Eend), (T, T)>,
+{
+    fn repr(schema: &Schema) -> Box<dyn Display> {
+        <() as ValueRepr<(Estart, Eend), (T, T)>>::repr(schema)
     }
 }
 

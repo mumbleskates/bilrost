@@ -1,6 +1,7 @@
 use bytes::{Buf, BufMut};
 
 use crate::buf::ReverseBuf;
+use crate::encoding::schema::{Schema, ValueRepr};
 use crate::encoding::{
     delegate_value_encoding, encoding_implemented_via_value_encoding,
     encoding_uses_base_empty_state, Canonicity, Capped, DecodeContext, DistinguishedValueDecoder,
@@ -8,6 +9,10 @@ use crate::encoding::{
 };
 use crate::DecodeError;
 use crate::DecodeErrorKind::{InvalidValue, Truncated};
+use alloc::boxed::Box;
+use alloc::format;
+use core::fmt::Display;
+use core::mem;
 
 pub struct Fixed;
 
@@ -23,10 +28,15 @@ macro_rules! fixed_width_common {
         $prepend:ident,
         $get:ident,
         get_value($value:ident) { $value_expr:expr },
-        set_value($gotten_value:ident) $set_value_body:block
+        set_value($gotten_value:ident) $set_value_body:block,
+        repr($schema:ident) $repr_body:block
     ) => {
         impl Wiretyped<Fixed, $ty> for () {
             const WIRE_TYPE: WireType = WireType::$wire_type;
+        }
+
+        impl ValueRepr<Fixed, $ty> for () {
+            fn repr($schema: &Schema) -> Box<dyn Display> $repr_body
         }
 
         impl ValueEncoder<Fixed, $ty> for () {
@@ -68,6 +78,7 @@ macro_rules! fixed_width_int {
     (
         $test_name:ident,
         $ty:ty,
+        $signedness:literal,
         $wire_type:ident,
         $put:ident,
         $prepend:ident,
@@ -83,7 +94,14 @@ macro_rules! fixed_width_int {
             $prepend,
             $get,
             get_value($value) { $value_expr },
-            set_value($gotten_value) $set_value_body
+            set_value($gotten_value) $set_value_body,
+            repr(_schema) {
+                Box::new(format!(
+                    "fixed {size} bytes, {signedness} integer",
+                    size = mem::size_of::<$ty>(),
+                    signedness = $signedness,
+                ))
+            }
         );
         delegate_value_encoding!(
             encoding (Fixed) borrows type ($ty) as owned including distinguished
@@ -126,6 +144,7 @@ macro_rules! fixed_width_int {
     (
         $test_name:ident,
         $ty:ty,
+        $signedness:literal,
         $wire_type:ident,
         $put:ident,
         $prepend:ident,
@@ -134,6 +153,7 @@ macro_rules! fixed_width_int {
         fixed_width_int!(
             $test_name,
             $ty,
+            $signedness,
             $wire_type,
             $put,
             $prepend,
@@ -160,7 +180,13 @@ macro_rules! fixed_width_float {
             $prepend,
             $get,
             get_value(value) { *value },
-            set_value(gotten_value) { *value = gotten_value; }
+            set_value(gotten_value) { *value = gotten_value; },
+            repr(_schema) {
+                Box::new(format!(
+                    "fixed {size} bytes, ieee754 floating point",
+                    size = mem::size_of::<$ty>(),
+                ))
+            }
         );
         delegate_value_encoding!(encoding (Fixed) borrows type ($ty) as owned);
 
@@ -190,6 +216,12 @@ macro_rules! fixed_width_array {
 
         impl Wiretyped<Fixed, [u8; $N]> for () {
             const WIRE_TYPE: WireType = WireType::$wire_type;
+        }
+
+        impl ValueRepr<Fixed, [u8; $N]> for () {
+            fn repr(_: &Schema) -> Box<dyn Display> {
+                Box::new(format!("fixed {size} bytes, plain", size = $N))
+            }
         }
 
         impl ValueEncoder<Fixed, [u8; $N]> for () {
@@ -271,6 +303,7 @@ fixed_width_float!(
 fixed_width_int!(
     fixed_u32,
     u32,
+    "unsigned",
     ThirtyTwoBit,
     put_u32_le,
     prepend_u32_le,
@@ -279,6 +312,7 @@ fixed_width_int!(
 fixed_width_int!(
     fixed_nonzerou32,
     core::num::NonZeroU32,
+    "unsigned",
     ThirtyTwoBit,
     put_u32_le,
     prepend_u32_le,
@@ -293,6 +327,7 @@ fixed_width_int!(
 fixed_width_int!(
     fixed_u64,
     u64,
+    "unsigned",
     SixtyFourBit,
     put_u64_le,
     prepend_u64_le,
@@ -301,6 +336,7 @@ fixed_width_int!(
 fixed_width_int!(
     fixed_nonzerou64,
     core::num::NonZeroU64,
+    "unsigned",
     SixtyFourBit,
     put_u64_le,
     prepend_u64_le,
@@ -315,6 +351,7 @@ fixed_width_int!(
 fixed_width_int!(
     fixed_i32,
     i32,
+    "signed",
     ThirtyTwoBit,
     put_i32_le,
     prepend_i32_le,
@@ -323,6 +360,7 @@ fixed_width_int!(
 fixed_width_int!(
     fixed_nonzeroi32,
     core::num::NonZeroI32,
+    "signed",
     ThirtyTwoBit,
     put_i32_le,
     prepend_i32_le,
@@ -337,6 +375,7 @@ fixed_width_int!(
 fixed_width_int!(
     fixed_i64,
     i64,
+    "signed",
     SixtyFourBit,
     put_i64_le,
     prepend_i64_le,
@@ -345,6 +384,7 @@ fixed_width_int!(
 fixed_width_int!(
     fixed_nonzeroi64,
     core::num::NonZeroI64,
+    "signed",
     SixtyFourBit,
     put_i64_le,
     prepend_i64_le,

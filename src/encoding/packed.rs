@@ -1,4 +1,5 @@
 use crate::buf::ReverseBuf;
+use crate::encoding::schema::{FieldRepr, PopulateSchema, Schema, ValueRepr};
 use crate::encoding::value_traits::{
     Collection, DistinguishedCollection, EmptyState, ForOverwrite,
 };
@@ -11,7 +12,11 @@ use crate::encoding::{
     Wiretyped,
 };
 use crate::DecodeErrorKind::{InvalidValue, Truncated};
+use alloc::boxed::Box;
+use alloc::format;
+use alloc::string::String;
 use bytes::{Buf, BufMut};
+use core::fmt::Display;
 
 pub struct Packed<E = GeneralPacked>(E);
 
@@ -20,6 +25,29 @@ encoding_uses_base_empty_state!(Packed<E>, with generics (E));
 /// Packed encodings always prefer to encode length delimited.
 impl<E, T: ?Sized> Wiretyped<Packed<E>, T> for () {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
+}
+
+impl<C, E> ValueRepr<Packed<E>, C> for ()
+where
+    C: Collection,
+    (): EmptyState<(), C> + ValueEncoder<Packed<E>, C> + ValueRepr<E, C::Item>,
+{
+    fn repr(schema: &Schema) -> Box<dyn Display> {
+        let bounds = match C::BOUNDS.end {
+            None => String::new(),
+            Some(max) => format!("; at most {max} items"),
+        };
+        let restrictions = match C::RESTRICTIONS {
+            None => String::new(),
+            Some(r) => format!("; items are {r}"),
+        };
+        schema.make_lazy_repr(move |schema| {
+            format!(
+                "{packed_repr}{bounds}{restrictions}",
+                packed_repr = <() as ValueRepr<Packed<E>, [C::Item]>>::repr(schema),
+            )
+        })
+    }
 }
 
 impl<C, T, E> ValueEncoder<Packed<E>, C> for ()
@@ -56,6 +84,15 @@ where
     }
 }
 
+impl<T, E> FieldRepr<Packed<E>, T> for ()
+where
+    (): Encoder<Packed<E>, T> + ValueRepr<Packed<E>, T>,
+{
+    fn repr(schema: &Schema) -> Box<dyn Display> {
+        <() as ValueRepr<Packed<E>, T>>::repr(schema)
+    }
+}
+
 /// ValueEncoder for packed repeated encodings lets this value type nest.
 impl<C, T, E> Encoder<Packed<E>, C> for ()
 where
@@ -87,6 +124,24 @@ where
             Self::field_encoded_len(tag, value, tm)
         } else {
             0
+        }
+    }
+}
+
+impl<T, const N: usize, E> ValueRepr<Packed<E>, [T; N]> for ()
+where
+    (): ValueRepr<E, T>,
+{
+    fn repr(schema: &Schema) -> Box<dyn Display> {
+        if N == 0 {
+            Box::new("delimited empty")
+        } else {
+            schema.make_lazy_repr(|schema| {
+                format!(
+                    "{packed_repr}; exactly {N} items",
+                    packed_repr = <() as ValueRepr<Packed<E>, [T]>>::repr(schema),
+                )
+            })
         }
     }
 }
@@ -141,6 +196,20 @@ where
         } else {
             0
         }
+    }
+}
+
+impl<T, E> ValueRepr<Packed<E>, [T]> for ()
+where
+    (): ValueRepr<E, T>,
+{
+    fn repr(schema: &Schema) -> Box<dyn Display> {
+        schema.make_lazy_repr(|schema| {
+            format!(
+                "delimited packed (items: {item_repr})",
+                item_repr = <() as ValueRepr<E, T>>::repr(schema),
+            )
+        })
     }
 }
 

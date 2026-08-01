@@ -1,5 +1,6 @@
 use bilrost::buf::ReverseBuf;
 use bilrost::bytes::{Buf, BufMut};
+use bilrost::encoding::schema::{FieldRepr, Schema, ValueRepr};
 use bilrost::encoding::{
     BorrowDecoder, Capped, DecodeContext, Decoder, DistinguishedBorrowDecoder,
     DistinguishedDecoder, DistinguishedValueBorrowDecoder, DistinguishedValueDecoder, EmptyState,
@@ -7,6 +8,7 @@ use bilrost::encoding::{
     ValueBorrowDecoder, ValueDecoder, ValueEncoder, WireType, Wiretyped,
 };
 use bilrost::{Canonicity, DecodeError};
+use std::fmt::Display;
 use std::sync::Arc;
 
 /// The `Arced` encoding can be used to encode and decode any type `T` that is wrapped in `Arc<T>`.
@@ -70,6 +72,24 @@ mod impl_arc_encoding {
         (): Wiretyped<E, T>,
     {
         const WIRE_TYPE: WireType = <() as Wiretyped<E, T>>::WIRE_TYPE;
+    }
+
+    impl<T, E> FieldRepr<Arced<E>, Arc<T>> for ()
+    where
+        (): FieldRepr<E, T>,
+    {
+        fn repr(schema: &Schema) -> Box<dyn Display> {
+            <() as FieldRepr<E, T>>::repr(schema)
+        }
+    }
+
+    impl<T, E> ValueRepr<Arced<E>, Arc<T>> for ()
+    where
+        (): ValueRepr<E, T>,
+    {
+        fn repr(schema: &Schema) -> Box<dyn Display> {
+            <() as ValueRepr<E, T>>::repr(schema)
+        }
     }
 
     impl<T, E> ValueEncoder<Arced<E>, Arc<T>> for ()
@@ -298,6 +318,24 @@ mod impl_arc_slice_encoding {
         (): Wiretyped<E, [T]>,
     {
         const WIRE_TYPE: WireType = <() as Wiretyped<E, [T]>>::WIRE_TYPE;
+    }
+
+    impl<T, E> FieldRepr<ArcedSlice<E>, Arc<[T]>> for ()
+    where
+        (): FieldRepr<E, [T]>,
+    {
+        fn repr(schema: &Schema) -> Box<dyn Display> {
+            <() as FieldRepr<E, [T]>>::repr(schema)
+        }
+    }
+
+    impl<T, E> ValueRepr<ArcedSlice<E>, Arc<[T]>> for ()
+    where
+        (): ValueRepr<E, [T]>,
+    {
+        fn repr(schema: &Schema) -> Box<dyn Display> {
+            <() as ValueRepr<E, [T]>>::repr(schema)
+        }
     }
 
     // We will pass-through value-encoding support to any encoder E which can value-encode `[T]`;

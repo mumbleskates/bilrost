@@ -9,7 +9,9 @@ use crate::{Canonicity, DecodeErrorKind};
 use alloc::borrow::{Cow, ToOwned};
 use alloc::boxed::Box;
 use alloc::collections::{btree_map, btree_set, BTreeMap, BTreeSet};
+use alloc::rc::Rc;
 use alloc::string::String;
+use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::cmp::Ordering::{Equal, Greater, Less};
 use core::mem;
@@ -217,6 +219,8 @@ where
     where
         Self::Item: 'a,
         Self: 'a;
+
+    const RESTRICTIONS: Option<&'static str> = Some("unique");
 
     #[inline]
     fn len(&self) -> usize {
@@ -432,6 +436,72 @@ where
         <() as EmptyState<(), T>>::clear(&mut end);
 
         drop(mem::replace(val, start..=end));
+    }
+}
+
+impl ForOverwrite<(), Arc<str>> for () {
+    #[inline]
+    fn for_overwrite() -> Arc<str>
+    where
+        Arc<str>: Sized,
+    {
+        Arc::from("")
+    }
+}
+
+impl EmptyState<(), Arc<str>> for () {
+    #[inline]
+    fn is_empty(val: &Arc<str>) -> bool {
+        val.is_empty()
+    }
+
+    #[inline]
+    fn clear(val: &mut Arc<str>) {
+        *val = <Self as EmptyState<(), Arc<str>>>::empty();
+    }
+}
+
+impl ForOverwrite<(), Rc<str>> for () {
+    #[inline]
+    fn for_overwrite() -> Rc<str>
+    where
+        Rc<str>: Sized,
+    {
+        Rc::from("")
+    }
+}
+
+impl EmptyState<(), Rc<str>> for () {
+    #[inline]
+    fn is_empty(val: &Rc<str>) -> bool {
+        val.is_empty()
+    }
+
+    #[inline]
+    fn clear(val: &mut Rc<str>) {
+        *val = <Self as EmptyState<(), Rc<str>>>::empty();
+    }
+}
+
+impl ForOverwrite<(), Box<str>> for () {
+    #[inline]
+    fn for_overwrite() -> Box<str>
+    where
+        Box<str>: Sized,
+    {
+        Box::from("")
+    }
+}
+
+impl EmptyState<(), Box<str>> for () {
+    #[inline]
+    fn is_empty(val: &Box<str>) -> bool {
+        val.is_empty()
+    }
+
+    #[inline]
+    fn clear(val: &mut Box<str>) {
+        *val = <Self as EmptyState<(), Box<str>>>::empty();
     }
 }
 

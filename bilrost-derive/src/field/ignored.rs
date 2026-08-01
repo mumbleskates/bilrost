@@ -1,10 +1,11 @@
 use crate::attrs::{named_attr, word_attr};
 use crate::field::ident_string;
 use crate::field::traits::{FieldBearer, WhereFor};
+use crate::Context;
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 use alloc::{format, vec};
-use eyre::{bail, Report as Error};
+use eyre::{bail, Result};
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{parse_str, Expr, Generics, Ident, Meta, Type};
@@ -45,7 +46,7 @@ impl IgnoredField {
         ty: &Type,
         attrs: &[Meta],
         default_init_mode: InitMode,
-    ) -> Result<Option<Box<Self>>, Error> {
+    ) -> Result<Option<Box<Self>>> {
         let mut ignore_attr = None;
         for attr in attrs {
             let this_attr = if word_attr(attr, "ignore") {
@@ -121,7 +122,7 @@ impl IgnoredField {
 }
 
 impl FieldBearer for IgnoredField {
-    fn where_terms(&self, _purpose: WhereFor) -> Vec<TokenStream> {
+    fn where_terms(&self, _purpose: WhereFor, _ctx: &Context) -> Vec<TokenStream> {
         match self.init_mode {
             InitMode::FromStructUpdate | InitMode::Override(..) => vec![],
             InitMode::DefaultPerField => {
@@ -136,13 +137,24 @@ impl FieldBearer for IgnoredField {
 /// initializer expressions for ignored fields.
 pub fn initializer_class_definition(
     methods: impl IntoIterator<Item = TokenStream>,
+    struct_update_expr: Option<Expr>,
     generics: &Generics,
 ) -> Option<TokenStream> {
-    let mut all_methods = methods.into_iter().peekable();
+    let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
+    let mut all_methods = methods
+        .into_iter()
+        .chain(struct_update_expr.iter().map(|expr| {
+            quote! {
+                #[inline]
+                fn struct_update() -> __Self #type_generics {
+                    #expr
+                }
+            }
+        }))
+        .peekable();
     if all_methods.peek().is_none() {
         return None;
     }
-    let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
     Some(quote! {
         struct __BilrostInitializer<T>(T);
         impl #impl_generics __BilrostInitializer<__Self #type_generics> #where_clause {

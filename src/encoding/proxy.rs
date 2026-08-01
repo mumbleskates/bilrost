@@ -1,11 +1,14 @@
 use crate::buf::ReverseBuf;
+use crate::encoding::schema::{Schema, ValueRepr};
 use crate::encoding::{
     Capped, DecodeContext, DistinguishedValueBorrowDecoder, DistinguishedValueDecoder,
     ForOverwrite, RestrictedDecodeContext, ValueBorrowDecoder, ValueDecoder, ValueEncoder,
     WireType, Wiretyped,
 };
 use crate::{Canonicity, DecodeError, DecodeErrorKind};
+use alloc::boxed::Box;
 use bytes::{Buf, BufMut};
+use core::fmt::Display;
 use core::ops::Deref;
 
 /// `Proxied` is a special encoder which translates the encoded type into its "proxy" type first,
@@ -62,6 +65,16 @@ where
     const WIRE_TYPE: WireType = <() as Wiretyped<E, T::Proxy>>::WIRE_TYPE;
 }
 
+impl<T, E, Tag> ValueRepr<Proxied<E, Tag>, T> for ()
+where
+    T: Proxiable<Tag>,
+    (): ValueEncoder<Proxied<E, Tag>, T> + ValueRepr<E, T::Proxy>,
+{
+    fn repr(schema: &Schema) -> Box<dyn Display> {
+        <() as ValueRepr<E, T::Proxy>>::repr(schema)
+    }
+}
+
 impl<T, E, Tag> ValueEncoder<Proxied<E, Tag>, T> for ()
 where
     T: Proxiable<Tag>,
@@ -88,8 +101,9 @@ where
         I: ExactSizeIterator,
         I::Item: Deref<Target = T>,
     {
-        /// Do-nothing wrapper allowing us to return items by-value and still have them Deref to T. Maybe
-        /// it would be "more correct" to use Borrow or something like that but this is pretty easy too.
+        /// Do-nothing wrapper allowing us to return items by-value and still have them Deref to T.
+        /// Maybe it would be "more correct" to use Borrow or something like that but this is
+        /// pretty easy too.
         #[repr(transparent)]
         struct WrapDeref<T>(T);
 

@@ -89,7 +89,9 @@ impl DistinguishedProxiable<SealedBilrostTag> for Date {
 delegate_proxied_encoding!(
     use encoding (Packed<Varint>) to encode proxied type (Date)
     using proxy tag (SealedBilrostTag)
-    with general encodings including distinguished
+    with general encodings
+    including distinguished
+    including schema
 );
 
 #[cfg(test)]
@@ -187,7 +189,9 @@ impl DistinguishedProxiable<SealedBilrostTag> for Time {
 delegate_proxied_encoding!(
     use encoding (Packed<Varint>) to encode proxied type (Time)
     using proxy tag (SealedBilrostTag)
-    with general encodings including distinguished
+    with general encodings
+    including distinguished
+    including schema
 );
 
 #[cfg(test)]
@@ -282,7 +286,9 @@ impl DistinguishedProxiable<SealedBilrostTag> for PrimitiveDateTime {
 delegate_proxied_encoding!(
     use encoding (Packed<Varint>) to encode proxied type (PrimitiveDateTime)
     using proxy tag (SealedBilrostTag)
-    with general encodings including distinguished
+    with general encodings
+    including distinguished
+    including schema
 );
 
 #[cfg(test)]
@@ -385,7 +391,9 @@ impl DistinguishedProxiable<SealedBilrostTag> for UtcOffset {
 delegate_proxied_encoding!(
     use encoding ((Varint, Varint, Varint)) to encode proxied type (UtcOffset)
     using proxy tag (SealedBilrostTag)
-    with general encodings including distinguished
+    with general encodings
+    including distinguished
+    including schema
 );
 
 #[cfg(test)]
@@ -509,7 +517,9 @@ impl DistinguishedProxiable<SealedBilrostTag> for OffsetDateTime {
 delegate_proxied_encoding!(
     use encoding (General) to encode proxied type (OffsetDateTime)
     using proxy tag (SealedBilrostTag)
-    with general encodings including distinguished
+    with general encodings
+    including distinguished
+    including schema
 );
 
 #[cfg(test)]
@@ -574,7 +584,9 @@ impl DistinguishedProxiable<SealedBilrostTag> for Duration {
 delegate_proxied_encoding!(
     use encoding (General) to encode proxied type (Duration)
     using proxy tag (SealedBilrostTag)
-    with general encodings including distinguished
+    with general encodings
+    including distinguished
+    including schema
 );
 
 #[cfg(test)]

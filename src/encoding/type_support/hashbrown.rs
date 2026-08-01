@@ -7,9 +7,11 @@ use crate::DecodeErrorKind;
 use crate::DecodeErrorKind::UnexpectedlyRepeated;
 use core::hash::Hash;
 
-for_overwrite_via_default!(hashbrown::HashSet<T, S>,
-        with generics (T, S),
-        with where clause (T: Eq + Hash, S: Default + core::hash::BuildHasher));
+for_overwrite_via_default!(
+    hashbrown::HashSet<T, S>,
+    with generics (T, S),
+    with where clause (T: Eq + Hash, S: Default + core::hash::BuildHasher)
+);
 
 impl<T, S> EmptyState<(), hashbrown::HashSet<T, S>> for ()
 where
@@ -43,6 +45,8 @@ where
     where
         Self::Item: 'a,
         Self: 'a;
+
+    const RESTRICTIONS: Option<&'static str> = Some("unique");
 
     #[inline]
     fn len(&self) -> usize {

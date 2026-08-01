@@ -7,7 +7,7 @@
 #![forbid(unsafe_op_in_unsafe_fn)]
 #![cfg_attr(feature = "forbid-unsafe", forbid(unsafe_code))]
 
-extern crate alloc;
+pub extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
 
@@ -16,7 +16,7 @@ pub use bytes;
 
 #[cfg(feature = "derive")]
 #[doc(hidden)]
-pub use bilrost_derive::{Enumeration, Message, Oneof};
+pub use bilrost_derive::{Enumeration, Message, Oneof, Schema};
 
 pub mod buf;
 mod error;
@@ -27,13 +27,13 @@ pub mod encoding;
 #[doc(hidden)]
 mod iter;
 
+pub use crate::encoding::schema::Schema;
 pub use crate::encoding::{Canonicity, Enumeration, WithCanonicity};
 pub use crate::error::{DecodeError, DecodeErrorKind, EncodeError};
 pub use crate::message::{
     BorrowedMessage, DistinguishedBorrowedMessage, DistinguishedOwnedMessage, Message, OwnedMessage,
 };
-
-pub use types::Blob;
+pub use crate::types::Blob;
 
 use bytes::{Buf, BufMut};
 #[cfg(feature = "extended-diagnostics")]

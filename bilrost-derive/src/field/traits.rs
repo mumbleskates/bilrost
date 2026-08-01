@@ -1,3 +1,4 @@
+use crate::Context;
 use alloc::vec;
 use alloc::vec::Vec;
 use core::ops::Deref;
@@ -19,12 +20,13 @@ pub enum DecodeLifetime {
 pub enum WhereFor {
     Encode,
     Decode(DecodeLifetime, DecodeMode),
+    Schema,
 }
 
 pub trait FieldBearer {
     /// Returns any and all where clause conditions asserting that this field has the given
     /// capability.
-    fn where_terms(&self, purpose: WhereFor) -> Vec<TokenStream>;
+    fn where_terms(&self, purpose: WhereFor, ctx: &Context) -> Vec<TokenStream>;
 }
 
 /// Auto-flattening impl by slice
@@ -32,9 +34,9 @@ impl<T> FieldBearer for [T]
 where
     T: FieldBearer,
 {
-    fn where_terms(&self, purpose: WhereFor) -> Vec<TokenStream> {
+    fn where_terms(&self, purpose: WhereFor, ctx: &Context) -> Vec<TokenStream> {
         self.iter()
-            .flat_map(|bearer| bearer.where_terms(purpose))
+            .flat_map(|bearer| bearer.where_terms(purpose, ctx))
             .collect()
     }
 }
@@ -45,8 +47,8 @@ where
     T: Deref<Target = F>,
     F: FieldBearer,
 {
-    fn where_terms(&self, purpose: WhereFor) -> Vec<TokenStream> {
-        self.deref().where_terms(purpose)
+    fn where_terms(&self, purpose: WhereFor, ctx: &Context) -> Vec<TokenStream> {
+        self.deref().where_terms(purpose, ctx)
     }
 }
 

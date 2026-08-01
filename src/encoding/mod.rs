@@ -1,9 +1,9 @@
 //! This is the module that defines the core encoding implementation for bilrost, including the
 //! traits that dispatch it.
 //!
-//! ---
+//! <div class="warning">
 //!
-//! ⚠️ All of the things beneath this module are "under the hood" and are intended for consumption
+//! All of the things beneath this module are "under the hood" and are intended for consumption
 //! of `bilrost` itself, in the output of the derive macros of the exactly matching version of the
 //! library. Historically these have undergone significant evolution, and stability of outside use
 //! of anything in or under this module is to be considered **EXPERIMENTAL** until further notice.
@@ -11,7 +11,7 @@
 //! useful set of features for advanced external users to have a set of tools to work around
 //! annoyances and end up with a result that is as pleasing, ergonomic, and performant as possible.
 //!
-//! ---
+//! </div>
 //!
 //! There are a whole product of traits for encoding and decoding in bilrost, based on the type of
 //! value and the capability.
@@ -35,13 +35,13 @@
 //!
 //! ...And here are the names of the traits we define for all the above combinations:
 //!
-//! * Supported value with an empty state:
+//! * Value with an empty state:
 //!     * `Encoder<E, T>`
 //!     * `Decoder<E, T>`
 //!     * `DistinguishedDecoder<E, T>`
 //!     * `BorrowDecoder<'a, E, T>`
 //!     * `DistinguishedBorrowDecoder<'a, E, T>`
-//! * Any supported value:
+//! * Value with the ability to be nested:
 //!     * `ValueEncoder<E, T>`
 //!     * `ValueDecoder<E, T>`
 //!     * `DistinguishedValueDecoder<E, T>`
@@ -69,8 +69,6 @@
 //! These traits and their main generic implementations are defined in this module and in its
 //! `message` and `oneof` sub-modules.
 //!
-//! Values themselves often have the trait of being
-//!
 //! The traits for values are parametrized by "encodings", marker structs which denote *how* the
 //! value is to be encoded, whose implementations are also defined in sub-modules here. These
 //! include:
@@ -92,18 +90,54 @@
 //!
 //! Type support for third party types and for many common aspects of core type implementations can
 //! be found in the `type_support` sub-module tree.
-
+//!
+//! In addition to the ability to encode and decode, values also have traits for initialized
+//! states:
+//!
+//! * `ForOverwrite<E, T>`: Cheaply create an owned value
+//! * `EmptyState<E, T>`: Create an owned value that is guaranteed to be empty, detect whether a
+//!   value is currently empty, and reset a mut value to an empty state
+//!
+//! For every value type implemented in `bilrost`, these traits are defined in terms of the
+//! encoding type `()`, which we call the "base empty state" implementation. All the encodings in
+//! the library delegate to this base implementation. However, it is possible for a third-party
+//! encoding type to implement empty states differently for its supported values rather than
+//! delegating this way; the logic of when a value is empty or not is entirely up to the encoding.
+//!
+//! Additionally, there are traits for homogenous collections and associative mappings. Anything
+//! that implements these traits will be naturally supported by the appropriate encoding (packed,
+//! unpacked, and map encodings):
+//!
+//! * `Collection`
+//! * `DistinguishedCollection`
+//! * `Mapping`
+//! * `DistinguishedMapping`
+//!
+//! Note that these traits must be able to provide iterators *and* reversed iterators, for purposes
+//! of encoding. These do not have to be double-ended, and these only need to truly be correct and
+//! the reverse of each other if the distinguished trait is implemented; otherwise, it doesn't
+//! really matter what order the items are produced in. Implementations of unordered collections
+//! and mappings like `std::collections::HashSet` never bother to iterate their items in any
+//! special order, nor do they support distinguished decoding as a result.
 use crate::buf::ReverseBuf;
 use crate::DecodeErrorKind::{
-    InvalidVarint, NotCanonical, Oversize, TagOverflowed, Truncated, UnknownField, WrongWireType,
+    InvalidValue, InvalidVarint, NotCanonical, Oversize, TagOverflowed, Truncated, UnknownField,
+    WrongWireType,
 };
 use crate::{decode_length_delimiter, DecodeError, DecodeErrorKind};
+use alloc::boxed::Box;
+use alloc::rc::Rc;
+use alloc::string::String;
+use alloc::sync::Arc;
 use bytes::buf::Take;
 use bytes::{Buf, BufMut};
 use core::cmp::{min, Eq, Ordering, PartialEq};
 use core::default::Default;
 use core::fmt::Debug;
 use core::ops::{Deref, DerefMut};
+use core::str;
+
+pub const VERSION: &str = core::env!("CARGO_PKG_VERSION");
 
 pub(crate) mod decoding_modes;
 mod encoding_traits;
@@ -120,6 +154,7 @@ mod packed;
 mod plain_bytes;
 mod proxy;
 mod range_as_tuple;
+pub mod schema;
 #[cfg(test)]
 mod test;
 mod tuple;
@@ -200,6 +235,8 @@ const VARINT_LIMIT: [u64; 9] = [
 
 /// Encodes an integer value into LEB128-bijective variable length format, and writes it to the
 /// buffer. The buffer must have enough remaining space (maximum 9 bytes).
+///
+/// See `encoded_len_varint` for notes on the logical structure here.
 #[cfg(any(
     all(
         feature = "auto-unroll-varint-encoding",
@@ -270,6 +307,8 @@ pub fn encode_varint<B: BufMut + ?Sized>(mut value: u64, buf: &mut B) {
 }
 
 /// Prepends an integer value in LEB128-bijective format to the given buffer.
+///
+/// See `encoded_len_varint` for notes on the logical structure here.
 #[cfg(any(
     all(
         feature = "auto-unroll-varint-encoding",
@@ -709,6 +748,21 @@ impl RestrictedDecodeContext {
 
 /// Returns the encoded length of the value in LEB128-bijective variable length format.
 /// The returned value will be between 1 and 9, inclusive.
+///
+/// Currently we branch this many times for a varint of a given length:
+/// -------------------
+/// 1 byte  | 1 branch
+/// 2 bytes | 4 branches
+/// 3 bytes | 4 branches
+/// 4 bytes | 4 branches
+/// 5 bytes | 4 branches
+/// 6 bytes | 4 branches
+/// 7 bytes | 4 branches
+/// 8 bytes | 4 branches
+/// 9 bytes | 4 branches
+///
+/// ...in effect, a fast-path check for 1-byte varints plus a hard-coded binary search on the other
+/// 8 possible lengths. The "unrolled" functions for encoding varints are structured similarly.
 #[inline(always)]
 pub const fn encoded_len_varint(value: u64) -> usize {
     if value < VARINT_LIMIT[1] {
@@ -1100,6 +1154,54 @@ impl<B: Buf + ?Sized> DerefMut for Capped<'_, B> {
     }
 }
 
+#[cfg(debug_assertions)]
+pub(crate) mod paranoid_buf_asserts {
+    use bytes::Buf;
+
+    /// Buf wrapper with extra assertions around its length.
+    pub(crate) struct Counted<B: Buf> {
+        tracked_remaining: usize,
+        buf: B,
+    }
+
+    impl<B: Buf> Counted<B> {
+        pub(crate) fn new(buf: B) -> Self {
+            Self {
+                tracked_remaining: buf.remaining(),
+                buf,
+            }
+        }
+    }
+
+    /// This implementation adds an extra layer of guards around the possibility that a Buf impl
+    /// could lie about its remaining bytes. The implementation of Capped, and therefore of most
+    /// of our decoding, depends heavily on this invariant in Buf's contract always holding.
+    impl<B: Buf> Buf for Counted<B> {
+        #[inline]
+        fn remaining(&self) -> usize {
+            assert_eq!(self.buf.remaining(), self.tracked_remaining);
+            self.buf.remaining()
+        }
+
+        #[inline]
+        fn chunk(&self) -> &[u8] {
+            let chunk = self.buf.chunk();
+            assert!(chunk.len() <= self.tracked_remaining);
+            chunk
+        }
+
+        #[inline]
+        fn advance(&mut self, cnt: usize) {
+            self.buf.advance(cnt);
+            self.tracked_remaining = self
+                .tracked_remaining
+                .checked_sub(cnt)
+                .expect("advanced too far");
+            assert_eq!(self.buf.remaining(), self.tracked_remaining);
+        }
+    }
+}
+
 /// Returns `Some` if there are more bytes in the buffer and the next data in the buffer begins
 /// with a "repeated" field key (a key with a tag delta of zero). If the repeated field key is found
 /// it is consumed; if it does not exist, the buffer is unchanged.
@@ -1348,4 +1450,93 @@ where
     fn help_get(field_val: Option<u32>) -> Option<Result<T, u32>> {
         field_val.map(Enumeration::try_from_number)
     }
+}
+
+macro_rules! read_pointered_str {
+    (name: $fn_name:ident, ptr: $ptr:ident, deref_mut($val:ident) $deref_mut:expr) => {
+        #[inline]
+        pub(crate) fn $fn_name<B: Buf + ?Sized>(buf: Capped<B>) -> Result<$ptr<str>, DecodeError> {
+            let string_len = buf.remaining_before_cap();
+
+            #[cfg(all(rustc_1_82, not(feature = "forbid-unsafe")))]
+            {
+                // We could have another branch here where we validate a single str before copying
+                // when string_data is contiguous, but that is optimizing for the error path so
+                // let's avoid it. We have no unnecessary copies on the success path in this
+                // branch.
+
+                // We prefer this fast-path, when available: we create a preallocated pointer of
+                // the right size, copy the data into it, validate it, and then convert it directly
+                // into the result type which retains the pointer.
+                #[allow(clippy::incompatible_msrv)]
+                let mut $val = $ptr::new_uninit_slice(string_len);
+                let mut ptr_slice = $deref_mut;
+                ptr_slice.put(buf.take_all());
+                // Check that we wrote every byte in the buf
+                debug_assert!(ptr_slice.is_empty());
+                // SAFETY: we just wrote to the buf's entire contents
+                #[allow(clippy::incompatible_msrv)]
+                let $val = unsafe { $val.assume_init() };
+                // Validate that buf contains utf8
+                str::from_utf8(&$val).map_err(|_| InvalidValue)?;
+                // SAFETY: we just validated the contents of the arc are valid for str
+                Ok(unsafe { core::mem::transmute::<$ptr<[u8]>, $ptr<str>>($val) })
+            }
+            #[cfg(any(not(rustc_1_82), feature = "forbid-unsafe"))]
+            {
+                let mut buf = buf;
+                if let Some(whole_value_bytes) = buf.chunk().get(..string_len) {
+                    // The data is available contiguously, so we can get away with copying it only
+                    // once
+                    let whole_value_str =
+                        str::from_utf8(whole_value_bytes).map_err(|_| InvalidValue)?;
+                    let res = $ptr::from(whole_value_str);
+                    // We got the data by reading the chunk from the buf directly, so we must
+                    // advance it manually as well.
+                    buf.advance(string_len);
+                    Ok(res)
+                } else {
+                    // The data isn't available contiguously, and there aren't really any nice ways
+                    // to create an appropriately sized Arc/Rc<str> until 1.82, so we just use a
+                    // temporary Vec and copy it twice in the successful case.
+                    let mut temp_vec = alloc::vec::Vec::with_capacity(string_len);
+                    temp_vec.put(buf.take_all());
+                    let allocated_string_data =
+                        str::from_utf8(&temp_vec).map_err(|_| InvalidValue)?;
+                    Ok($ptr::from(allocated_string_data))
+                }
+            }
+        }
+    };
+}
+
+read_pointered_str!(
+    name: read_arc_str,
+    ptr: Arc,
+    deref_mut(arc) {
+        Arc::get_mut(&mut arc).unwrap()
+    }
+);
+
+read_pointered_str!(
+    name: read_rc_str,
+    ptr: Rc,
+    deref_mut(rc) {
+        Rc::get_mut(&mut rc).unwrap()
+    }
+);
+
+pub(crate) fn read_box_str<B: Buf + ?Sized>(buf: Capped<B>) -> Result<Box<str>, DecodeError> {
+    let string_len = buf.remaining_before_cap();
+
+    // We could have another branch here where we validate a single str before copying when
+    // buf is contiguous, but that is optimizing for the error path so let's avoid it.
+
+    // Overall this function is much simpler, as the allocation of `Box` contains only its data,
+    // without any header.
+
+    let mut temp_vec = alloc::vec::Vec::with_capacity(string_len);
+    temp_vec.put(buf.take_all());
+    let temp_string = String::from_utf8(temp_vec).map_err(|_| InvalidValue)?;
+    Ok(temp_string.into_boxed_str())
 }

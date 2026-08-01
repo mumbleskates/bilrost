@@ -1,23 +1,23 @@
 use crate::attrs::{
-    bilrost_attrs, named_attr, set_bool, set_option, set_option_with_display, tag_attr,
-    tag_list_attr, word_attr, TagList,
+    bilrost_attrs, named_attr, set_bool, set_option, set_option_with_display, shorthand_tag,
+    tag_attr, tag_list_attr, word_attr, TagList,
 };
-use crate::crate_name;
 use crate::field::traits::{
     DecodeLifetime::{self, Borrowed, Owned},
     DecodeMode::{self, Distinguished, Relaxed},
     FieldBearer, SinglyTagged, Tagged,
-    WhereFor::{self, Decode, Encode},
+    WhereFor::{self, Decode, Encode, Schema},
 };
 use crate::field::{
     ident_string, parse_message_fields, Field, FieldTarget, InitMode, MessageFieldsSorted,
 };
+use crate::{string_attr, Context};
 use alloc::boxed::Box;
 use alloc::format;
-use alloc::string::ToString;
+use alloc::string::{String, ToString};
 use alloc::vec;
 use alloc::vec::Vec;
-use eyre::{bail, eyre as err, Report as Error};
+use eyre::{bail, eyre as err, Result};
 use itertools::Itertools;
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, ToTokens};
@@ -50,6 +50,7 @@ struct ValueField {
 pub struct OneofVariant {
     tag: u32,
     variant_ident: Ident,
+    schema_variant_name: String,
     contents: VariantContents,
 }
 
@@ -77,7 +78,7 @@ impl MessageField {
         ty: &Type,
         attrs: Vec<Meta>,
         inferred_tag: Option<u32>,
-    ) -> Result<Box<MessageField>, Error> {
+    ) -> Result<Box<MessageField>> {
         let mut tag = None;
         let mut enumeration_ty: Option<Type> = None;
         let mut remaining_attrs = vec![];
@@ -101,7 +102,9 @@ impl MessageField {
 
         let tag = match tag.or(inferred_tag) {
             Some(tag) => tag,
-            None => bail!("missing tag attribute"),
+            None => {
+                bail!("missing tag attribute");
+            }
         };
 
         Ok(Box::new(MessageField {
@@ -121,8 +124,8 @@ impl MessageField {
 
     /// Returns a statement which encodes the field using buffer `buf` and tag writer `tw`. `target`
     /// should be a reference to the field value.
-    pub fn encode(&self, target: TokenStream) -> TokenStream {
-        let crate_ = crate_name();
+    pub fn encode(&self, target: TokenStream, ctx: &Context) -> TokenStream {
+        let crate_ = &ctx.crate_name;
         let tag = self.tag;
         let encoding = &self.value.encoding;
         let ty = &self.value.ty;
@@ -133,8 +136,8 @@ impl MessageField {
 
     /// Returns a statement which encodes the field using buffer `buf` and tag writer `tw`. `target`
     /// should be a reference to the field value.
-    pub fn prepend(&self, target: TokenStream) -> TokenStream {
-        let crate_ = crate_name();
+    pub fn prepend(&self, target: TokenStream, ctx: &Context) -> TokenStream {
+        let crate_ = &ctx.crate_name;
         let tag = self.tag;
         let encoding = &self.value.encoding;
         let ty = &self.value.ty;
@@ -156,8 +159,9 @@ impl MessageField {
         target: TokenStream,
         lifetime: DecodeLifetime,
         mode: DecodeMode,
+        ctx: &Context,
     ) -> TokenStream {
-        let crate_ = crate_name();
+        let crate_ = &ctx.crate_name;
         let encoding = &self.value.encoding;
         let ty = &self.value.ty;
         let (decoder_trait, call) = match (lifetime, mode) {
@@ -190,8 +194,8 @@ impl MessageField {
     /// Returns an expression which evaluates to the encoded length of the field. The given ident
     /// must be the location name of the field value, not a reference. `target` should be a
     /// reference to the field value.
-    pub fn encoded_len(&self, target: TokenStream) -> TokenStream {
-        let crate_ = crate_name();
+    pub fn encoded_len(&self, target: TokenStream, ctx: &Context) -> TokenStream {
+        let crate_ = &ctx.crate_name;
         let tag = self.tag;
         let encoding = &self.value.encoding;
         let ty = &self.value.ty;
@@ -202,8 +206,8 @@ impl MessageField {
 
     /// Returns an expression which initializes the field's type as a guaranteed empty value with
     /// its encoding.
-    pub fn empty(&self) -> TokenStream {
-        let crate_ = crate_name();
+    pub fn empty(&self, ctx: &Context) -> TokenStream {
+        let crate_ = &ctx.crate_name;
         let encoding = &self.value.encoding;
         let ty = &self.value.ty;
         quote!(<() as #crate_::encoding::EmptyState<#encoding, #ty>>::empty())
@@ -211,8 +215,8 @@ impl MessageField {
 
     /// Returns an expression which returns whether the field is considered empty in the encoding.
     /// `target` should be a reference to the field value.
-    pub fn is_empty(&self, target: TokenStream) -> TokenStream {
-        let crate_ = crate_name();
+    pub fn is_empty(&self, target: TokenStream, ctx: &Context) -> TokenStream {
+        let crate_ = &ctx.crate_name;
         let encoding = &self.value.encoding;
         let ty = &self.value.ty;
         quote!(<() as #crate_::encoding::EmptyState<#encoding, #ty>>::is_empty(#target))
@@ -220,8 +224,8 @@ impl MessageField {
 
     /// Returns an expression which resets the field's value to empty with its encoding. `target`
     /// should be a mutable reference to the field value.
-    pub fn clear(&self, target: TokenStream) -> TokenStream {
-        let crate_ = crate_name();
+    pub fn clear(&self, target: TokenStream, ctx: &Context) -> TokenStream {
+        let crate_ = &ctx.crate_name;
         let encoding = &self.value.encoding;
         let ty = &self.value.ty;
         quote! {
@@ -230,42 +234,46 @@ impl MessageField {
     }
 
     /// Returns the where clause constraint terms for the field's encoder.
-    pub fn where_terms(&self, purpose: WhereFor) -> Vec<TokenStream> {
-        let crate_ = crate_name();
+    pub fn where_terms(&self, purpose: WhereFor, ctx: &Context) -> Vec<TokenStream> {
+        let crate_ = &ctx.crate_name;
         if self.value.recurses {
             return vec![];
         }
         let ty = &self.value.ty;
         let encoding = &self.value.encoding;
-        vec![
-            match purpose {
-                Encode => quote!((): #crate_::encoding::Encoder<#encoding, #ty>),
-                Decode(Owned, Relaxed) => {
-                    quote!((): #crate_::encoding::Decoder<#encoding, #ty>)
-                }
-                Decode(Borrowed, Relaxed) => {
-                    quote!((): #crate_::encoding::BorrowDecoder<'__a, #encoding, #ty>)
-                }
-                Decode(Owned, Distinguished) => {
-                    quote!((): #crate_::encoding::DistinguishedDecoder<#encoding, #ty>)
-                }
-                Decode(Borrowed, Distinguished) => {
-                    quote!(
-                        (): #crate_::encoding::DistinguishedBorrowDecoder<'__a, #encoding, #ty>
-                    )
-                }
-            },
-            // Message field encoding always requires EmptyState instead of just ForOverwrite
-            // because we need to know whether a field is empty to know whether we should write
-            // anything; and all the decoding traits imply the encoding trait.
-            quote!((): #crate_::encoding::EmptyState<#encoding, #ty>),
-        ]
+        let mut res = vec![match purpose {
+            Encode => quote!((): #crate_::encoding::Encoder<#encoding, #ty>),
+            Decode(Owned, Relaxed) => {
+                quote!((): #crate_::encoding::Decoder<#encoding, #ty>)
+            }
+            Decode(Borrowed, Relaxed) => {
+                quote!((): #crate_::encoding::BorrowDecoder<'__a, #encoding, #ty>)
+            }
+            Decode(Owned, Distinguished) => {
+                quote!((): #crate_::encoding::DistinguishedDecoder<#encoding, #ty>)
+            }
+            Decode(Borrowed, Distinguished) => {
+                quote!(
+                    (): #crate_::encoding::DistinguishedBorrowDecoder<'__a, #encoding, #ty>
+                )
+            }
+            Schema => quote!((): #crate_::encoding::schema::FieldRepr<#encoding, #ty>),
+        }];
+        if !matches!(purpose, Schema) {
+            res.push(
+                // Message field encoding always requires EmptyState instead of just ForOverwrite
+                // because we need to know whether a field is empty to know whether we should write
+                // anything; and all the decoding traits imply the encoding trait.
+                quote!((): #crate_::encoding::EmptyState<#encoding, #ty>),
+            );
+        }
+        res
     }
 
     /// Returns methods to embed in the message. `ident` must be the name of the field within the
     /// message struct.
-    pub fn methods(&self, ident: &TokenStream) -> Option<TokenStream> {
-        let crate_ = crate_name();
+    pub fn methods(&self, ident: &TokenStream, ctx: &Context) -> Option<TokenStream> {
+        let crate_ = &ctx.crate_name;
         let enumeration_ty = self.enumeration_ty.as_ref()?;
 
         let ident_str = ident_string(ident);
@@ -302,6 +310,10 @@ impl MessageField {
             }
         })
     }
+
+    pub fn schema(&self, field_name: &str, in_oneof: bool, ctx: &Context) -> TokenStream {
+        self.value.schema(self.tag, field_name, in_oneof, ctx)
+    }
 }
 
 impl SinglyTagged for MessageField {
@@ -311,11 +323,7 @@ impl SinglyTagged for MessageField {
 }
 
 impl ValueField {
-    fn new(
-        ty: &Type,
-        attrs: Vec<Meta>,
-        implicit_default_encoding: &str,
-    ) -> Result<ValueField, Error> {
+    fn new(ty: &Type, attrs: Vec<Meta>, implicit_default_encoding: &str) -> Result<ValueField> {
         let mut encoding = None;
         let mut recurses = false;
         let mut unknown_attrs = Vec::new();
@@ -336,7 +344,7 @@ impl ValueField {
             bail!(
                 "unknown attribute(s) for field: {attrs}",
                 attrs = quote!(#(#unknown_attrs),*),
-            )
+            );
         }
 
         let encoding =
@@ -348,27 +356,65 @@ impl ValueField {
             recurses,
         })
     }
+
+    fn schema(&self, tag: u32, field_name: &str, in_oneof: bool, ctx: &Context) -> TokenStream {
+        let crate_ = &ctx.crate_name;
+        let ty = &self.ty;
+        let encoding = &self.encoding;
+        let prelude;
+        let final_field_name;
+        if in_oneof {
+            let field_name = format!("variant {field_name}");
+            prelude = Some(quote! {
+                // the 'field name' identifier here is the one that's passed in to
+                // AddOneofFields::add_fields, which tells us what the oneof enum value's name is
+                let field_name_with_variant = field_name.map(|field_name| {
+                    let mut combined = #crate_::alloc::string::String::from(field_name);
+                    combined.push(' ');
+                    combined.push_str(#field_name);
+                    combined
+                });
+            });
+            final_field_name = quote!(field_name_with_variant.as_deref().unwrap_or(#field_name));
+        } else {
+            prelude = None;
+            final_field_name = quote!(#field_name);
+        }
+        quote! {
+            #prelude
+            fields.add_field(
+                #final_field_name,
+                #tag,
+                <() as #crate_::encoding::schema::FieldRepr<#encoding, #ty>>::repr(schema),
+            );
+        }
+    }
 }
 
 impl OneofVariant {
     /// Parses values specifically for within a Oneof variant, which works differently than fields
     /// within a Message.
     ///
-    /// Returns `Ok` for data variants, and `Err` with just the ident for an empty variant.
-    pub fn new(variant: Variant) -> Result<Option<OneofVariant>, Error> {
+    /// Returns `Ok(Some)` for data variants, and `Ok(None)` for empty variants.
+    pub fn new(variant: Variant) -> Result<Option<OneofVariant>> {
         let mut tag = None; // tag number
         let mut message = false; // whether this variant is marked as a "message" variant
         let mut empty = false; // whether this unit is marked as an "empty" variant
+        let mut schema_variant_name = None;
         let mut other_attrs = vec![];
-        let our_attrs = bilrost_attrs(&variant.attrs)?;
-
-        for attr in our_attrs {
+        for attr in bilrost_attrs(&variant.attrs, Some(shorthand_tag))? {
             if let Some(t) = tag_attr(&attr)? {
                 set_option(&mut tag, t, "duplicate tag attributes")?;
             } else if word_attr(&attr, "message") {
                 set_bool(&mut message, "duplicate message attributes")?;
             } else if word_attr(&attr, "empty") {
                 set_bool(&mut empty, "duplicate empty attributes")?;
+            } else if let Some(name) = string_attr(&attr, "name")? {
+                set_option(
+                    &mut schema_variant_name,
+                    name,
+                    "duplicate variant name attributes",
+                )?;
             } else {
                 other_attrs.push(attr);
             }
@@ -382,10 +428,13 @@ impl OneofVariant {
                     Fields::Unnamed(fields) => fields.unnamed.is_empty(),
                     Fields::Unit => true,
                 } {
+                    if schema_variant_name.is_some() {
+                        bail!("empty variants cannot also have a name");
+                    }
                     Ok(None)
                 } else {
-                    // Return a error message depending on whether the variant is explicitly marked
-                    // empty
+                    // The variant has one or more fields. Return a error message depending on
+                    // whether the variant is explicitly marked empty
                     if empty {
                         bail!(
                             "Oneof variant {variant_ident} is marked 'empty' but it has fields",
@@ -422,11 +471,13 @@ impl OneofVariant {
                 let fields = match &variant.fields {
                     Fields::Named(fields) => &fields.named,
                     Fields::Unnamed(fields) => &fields.unnamed,
-                    Fields::Unit => bail!(
-                        "Oneof value variants must have exactly one field, but variant \
+                    Fields::Unit => {
+                        bail!(
+                            "Oneof value variants must have exactly one field, but variant \
                         {variant_ident} has no fields",
-                        variant_ident = variant.ident
-                    ),
+                            variant_ident = variant.ident
+                        );
+                    }
                 };
                 if fields.len() != 1 {
                     bail!(
@@ -437,9 +488,19 @@ impl OneofVariant {
                     );
                 }
                 let field = fields.first().unwrap();
+                if !bilrost_attrs(&field.attrs, None)?.is_empty() {
+                    bail!(
+                        "bilrost attributes found on the field inside variant {variant_ident}; \
+                        those attributes should probably go on the variant instead, or the \
+                        variant should be a message variant",
+                        variant_ident = variant.ident,
+                    );
+                }
                 Ok(Some(OneofVariant {
                     tag,
                     variant_ident: variant.ident.clone(),
+                    schema_variant_name: schema_variant_name
+                        .unwrap_or_else(|| variant.ident.to_string()),
                     contents: VariantContents::Value(Box::new(FieldInVariant {
                         value: ValueField::new(&field.ty, other_attrs, "general_packed")?,
                         ident_within_variant: field
@@ -508,6 +569,8 @@ impl OneofVariant {
 
                 Ok(Some(OneofVariant {
                     tag,
+                    schema_variant_name: schema_variant_name
+                        .unwrap_or_else(|| variant.ident.to_string()),
                     variant_ident: variant.ident,
                     contents: VariantContents::Message(variant_fields),
                 }))
@@ -517,6 +580,10 @@ impl OneofVariant {
 
     pub fn ident(&self) -> &Ident {
         &self.variant_ident
+    }
+
+    pub fn schema_variant_name(&self) -> &str {
+        &self.schema_variant_name
     }
 
     pub fn has_ignored_fields(&self) -> bool {
@@ -540,8 +607,8 @@ impl OneofVariant {
         quote! { #(#bindings,)* .. }
     }
 
-    pub fn encode(&self, type_ident: impl ToTokens) -> TokenStream {
-        let crate_ = crate_name();
+    pub fn encode(&self, type_ident: impl ToTokens, ctx: &Context) -> TokenStream {
+        let crate_ = &ctx.crate_name;
         let tag = self.tag;
         let variant_ident = &self.variant_ident;
         match &self.contents {
@@ -563,8 +630,8 @@ impl OneofVariant {
             VariantContents::Message(fields) => {
                 let binding = OneofVariant::binding(fields);
                 let sorted_fields = MessageFieldsSorted::new_filtering_ignored(fields);
-                let encoded_len = sorted_fields.encoded_len(&FieldTarget::BoundVariantFields);
-                let encode = sorted_fields.encode(&FieldTarget::BoundVariantFields);
+                let encoded_len = sorted_fields.encoded_len(&FieldTarget::BoundVariantFields, ctx);
+                let encode = sorted_fields.encode(&FieldTarget::BoundVariantFields, ctx);
                 quote! {
                     #type_ident::#variant_ident { #binding } => {
                         tw.encode_key(#tag, #crate_::encoding::WireType::LengthDelimited, buf);
@@ -578,8 +645,8 @@ impl OneofVariant {
         }
     }
 
-    pub fn prepend(&self, type_ident: impl ToTokens) -> TokenStream {
-        let crate_ = crate_name();
+    pub fn prepend(&self, type_ident: impl ToTokens, ctx: &Context) -> TokenStream {
+        let crate_ = &ctx.crate_name;
         let tag = self.tag;
         let variant_ident = &self.variant_ident;
         match &self.contents {
@@ -601,7 +668,7 @@ impl OneofVariant {
             VariantContents::Message(fields) => {
                 let binding = OneofVariant::binding(fields);
                 let prepend = MessageFieldsSorted::new_filtering_ignored(fields)
-                    .prepend(&FieldTarget::BoundVariantFields);
+                    .prepend(&FieldTarget::BoundVariantFields, ctx);
                 quote! {
                     #type_ident::#variant_ident { #binding } => {
                         tw.begin_field(#tag, #crate_::encoding::WireType::LengthDelimited, buf);
@@ -614,8 +681,8 @@ impl OneofVariant {
         }
     }
 
-    pub fn encoded_len(&self, type_ident: impl ToTokens) -> TokenStream {
-        let crate_ = crate_name();
+    pub fn encoded_len(&self, type_ident: impl ToTokens, ctx: &Context) -> TokenStream {
+        let crate_ = &ctx.crate_name;
         let tag = self.tag;
         let variant_ident = &self.variant_ident;
         match &self.contents {
@@ -636,7 +703,7 @@ impl OneofVariant {
             VariantContents::Message(fields) => {
                 let binding = OneofVariant::binding(fields);
                 let encoded_len = MessageFieldsSorted::new_filtering_ignored(fields)
-                    .encoded_len(&FieldTarget::BoundVariantFields);
+                    .encoded_len(&FieldTarget::BoundVariantFields, ctx);
                 quote! {
                     #type_ident::#variant_ident { #binding } => {
                         let total = #encoded_len;
@@ -657,11 +724,12 @@ impl OneofVariant {
         type_ident: impl ToTokens,
         lifetime: DecodeLifetime,
         mode: DecodeMode,
+        ctx: &Context,
     ) -> TokenStream {
         let tag = self.tag;
-        let for_overwrite = self.for_overwrite();
-        let decode = self.decode_fields(lifetime, mode);
-        let construct = self.construct(type_ident);
+        let for_overwrite = self.for_overwrite(ctx);
+        let decode = self.decode_fields(lifetime, mode, ctx);
+        let construct = self.construct(type_ident, ctx);
         let (decode_result, output) = match mode {
             Relaxed => (quote!(()), construct),
             Distinguished => (quote!(canon), quote!((#construct, canon))),
@@ -685,11 +753,11 @@ impl OneofVariant {
         }
     }
 
-    fn for_overwrite(&self) -> TokenStream {
+    fn for_overwrite(&self, ctx: &Context) -> TokenStream {
         // TODO: can we clear the variant's field(s) instead if it's already known to be present?
         match &self.contents {
             VariantContents::Value(field) => {
-                let crate_ = crate_name();
+                let crate_ = &ctx.crate_name;
                 let encoding = &field.value.encoding;
                 let ty = &field.value.ty;
                 quote! {
@@ -703,7 +771,7 @@ impl OneofVariant {
                         return None; // we don't need mutable variables to parse ignored fields into
                     }
                     let field_ident = FieldTarget::free_field_ident(field);
-                    let empty = field.empty(Some(self.tag));
+                    let empty = field.empty(Some(self.tag), ctx);
                     Some(quote! { let mut #field_ident = #empty; })
                 });
                 quote! { #(#empties)* }
@@ -711,8 +779,13 @@ impl OneofVariant {
         }
     }
 
-    fn decode_fields(&self, lifetime: DecodeLifetime, mode: DecodeMode) -> TokenStream {
-        let crate_ = crate_name();
+    fn decode_fields(
+        &self,
+        lifetime: DecodeLifetime,
+        mode: DecodeMode,
+        ctx: &Context,
+    ) -> TokenStream {
+        let crate_ = &ctx.crate_name;
         match &self.contents {
             VariantContents::Value(field) => {
                 let encoding = &field.value.encoding;
@@ -741,7 +814,7 @@ impl OneofVariant {
                 )
             }
             VariantContents::Message(fields) => {
-                let variant_ident_str = self.variant_ident.to_string();
+                let schema_variant_name = &self.schema_variant_name;
                 let field_arms: Vec<_> = fields
                     .iter()
                     .filter_map(|field| {
@@ -750,12 +823,13 @@ impl OneofVariant {
                         }
                         let tags = field.tags().into_iter().map(|tag| quote!(#tag));
                         let tags = Itertools::intersperse(tags, quote!(|));
-                        let decode = field.decode(&FieldTarget::FreeVariantFields, lifetime, mode);
-                        let field_ident_str = field.ident.to_string();
+                        let decode =
+                            field.decode(&FieldTarget::FreeVariantFields, lifetime, mode, ctx);
+                        let schema_field_name = field.schema_field_name();
                         Some(quote!(#(#tags)* => match #decode {
                             ::core::result::Result::Ok(res) => ::core::result::Result::Ok(res),
                             ::core::result::Result::Err(mut error) => {
-                                error.push(#variant_ident_str, #field_ident_str);
+                                error.push(#schema_variant_name, #schema_field_name);
                                 ::core::result::Result::Err(error)
                             }
                         }))
@@ -816,7 +890,7 @@ impl OneofVariant {
         }
     }
 
-    fn construct(&self, type_ident: impl ToTokens) -> TokenStream {
+    fn construct(&self, type_ident: impl ToTokens, ctx: &Context) -> TokenStream {
         let variant_ident = &self.variant_ident;
         match &self.contents {
             VariantContents::Value(field) => {
@@ -832,7 +906,7 @@ impl OneofVariant {
                     // the variant itself. so, we will only ever initialize them on a per-field
                     // basis like this.
                     if field.is_ignored() {
-                        let empty = field.empty(Some(self.tag));
+                        let empty = field.empty(Some(self.tag), ctx);
                         quote!(#ident: #empty)
                     } else {
                         let free_ident = FieldTarget::free_field_ident(field);
@@ -858,13 +932,72 @@ impl OneofVariant {
             vec![]
         }
     }
+
+    pub fn subtype_schema(&self, ctx: &Context) -> Option<TokenStream> {
+        let VariantContents::Message(fields) = &self.contents else {
+            return None;
+        };
+        let schema_variant_name = self.schema_variant_name();
+        let tag = self.tag;
+        let field_schemas: Vec<_> = fields.iter().flat_map(|field| field.schema(ctx)).collect();
+        Some(quote! {
+            messages.add_message_variant(
+                #schema_variant_name,
+                #tag,
+                |fields| {
+                    #(#field_schemas)*
+                },
+            );
+        })
+    }
+
+    pub fn schema(&self, ctx: &Context) -> TokenStream {
+        match &self.contents {
+            VariantContents::Value(field_in_variant) => {
+                field_in_variant
+                    .value
+                    .schema(self.tag, self.schema_variant_name(), true, ctx)
+            }
+            VariantContents::Message(_) => {
+                let crate_ = &ctx.crate_name;
+                let schema_variant_name =
+                    format!("variant {name}", name = self.schema_variant_name());
+                let tag = self.tag;
+                quote! {
+                    // the 'field name' identifier here is the one that's passed in to
+                    // AddOneofFields::add_fields, which tells us what the oneof enum value's
+                    // name is
+                    let mut field_name_with_variant = field_name.map(|field_name| {
+                        let mut combined = #crate_::alloc::string::String::from(field_name);
+                        combined.push(' ');
+                        combined.push_str(#schema_variant_name);
+                        combined
+                    });
+                    fields.add_field(
+                        field_name_with_variant.as_deref().unwrap_or(#schema_variant_name),
+                        #tag,
+                        #crate_::encoding::schema::PopulateSchema::make_lazy_repr(
+                            schema,
+                            |schema| #crate_::alloc::format!(
+                                "delimited message {message_type}",
+                                message_type =
+                                    #crate_::encoding::schema::PopulateSchema::subtype_reference::<
+                                        Self, #tag
+                                    >(schema),
+                            ),
+                        ),
+                    );
+                }
+            }
+        }
+    }
 }
 
 impl FieldBearer for OneofVariant {
-    fn where_terms(&self, purpose: WhereFor) -> Vec<TokenStream> {
+    fn where_terms(&self, purpose: WhereFor, ctx: &Context) -> Vec<TokenStream> {
         match &self.contents {
-            VariantContents::Value(field) => field.where_terms(purpose),
-            VariantContents::Message(fields) => fields.where_terms(purpose),
+            VariantContents::Value(field) => field.where_terms(purpose, ctx),
+            VariantContents::Message(fields) => fields.where_terms(purpose, ctx),
         }
     }
 }
@@ -879,36 +1012,40 @@ impl SinglyTagged for OneofVariant {
 /// information and must always embed as a single real field and thus need the
 /// "value encoder/decoder" traits.
 impl FieldBearer for FieldInVariant {
-    fn where_terms(&self, purpose: WhereFor) -> Vec<TokenStream> {
-        let crate_ = crate_name();
+    fn where_terms(&self, purpose: WhereFor, ctx: &Context) -> Vec<TokenStream> {
+        let crate_ = &ctx.crate_name;
         if self.value.recurses {
             return vec![]; // don't generate constraints for this (sub-)field
         }
         let ty = &self.value.ty;
         let encoding = &self.value.encoding;
-        vec![
-            match purpose {
-                Encode => quote!((): #crate_::encoding::ValueEncoder<#encoding, #ty>),
-                Decode(Owned, Relaxed) => {
-                    quote!((): #crate_::encoding::ValueDecoder<#encoding, #ty>)
-                }
-                Decode(Borrowed, Relaxed) => {
-                    quote!((): #crate_::encoding::ValueBorrowDecoder<'__a, #encoding, #ty>)
-                }
-                Decode(Owned, Distinguished) => {
-                    quote!((): #crate_::encoding::DistinguishedValueDecoder<#encoding, #ty>)
-                }
-                Decode(Borrowed, Distinguished) => {
-                    quote!(
-                        (): #crate_::encoding::
-                            DistinguishedValueBorrowDecoder<'__a, #encoding, #ty>
-                    )
-                }
-            },
-            // Encoding or decoding a oneof field always has trivially externally determined
-            // presence, and we never need to know whether or not the value is empty; it never
-            // needs to implement the empty state.
-            quote!((): #crate_::encoding::ForOverwrite<#encoding, #ty>),
-        ]
+        let mut res = vec![match purpose {
+            Encode => quote!((): #crate_::encoding::ValueEncoder<#encoding, #ty>),
+            Decode(Owned, Relaxed) => {
+                quote!((): #crate_::encoding::ValueDecoder<#encoding, #ty>)
+            }
+            Decode(Borrowed, Relaxed) => {
+                quote!((): #crate_::encoding::ValueBorrowDecoder<'__a, #encoding, #ty>)
+            }
+            Decode(Owned, Distinguished) => {
+                quote!((): #crate_::encoding::DistinguishedValueDecoder<#encoding, #ty>)
+            }
+            Decode(Borrowed, Distinguished) => {
+                quote!(
+                    (): #crate_::encoding::
+                        DistinguishedValueBorrowDecoder<'__a, #encoding, #ty>
+                )
+            }
+            Schema => quote!((): #crate_::encoding::schema::FieldRepr<#encoding, #ty>),
+        }];
+        if !matches!(purpose, Schema) {
+            res.push(
+                // Encoding or decoding a oneof field always has trivially externally determined
+                // presence, and we never need to know whether or not the value is empty; it never
+                // needs to implement the empty state.
+                quote!((): #crate_::encoding::ForOverwrite<#encoding, #ty>),
+            );
+        }
+        res
     }
 }

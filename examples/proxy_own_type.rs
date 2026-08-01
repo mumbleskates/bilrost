@@ -1,4 +1,4 @@
-use bilrost::{Message, OwnedMessage};
+use bilrost::{Message, OwnedMessage, Schema};
 use std::collections::BTreeMap;
 
 struct CustomEncoding;
@@ -171,31 +171,39 @@ mod implement_encoding_for_those_structs {
     bilrost::delegate_proxied_encoding!(
         use encoding (bilrost::encoding::Varint)
         to encode proxied type (AlwaysEven)
-        with general encodings including distinguished
+        with general encodings
+        including distinguished
+        including schema
     );
     bilrost::delegate_proxied_encoding!(
         use encoding (bilrost::encoding::Varint)
         to encode proxied type (AlwaysOdd) using proxy tag (Tag)
-        with general encodings including distinguished
+        with general encodings
+        including distinguished
+        including schema
     );
 
     // We can also delegate these to our own encoding, perhaps with a different default meaning.
     bilrost::delegate_proxied_encoding!(
         use encoding(bilrost::encoding::Fixed)
         to encode proxied type (AlwaysEven)
-        with encoding (super::CustomEncoding) including distinguished
+        with encoding (super::CustomEncoding)
+        including distinguished
+        including schema
     );
     bilrost::delegate_proxied_encoding!(
         use encoding(bilrost::encoding::Fixed)
         to encode proxied type (AlwaysOdd) using proxy tag (Tag)
-        with encoding (super::CustomEncoding) including distinguished
+        with encoding (super::CustomEncoding)
+        including distinguished
+        including schema
     );
 }
 
 fn main() {
     use crate_defined_structs::{AlwaysEven, AlwaysOdd};
 
-    #[derive(Debug, PartialEq, Message)]
+    #[derive(Debug, PartialEq, Message, Schema)]
     struct MessageWithCustomTypes {
         plain: AlwaysEven,
         repeated: Vec<AlwaysEven>,
@@ -206,9 +214,9 @@ fn main() {
         encoded_customly: Option<AlwaysOdd>,
     }
 
-    #[derive(Message)]
+    #[derive(Message, Schema)]
     struct EncodesSingle<T>(T);
-    #[derive(Message)]
+    #[derive(Message, Schema)]
     struct EncodesPacked<T>(#[bilrost(encoding(packed))] T);
 
     // `AlwaysOdd` doesn't have an empty value. That means that it can't be a message value that
@@ -254,4 +262,12 @@ fn main() {
         .expect_err("invalid message should not decode without error");
     assert_eq!(decode_error.kind(), bilrost::DecodeErrorKind::InvalidValue);
     println!("got the expected invalid value error -- {decode_error}");
+
+    let schema = Schema::new();
+    schema.register::<MessageWithCustomTypes>();
+    schema.register::<EncodesSingle<Option<AlwaysOdd>>>();
+    schema.register::<EncodesPacked<Option<[AlwaysOdd; 5]>>>();
+    println!();
+    println!("schema for our messages:");
+    println!("{schema}", schema = schema.with_rust_types());
 }

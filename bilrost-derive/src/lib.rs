@@ -10,39 +10,80 @@
 //!
 //! [bilrost]: https://docs.rs/bilrost
 
-extern crate alloc;
-
 use crate::attrs::{
-    bilrost_attrs, named_attr, set_bool, set_option_with_display, tag_list_attr, word_attr, TagList,
+    bilrost_attrs, enum_val_attr, named_attr, set_bool, set_option, set_option_with_display,
+    shorthand_enum_val, string_attr, tag_list_attr, word_attr, TagList,
 };
+use crate::context::Context;
 use crate::field::traits::{
     DecodeLifetime::{Borrowed, Owned},
     DecodeMode::{Distinguished, Relaxed},
     FieldBearer, SinglyTagged, Tagged,
-    WhereFor::{self, Decode, Encode},
+    WhereFor::{self, Decode, Encode, Schema as ForSchema},
 };
 use crate::field::{
     initializer_class_definition, parse_message_fields, tag_measurer, Field, FieldTarget, InitMode,
     MessageFieldsSorted, OneofVariant,
 };
 use alloc::collections::BTreeMap;
-use alloc::string::ToString;
+use alloc::string::{String, ToString};
 use alloc::vec;
 use alloc::vec::Vec;
-use eyre::{bail, eyre as err, Report as Error};
+use eyre::{bail, eyre as err, Result};
 use itertools::Itertools;
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
-use syn::{
-    parse2, Attribute, Data, DeriveInput, Expr, Fields, Generics, Ident, Meta, Pat, TypeGenerics,
-    Variant, WhereClause,
-};
+use syn::{parse2, Data, DeriveInput, Expr, Fields, Generics, Ident, Path, Variant, WhereClause};
+
+extern crate alloc;
 
 mod attrs;
 mod field;
 
-fn crate_name() -> TokenStream {
-    quote!(::bilrost)
+mod context {
+    use super::*;
+
+    pub struct Context {
+        pub crate_name: Path,
+    }
+
+    impl Context {
+        pub fn new(crate_name: Option<Path>) -> Self {
+            Context {
+                crate_name: crate_name.unwrap_or_else(|| parse2(quote!(::bilrost)).unwrap()),
+            }
+        }
+    }
+}
+
+fn version_assert(ctx: &Context) -> TokenStream {
+    let crate_ = &ctx.crate_name;
+    let derive_version = core::env!("CARGO_PKG_VERSION");
+    let error_msg = alloc::format!(
+        "derive version {derive_version} does not match library version at {path}",
+        path = quote!(#crate_),
+    );
+    quote! {
+        let derive_version = #derive_version;
+        let library_version = #crate_::encoding::VERSION;
+        let different = if derive_version.len() != library_version.len() {
+            true
+        } else {
+            let mut i = 0;
+            let mut different = false;
+            while i < derive_version.len() {
+                if derive_version.as_bytes()[i] != library_version.as_bytes()[i] {
+                    different = true;
+                    break;
+                }
+                i += 1;
+            }
+            different
+        };
+        if different {
+            panic!(#error_msg);
+        }
+    }
 }
 
 /// Defines the common aliases for encoder types available to every bilrost derive.
@@ -50,8 +91,8 @@ fn crate_name() -> TokenStream {
 /// The standard encoders are all made available in scope with lower-cased names, making them
 /// simultaneously easier to spell when writing the field attributes and making them less likely to
 /// shadow custom encoder types.
-fn encoder_alias_header() -> TokenStream {
-    let crate_ = crate_name();
+fn encoder_alias_header(ctx: &Context) -> TokenStream {
+    let crate_ = &ctx.crate_name;
     quote! {
         use #crate_::encoding::{
             Fixed as fixed,
@@ -98,37 +139,46 @@ fn append_wheres_with_fields(
     wheres: impl IntoIterator<Item = TokenStream>,
     fields: impl FieldBearer,
     field_purpose: WhereFor,
+    ctx: &Context,
 ) -> Option<TokenStream> {
     append_wheres(
         where_clause,
-        wheres.into_iter().chain(fields.where_terms(field_purpose)),
+        wheres
+            .into_iter()
+            .chain(fields.where_terms(field_purpose, ctx)),
     )
 }
 
-/// Adds the given identifier to the generics list
-fn prepend_to_generics(generics: &Generics, ident: TokenStream) -> TokenStream {
-    let params = &generics.params;
-    quote!(<#ident, #params>)
+/// Adds the given generics to the generics list. `to_add` must be a list of generic terms
+fn combine_generics(generics: &Generics, to_add: TokenStream) -> TokenStream {
+    let mut new_generics: Generics = parse2(quote!(<#to_add>)).expect("invalid generic terms");
+    new_generics.params.extend(generics.params.iter().cloned());
+    // wrap the generics in ImplGenerics, which puts lifetime params first when rendered
+    let (wrapped, _, _) = new_generics.split_for_impl();
+    quote!(#wrapped)
 }
 
-fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
-    let crate_ = crate_name();
-    let input: DeriveInput = parse2(input)?;
+struct PreprocessedMessageStruct {
+    ident: Ident,
+    generics: Generics,
+    fields: Vec<Field>,
+    distinguished: bool,
+    borrow_only: bool,
+    struct_update_expr: Option<Expr>,
+    crate_name: Option<Path>,
+    schema_type_name: String,
+}
 
+fn preprocess_message_struct(input: DeriveInput) -> Result<PreprocessedMessageStruct> {
     let DeriveInput {
         ident,
         attrs: input_attrs,
-        generics: impl_generics,
+        generics,
         data: Data::Struct(data_struct),
         ..
     } = input
     else {
-        // `enum` types are only derived as `Message` in terms of their `Oneof` implementation
-        if matches!(input.data, Data::Enum(..)) {
-            return try_message_via_oneof(input);
-        } else {
-            bail!("Message can only be derived for a struct or an enum");
-        }
+        panic!("non-struct derive input sent to preprocess_message_struct");
     };
 
     // Process attributes
@@ -136,9 +186,11 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     let mut distinguished = false;
     let mut borrow_only = false;
     let mut default_per_field = false;
-    let mut default_expr: Option<Expr> = None;
+    let mut struct_update_expr: Option<Expr> = None;
+    let mut crate_name: Option<Path> = None;
+    let mut schema_type_name = None;
     let mut unknown_attrs = Vec::new();
-    for attr in bilrost_attrs(&input_attrs)? {
+    for attr in bilrost_attrs(&input_attrs, None)? {
         if let Some(tags) = tag_list_attr(&attr, "reserved_tags", None)? {
             set_option_with_display(
                 &mut reserved_tags,
@@ -157,16 +209,29 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
             )?;
         } else if let Some(expr) = named_attr(&attr, "default")? {
             set_option_with_display(
-                &mut default_expr,
+                &mut struct_update_expr,
                 expr,
                 "duplicated default (expression) attributes",
                 |t| quote!((#t)).to_string(),
+            )?;
+        } else if let Some(path) = named_attr(&attr, "crate")? {
+            set_option_with_display(
+                &mut crate_name,
+                path,
+                "duplicated crate path attributes",
+                |t| quote!(#t).to_string(),
+            )?;
+        } else if let Some(name) = string_attr(&attr, "name")? {
+            set_option(
+                &mut schema_type_name,
+                name,
+                "duplicated message name attributes",
             )?;
         } else {
             unknown_attrs.push(attr);
         }
     }
-    if default_per_field && default_expr.is_some() {
+    if default_per_field && struct_update_expr.is_some() {
         bail!("default_per_field and default (expression) attributes are mutually exclusive");
     }
 
@@ -174,30 +239,69 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         bail!(
             "unknown attribute(s) for message: {attrs}",
             attrs = quote!(#(#unknown_attrs),*),
-        )
+        );
     }
 
-    let init_mode = match default_per_field {
+    let ignored_field_init_mode = match default_per_field {
         true => InitMode::DefaultPerField,
         false => InitMode::FromStructUpdate,
     };
 
     // Parse field data
+    let fields = parse_message_fields(data_struct.fields, ignored_field_init_mode, reserved_tags)?;
+
+    let schema_type_name = schema_type_name.unwrap_or_else(|| ident.to_string());
+
+    Ok(PreprocessedMessageStruct {
+        ident,
+        generics,
+        fields,
+        distinguished,
+        borrow_only,
+        struct_update_expr,
+        crate_name,
+        schema_type_name,
+    })
+}
+
+fn try_message(input: TokenStream) -> Result<TokenStream> {
+    let input: DeriveInput = parse2(input)?;
+
+    match &input.data {
+        Data::Enum(..) => return try_message_via_oneof(input),
+        Data::Struct(..) => {}
+        _ => {
+            bail!("Message can only be derived for a struct or an enum");
+        }
+    }
+
+    let PreprocessedMessageStruct {
+        ident,
+        generics,
+        fields,
+        distinguished,
+        borrow_only,
+        struct_update_expr,
+        crate_name,
+        schema_type_name,
+    } = preprocess_message_struct(input)?;
+
+    let ctx = &Context::new(crate_name);
+    let crate_ = &ctx.crate_name;
+
     let (ignored_fields, unsorted_fields): (Vec<_>, Vec<_>) =
-        parse_message_fields(data_struct.fields, init_mode, reserved_tags)?
-            .into_iter()
-            .partition(Field::is_ignored);
+        fields.into_iter().partition(Field::is_ignored);
 
     if distinguished && !ignored_fields.is_empty() {
         bail!("messages with ignored fields cannot be distinguished");
     }
 
-    let (_, ty_generics, where_clause) = impl_generics.split_for_impl();
+    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
     let self_where = if ignored_fields
         .iter()
         .any(Field::ignored_and_uses_struct_update_syntax)
-        && default_expr.is_none()
+        && struct_update_expr.is_none()
     {
         // When there are ignored fields that we are taking from ..<Self as Default>, the whole
         // message impl should be bounded by Self: Default
@@ -206,11 +310,11 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         None
     };
 
-    let borrow_generics = prepend_to_generics(&impl_generics, quote!('__a));
+    let borrow_generics = combine_generics(&generics, quote!('__a));
 
     let where_fields = vec![unsorted_fields.as_slice(), ignored_fields.as_slice()];
     let encoder_where_clause =
-        append_wheres_with_fields(where_clause, self_where.clone(), &where_fields, Encode);
+        append_wheres_with_fields(where_clause, self_where.clone(), &where_fields, Encode, ctx);
     let [owned_decoder_where_clause, borrowed_decoder_where_clause] =
         [Owned, Borrowed].map(|lifetime| {
             append_wheres_with_fields(
@@ -218,28 +322,29 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
                 self_where.clone(),
                 &where_fields,
                 Decode(lifetime, Relaxed),
+                ctx,
             )
         });
 
     let self_instance = FieldTarget::MessageInstance(quote!(self));
     let fields = MessageFieldsSorted::new(&unsorted_fields);
-    let encoded_len = fields.encoded_len(&self_instance);
-    let encode = fields.encode(&self_instance);
-    let prepend = fields.prepend(&self_instance);
+    let encoded_len = fields.encoded_len(&self_instance, ctx);
+    let encode = fields.encode(&self_instance, ctx);
+    let prepend = fields.prepend(&self_instance, ctx);
 
     let [decode_owned, decode_borrowed] = [Owned, Borrowed].map(|lifetime| {
-        let ident_str = ident.to_string();
         let self_instance = self_instance.clone();
+        let schema_type_name = schema_type_name.clone();
         unsorted_fields.iter().map(move |field| {
-            let decode = field.decode(&self_instance, lifetime, Relaxed);
+            let decode = field.decode(&self_instance, lifetime, Relaxed, ctx);
             let tags = field.tags().into_iter().map(|tag| quote!(#tag));
             let tags = Itertools::intersperse(tags, quote!(|));
-            let field_ident_str = field.ident().to_string();
+            let schema_field_name = field.schema_field_name();
 
             quote! {
                 #(#tags)* => {
                     if let ::core::result::Result::Err(mut error) = #decode {
-                        error.push(#ident_str, #field_ident_str);
+                        error.push(#schema_type_name, #schema_field_name);
                         return ::core::result::Result::Err(error);
                     }
                 }
@@ -249,7 +354,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
 
     let methods = unsorted_fields
         .iter()
-        .flat_map(|field| field.methods())
+        .flat_map(|field| field.methods(ctx))
         .collect::<Vec<_>>();
     let methods = if methods.is_empty() {
         None
@@ -264,24 +369,25 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
 
     let static_guards = unsorted_fields
         .iter()
-        .filter_map(|field| field.tag_list_guard());
+        .filter_map(|field| field.tag_list_guard(ctx))
+        .chain([version_assert(ctx)]);
 
     let empties: Vec<_> = unsorted_fields
         .iter()
         .chain(ignored_fields.iter())
         .flat_map(|field| {
-            let empty = field.empty(None)?;
+            let empty = field.empty(None, ctx)?;
             let ident = field.ident();
             Some(quote!(#ident: #empty))
         })
         .collect();
     let is_empties: Vec<_> = unsorted_fields
         .iter()
-        .map(|field| field.is_empty(&self_instance))
+        .map(|field| field.is_empty(&self_instance, ctx))
         .collect();
     let clears: Vec<_> = unsorted_fields
         .iter()
-        .map(|field| field.clear(&self_instance))
+        .map(|field| field.clear(&self_instance, ctx))
         .collect();
 
     let maybe_struct_update = if ignored_fields
@@ -289,11 +395,11 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         .any(Field::ignored_and_uses_struct_update_syntax)
     {
         // initialize ignored fields from our struct-update expression:
-        let default_expr = default_expr.map_or(
-            quote!(::core::default::Default::default()),
-            |expr| quote!(#expr),
-        );
-        Some(quote!(..#default_expr))
+        Some(if struct_update_expr.is_some() {
+            quote!(..__BilrostInitializer::<Self>::struct_update())
+        } else {
+            quote!(..::core::default::Default::default())
+        })
     } else {
         None
     };
@@ -434,17 +540,18 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
                     distinguished_self_where.clone(),
                     &where_fields,
                     Decode(lifetime, Distinguished),
+                    ctx,
                 )
             });
 
         let [decode_owned, decode_borrowed] = [Owned, Borrowed].map(|lifetime| {
-            let ident_str = ident.to_string();
-            let self_instance = self_instance.clone();
+            let schema_type_name = &schema_type_name;
+            let self_instance = &self_instance;
             unsorted_fields.iter().map(move |field| {
-                let decode = field.decode(&self_instance, lifetime, Distinguished);
+                let decode = field.decode(self_instance, lifetime, Distinguished, ctx);
                 let tags = field.tags().into_iter().map(|tag| quote!(#tag));
                 let tags = Itertools::intersperse(tags, quote!(|));
-                let field_ident_str = field.ident().to_string();
+                let schema_field_name = field.schema_field_name();
 
                 quote! {
                     #(#tags)* => {
@@ -453,7 +560,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
                                 canon.update(new_canon);
                             }
                             ::core::result::Result::Err(mut error) => {
-                                error.push(#ident_str, #field_ident_str);
+                                error.push(#schema_type_name, #schema_field_name);
                                 return ::core::result::Result::Err(error);
                             }
                         }
@@ -522,12 +629,13 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         }
     });
 
-    let aliases = encoder_alias_header();
+    let aliases = encoder_alias_header(ctx);
     let initializer_class = initializer_class_definition(
         ignored_fields
             .iter()
             .flat_map(|field| field.initializer_method(None)),
-        &impl_generics,
+        struct_update_expr,
+        &generics,
     );
     let expanded = quote! {
         const _: () = {
@@ -550,26 +658,31 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     Ok(expanded)
 }
 
-fn try_message_via_oneof(input: DeriveInput) -> Result<TokenStream, Error> {
-    let crate_ = crate_name();
+fn try_message_via_oneof(input: DeriveInput) -> Result<TokenStream> {
     let PreprocessedOneof {
         ident,
-        impl_generics,
-        ty_generics,
-        where_clause,
+        generics,
         variants,
         distinguished,
         borrow_only,
         empty_variant,
-    } = preprocess_oneof(&input)?;
+        crate_name,
+        schema_type_name: _,
+    } = preprocess_oneof(input)?;
 
-    let tag_measurer_ty = tag_measurer(&variants);
+    let ctx = &Context::new(crate_name);
+    let crate_ = &ctx.crate_name;
+    let version_guard = version_assert(ctx);
+
+    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+
+    let tag_measurer_ty = tag_measurer(&variants)(ctx);
 
     if empty_variant.is_none() {
-        bail!("Message can only be derived for Oneof enums that have an empty variant.")
+        bail!("Message can only be derived for Oneof enums that have an empty variant.");
     }
 
-    let borrow_generics = prepend_to_generics(impl_generics, quote!('__a));
+    let borrow_generics = combine_generics(&generics, quote!('__a));
 
     let encoder_where_clause = append_wheres(
         where_clause,
@@ -619,7 +732,7 @@ fn try_message_via_oneof(input: DeriveInput) -> Result<TokenStream, Error> {
     let impls = quote! {
         impl #impl_generics #crate_::encoding::RawMessage
         for #ident #ty_generics #encoder_where_clause {
-            const __ASSERTIONS: () = ();
+            const __ASSERTIONS: () = { #version_guard };
 
             #[inline(always)]
             fn empty() -> Self {
@@ -812,24 +925,62 @@ pub fn message(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     try_message(input.into()).unwrap().into()
 }
 
-fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
-    let crate_ = crate_name();
+fn try_enumeration(input: TokenStream) -> Result<TokenStream> {
     let input: DeriveInput = parse2(input)?;
     let ident = input.ident;
 
+    // Process attributes
+    let mut crate_name: Option<Path> = None;
+    let mut schema_type_name = None;
+    let mut unknown_attrs = Vec::new();
+    for attr in bilrost_attrs(&input.attrs, None)? {
+        if let Some(path) = named_attr(&attr, "crate")? {
+            set_option_with_display(
+                &mut crate_name,
+                path,
+                "duplicated crate path attributes",
+                |t| quote!(#t).to_string(),
+            )?;
+        } else if let Some(name) = string_attr(&attr, "name")? {
+            set_option(
+                &mut schema_type_name,
+                name,
+                "duplicated enumeration name attributes",
+            )?;
+        } else {
+            unknown_attrs.push(attr);
+        }
+    }
+    if !unknown_attrs.is_empty() {
+        bail!(
+            "unknown attribute(s) for enumeration: {attrs}",
+            attrs = quote!(#(#unknown_attrs),*),
+        );
+    }
+
+    let schema_type_name = schema_type_name.unwrap_or_else(|| ident.to_string());
+
+    let ctx = &Context::new(crate_name);
+    let crate_ = &ctx.crate_name;
+
     let generics = &input.generics;
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
-    let unborrowed_generics = prepend_to_generics(generics, quote!(const __G: u8));
-    let borrow_generics = prepend_to_generics(generics, quote!('__a, const __G: u8));
+    let unborrowed_generics = combine_generics(generics, quote!(const __G: u8));
+    let borrow_generics = combine_generics(generics, quote!('__a, const __G: u8));
 
     let punctuated_variants = match input.data {
         Data::Enum(enum_) => enum_.variants,
-        Data::Struct(_) => bail!("Enumeration can not be derived for a struct"),
-        Data::Union(..) => bail!("Enumeration can not be derived for a union"),
+        Data::Struct(_) => {
+            bail!("Enumeration can not be derived for a struct");
+        }
+        Data::Union(..) => {
+            bail!("Enumeration can not be derived for a union");
+        }
     };
 
     struct EnumVariant {
         variant_ident: Ident,
+        schema_variant_name: String,
         discriminant_expr: Expr,
     }
 
@@ -851,16 +1002,47 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
             bail!("Enumeration variants may not have fields");
         }
 
-        let discriminant_expr = variant_attr(&attrs)?
+        let mut variant_val: Option<Expr> = None;
+        let mut schema_variant_name = None;
+        let mut unknown_attrs = vec![];
+        for attr in bilrost_attrs(&attrs, Some(shorthand_enum_val))? {
+            if let Some(expr) = enum_val_attr(&attr)? {
+                set_option_with_display(
+                    &mut variant_val,
+                    expr,
+                    "duplicate value attributes on enumeration variant",
+                    |t| quote!((#t)).to_string(),
+                )?;
+            } else if let Some(name) = string_attr(&attr, "name")? {
+                set_option(
+                    &mut schema_variant_name,
+                    name,
+                    "duplicate variant name attributes",
+                )?;
+            } else {
+                unknown_attrs.push(attr);
+            }
+        }
+        if !unknown_attrs.is_empty() {
+            bail!(
+                "unknown attribute(s) for Enumeration variant: {}",
+                quote!(#(#unknown_attrs),*)
+            );
+        }
+
+        let schema_variant_name = schema_variant_name.unwrap_or_else(|| variant_ident.to_string());
+        let discriminant_expr = variant_val
             .or(discriminant.map(|(_, expr)| expr))
             .ok_or_else(|| {
                 err!(
-                    "Enumeration variants must have a discriminant or a #[bilrost(..)] attribute \
-                    with a constant value"
+                    "Enumeration variants must have a discriminant or a #[bilrost(val = ..)] \
+                    attribute (shorthand #[bilrost(..)]) with a constant value"
                 )
             })?;
+
         variants.push(EnumVariant {
             variant_ident,
+            schema_variant_name,
             discriminant_expr,
         });
     }
@@ -880,6 +1062,10 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
     let variant_idents: Vec<_> = variants
         .iter()
         .map(|variant| &variant.variant_ident)
+        .collect();
+    let schema_variant_names: Vec<_> = variants
+        .iter()
+        .map(|variant| &variant.schema_variant_name)
         .collect();
     let discriminant_exprs: Vec<_> = variants
         .iter()
@@ -962,6 +1148,38 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
         }
 
         impl #unborrowed_generics
+        #crate_::encoding::schema::ValueRepr<
+            #crate_::encoding::GeneralGeneric<__G>,
+            #ident #ty_generics
+        > for () #where_clause {
+            fn repr(
+                schema: &#crate_::encoding::schema::Schema,
+            ) -> #crate_::alloc::boxed::Box<dyn ::core::fmt::Display> {
+                #crate_::encoding::schema::PopulateSchema::register_enumeration::<
+                    #ident #ty_generics
+                >(
+                    schema,
+                    #schema_type_name,
+                    |fields| {
+                        #(fields.add_value(#schema_variant_names, #discriminant_exprs);)*
+                    },
+                );
+                #crate_::encoding::schema::PopulateSchema::make_lazy_repr(
+                    schema,
+                    |schema| {
+                        #crate_::alloc::format!(
+                            "varint, unsigned; one of enumeration {enum_type}",
+                            enum_type =
+                                #crate_::encoding::schema::PopulateSchema::type_reference::<
+                                    #ident #ty_generics
+                                >(schema),
+                        )
+                    },
+                )
+            }
+        }
+
+        impl #unborrowed_generics
         #crate_::encoding::ValueEncoder<
             #crate_::encoding::GeneralGeneric<__G>,
             #ident #ty_generics
@@ -1006,7 +1224,7 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
                 value: &mut #ident #ty_generics,
                 mut buf: #crate_::encoding::Capped<__B>,
                 _ctx: #crate_::encoding::DecodeContext,
-            ) -> Result<(), #crate_::DecodeError> {
+            ) -> ::core::result::Result<(), #crate_::DecodeError> {
                 let decoded = buf.decode_varint()?;
                 let ::core::result::Result::Ok(in_range) = u32::try_from(decoded) else {
                     return ::core::result::Result::Err(
@@ -1036,7 +1254,7 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
                 value: &mut #ident #ty_generics,
                 buf: #crate_::encoding::Capped<impl #crate_::bytes::Buf + ?Sized>,
                 ctx: #crate_::encoding::RestrictedDecodeContext,
-            ) -> Result<#crate_::Canonicity, #crate_::DecodeError> {
+            ) -> ::core::result::Result<#crate_::Canonicity, #crate_::DecodeError> {
                 <() as #crate_::encoding::ValueDecoder<
                     #crate_::encoding::GeneralGeneric<__G>, #ident #ty_generics
                 >>::decode_value(
@@ -1059,7 +1277,7 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
                 value: &mut #ident #ty_generics,
                 mut buf: #crate_::encoding::Capped<&'__a [u8]>,
                 ctx: #crate_::encoding::DecodeContext,
-            ) -> Result<(), #crate_::DecodeError> {
+            ) -> ::core::result::Result<(), #crate_::DecodeError> {
                 <() as #crate_::encoding::ValueDecoder<
                     #crate_::encoding::GeneralGeneric<__G>, #ident #ty_generics
                 >>::decode_value(
@@ -1083,7 +1301,7 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
                 value: &mut #ident #ty_generics,
                 buf: #crate_::encoding::Capped<&'__a [u8]>,
                 ctx: #crate_::encoding::RestrictedDecodeContext,
-            ) -> Result<#crate_::Canonicity, #crate_::DecodeError> {
+            ) -> ::core::result::Result<#crate_::Canonicity, #crate_::DecodeError> {
                 <() as #crate_::encoding::ValueDecoder<
                     #crate_::encoding::GeneralGeneric<__G>, #ident #ty_generics
                 >>::decode_value(
@@ -1110,66 +1328,38 @@ fn is_zero_discriminant(expr: &Expr) -> bool {
     expr.to_token_stream().to_string() == "0"
 }
 
-/// Get the numeric variant value for an enumeration from attrs.
-fn variant_attr(attrs: &Vec<Attribute>) -> Result<Option<Expr>, Error> {
-    let mut result: Option<Expr> = None;
-    for attr in attrs {
-        if attr.meta.path().is_ident("bilrost") {
-            // attribute values for enumerations don't have to be exactly numeric literals, but they
-            // will need to be used both as a literal-equivalent u32 value and as the match pattern
-            // for the variant's corresponding value.
-            let Some(expr) = match &attr.meta {
-                Meta::List(list) => parse2::<Expr>(list.tokens.clone()).ok(),
-                Meta::NameValue(name_value) => Some(name_value.value.clone()),
-                _ => None,
-            }
-            .filter(|expr| {
-                // it's a valid expression; also make sure that it parses successfully as a
-                // single-variant pattern
-                syn::parse::Parser::parse2(Pat::parse_single, expr.to_token_stream()).is_ok()
-            }) else {
-                bail!(
-                    "attribute on enumeration variant must be valid as both an expression and a \
-                    match pattern for u32"
-                );
-            };
-
-            set_option_with_display(
-                &mut result,
-                expr,
-                "duplicate value attributes on enumeration variant",
-                |t| quote!((#t)).to_string(),
-            )?;
-        }
-    }
-    Ok(result)
-}
-
-struct PreprocessedOneof<'a> {
+struct PreprocessedOneof {
     ident: Ident,
-    impl_generics: &'a Generics,
-    ty_generics: TypeGenerics<'a>,
-    where_clause: Option<&'a WhereClause>,
+    generics: Generics,
     variants: Vec<OneofVariant>,
     distinguished: bool,
     borrow_only: bool,
     empty_variant: Option<Ident>,
+    crate_name: Option<Path>,
+    schema_type_name: String,
 }
 
-fn preprocess_oneof(input: &DeriveInput) -> Result<PreprocessedOneof<'_>, Error> {
-    let ident = input.ident.clone();
-
+fn preprocess_oneof(input: DeriveInput) -> Result<PreprocessedOneof> {
     let input_variants = match &input.data {
         Data::Enum(enum_) => enum_.variants.clone(),
-        Data::Struct(..) => bail!("Oneof can not be derived for a struct"),
-        Data::Union(..) => bail!("Oneof can not be derived for a union"),
+        Data::Struct(..) => {
+            bail!("Oneof can not be derived for a struct");
+        }
+        Data::Union(..) => {
+            bail!("Oneof can not be derived for a union");
+        }
     };
+
+    let ident = input.ident;
+    let generics = input.generics;
 
     let mut reserved_tags = None;
     let mut unknown_attrs = Vec::new();
     let mut distinguished = false;
     let mut borrow_only = false;
-    for attr in bilrost_attrs(&input.attrs)? {
+    let mut crate_name: Option<Path> = None;
+    let mut schema_type_name = None;
+    for attr in bilrost_attrs(&input.attrs, None)? {
         if let Some(tags) = tag_list_attr(&attr, "reserved_tags", None)? {
             set_option_with_display(
                 &mut reserved_tags,
@@ -1181,6 +1371,19 @@ fn preprocess_oneof(input: &DeriveInput) -> Result<PreprocessedOneof<'_>, Error>
             set_bool(&mut distinguished, "duplicated distinguished attributes")?;
         } else if word_attr(&attr, "borrowed_only") {
             set_bool(&mut borrow_only, "duplicated borrowed_only attributes")?;
+        } else if let Some(path) = named_attr(&attr, "crate")? {
+            set_option_with_display(
+                &mut crate_name,
+                path,
+                "duplicated crate path attributes",
+                |t| quote!(#t).to_string(),
+            )?;
+        } else if let Some(name) = string_attr(&attr, "name")? {
+            set_option(
+                &mut schema_type_name,
+                name,
+                "duplicated message name attributes",
+            )?;
         } else {
             unknown_attrs.push(attr);
         }
@@ -1190,7 +1393,7 @@ fn preprocess_oneof(input: &DeriveInput) -> Result<PreprocessedOneof<'_>, Error>
         bail!(
             "unknown attribute(s) for oneof-message: {}",
             quote!(#(#unknown_attrs),*)
-        )
+        );
     }
 
     // Oneof enums have either zero or one unit variant. If there is no such variant, the Oneof
@@ -1235,43 +1438,51 @@ fn preprocess_oneof(input: &DeriveInput) -> Result<PreprocessedOneof<'_>, Error>
         }
     }
 
-    let generics = &input.generics;
-    let (_, ty_generics, where_clause) = generics.split_for_impl();
+    let schema_type_name = schema_type_name.unwrap_or_else(|| ident.to_string());
 
     Ok(PreprocessedOneof {
         ident,
-        impl_generics: generics,
-        ty_generics,
-        where_clause,
+        generics,
         variants,
         distinguished,
         borrow_only,
         empty_variant,
+        crate_name,
+        schema_type_name,
     })
 }
 
-fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
-    let crate_ = crate_name();
+fn try_oneof(input: TokenStream) -> Result<TokenStream> {
     let input: DeriveInput = parse2(input)?;
 
     let PreprocessedOneof {
         ident,
-        impl_generics,
-        ty_generics,
-        where_clause,
+        generics,
         variants,
         distinguished,
         borrow_only,
         empty_variant,
-    } = preprocess_oneof(&input)?;
+        crate_name,
+        schema_type_name,
+    } = preprocess_oneof(input)?;
 
-    let borrow_generics = prepend_to_generics(impl_generics, quote!('__a));
+    let ctx = &Context::new(crate_name);
+    let crate_ = &ctx.crate_name;
 
-    let encoder_where_clause = append_wheres_with_fields(where_clause, None, &variants, Encode);
+    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+    let borrow_generics = combine_generics(&generics, quote!('__a));
+
+    let encoder_where_clause =
+        append_wheres_with_fields(where_clause, None, &variants, Encode, ctx);
     let owned_decoder_where_clause =
-        append_wheres_with_fields(where_clause, None, &variants, Decode(Owned, Relaxed));
-    let borrowed_decoder_where_clause =
-        append_wheres_with_fields(where_clause, None, &variants, Decode(Borrowed, Relaxed));
+        append_wheres_with_fields(where_clause, None, &variants, Decode(Owned, Relaxed), ctx);
+    let borrowed_decoder_where_clause = append_wheres_with_fields(
+        where_clause,
+        None,
+        &variants,
+        Decode(Borrowed, Relaxed),
+        ctx,
+    );
 
     let sorted_tags: Vec<u32> = variants
         .iter()
@@ -1290,17 +1501,17 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
 
     let mut encode: Vec<TokenStream> = variants
         .iter()
-        .map(|variant| variant.encode(&self_alias))
+        .map(|variant| variant.encode(&self_alias, ctx))
         .collect();
 
     let mut prepend: Vec<TokenStream> = variants
         .iter()
-        .map(|variant| variant.prepend(&self_alias))
+        .map(|variant| variant.prepend(&self_alias, ctx))
         .collect();
 
     let mut encoded_len: Vec<TokenStream> = variants
         .iter()
-        .map(|variant| variant.encoded_len(&self_alias))
+        .map(|variant| variant.encoded_len(&self_alias, ctx))
         .collect();
 
     let encoder_trait;
@@ -1372,10 +1583,9 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
 
     let variant_name_arms = variants.iter().map(|variant| {
         let tag = variant.tag();
-        let ident_str = ident.to_string();
-        let variant_ident_str = variant.ident().to_string();
+        let schema_variant_name = variant.schema_variant_name();
         quote! {
-            #tag => (#ident_str, #variant_ident_str),
+            #tag => (#schema_type_name, #schema_variant_name),
         }
     });
 
@@ -1383,7 +1593,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         let ident_str = ident.to_string();
         let arms = variants
             .iter()
-            .map(|variant| variant.decode(&self_alias, lifetime, mode));
+            .map(|variant| variant.decode(&self_alias, lifetime, mode, ctx));
         quote! {
             match tag {
                 #(#arms,)*
@@ -1555,6 +1765,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
                         [quote!(Self: #crate_::encoding::Oneof)],
                         &variants,
                         Decode(lifetime, Distinguished),
+                        ctx,
                     )
                 });
         } else {
@@ -1571,6 +1782,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
                         None,
                         &variants,
                         Decode(lifetime, Distinguished),
+                        ctx,
                     )
                 });
         };
@@ -1658,10 +1870,11 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         }
     });
 
-    let aliases = encoder_alias_header();
+    let aliases = encoder_alias_header(ctx);
     let initializer_class = initializer_class_definition(
         variants.iter().flat_map(OneofVariant::initializer_methods),
-        impl_generics,
+        None,
+        &generics,
     );
     Ok(quote! {
         const _: () = {
@@ -1683,6 +1896,210 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
 #[proc_macro_derive(Oneof, attributes(bilrost))]
 pub fn oneof(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     try_oneof(input.into()).unwrap().into()
+}
+
+fn try_schema(input: TokenStream) -> Result<TokenStream> {
+    let input: DeriveInput = parse2(input)?;
+
+    match &input.data {
+        Data::Struct(..) => try_struct_schema(input),
+        Data::Enum(..) => try_enum_schema(input),
+        Data::Union(..) => {
+            bail!("schema cannot be derived for a union type");
+        }
+    }
+}
+
+fn try_struct_schema(input: DeriveInput) -> Result<TokenStream> {
+    let PreprocessedMessageStruct {
+        ident,
+        generics,
+        fields,
+        distinguished: _,
+        borrow_only: _,
+        struct_update_expr,
+        crate_name,
+        schema_type_name,
+    } = preprocess_message_struct(input)?;
+
+    let ctx = &Context::new(crate_name);
+    let crate_ = &ctx.crate_name;
+
+    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+
+    let (ignored_fields, implemented_fields): (Vec<_>, Vec<_>) =
+        fields.into_iter().partition(Field::is_ignored);
+
+    let self_where = if ignored_fields
+        .iter()
+        .any(Field::ignored_and_uses_struct_update_syntax)
+        && struct_update_expr.is_none()
+    {
+        // When there are ignored fields that we are taking from ..<Self as Default>, the whole
+        // message impl should be bounded by Self: Default
+        Some(quote!(Self: ::core::default::Default))
+    } else {
+        None
+    };
+
+    let schema_where_clause = append_wheres_with_fields(
+        where_clause,
+        self_where
+            .into_iter()
+            .chain([quote!(Self: ::core::any::Any)]),
+        &implemented_fields,
+        ForSchema,
+        ctx,
+    );
+
+    let field_schemas: Vec<_> = implemented_fields
+        .iter()
+        .flat_map(|field| field.schema(ctx))
+        .collect();
+
+    let impls = quote! {
+        impl #impl_generics #crate_::encoding::schema::RegisterMessage for __Self #ty_generics
+        #schema_where_clause {
+            fn register(schema: &#crate_::encoding::schema::Schema) {
+                #crate_::encoding::schema::PopulateSchema::register_message::<Self>(
+                    schema,
+                    #schema_type_name,
+                    |fields| {
+                        #(#field_schemas)*
+                    },
+                );
+            }
+        }
+    };
+
+    let aliases = encoder_alias_header(ctx);
+    let expanded = quote! {
+        const _: () = {
+            use #ident as __Self;
+
+            const _: () = {
+                #aliases
+
+                #impls
+            };
+        };
+    };
+
+    Ok(expanded)
+}
+
+fn try_enum_schema(input: DeriveInput) -> Result<TokenStream> {
+    let PreprocessedOneof {
+        ident,
+        generics,
+        variants,
+        distinguished: _,
+        borrow_only: _,
+        empty_variant,
+        crate_name,
+        schema_type_name,
+    } = preprocess_oneof(input)?;
+
+    let ctx = &Context::new(crate_name);
+    let crate_ = &ctx.crate_name;
+
+    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+
+    let schema_where_clause = append_wheres_with_fields(
+        where_clause,
+        Some(quote!(Self: ::core::any::Any)),
+        &variants,
+        ForSchema,
+        ctx,
+    );
+
+    let submessage_schemas = {
+        let submessage_registrations: Vec<_> = variants
+            .iter()
+            .flat_map(|variant| variant.subtype_schema(ctx))
+            .collect();
+        if submessage_registrations.is_empty() {
+            None
+        } else {
+            Some(quote! {
+                #crate_::encoding::schema::PopulateSchema::register_oneof_messages::<Self>(
+                    schema,
+                    #schema_type_name,
+                    |messages| {
+                        #(#submessage_registrations)*
+                    },
+                );
+            })
+        }
+    };
+    // registers the variants of the oneof as fields
+    let field_schemas: Vec<_> = variants.iter().map(|variant| variant.schema(ctx)).collect();
+
+    // We always emit the AddOneofFields impl for the oneof.
+    let as_oneof_impls = quote! {
+        impl #impl_generics #crate_::encoding::schema::AddOneofFields
+        for __Self #ty_generics #schema_where_clause
+        {
+            fn add_fields(
+                schema: &#crate_::encoding::schema::Schema,
+                fields: &mut #crate_::encoding::schema::MessageFields,
+                field_name: ::core::option::Option<&str>,
+            ) {
+                #submessage_schemas
+                #(#field_schemas)*
+            }
+        }
+    };
+
+    // We only emit the RegisterMessage impl if the oneof *can* be a Message (that is, if it has an
+    // empty variant)
+    let as_message_impls = empty_variant.map(|_| {
+        quote! {
+            impl #impl_generics #crate_::encoding::schema::RegisterMessage
+            for __Self #ty_generics #schema_where_clause
+            {
+                fn register(schema: &#crate_::encoding::schema::Schema) {
+                    #crate_::encoding::schema::PopulateSchema::register_message::<Self>(
+                        schema,
+                        #schema_type_name,
+                        |fields| {
+                            fields.add_oneof(
+                                #schema_type_name,
+                                <Self as #crate_::encoding::Oneof>::FIELD_TAGS,
+                            );
+                            <Self as #crate_::encoding::schema::AddOneofFields>::add_fields(
+                                schema,
+                                fields,
+                                None,
+                            );
+                        },
+                    );
+                }
+            }
+        }
+    });
+
+    let aliases = encoder_alias_header(ctx);
+    let expanded = quote! {
+        const _: () = {
+            use #ident as __Self;
+
+            const _: () = {
+                #aliases
+
+                #as_oneof_impls
+
+                #as_message_impls
+            };
+        };
+    };
+
+    Ok(expanded)
+}
+
+#[proc_macro_derive(Schema, attributes(bilrost))]
+pub fn schema(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    try_schema(input.into()).unwrap().into()
 }
 
 #[cfg(test)]
@@ -2068,7 +2485,7 @@ mod test {
                 #[bilrost(oneof(2, 3))] B,
                 u32,
                 #[bilrost(encoding = "::custom <Z>")] String,
-                #[bilrost(tag(1000))] i64,
+                #[bilrost = 1000] i64,
                 bool,
             );
         })
@@ -2080,7 +2497,7 @@ mod test {
                 #[bilrost(oneof(2, 3))] B,
                 u32,
                 #[bilrost(encoding(::custom<Z>))] String,
-                #[bilrost(1000)] i64,
+                #[bilrost = 1000] i64,
                 #[bilrost()] bool,
             );
         })
@@ -2278,6 +2695,26 @@ mod test {
     }
 
     #[test]
+    fn test_rejects_attributes_on_value_variant() {
+        let output = try_oneof(quote!(
+            enum A {
+                #[bilrost(1)]
+                A {
+                    #[bilrost(encoding(fixed))]
+                    val: u64,
+                },
+            }
+        ));
+        assert_eq!(
+            output
+                .expect_err("attributes on value variant not detected")
+                .to_string(),
+            "bilrost attributes found on the field inside variant A; those attributes should \
+            probably go on the variant instead, or the variant should be a message variant"
+        );
+    }
+
+    #[test]
     fn test_rejects_struct_and_union_enumerations() {
         let output = try_enumeration(quote!(
             struct X {
@@ -2354,8 +2791,8 @@ mod test {
             output
                 .expect_err("variant without discriminant not detected")
                 .to_string(),
-            "Enumeration variants must have a discriminant or a #[bilrost(..)] attribute with a \
-            constant value"
+            "Enumeration variants must have a discriminant or a #[bilrost(val = ..)] attribute \
+            (shorthand #[bilrost(..)]) with a constant value"
         );
     }
 

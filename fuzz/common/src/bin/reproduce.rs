@@ -1,8 +1,6 @@
 use bilrost::encoding::opaque::OpaqueMessage;
 use bilrost::{DistinguishedOwnedMessage, OwnedMessage};
-use common::test_messages::{
-    TestAllTypes, TestDistinguished, TestTypeSupport, TestTypeSupportDistinguished,
-};
+use test_types::{TestAllTypes, TestDistinguished, TestTypeSupport, TestTypeSupportDistinguished};
 
 fn main() {
     let mut args = std::env::args();

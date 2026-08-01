@@ -73,7 +73,9 @@ impl DistinguishedProxiable<SealedBilrostTag> for NaiveDate {
 delegate_proxied_encoding!(
     use encoding (Packed<Varint>) to encode proxied type (NaiveDate)
     using proxy tag (SealedBilrostTag)
-    with general encodings including distinguished
+    with general encodings
+    including distinguished
+    including schema
 );
 
 #[cfg(test)]
@@ -184,7 +186,9 @@ impl DistinguishedProxiable<SealedBilrostTag> for NaiveTime {
 delegate_proxied_encoding!(
     use encoding (Packed<Varint>) to encode proxied type (NaiveTime)
     using proxy tag (SealedBilrostTag)
-    with general encodings including distinguished
+    with general encodings
+    including distinguished
+    including schema
 );
 
 #[cfg(test)]
@@ -323,7 +327,9 @@ impl DistinguishedProxiable<SealedBilrostTag> for NaiveDateTime {
 delegate_proxied_encoding!(
     use encoding (Packed<Varint>) to encode proxied type (NaiveDateTime)
     using proxy tag (SealedBilrostTag)
-    with general encodings including distinguished
+    with general encodings
+    including distinguished
+    including schema
 );
 
 #[cfg(test)]
@@ -443,7 +449,9 @@ impl DistinguishedProxiable<SealedBilrostTag> for Utc {
 delegate_proxied_encoding!(
     use encoding ((Varint, Varint, Varint)) to encode proxied type (Utc)
     using proxy tag (SealedBilrostTag)
-    with general encodings including distinguished
+    with general encodings
+    including distinguished
+    including schema
 );
 
 #[cfg(test)]
@@ -578,7 +586,9 @@ impl DistinguishedProxiable<SealedBilrostTag> for FixedOffset {
 delegate_proxied_encoding!(
     use encoding ((Varint, Varint, Varint)) to encode proxied type (FixedOffset)
     using proxy tag (SealedBilrostTag)
-    with general encodings including distinguished
+    with general encodings
+    including distinguished
+    including schema
 );
 
 #[cfg(test)]
@@ -761,7 +771,9 @@ where
 delegate_proxied_encoding!(
     use encoding (General) to encode proxied type (DateTime<Z>)
     using proxy tag (SealedBilrostTag)
-    with general encodings including distinguished
+    with general encodings
+    including distinguished
+    including schema
     with where clause for relaxed ((): EmptyState<(), Z::Offset>)
     with generics (Z: TimeZone)
 );
@@ -861,7 +873,9 @@ impl DistinguishedProxiable<SealedBilrostTag> for TimeDelta {
 delegate_proxied_encoding!(
     use encoding (General) to encode proxied type (TimeDelta)
     using proxy tag (SealedBilrostTag)
-    with general encodings including distinguished
+    with general encodings
+    including distinguished
+    including schema
 );
 
 #[cfg(test)]

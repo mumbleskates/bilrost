@@ -1,6 +1,6 @@
-use crate::attrs::{bilrost_attrs, TagList};
-use crate::crate_name;
+use crate::attrs::{bilrost_attrs, set_option, shorthand_tag, string_attr, TagList};
 use crate::field::traits::{DecodeLifetime, DecodeMode, FieldBearer, Tagged, WhereFor};
+use crate::Context;
 use alloc::boxed::Box;
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::format;
@@ -11,7 +11,7 @@ use core::iter::repeat;
 use core::mem::take;
 use core::ops::Deref;
 use core::{iter, slice};
-use eyre::{bail, eyre as err, Report as Error};
+use eyre::{bail, eyre as err, Result};
 use itertools::{repeat_n, Either, Itertools};
 use proc_macro2::{Ident, TokenStream};
 use quote::{quote, ToTokens};
@@ -28,6 +28,7 @@ pub use value::OneofVariant;
 #[derive(Clone)]
 pub struct Field {
     ident: TokenStream,
+    schema_field_name: String,
     content: MessageFieldContent,
 }
 
@@ -58,7 +59,7 @@ pub fn parse_message_fields(
     fields: syn::Fields,
     init_mode: InitMode,
     reserved: Option<TagList>,
-) -> Result<Vec<Field>, Error> {
+) -> Result<Vec<Field>> {
     let mut next_tag = Some(match fields {
         // tuple structs begin field numbering at zero
         syn::Fields::Unnamed(..) => 0,
@@ -91,7 +92,7 @@ pub fn parse_message_fields(
             }
             Ok(field)
         })
-        .collect::<Result<Vec<_>, Error>>()?;
+        .collect::<Result<Vec<_>>>()?;
 
     // Index all fields by their tag(s) and check them against the forbidden tag ranges
     let all_tags: BTreeMap<u32, &Field> = unsorted_fields
@@ -113,19 +114,26 @@ pub fn parse_message_fields(
         .tuple_windows()
         .find(|(a, b)| a == b)
     {
-        bail!("multiple fields have tag {duplicated_tag}")
+        bail!("multiple fields have tag {duplicated_tag}");
     };
 
     Ok(unsorted_fields)
 }
 
 /// If there can never be a tag delta larger than 31, field keys will never be more than 1 byte.
-pub fn tag_measurer<T: Tagged>(for_these: impl IntoIterator<Item = T>) -> TokenStream {
-    let crate_ = crate_name();
+pub fn tag_measurer<T: Tagged>(
+    for_these: impl IntoIterator<Item = T>,
+) -> fn(&Context) -> TokenStream {
     if matches!(for_these.into_iter().flat_map(|t| t.tags()).max(), Some(max_tag) if max_tag < 32) {
-        quote!(#crate_::encoding::TrivialTagMeasurer)
+        |ctx| {
+            let crate_ = &ctx.crate_name;
+            quote!(#crate_::encoding::TrivialTagMeasurer)
+        }
     } else {
-        quote!(#crate_::encoding::RuntimeTagMeasurer)
+        |ctx| {
+            let crate_ = &ctx.crate_name;
+            quote!(#crate_::encoding::RuntimeTagMeasurer)
+        }
     }
 }
 
@@ -140,24 +148,47 @@ impl Field {
         attrs: &[Attribute],
         inferred_tag: Option<u32>,
         init_mode: InitMode,
-    ) -> Result<Field, Error> {
-        let attrs = bilrost_attrs(attrs)?;
+    ) -> Result<Field> {
+        let mut schema_field_name = None;
+        // filtered attrs that don't match the below universal attrs we check for
+        let mut filtered_attrs = vec![];
+        for attr in bilrost_attrs(attrs, Some(shorthand_tag))? {
+            if let Some(name) = string_attr(&attr, "name")? {
+                set_option(
+                    &mut schema_field_name,
+                    name,
+                    "duplicate field name attributes",
+                )?;
+            } else {
+                filtered_attrs.push(attr);
+            }
+        }
 
         Ok(Field {
-            content: if let Some(field) = ignored::IgnoredField::new(ty, &attrs, init_mode)? {
+            content: if let Some(field) =
+                ignored::IgnoredField::new(ty, &filtered_attrs, init_mode)?
+            {
+                if schema_field_name.is_some() {
+                    bail!("ignored fields cannot also have a name");
+                }
                 Ignored(field)
-            } else if let Some(field) = oneof::OneofInclusion::new(ty, &attrs)? {
+            } else if let Some(field) = oneof::OneofInclusion::new(ty, &filtered_attrs)? {
                 Oneof(field)
             } else {
-                Value(value::MessageField::new(ty, attrs, inferred_tag)?)
+                Value(value::MessageField::new(ty, filtered_attrs, inferred_tag)?)
             },
             ident: ident.clone(),
+            schema_field_name: schema_field_name.unwrap_or_else(|| ident.to_string()),
         })
     }
 
     /// Returns the ident of the field within its struct or variant.
     pub fn ident(&self) -> &TokenStream {
         &self.ident
+    }
+
+    pub fn schema_field_name(&self) -> &str {
+        &self.schema_field_name
     }
 
     pub fn ty(&self) -> &Type {
@@ -177,19 +208,16 @@ impl Field {
     }
 
     pub fn has_enumeration_type(&self) -> bool {
-        let Value(scalar) = &self.content else {
-            return false;
-        };
-        scalar.has_enumeration_type()
+        matches!(&self.content, Value(scalar) if scalar.has_enumeration_type())
     }
 
     /// Returns a statement that statically asserts the type of this field has the correct tags in
     /// its accepted fields, if it is a oneof inclusion.
-    pub fn tag_list_guard(&self) -> Option<TokenStream> {
+    pub fn tag_list_guard(&self, ctx: &Context) -> Option<TokenStream> {
         let Oneof(field) = &self.content else {
             return None; // only oneof inclusions have lists of tags that need assertions
         };
-        let crate_ = crate_name();
+        let crate_ = &ctx.crate_name;
         let mut tags = self.tags();
         tags.sort();
         let oneof_ty = &field.ty;
@@ -210,21 +238,21 @@ impl Field {
     }
 
     /// Returns a statement which encodes the field.
-    pub fn encode(&self, instance: &FieldTarget) -> TokenStream {
+    pub fn encode(&self, instance: &FieldTarget, ctx: &Context) -> TokenStream {
         let target = instance.const_field_ref(self);
         match &self.content {
-            Value(scalar) => scalar.encode(target),
-            Oneof(oneof) => oneof.encode(target),
+            Value(scalar) => scalar.encode(target, ctx),
+            Oneof(oneof) => oneof.encode(target, ctx),
             Ignored(..) => panic!("cannot encode ignored field"),
         }
     }
 
     /// Returns a statement which prepends the field.
-    pub fn prepend(&self, instance: &FieldTarget) -> TokenStream {
+    pub fn prepend(&self, instance: &FieldTarget, ctx: &Context) -> TokenStream {
         let target = instance.const_field_ref(self);
         match &self.content {
-            Value(scalar) => scalar.prepend(target),
-            Oneof(oneof) => oneof.prepend(target),
+            Value(scalar) => scalar.prepend(target, ctx),
+            Oneof(oneof) => oneof.prepend(target, ctx),
             Ignored(..) => panic!("cannot prepend ignored field"),
         }
     }
@@ -235,68 +263,69 @@ impl Field {
         instance: &FieldTarget,
         lifetime: DecodeLifetime,
         mode: DecodeMode,
+        ctx: &Context,
     ) -> TokenStream {
         let target = instance.mut_field_ref(self);
         match &self.content {
-            Value(scalar) => scalar.decode(target, lifetime, mode),
-            Oneof(oneof) => oneof.decode(target, lifetime, mode),
+            Value(scalar) => scalar.decode(target, lifetime, mode, ctx),
+            Oneof(oneof) => oneof.decode(target, lifetime, mode, ctx),
             Ignored(..) => panic!("canot decode ignored field"),
         }
     }
 
     /// Returns an expression which evaluates to the encoded length of the field.
-    pub fn encoded_len(&self, instance: &FieldTarget) -> TokenStream {
+    pub fn encoded_len(&self, instance: &FieldTarget, ctx: &Context) -> TokenStream {
         let target = instance.const_field_ref(self);
         match &self.content {
-            Value(scalar) => scalar.encoded_len(target),
-            Oneof(oneof) => oneof.encoded_len(target),
+            Value(scalar) => scalar.encoded_len(target, ctx),
+            Oneof(oneof) => oneof.encoded_len(target, ctx),
             Ignored(..) => panic!("cannot get encode length of ignored field"),
         }
     }
 
     /// Returns an expression which initializes the field's type with its encoding with a guaranteed
     /// empty value.
-    pub fn empty(&self, variant_tag: Option<u32>) -> Option<TokenStream> {
+    pub fn empty(&self, variant_tag: Option<u32>, ctx: &Context) -> Option<TokenStream> {
         match &self.content {
-            Value(scalar) => Some(scalar.empty()),
-            Oneof(oneof) => Some(oneof.empty()),
+            Value(scalar) => Some(scalar.empty(ctx)),
+            Oneof(oneof) => Some(oneof.empty(ctx)),
             Ignored(ignored) => ignored.initialize(variant_tag, &self.ident),
         }
     }
 
     /// Returns an expression which returns whether the field is considered empty in the encoding.
-    pub fn is_empty(&self, instance: &FieldTarget) -> TokenStream {
+    pub fn is_empty(&self, instance: &FieldTarget, ctx: &Context) -> TokenStream {
         let target = instance.const_field_ref(self);
         match &self.content {
-            Value(scalar) => scalar.is_empty(target),
-            Oneof(oneof) => oneof.is_empty(target),
+            Value(scalar) => scalar.is_empty(target, ctx),
+            Oneof(oneof) => oneof.is_empty(target, ctx),
             Ignored(..) => panic!("cannot detect empty on ignored field"),
         }
     }
 
     /// Returns an expression which resets the field's value to empty with its encoding.
-    pub fn clear(&self, instance: &FieldTarget) -> TokenStream {
+    pub fn clear(&self, instance: &FieldTarget, ctx: &Context) -> TokenStream {
         let target = instance.mut_field_ref(self);
         match &self.content {
-            Value(scalar) => scalar.clear(target),
-            Oneof(oneof) => oneof.clear(target),
+            Value(scalar) => scalar.clear(target, ctx),
+            Oneof(oneof) => oneof.clear(target, ctx),
             Ignored(..) => panic!("cannot clear ignored field"),
         }
     }
 
     /// If the field is a oneof, returns an expression which evaluates to an Option<u32> of the tag
     /// of the (maybe) present field in the oneof. Panics if the field is not a oneof.
-    pub fn current_tag(&self, instance: &FieldTarget) -> TokenStream {
+    pub fn current_tag(&self, instance: &FieldTarget, ctx: &Context) -> TokenStream {
         let Oneof(field) = &self.content else {
             panic!("tried to use a value field as a oneof")
         };
         let target = instance.const_field_ref(self);
-        field.current_tag(target)
+        field.current_tag(target, ctx)
     }
 
-    pub fn methods(&self) -> Option<TokenStream> {
+    pub fn methods(&self, ctx: &Context) -> Option<TokenStream> {
         match &self.content {
-            Value(scalar) => scalar.methods(&self.ident),
+            Value(scalar) => scalar.methods(&self.ident, ctx),
             _ => None,
         }
     }
@@ -309,14 +338,22 @@ impl Field {
             None
         }
     }
+
+    pub fn schema(&self, ctx: &Context) -> Option<TokenStream> {
+        match &self.content {
+            Value(scalar) => Some(scalar.schema(self.schema_field_name(), false, ctx)),
+            Oneof(oneof) => Some(oneof.schema(self.ident(), self.schema_field_name(), ctx)),
+            Ignored(..) => None,
+        }
+    }
 }
 
 impl FieldBearer for Field {
-    fn where_terms(&self, purpose: WhereFor) -> Vec<TokenStream> {
+    fn where_terms(&self, purpose: WhereFor, ctx: &Context) -> Vec<TokenStream> {
         match &self.content {
-            Value(field) => field.where_terms(purpose),
-            Oneof(field) => field.where_terms(purpose),
-            Ignored(field) => field.where_terms(purpose),
+            Value(field) => field.where_terms(purpose, ctx),
+            Oneof(field) => field.where_terms(purpose, ctx),
+            Ignored(field) => field.where_terms(purpose, ctx),
         }
     }
 }
@@ -372,7 +409,7 @@ impl<T> Deref for MustMove<T> {
 /// guaranteed tag order.
 pub struct MessageFieldsSorted<'a> {
     chunks: Vec<FieldChunk<'a>>,
-    tag_measurer_ty: TokenStream,
+    tag_measurer_ty: fn(&Context) -> TokenStream,
 }
 
 enum FieldChunk<'a> {
@@ -434,6 +471,7 @@ impl Direction {
 fn process_sort_groups<FC, FO>(
     parts: &[SortGroupPart],
     instance: &FieldTarget,
+    ctx: &Context,
     config: SortGroupConfig<FC, FO>,
 ) -> TokenStream
 where
@@ -469,7 +507,7 @@ where
         .align(parts)
         .flat_map(|part| match part {
             OneofPart(field) => {
-                let current_tag = field.current_tag(instance);
+                let current_tag = field.current_tag(instance, ctx);
                 let closure = oneof_part_fn(field);
                 Some(quote! {
                     if let ::core::option::Option::Some(tag) = #current_tag {
@@ -646,8 +684,8 @@ impl<'a> MessageFieldsSorted<'a> {
         )
     }
 
-    pub fn encoded_len(&self, instance: &FieldTarget) -> TokenStream {
-        let tag_measurer_ty = &self.tag_measurer_ty;
+    pub fn encoded_len(&self, instance: &FieldTarget, ctx: &Context) -> TokenStream {
+        let tag_measurer_ty = (self.tag_measurer_ty)(ctx);
         let sort_group_instance;
         let part_fn_instance_ty;
         if instance.has_instance() {
@@ -660,20 +698,21 @@ impl<'a> MessageFieldsSorted<'a> {
         let sort_group_self = sort_group_instance.self_expr();
         let renamed = sort_group_instance.rename(quote!(instance));
         let chunks = self.chunks.iter().map(|chunk| match chunk {
-            AlwaysOrdered(field) => field.encoded_len(instance),
+            AlwaysOrdered(field) => field.encoded_len(instance, ctx),
             SortGroup(parts) => process_sort_groups(
                 parts,
                 &sort_group_instance,
+                ctx,
                 SortGroupConfig {
                     direction: Direction::Forward,
                     contiguous_part_fn: |fields: ReversibleFields| {
-                        let each_len = fields.map(|field| field.encoded_len(&renamed));
+                        let each_len = fields.map(|field| field.encoded_len(&renamed, ctx));
                         quote! {
                             |instance, tm| { 0 #(+ #each_len)* }
                         }
                     },
                     oneof_part_fn: |field: &Field| {
-                        let encoded_len = field.encoded_len(&renamed);
+                        let encoded_len = field.encoded_len(&renamed, ctx);
                         quote! {
                             |instance, tm| { #encoded_len }
                         }
@@ -697,8 +736,8 @@ impl<'a> MessageFieldsSorted<'a> {
         }
     }
 
-    pub fn encode(&self, instance: &FieldTarget) -> TokenStream {
-        let crate_ = crate_name();
+    pub fn encode(&self, instance: &FieldTarget, ctx: &Context) -> TokenStream {
+        let crate_ = &ctx.crate_name;
         let sort_group_instance;
         let part_fn_instance_ty;
         if instance.has_instance() {
@@ -711,20 +750,21 @@ impl<'a> MessageFieldsSorted<'a> {
         let sort_group_self = sort_group_instance.self_expr();
         let renamed = sort_group_instance.rename(quote!(instance));
         let chunks = self.chunks.iter().map(|chunk| match chunk {
-            AlwaysOrdered(field) => field.encode(instance),
+            AlwaysOrdered(field) => field.encode(instance, ctx),
             SortGroup(parts) => process_sort_groups(
                 parts,
                 &sort_group_instance,
+                ctx,
                 SortGroupConfig {
                     direction: Direction::Forward,
                     contiguous_part_fn: |fields: ReversibleFields| {
-                        let each_field = fields.map(|field| field.encode(&renamed));
+                        let each_field = fields.map(|field| field.encode(&renamed, ctx));
                         quote! {
                             |instance, buf, tw| { #(#each_field)* }
                         }
                     },
                     oneof_part_fn: |field: &Field| {
-                        let encode = field.encode(&renamed);
+                        let encode = field.encode(&renamed, ctx);
                         quote! {
                             |instance, buf, tw| { #encode }
                         }
@@ -748,8 +788,8 @@ impl<'a> MessageFieldsSorted<'a> {
         }
     }
 
-    pub fn prepend(&self, instance: &FieldTarget) -> TokenStream {
-        let crate_ = crate_name();
+    pub fn prepend(&self, instance: &FieldTarget, ctx: &Context) -> TokenStream {
+        let crate_ = &ctx.crate_name;
         let sort_group_instance;
         let part_fn_instance_ty;
         if instance.has_instance() {
@@ -762,20 +802,21 @@ impl<'a> MessageFieldsSorted<'a> {
         let sort_group_self = sort_group_instance.self_expr();
         let renamed = sort_group_instance.rename(quote!(instance));
         let chunks = self.chunks.iter().rev().map(|chunk| match chunk {
-            AlwaysOrdered(field) => field.prepend(instance),
+            AlwaysOrdered(field) => field.prepend(instance, ctx),
             SortGroup(parts) => process_sort_groups(
                 parts,
                 &sort_group_instance,
+                ctx,
                 SortGroupConfig {
                     direction: Direction::Reverse,
                     contiguous_part_fn: |fields: ReversibleFields| {
-                        let each_field = fields.map(|field| field.prepend(&renamed));
+                        let each_field = fields.map(|field| field.prepend(&renamed, ctx));
                         quote! {
                             |instance, buf, tw| { #(#each_field)* }
                         }
                     },
                     oneof_part_fn: |field: &Field| {
-                        let prepend = field.prepend(&renamed);
+                        let prepend = field.prepend(&renamed, ctx);
                         quote! {
                             |instance, buf, tw| { #prepend }
                         }

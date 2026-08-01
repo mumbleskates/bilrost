@@ -13,6 +13,7 @@ default-run = "reproduce"
 cargo-fuzz = true
 
 [dependencies]
+bilrost = { path = "../..", default-features = false }
 bilrost-types = { path = "../../bilrost-types" }
 bstr = "1.10"
 bytes = "1"
@@ -24,22 +25,7 @@ regex = "1.12.4"
 smol_str = { version = ">=0.1.24,<0.4", default-features = false }
 time = "0.3"
 tinyvec = "1"
-
-[dependencies.bilrost]
-path = "../.."
-default-features = false
-features = [
-    "bstr",
-    "bytestring",
-    "derive",
-    "auto-optimize",
-    "no-recursion-limit",
-    "chrono",
-    "smol_str",
-    "std",
-    "time",
-    "tinyvec",
-]
+test-types = { path = "../../test-types" }
 
 [features]
 compare-borrowed = []

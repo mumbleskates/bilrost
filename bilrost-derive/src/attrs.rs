@@ -4,70 +4,132 @@ use alloc::vec::Vec;
 use core::any::type_name;
 use core::fmt::Debug;
 use core::ops::RangeInclusive;
-use eyre::{bail, eyre as err, Report as Error};
+use eyre::{bail, eyre as err, Result};
 use itertools::Itertools;
-use quote::quote;
+use proc_macro2::TokenStream;
+use quote::{quote, ToTokens};
 use syn::parse::ParseStream;
 use syn::punctuated::Punctuated;
 use syn::token::Comma;
 use syn::{
-    parse, parse2, Attribute, BinOp, Expr, ExprBinary, ExprLit, ExprRange, Lit, LitInt, Meta,
-    MetaList, MetaNameValue, RangeLimits, Token,
+    parse, parse2, Attribute, BinOp, Expr, ExprBinary, ExprLit, ExprRange, Lit, LitInt, LitStr,
+    Meta, MetaList, MetaNameValue, Pat, RangeLimits, Token,
 };
 
 /// Get the items belonging to the 'bilrost' list attribute, e.g. `#[bilrost(foo, bar="baz")]`.
-pub fn bilrost_attrs(attrs: &[Attribute]) -> Result<Vec<Meta>, Error> {
+/// If a shorthand is provided and it transforms the whole contents of the attribute into one Meta,
+/// then that transformation is used instead.
+pub fn bilrost_attrs(
+    attrs: &[Attribute],
+    try_shorthand: Option<fn(&TokenStream) -> Option<Meta>>,
+) -> Result<Vec<Meta>> {
     let mut result = Vec::new();
     for attr in attrs {
-        if let Meta::List(meta_list) = &attr.meta {
-            if meta_list.path.is_ident("bilrost") {
-                // `bilrost(1)` is transformed into `bilrost(tag = 1)` as a shorthand
-                if let Ok(short_tag) = parse2::<LitInt>(meta_list.tokens.clone()) {
-                    result.push(parse2::<Meta>(quote!(tag = #short_tag)).unwrap());
-                } else {
-                    result.extend(
-                        meta_list
-                            .parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)
-                            .map_err(|err| {
-                                err!(
-                                    "couldn't parse bilrost attributes {meta_list}: {err}",
-                                    meta_list = quote!(#meta_list),
-                                )
-                            })?,
-                    );
+        if !attr.path().is_ident("bilrost") {
+            continue;
+        }
+        match &attr.meta {
+            Meta::List(meta_list) => {
+                if let Some(try_shorthand) = &try_shorthand {
+                    if let Some(replacement) = try_shorthand(&meta_list.tokens) {
+                        result.push(replacement);
+                        continue;
+                    }
                 }
+                result.extend(
+                    meta_list
+                        .parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)
+                        .map_err(|err| {
+                            err!(
+                                "couldn't parse bilrost attributes {meta_list}: {err}",
+                                meta_list = quote!(#meta_list),
+                            )
+                        })?,
+                );
+            }
+            Meta::NameValue(meta_name_value) => {
+                let Some(try_shorthand) = &try_shorthand else {
+                    bail!(
+                        "couldn't parse bilrost attribute {meta_name_value}: no shorthand for this location",
+                        meta_name_value = quote!(#meta_name_value),
+                    );
+                };
+                let Some(replacement) = try_shorthand(&meta_name_value.value.to_token_stream())
+                else {
+                    bail!(
+                        "couldn't parse bilrost attribute {meta_name_value}: unrecognized shorthand",
+                        meta_name_value = quote!(#meta_name_value),
+                    );
+                };
+                result.push(replacement);
+            }
+            _ => {
+                // we don't do anything with bare #[bilrost] attrs
             }
         }
     }
     Ok(result)
 }
 
-pub fn tag_attr(attr: &Meta) -> Result<Option<u32>, Error> {
-    if !attr.path().is_ident("tag") {
+pub fn shorthand_tag(tokens: &TokenStream) -> Option<Meta> {
+    parse2::<LitInt>(tokens.clone())
+        .ok()
+        .map(|short_tag| parse2::<Meta>(quote!(tag = #short_tag)).unwrap())
+}
+
+pub fn shorthand_enum_val(tokens: &TokenStream) -> Option<Meta> {
+    if let Ok(expr) = parse2::<Expr>(tokens.clone()) {
+        if syn::parse::Parser::parse2(Pat::parse_single, expr.to_token_stream()).is_ok() {
+            return Some(parse2::<Meta>(quote!(val = #expr)).unwrap());
+        }
+    }
+    None
+}
+
+#[test]
+fn test_shorthand_enum_val() {
+    assert!(shorthand_enum_val(&quote!(name = "abc")).is_none());
+    // This version of the "name" attribute is still a potentially valid const expression for a
+    // match pattern, so it is still turned into a "val" shorthand.
+    assert!(shorthand_enum_val(&quote!(name("abc"))).is_some());
+    assert!(shorthand_enum_val(&quote!(123)).is_some());
+    assert!(shorthand_enum_val(&quote!(CONST)).is_some());
+}
+
+pub fn tag_attr(attr: &Meta) -> Result<Option<u32>> {
+    numeric_attr(attr, "tag")
+}
+
+fn numeric_attr(attr: &Meta, key: &str) -> Result<Option<u32>> {
+    if !attr.path().is_ident(key) {
         return Ok(None);
     }
-    match attr {
-        // tag(1)
-        Meta::List(meta_list) => Ok(Some(meta_list.parse_args::<LitInt>()?.base10_parse()?)),
+    Ok(Some(match attr {
+        // key(1)
+        Meta::List(meta_list) => meta_list.parse_args::<LitInt>()?.base10_parse()?,
         Meta::NameValue(MetaNameValue {
             value: Expr::Lit(expr),
             ..
         }) => match &expr.lit {
-            // tag = "1"
-            Lit::Str(lit) => lit.value().parse::<u32>().map_err(Error::from).map(Some),
-            // tag = 1
-            Lit::Int(lit) => Ok(Some(lit.base10_parse()?)),
-            _ => bail!("invalid tag attribute: {attr}", attr = quote!(#attr)),
+            // key = "1"
+            Lit::Str(lit) => lit.parse::<LitInt>()?.base10_parse()?,
+            // key = 1
+            Lit::Int(lit) => lit.base10_parse()?,
+            _ => {
+                bail!("invalid {key} attribute: {attr}", attr = quote!(#attr));
+            }
         },
-        _ => bail!("invalid tag attribute: {attr}", attr = quote!(#attr)),
-    }
+        _ => {
+            bail!("invalid {key} attribute: {attr}", attr = quote!(#attr));
+        }
+    }))
 }
 
 #[derive(Debug, Default)]
 pub struct TagList(Vec<RangeInclusive<u32>>);
 
 impl TagList {
-    fn validate(&mut self, range_size_limit: Option<usize>) -> Result<(), Error> {
+    fn validate(&mut self, range_size_limit: Option<usize>) -> Result<()> {
         for range in &self.0 {
             if range.is_empty() {
                 bail!(
@@ -190,7 +252,7 @@ pub fn tag_list_attr(
     attr: &Meta,
     name: &str,
     range_size_limit: Option<usize>,
-) -> Result<Option<TagList>, Error> {
+) -> Result<Option<TagList>> {
     if !attr.path().is_ident(name) {
         return Ok(None);
     }
@@ -204,13 +266,15 @@ pub fn tag_list_attr(
             }),
             ..
         }) => lit.parse(),
-        _ => bail!("invalid {name} attribute: {attr}", attr = quote!(#attr)),
+        _ => {
+            bail!("invalid {name} attribute: {attr}", attr = quote!(#attr));
+        }
     }?;
     tag_list.validate(range_size_limit)?;
     Ok(Some(tag_list))
 }
 
-pub fn named_attr<T: parse::Parse>(attr: &Meta, attr_name: &str) -> Result<Option<T>, Error> {
+pub fn named_attr<T: parse::Parse>(attr: &Meta, attr_name: &str) -> Result<Option<T>> {
     if !attr.path().is_ident(attr_name) {
         return Ok(None);
     }
@@ -223,15 +287,19 @@ pub fn named_attr<T: parse::Parse>(attr: &Meta, attr_name: &str) -> Result<Optio
             ..
         }) => match &expr.lit {
             Lit::Str(lit) => lit.parse(),
-            _ => bail!(
+            _ => {
+                bail!(
+                    "invalid {attr_name} attribute: {attr}",
+                    attr = quote!(#attr)
+                );
+            }
+        },
+        _ => {
+            bail!(
                 "invalid {attr_name} attribute: {attr}",
                 attr = quote!(#attr)
-            ),
-        },
-        _ => bail!(
-            "invalid {attr_name} attribute: {attr}",
-            attr = quote!(#attr)
-        ),
+            );
+        }
     }
     .map(Some)
     .map_err(|_| {
@@ -243,6 +311,35 @@ pub fn named_attr<T: parse::Parse>(attr: &Meta, attr_name: &str) -> Result<Optio
     })
 }
 
+/// Get the numeric variant value for an enumeration from attrs.
+pub fn enum_val_attr(attr: &Meta) -> Result<Option<Expr>> {
+    if !attr.path().is_ident("val") {
+        return Ok(None);
+    }
+    // attribute values for enumerations don't have to be exactly numeric literals, but they
+    // will need to be used both as a literal-equivalent u32 value and as the match pattern
+    // for the variant's corresponding value.
+    let expr: Expr = match attr {
+        // val(expr)
+        Meta::List(list) => parse2(list.tokens.clone())?,
+        // val = expr
+        Meta::NameValue(name_value) => name_value.value.clone(),
+        _ => {
+            bail!("invalid val attribute: {attr}", attr = quote!(#attr));
+        }
+    };
+
+    // it's a valid expression; also make sure that it parses successfully as a
+    // single-variant pattern
+    if !syn::parse::Parser::parse2(Pat::parse_single, expr.to_token_stream()).is_ok() {
+        bail!(
+            "attribute on enumeration variant's 'val' attribute must be valid as both an \
+            expression and a match pattern for u32"
+        );
+    };
+    Ok(Some(expr))
+}
+
 /// Checks if an attribute matches a word.
 pub fn word_attr(attr: &Meta, key: &str) -> bool {
     if let Meta::Path(ref path) = *attr {
@@ -252,7 +349,33 @@ pub fn word_attr(attr: &Meta, key: &str) -> bool {
     }
 }
 
-pub fn set_option<T: Debug>(option: &mut Option<T>, value: T, message: &str) -> Result<(), Error> {
+/// Checks if an attribute provides a string literal
+pub fn string_attr(attr: &Meta, key: &str) -> Result<Option<String>> {
+    if !attr.path().is_ident(key) {
+        return Ok(None);
+    }
+    match attr {
+        // name("string value here")
+        Meta::List(MetaList { tokens, .. }) => {
+            let lit_str: LitStr = parse2(tokens.clone())?;
+            Ok(Some(lit_str.value()))
+        }
+        // name = "string value here"
+        Meta::NameValue(MetaNameValue {
+            value:
+                Expr::Lit(ExprLit {
+                    lit: Lit::Str(lit_str),
+                    ..
+                }),
+            ..
+        }) => Ok(Some(lit_str.value())),
+        _ => {
+            bail!("invalid {key} attribute: {attr}", attr = quote!(attr));
+        }
+    }
+}
+
+pub fn set_option<T: Debug>(option: &mut Option<T>, value: T, message: &str) -> Result<()> {
     set_option_with_display(option, value, message, |val| format!("{val:?}"))
 }
 
@@ -261,7 +384,7 @@ pub fn set_option_with_display<T>(
     value: T,
     message: &str,
     display: impl Fn(&T) -> String,
-) -> Result<(), Error>
+) -> Result<()>
 where
     T: Debug,
 {
@@ -276,7 +399,7 @@ where
     Ok(())
 }
 
-pub fn set_bool(b: &mut bool, message: &str) -> Result<(), Error> {
+pub fn set_bool(b: &mut bool, message: &str) -> Result<()> {
     if *b {
         bail!("{message}");
     } else {

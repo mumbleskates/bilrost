@@ -2,11 +2,45 @@
 
 ### Breaking changes
 
+* Possible breaking change: Removed some unused and unnecessary `*_capped_dyn`
+  decoding methods from the public `Message` traits. These methods were already
+  hidden in the documentation, and defining them as concrete dyn-compatible
+  methods never found a use case.
+
 ### New features
+
+* Headline feature: Added support for rendering the schema of encodable
+  messages, which outputs the essential details of the values' representation
+  in encoded data rather than the types that are used to store it.
+* Added support for string-data types `Arc<str>`, `Rc<str>`, and `Box<str>` via
+  the "general" encoding. These aren't necessarily very efficient, but there's
+  no major reason we can't support them.
+* Added support for a "crate" attribute that enables using `bilrost` from a
+  different path or crate name.
 
 ### Fixes
 
 ### Cleanups
+
+* Added some additional assertions when `debug_asserts` are enabled to
+  proactively detect bad implementations of `bytes::Buf` that have an
+  inconsistent `remaining()` method.
+
+  It has always been a dire error that invalidates `bilrost`'s guarantees to
+  decode from a `Buf` with an incorrect remaining implementation, we just check
+  more often now.
+
+  Under typical usage this is unlikely to ever happen; with the implementations
+  provided by `bytes` and `bilrost` this should only possibly occur when a
+  `Buf` contains more than `usize::MAX` bytes, usually by repeating segments
+  internally. `Buf::remaining()` implementations typically saturate on
+  overflow, but `bilrost` always expects that the remaining bytes count should
+  decrease the exact number of bytes the `Buf` is advanced.
+* Fixed some newly-linted issues with semicolons in macros in the derive crate.
+* Organized the unpublished crates in the source that are used for tests to all
+  share a "test-" prefix.
+* Enable more features on docs.rs so the documentation of internal impls is
+  more complete.
 
 ## v0.1015.0
 

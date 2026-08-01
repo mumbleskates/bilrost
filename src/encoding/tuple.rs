@@ -15,9 +15,8 @@
 //! implements `Message` itself, and it stands as the prototype for a message with no defined
 //! fields.
 
-use bytes::{Buf, BufMut};
-
 use crate::buf::ReverseBuf;
+use crate::encoding::schema::{FieldRepr, PopulateSchema, Schema, ValueRepr};
 use crate::encoding::{
     delegate_value_encoding, encode_varint, encoded_len_varint,
     encoding_implemented_via_value_encoding, implement_core_empty_state_rules, prepend_varint,
@@ -29,6 +28,20 @@ use crate::encoding::{
 };
 use crate::DecodeError;
 use crate::DecodeErrorKind::UnexpectedlyRepeated;
+use alloc::boxed::Box;
+use alloc::format;
+use bytes::{Buf, BufMut};
+use core::any::Any;
+use core::fmt::Display;
+
+/// This type is intentionally never constructed and is private. It stands in as an identifier of
+/// tuple messages and identifies that ad-hoc message type by both its value types and their
+/// encodings.
+#[allow(dead_code)] // This type is intentionally never constructed
+struct TupleIdentity<E: 'static, V: 'static> {
+    encodings: E,
+    values: V,
+}
 
 macro_rules! impl_tuple {
     (
@@ -84,6 +97,31 @@ macro_rules! impl_tuple {
 
         impl<$($letters,)* $($encodings,)*> Wiretyped<($($encodings,)*), ($($letters,)*)> for () {
             const WIRE_TYPE: WireType = WireType::LengthDelimited;
+        }
+
+        impl<$($letters,)* $($encodings,)*> ValueRepr<($($encodings,)*), ($($letters,)*)> for ()
+        where
+            TupleIdentity<($($encodings,)*), ($($letters,)*)>: Any,
+            (): ValueEncoder<($($encodings,)*), ($($letters,)*)>,
+            $((): FieldRepr<$encodings, $letters>,)*
+        {
+            fn repr(schema: &Schema) -> Box<dyn Display> {
+                schema.register_message::<
+                    TupleIdentity<($($encodings,)*), ($($letters,)*)>
+                >($name, |fields| {
+                    $(fields.add_field(
+                        stringify!($numbers),
+                        $numbers,
+                        <() as FieldRepr<$encodings, $letters>>::repr(schema),
+                    );)*
+                });
+                schema.make_lazy_repr(|schema| format!(
+                    "delimited tuple message {message_type}",
+                    message_type = schema.type_reference::<
+                        TupleIdentity<($($encodings,)*), ($($letters,)*)>
+                    >()
+                ))
+            }
         }
 
         impl<$($letters,)* $($encodings,)*> ValueEncoder<($($encodings,)*), ($($letters,)*)> for ()
@@ -603,67 +641,91 @@ impl_tuple!(
 
 delegate_value_encoding!(
     delegate from (GeneralGeneric<P>) to ((General,))
-    for type ((A,)) including distinguished
+    for type ((A,))
+    including distinguished
+    including schema
     with generics (const P: u8, A)
 );
 delegate_value_encoding!(
     delegate from (GeneralGeneric<P>) to ((General, General))
-    for type ((A, B)) including distinguished
+    for type ((A, B))
+    including distinguished
+    including schema
     with generics (const P: u8, A, B)
 );
 delegate_value_encoding!(
     delegate from (GeneralGeneric<P>) to ((General, General, General))
-    for type ((A, B, C)) including distinguished
+    for type ((A, B, C))
+    including distinguished
+    including schema
     with generics (const P: u8, A, B, C)
 );
 delegate_value_encoding!(
     delegate from (GeneralGeneric<P>) to ((General, General, General, General))
-    for type ((A, B, C, D)) including distinguished
+    for type ((A, B, C, D))
+    including distinguished
+    including schema
     with generics (const P: u8, A, B, C, D)
 );
 delegate_value_encoding!(
     delegate from (GeneralGeneric<P>) to ((General, General, General, General, General))
-    for type ((A, B, C, D, E)) including distinguished
+    for type ((A, B, C, D, E))
+    including distinguished
+    including schema
     with generics (const P: u8, A, B, C, D, E)
 );
 delegate_value_encoding!(
     delegate from (GeneralGeneric<P>) to ((General, General, General, General, General, General))
-    for type ((A, B, C, D, E, F)) including distinguished
+    for type ((A, B, C, D, E, F))
+    including distinguished
+    including schema
     with generics (const P: u8, A, B, C, D, E, F)
 );
 delegate_value_encoding!(
     delegate from (GeneralGeneric<P>) to ((General, General, General, General, General, General,
                                            General))
-    for type ((A, B, C, D, E, F, G)) including distinguished
+    for type ((A, B, C, D, E, F, G))
+    including distinguished
+    including schema
     with generics (const P: u8, A, B, C, D, E, F, G)
 );
 delegate_value_encoding!(
     delegate from (GeneralGeneric<P>) to ((General, General, General, General, General, General,
                                            General, General))
-    for type ((A, B, C, D, E, F, G, H)) including distinguished
+    for type ((A, B, C, D, E, F, G, H))
+    including distinguished
+    including schema
     with generics (const P: u8, A, B, C, D, E, F, G, H)
 );
 delegate_value_encoding!(
     delegate from (GeneralGeneric<P>) to ((General, General, General, General, General, General,
                                            General, General, General))
-    for type ((A, B, C, D, E, F, G, H, I)) including distinguished
+    for type ((A, B, C, D, E, F, G, H, I))
+    including distinguished
+    including schema
     with generics (const P: u8, A, B, C, D, E, F, G, H, I)
 );
 delegate_value_encoding!(
     delegate from (GeneralGeneric<P>) to ((General, General, General, General, General, General,
                                            General, General, General, General))
-    for type ((A, B, C, D, E, F, G, H, I, J)) including distinguished
+    for type ((A, B, C, D, E, F, G, H, I, J))
+    including distinguished
+    including schema
     with generics (const P: u8, A, B, C, D, E, F, G, H, I, J)
 );
 delegate_value_encoding!(
     delegate from (GeneralGeneric<P>) to ((General, General, General, General, General, General,
                                            General, General, General, General, General))
-    for type ((A, B, C, D, E, F, G, H, I, J, K)) including distinguished
+    for type ((A, B, C, D, E, F, G, H, I, J, K))
+    including distinguished
+    including schema
     with generics (const P: u8, A, B, C, D, E, F, G, H, I, J, K)
 );
 delegate_value_encoding!(
     delegate from (GeneralGeneric<P>) to ((General, General, General, General, General, General,
                                            General, General, General, General, General, General))
-    for type ((A, B, C, D, E, F, G, H, I, J, K, L)) including distinguished
+    for type ((A, B, C, D, E, F, G, H, I, J, K, L))
+    including distinguished
+    including schema
     with generics (const P: u8, A, B, C, D, E, F, G, H, I, J, K, L)
 );

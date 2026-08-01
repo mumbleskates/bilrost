@@ -6,15 +6,20 @@ use crate::encoding::{
     TagRevWriter, TagWriter, ValueDecoder, ValueEncoder, Varint, WireType,
 };
 use crate::DecodeErrorKind::{
-    InvalidVarint, OutOfDomainValue, TagOverflowed, Truncated, WrongWireType,
+    InvalidValue, InvalidVarint, OutOfDomainValue, TagOverflowed, Truncated, WrongWireType,
 };
 use crate::{Blob, Canonicity, DecodeError};
+use alloc::boxed::Box;
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::format;
+use alloc::rc::Rc;
 use alloc::string::String;
+use alloc::sync::Arc;
 use alloc::vec::Vec;
 use bytes::{Buf, BufMut};
 use core::fmt::Debug;
+use core::ops::Deref;
+use core::str;
 use proptest::{prelude::*, test_runner::TestCaseResult};
 
 /// Generalized proptest macro. Kind must be either `relaxed` or `distinguished`.
@@ -506,6 +511,49 @@ where
     assert_eq!(start, end);
 }
 
+/// Test case covering the path that decodes noncontinguous values into pointered strs
+pub(crate) fn decode_noncontiguous_pointered_str<T>()
+where
+    T: Deref<Target = str>,
+    (): ValueDecoder<General, T> + EmptyState<(), T>,
+{
+    for (string_data, error) in [
+        ("abcxyz".as_bytes(), None),
+        (
+            "significantly longer string that will have to go off stack".as_bytes(),
+            None,
+        ),
+        ("\u{1f9d0}unicode, inline".as_bytes(), None),
+        (
+            "\u{1f9d0}unicode, too long to be inline, once again goes off stack".as_bytes(),
+            None,
+        ),
+        ([0xff; 10].as_slice(), Some(InvalidValue)), // inline invalid
+        ([0xff; 50].as_slice(), Some(InvalidValue)), // out-of-line invalid
+    ] {
+        // Put the string data into a non-contiguous buf
+        let (pre, post) = string_data.split_at(3);
+        let mut pre_vec = alloc::vec![];
+        encode_varint(string_data.len() as u64, &mut pre_vec);
+        pre_vec.extend(pre);
+        let mut buf = pre_vec.chain(post);
+        let mut val = <() as EmptyState<(), T>>::empty();
+        let decode_result = <() as ValueDecoder<General, T>>::decode_value(
+            &mut val,
+            Capped::new(&mut buf),
+            Default::default(),
+        );
+        if let Some(error) = error {
+            assert_eq!(decode_result.err().map(|err| err.kind()), Some(error));
+        } else {
+            assert!(decode_result.is_ok());
+            assert_eq!(Ok(&*val), str::from_utf8(string_data));
+        }
+        // The entire buffer should have been read regardless
+        assert_eq!(buf.remaining(), 0);
+    }
+}
+
 fn present_empty_not_canon<T, E>()
 where
     T: Eq,
@@ -549,6 +597,9 @@ fn test_present_and_empty() {
     present_empty_not_canon::<i64, Fixed>();
     present_empty_not_canon::<bool, General>();
     present_empty_not_canon::<String, General>();
+    present_empty_not_canon::<Arc<str>, General>();
+    present_empty_not_canon::<Rc<str>, General>();
+    present_empty_not_canon::<Box<str>, General>();
     present_empty_not_canon::<Blob, General>();
     present_empty_not_canon::<Vec<u8>, PlainBytes>();
 

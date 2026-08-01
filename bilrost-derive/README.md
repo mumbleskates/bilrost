@@ -17,5 +17,5 @@ For the most part, users of `bilrost` shouldn't need to interact with
 
 See [LICENSE](../LICENSE) for details.
 
-Copyright 2023-2025 Kent Ross  
+Copyright 2023-2026 Kent Ross  
 Copyright 2017 Dan Burkert

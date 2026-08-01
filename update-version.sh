@@ -34,9 +34,7 @@ sed -i -E "s~html_root_url = \"https://docs\.rs/${BILROST_CRATE_MATCHER}/${VERSI
 
 # Update Cargo.toml version fields.
 sed -i -E "s/^version = \"${VERSION_MATCHER}\"$/version = \"${VERSION}\"/" \
-  "${DIR}/Cargo.toml" \
-  "${DIR}/bilrost-derive/Cargo.toml" \
-  "${DIR}/bilrost-types/Cargo.toml"
+  "${DIR}/Cargo.toml"
 
 # Update Cargo.toml dependency versions.
 sed -i -E "s/^${BILROST_CRATE_MATCHER} = \{ version = \"=${VERSION_MATCHER}\"/\1 = { version = \"=${VERSION}\"/" \

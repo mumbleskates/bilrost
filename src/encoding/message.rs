@@ -1,4 +1,5 @@
 use crate::buf::ReverseBuf;
+use crate::encoding::schema::{PopulateSchema, RegisterMessage, Schema, ValueRepr};
 use crate::encoding::{
     encode_varint, encoded_len_varint, implement_core_empty_state_rules, prepend_varint,
     Canonicity, Capped, DecodeContext, DistinguishedValueBorrowDecoder, DistinguishedValueDecoder,
@@ -8,7 +9,10 @@ use crate::encoding::{
 use crate::Canonicity::Canonical;
 use crate::DecodeError;
 use alloc::boxed::Box;
+use alloc::format;
 use bytes::{Buf, BufMut};
+use core::any::Any;
+use core::fmt::Display;
 
 /// Encoding that performs the actual value-encoding of messages, to and from `RawMessage`-family
 /// traits into length-delimited values on the wire. By default this is directly delegated to by
@@ -207,9 +211,19 @@ pub trait RawDistinguishedMessageBorrowDecoder<'a>: RawMessage + Eq {
         Self: Sized;
 }
 
+impl<T> RegisterMessage for Box<T>
+where
+    T: Any + RawMessage + RegisterMessage,
+{
+    fn register(schema: &Schema) {
+        schema.register_message_wrapper::<Self, T>();
+        T::register(schema);
+    }
+}
+
 impl<T> RawMessage for Box<T>
 where
-    T: RawMessage + Sized,
+    T: RawMessage,
 {
     const __ASSERTIONS: () = ();
 
@@ -347,6 +361,21 @@ where
     T: RawMessage,
 {
     const WIRE_TYPE: WireType = WireType::LengthDelimited;
+}
+
+impl<T> ValueRepr<MessageEncoding, T> for ()
+where
+    T: Any + RawMessage + RegisterMessage,
+{
+    fn repr(schema: &Schema) -> Box<dyn Display> {
+        T::register(schema);
+        schema.make_lazy_repr(|schema| {
+            format!(
+                "delimited message {message_type}",
+                message_type = schema.type_reference::<T>(),
+            )
+        })
+    }
 }
 
 impl<T> ValueEncoder<MessageEncoding, T> for ()
