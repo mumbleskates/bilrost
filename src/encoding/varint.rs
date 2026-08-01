@@ -79,11 +79,11 @@ macro_rules! varint {
                 const SIGNEDNESS: &'static str = $signedness;
                 const SIZE: usize = mem::size_of::<$ty>();
                 if SIGNEDNESS== "boolean" {
-                    Box::new("varint, boolean 0 or 1")
+                    Box::new("varint; boolean 0 or 1")
                 } else if SIZE == 8 {
                     Box::new(format!("varint, {SIGNEDNESS}"))
                 } else {
-                    Box::new(format!("varint, {SIGNEDNESS} in {bits} bit range", bits = SIZE * 8))
+                    Box::new(format!("varint, {SIGNEDNESS}; in {bits} bit range", bits = SIZE * 8))
                 }
             }
         }
