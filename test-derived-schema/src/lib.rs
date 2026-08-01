@@ -84,7 +84,7 @@ fn schema_renaming() {
         xrust_enumeration_fieldx: XRustEnumerationX,
     }
 
-    #[derive(Oneof, Schema)]
+    #[derive(Message, Oneof, Schema)]
     #[bilrost(name = "XSchemaOneofX")]
     enum XRustOneofX {
         Empty,
@@ -106,6 +106,7 @@ fn schema_renaming() {
 
     let schema = Schema::new();
     schema.register::<XRustMessageX>();
+    schema.register::<XRustOneofX>();
 
     let plain = format!("{schema}");
     let with_rust = format!("{}", schema.with_rust_types());
@@ -144,11 +145,16 @@ fn schema_renaming() {
 [2] message XSchemaMessageX {
     1: xschema_fieldx (varint, unsigned),
     2: xschema_oneof_fieldx variant XSchemaVariantX (varint, unsigned),
-    3: xschema_oneof_fieldx variant XSchemaMessageVariantX (delimited message XSchemaOneofX::XSchemaMessageVariantX [3]),
+    3: xschema_oneof_fieldx variant XSchemaMessageVariantX (delimited message XSchemaOneofX::XSchemaMessageVariantX [4]),
     4: xschema_enumeration_fieldx (varint, unsigned; one of enumeration XSchemaEnumerationX [1]),
 }
 
-[3] message XSchemaOneofX::XSchemaMessageVariantX {
+[3] message XSchemaOneofX {
+    2: variant XSchemaVariantX (varint, unsigned),
+    3: variant XSchemaMessageVariantX (delimited message XSchemaOneofX::XSchemaMessageVariantX [4]),
+}
+
+[4] message XSchemaOneofX::XSchemaMessageVariantX {
     1: xschema_variant_fieldx (varint, unsigned),
 }
 "

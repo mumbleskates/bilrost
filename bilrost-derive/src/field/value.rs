@@ -364,12 +364,13 @@ impl ValueField {
         let prelude;
         let final_field_name;
         if in_oneof {
+            let field_name = format!("variant {field_name}");
             prelude = Some(quote! {
                 // the 'field name' identifier here is the one that's passed in to
                 // AddOneofFields::add_fields, which tells us what the oneof enum value's name is
                 let field_name_with_variant = field_name.map(|field_name| {
                     let mut combined = #crate_::alloc::string::String::from(field_name);
-                    combined.push_str(" variant ");
+                    combined.push(' ');
                     combined.push_str(#field_name);
                     combined
                 });
@@ -959,15 +960,16 @@ impl OneofVariant {
             }
             VariantContents::Message(_) => {
                 let crate_ = &ctx.crate_name;
-                let schema_variant_name = self.schema_variant_name();
+                let schema_variant_name =
+                    format!("variant {name}", name = self.schema_variant_name());
                 let tag = self.tag;
                 quote! {
                     // the 'field name' identifier here is the one that's passed in to
                     // AddOneofFields::add_fields, which tells us what the oneof enum value's
                     // name is
-                    let field_name_with_variant = field_name.map(|field_name| {
+                    let mut field_name_with_variant = field_name.map(|field_name| {
                         let mut combined = #crate_::alloc::string::String::from(field_name);
-                        combined.push_str(" variant ");
+                        combined.push(' ');
                         combined.push_str(#schema_variant_name);
                         combined
                     });
