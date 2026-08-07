@@ -1,12 +1,8 @@
 ## v0.1014.3
 
-### Breaking changes
-
-### New features
-
 ### Fixes
 
-### Cleanups
+* Added missing impls for borrowed decoding for `bstr::BString`.
 
 ## v0.1014.2
 
