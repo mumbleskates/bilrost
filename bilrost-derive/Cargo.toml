@@ -1,6 +1,6 @@
 [package]
 name = "bilrost-derive"
-version = "0.1013.0"
+version = "0.1013.1"
 authors = [
     "Kent Ross <k@mad.cash>",
     "Dan Burkert <dan@danburkert.com>",
