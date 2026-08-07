@@ -1,5 +1,5 @@
 #![no_std]
-#![doc(html_root_url = "https://docs.rs/bilrost-types/0.1015.0")]
+#![doc(html_root_url = "https://docs.rs/bilrost-types/0.1015.1")]
 #![forbid(unsafe_code)]
 
 //! Analogs for protobuf well-known types, implemented alongside the
