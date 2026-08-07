@@ -6,6 +6,8 @@
 
 ### Fixes
 
+* Added missing impls for borrowed decoding for `bstr::BString`.
+
 ### Cleanups
 
 ## v0.1015.0
