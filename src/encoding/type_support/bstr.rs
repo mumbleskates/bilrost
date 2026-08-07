@@ -2,9 +2,10 @@ use crate::buf::ReverseBuf;
 use crate::encoding::schema::{Schema, ValueRepr};
 use crate::encoding::value_traits::{empty_state_via_default, for_overwrite_via_default};
 use crate::encoding::{
-    impl_cow_value_encoding, Capped, DecodeContext, DistinguishedValueBorrowDecoder,
-    DistinguishedValueDecoder, EmptyState, GeneralGeneric, PlainBytes, RestrictedDecodeContext,
-    ValueBorrowDecoder, ValueDecoder, ValueEncoder, WireType, Wiretyped,
+    delegate_value_encoding, impl_cow_value_encoding, Capped, DecodeContext,
+    DistinguishedValueBorrowDecoder, DistinguishedValueDecoder, EmptyState, GeneralGeneric,
+    PlainBytes, RestrictedDecodeContext, ValueBorrowDecoder, ValueDecoder, ValueEncoder, WireType,
+    Wiretyped,
 };
 use crate::{Canonicity, DecodeError};
 use alloc::boxed::Box;
@@ -150,6 +151,11 @@ impl<const P: u8> DistinguishedValueDecoder<GeneralGeneric<P>, bstr::BString> fo
         )
     }
 }
+
+delegate_value_encoding!(
+    encoding (GeneralGeneric<P>) borrows type (bstr::BString) as owned including distinguished
+    with generics (const P: u8)
+);
 
 impl_cow_value_encoding!(
     borrowed bstr::BStr,

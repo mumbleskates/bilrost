@@ -764,7 +764,7 @@ pub mod test_distinguished {
 }
 
 #[derive(Debug, PartialEq, Message, Schema)]
-pub struct TestTypeSupport {
+pub struct TestTypeSupport<'a> {
     #[bilrost(1)]
     core_duration: core::time::Duration,
     #[bilrost(2)]
@@ -797,11 +797,15 @@ pub struct TestTypeSupport {
     std_systemtime: std::time::SystemTime,
     #[bilrost(16)]
     smol_str: smol_str::SmolStr,
+    #[bilrost(17)]
+    bstr: bstr::BString,
+    #[bilrost(18)]
+    bstr_cow: Cow<'a, bstr::BStr>,
 }
 
 #[derive(Debug, PartialEq, Eq, Message, Schema)]
 #[bilrost(distinguished)]
-pub struct TestTypeSupportDistinguished {
+pub struct TestTypeSupportDistinguished<'a> {
     #[bilrost(1)]
     core_duration: core::time::Duration,
     #[bilrost(2)]
@@ -832,6 +836,10 @@ pub struct TestTypeSupportDistinguished {
     time_duration: time::Duration,
     #[bilrost(15)]
     smol_str: smol_str::SmolStr,
+    #[bilrost(16)]
+    bstr: bstr::BString,
+    #[bilrost(17)]
+    bstr_cow: Cow<'a, bstr::BStr>,
 }
 
 #[derive(Debug, PartialEq, Eq, Message, Schema)]
