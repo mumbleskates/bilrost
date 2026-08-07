@@ -1,14 +1,12 @@
 ## v0.1015.1
 
-### Breaking changes
-
-### New features
-
 ### Fixes
 
 * Added missing impls for borrowed decoding for `bstr::BString`.
 
 ### Cleanups
+
+* Fixed some newly-linted issues with semicolons in macros in the derive crate.
 
 ## v0.1015.0
 
