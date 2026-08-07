@@ -113,7 +113,7 @@ pub fn parse_message_fields(
         .tuple_windows()
         .find(|(a, b)| a == b)
     {
-        bail!("multiple fields have tag {duplicated_tag}")
+        bail!("multiple fields have tag {duplicated_tag}");
     };
 
     Ok(unsorted_fields)

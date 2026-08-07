@@ -174,7 +174,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         bail!(
             "unknown attribute(s) for message: {attrs}",
             attrs = quote!(#(#unknown_attrs),*),
-        )
+        );
     }
 
     let init_mode = match default_per_field {
@@ -566,7 +566,7 @@ fn try_message_via_oneof(input: DeriveInput) -> Result<TokenStream, Error> {
     let tag_measurer_ty = tag_measurer(&variants);
 
     if empty_variant.is_none() {
-        bail!("Message can only be derived for Oneof enums that have an empty variant.")
+        bail!("Message can only be derived for Oneof enums that have an empty variant.");
     }
 
     let borrow_generics = prepend_to_generics(impl_generics, quote!('__a));
@@ -824,8 +824,12 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
 
     let punctuated_variants = match input.data {
         Data::Enum(enum_) => enum_.variants,
-        Data::Struct(_) => bail!("Enumeration can not be derived for a struct"),
-        Data::Union(..) => bail!("Enumeration can not be derived for a union"),
+        Data::Struct(_) => {
+            bail!("Enumeration can not be derived for a struct");
+        }
+        Data::Union(..) => {
+            bail!("Enumeration can not be derived for a union");
+        }
     };
 
     struct EnumVariant {
@@ -1161,8 +1165,12 @@ fn preprocess_oneof(input: &DeriveInput) -> Result<PreprocessedOneof<'_>, Error>
 
     let input_variants = match &input.data {
         Data::Enum(enum_) => enum_.variants.clone(),
-        Data::Struct(..) => bail!("Oneof can not be derived for a struct"),
-        Data::Union(..) => bail!("Oneof can not be derived for a union"),
+        Data::Struct(..) => {
+            bail!("Oneof can not be derived for a struct");
+        }
+        Data::Union(..) => {
+            bail!("Oneof can not be derived for a union");
+        }
     };
 
     let mut reserved_tags = None;
@@ -1190,7 +1198,7 @@ fn preprocess_oneof(input: &DeriveInput) -> Result<PreprocessedOneof<'_>, Error>
         bail!(
             "unknown attribute(s) for oneof-message: {}",
             quote!(#(#unknown_attrs),*)
-        )
+        );
     }
 
     // Oneof enums have either zero or one unit variant. If there is no such variant, the Oneof
