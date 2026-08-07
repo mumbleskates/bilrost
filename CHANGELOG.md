@@ -20,6 +20,8 @@
 
 ### Fixes
 
+* Added missing impls for borrowed decoding for `bstr::BString`.
+
 ### Cleanups
 
 * Added some additional assertions when `debug_asserts` are enabled to
