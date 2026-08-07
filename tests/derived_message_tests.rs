@@ -1321,6 +1321,8 @@ fn ignored_fields_strange_initializers() {
 #[test]
 fn field_clearing() {
     use bilrost::Blob;
+    #[cfg(feature = "bstr")]
+    use bstr::ByteVec;
     use bytes::Bytes;
     #[cfg(feature = "bytestring")]
     use bytestring::ByteString;
@@ -1392,6 +1394,8 @@ fn field_clearing() {
         cow_bytes_owned: Cow<'a, [u8]>,
         cow_str_borrowed: Cow<'a, str>,
         cow_str_owned: Cow<'a, str>,
+        #[cfg(feature = "bstr")]
+        bstring: bstr::BString,
         #[cfg(feature = "smol_str")]
         smol_str: SmolStr,
         #[cfg(feature = "arrayvec")]
@@ -1457,6 +1461,8 @@ fn field_clearing() {
                 cow_bytes_owned: Vec::with_capacity(64).into(),
                 cow_str_borrowed: Cow::Borrowed("foo"),
                 cow_str_owned: string_with_capacity("foo").into(),
+                #[cfg(feature = "bstr")]
+                bstring: bstr::BString::new(Vec::with_capacity(64)),
                 #[cfg(feature = "smol_str")]
                 smol_str: SmolStr::new_inline("foo"),
                 #[cfg(feature = "arrayvec")]
@@ -1487,6 +1493,8 @@ fn field_clearing() {
             #[cfg(feature = "std")]
             result.hashset.insert(1);
             result.cow_bytes_owned.to_mut().push(1);
+            #[cfg(feature = "bstr")]
+            result.bstring.push_char('a');
             #[cfg(feature = "smallvec")]
             result.smallvec.push(1);
             #[cfg(feature = "smallvec")]
@@ -1525,6 +1533,8 @@ fn field_clearing() {
     assert!(clearable.hashset.capacity() >= 64);
     assert!(clearable.cow_bytes_owned.to_mut().capacity() >= 64);
     assert!(clearable.cow_str_owned.to_mut().capacity() >= 64);
+    #[cfg(feature = "bstr")]
+    assert!(clearable.bstring.capacity() >= 64);
     #[cfg(feature = "smallvec")]
     assert!(clearable.smallvec.capacity() >= 64);
     #[cfg(feature = "smallvec")]
