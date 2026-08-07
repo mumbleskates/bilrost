@@ -1,9 +1,9 @@
 use crate::buf::ReverseBuf;
 use crate::encoding::value_traits::{empty_state_via_default, for_overwrite_via_default};
 use crate::encoding::{
-    impl_cow_value_encoding, Capped, DecodeContext, DistinguishedValueBorrowDecoder,
-    DistinguishedValueDecoder, EmptyState, General, PlainBytes, RestrictedDecodeContext,
-    ValueBorrowDecoder, ValueDecoder, ValueEncoder, WireType, Wiretyped,
+    delegate_value_encoding, impl_cow_value_encoding, Capped, DecodeContext,
+    DistinguishedValueBorrowDecoder, DistinguishedValueDecoder, EmptyState, General, PlainBytes,
+    RestrictedDecodeContext, ValueBorrowDecoder, ValueDecoder, ValueEncoder, WireType, Wiretyped,
 };
 use crate::{Canonicity, DecodeError};
 use alloc::vec::Vec;
@@ -130,7 +130,15 @@ impl DistinguishedValueDecoder<General> for bstr::BString {
     }
 }
 
-impl_cow_value_encoding!(borrowed bstr::BStr, owned bstr::BString, encoding General);
+delegate_value_encoding!(
+    encoding (General) borrows type (bstr::BString) as owned including distinguished
+);
+
+impl_cow_value_encoding!(
+    borrowed bstr::BStr,
+    owned bstr::BString,
+    encoding General
+);
 
 #[cfg(test)]
 mod test {
