@@ -639,7 +639,7 @@ mod tests {
         #[test]
         fn check_duration_roundtrip(
             seconds: u64,
-            nanos in 0u32..1_000_000_000u32,
+            nanos in 0..1_000_000_000u32,
         ) {
             let std_duration = time::Duration::new(seconds, nanos);
             let bilrost_duration = match Duration::try_from(std_duration) {

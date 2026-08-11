@@ -801,6 +801,18 @@ pub struct TestTypeSupport<'a> {
     bstr: bstr::BString,
     #[bilrost(18)]
     bstr_cow: Cow<'a, bstr::BStr>,
+    #[bilrost(19)]
+    jiff_date: jiff::civil::Date,
+    #[bilrost(20)]
+    jiff_time: jiff::civil::Time,
+    #[bilrost(21)]
+    jiff_datetime: jiff::civil::DateTime,
+    #[bilrost(22)]
+    jiff_timestamp: jiff::Timestamp,
+    #[bilrost(23)]
+    jiff_duration: jiff::SignedDuration,
+    #[bilrost(24)]
+    jiff_zoned: jiff::Zoned,
 }
 
 #[derive(Debug, PartialEq, Eq, Message, Schema)]
@@ -840,6 +852,16 @@ pub struct TestTypeSupportDistinguished<'a> {
     bstr: bstr::BString,
     #[bilrost(17)]
     bstr_cow: Cow<'a, bstr::BStr>,
+    #[bilrost(18)]
+    jiff_date: jiff::civil::Date,
+    #[bilrost(19)]
+    jiff_time: jiff::civil::Time,
+    #[bilrost(20)]
+    jiff_datetime: jiff::civil::DateTime,
+    #[bilrost(21)]
+    jiff_timestamp: jiff::Timestamp,
+    #[bilrost(22)]
+    jiff_duration: jiff::SignedDuration,
 }
 
 #[derive(Debug, PartialEq, Eq, Message, Schema)]

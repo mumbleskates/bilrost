@@ -69,6 +69,7 @@ bytestring = { version = "^1", default-features = false, optional = true }
 chrono = { version = "^0.4.34", default-features = false, optional = true }
 const_panic = { version = "0.2.12", default-features = false, features = ["non_basic"], optional = true }
 hashbrown = { version = ">=0.1.0,<0.18", default-features = false, optional = true }
+jiff = { version = ">=0.2.35,<0.3", default-features = false, optional = true }
 smallvec = { version = ">=1.6.1,<2", default-features = false, features = ["const_generics"], optional = true }
 smol_str = { version = ">=0.1.24,<0.4", default-features = false, optional = true }
 thin-vec = { version = "^0.2", default-features = false, optional = true }
@@ -112,6 +113,7 @@ third-party-type-support = [
     "bytestring",
     "chrono",
     "hashbrown",
+    "jiff",
     "smallvec",
     "smol_str",
     "thin-vec",
@@ -123,6 +125,7 @@ bstr = ["dep:bstr"]
 bytestring = ["dep:bytestring"]
 chrono = ["dep:chrono"]
 hashbrown = ["dep:hashbrown"]
+jiff = ["dep:jiff"]
 smallvec = ["dep:smallvec"]
 smol_str = ["dep:smol_str"]
 thin-vec = ["dep:thin-vec"]

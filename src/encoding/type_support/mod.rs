@@ -24,6 +24,8 @@ mod bytestring;
 mod chrono;
 #[cfg(feature = "hashbrown")]
 mod hashbrown;
+#[cfg(feature = "jiff")]
+mod jiff;
 #[cfg(feature = "smallvec")]
 mod smallvec;
 #[cfg(feature = "smol_str")]

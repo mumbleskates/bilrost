@@ -14,6 +14,7 @@ pub(crate) mod time_proxies {
     use crate::{Canonicity, DecodeError};
     use bytes::{Buf, BufMut};
 
+    /// Encoding standin for bilrost_types::Duration
     #[derive(Debug, Default, PartialEq, Eq)]
     pub(crate) struct TimeDeltaProxy {
         pub(crate) secs: i64,
@@ -89,6 +90,86 @@ pub(crate) mod time_proxies {
 
     delegate_value_encoding!(
         encoding (GeneralGeneric<P>) borrows type (TimeDeltaProxy) as owned including distinguished
+        with generics (const P: u8)
+    );
+
+    /// TimestampProxy is exactly like TimeDeltaProxy but it has a different name and semantically
+    /// stands in for bilrost_types::Timestamp instead.
+    #[derive(Debug, Default, PartialEq, Eq)]
+    pub(crate) struct TimestampProxy {
+        pub(crate) secs: i64,
+        pub(crate) nanos: i32,
+    }
+
+    empty_state_via_default!(TimestampProxy);
+
+    impl<const P: u8> Wiretyped<GeneralGeneric<P>, TimestampProxy> for () {
+        const WIRE_TYPE: WireType = WireType::LengthDelimited;
+    }
+
+    underived_schema!(TimestampProxy: "Timestamp" {
+        1: General => secs: i64,
+        2: Fixed => nanos: i32,
+    });
+
+    impl<const P: u8> ValueEncoder<GeneralGeneric<P>, TimestampProxy> for () {
+        fn encode_value<B: BufMut + ?Sized>(value: &TimestampProxy, buf: &mut B) {
+            underived_encode!(Timestamp {
+                1: General => secs: &value.secs,
+                2: Fixed => nanos: &value.nanos,
+            }, buf)
+        }
+
+        fn prepend_value<B: ReverseBuf + ?Sized>(value: &TimestampProxy, buf: &mut B) {
+            underived_prepend!(Timestamp {
+                2: Fixed => nanos: &value.nanos,
+                1: General => secs: &value.secs,
+            }, buf)
+        }
+
+        fn value_encoded_len(value: &TimestampProxy) -> usize {
+            underived_encoded_len!(Timestamp {
+                1: General => secs: &value.secs,
+                2: Fixed => nanos: &value.nanos,
+            })
+        }
+    }
+
+    impl<const P: u8> ValueDecoder<GeneralGeneric<P>, TimestampProxy> for () {
+        fn decode_value<B: Buf + ?Sized>(
+            value: &mut TimestampProxy,
+            mut buf: Capped<B>,
+            ctx: DecodeContext,
+        ) -> Result<(), DecodeError> {
+            underived_decode!(Timestamp {
+                1: General => secs: &mut value.secs,
+                2: Fixed => nanos: &mut value.nanos,
+            }, owned, buf, ctx)?;
+            if value.secs.signum() as i32 * value.nanos.signum() == -1 {
+                Err(DecodeError::new(InvalidValue))
+            } else {
+                Ok(())
+            }
+        }
+    }
+
+    impl<const P: u8> DistinguishedValueDecoder<GeneralGeneric<P>, TimestampProxy> for () {
+        const CHECKS_EMPTY: bool = true;
+
+        fn decode_value_distinguished<const ALLOW_EMPTY: bool>(
+            value: &mut TimestampProxy,
+            mut buf: Capped<impl Buf + ?Sized>,
+            ctx: RestrictedDecodeContext,
+        ) -> Result<Canonicity, DecodeError> {
+            underived_decode_distinguished!(Timestamp {
+                1: General => secs: &mut value.secs,
+                2: Fixed => nanos: &mut value.nanos,
+            }, owned, buf, ctx)
+        }
+    }
+
+    delegate_value_encoding!(
+        encoding (GeneralGeneric<P>) borrows type (TimestampProxy) as owned including distinguished
         with generics (const P: u8)
     );
 }
