@@ -12,7 +12,7 @@ use chrono::{
     Timelike, Utc,
 };
 
-#[cfg(all(test, feature = "time"))]
+#[cfg(test)]
 pub(super) use {
     fixedoffset::test_zones,
     naivedate::test_dates,

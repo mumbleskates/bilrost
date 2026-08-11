@@ -15,6 +15,12 @@ use jiff::{
     SignedDuration, Timestamp, Zoned,
 };
 
+#[cfg(test)]
+pub(super) use {
+    civil_date::test_dates, civil_datetime::test_datetimes, civil_time::test_times,
+    signedduration::test_signeddurations, zoned::test_zoneds,
+};
+
 impl ForOverwrite<(), Date> for () {
     fn for_overwrite() -> Date {
         date(0, 1, 1)
@@ -450,7 +456,7 @@ impl Proxiable<SealedBilrostTag> for Zoned {
         let mins = (offset_mins % 60) as i8;
         let hours = (offset_mins / 60) as i8;
         (
-            self.datetime(),
+            self.timestamp().to_zoned(TimeZone::UTC).datetime(),
             (
                 hours,
                 mins,
@@ -469,6 +475,8 @@ impl Proxiable<SealedBilrostTag> for Zoned {
     fn decode_proxy(&mut self, proxy: Self::Proxy) -> Result<(), DecodeErrorKind> {
         let (civil, (hours, mins, secs, tz_name)) = proxy;
 
+        let utc = civil.to_zoned(TimeZone::UTC).unwrap();
+
         // we aren't very stringent about the allowed values for the offsets here, but we at least
         // check that they're in a reasonable range so we don't overflow.
         match (hours, mins, secs) {
@@ -481,35 +489,18 @@ impl Proxiable<SealedBilrostTag> for Zoned {
             if let Some(tz_name) = tz_name {
                 if let Ok(tz) = TimeZone::get(&tz_name) {
                     // if we can load a timezone, we try to create a Zoned value in that zone
-                    let ambiguous = tz.to_ambiguous_zoned(civil);
-                    match ambiguous.offset() {
-                        jiff::tz::AmbiguousOffset::Unambiguous { offset } => {
-                            if offset.seconds() == offset_secs {
-                                break 'create ambiguous
-                                    .unambiguous()
-                                    .map_err(|_| OutOfDomainValue)?;
-                            }
-                        }
-                        jiff::tz::AmbiguousOffset::Gap { before, after }
-                        | jiff::tz::AmbiguousOffset::Fold { before, after } => {
-                            if before.seconds() == offset_secs {
-                                break 'create ambiguous.earlier().map_err(|_| OutOfDomainValue)?;
-                            }
-                            if after.seconds() == offset_secs {
-                                break 'create ambiguous.later().map_err(|_| OutOfDomainValue)?;
-                            }
-                        }
+                    let in_zone = utc.with_time_zone(tz);
+                    if in_zone.offset().seconds() == offset_secs {
+                        break 'create in_zone;
                     }
                 }
             }
             // if we can't find the named time zone or the time zone we found doesn't produce a
             // matching offset, we discard the name of the time zone and create the timestamp with
             // a fixed UTC offset.
-            civil
-                .to_zoned(TimeZone::fixed(
-                    Offset::from_seconds(offset_secs).map_err(|_| OutOfDomainValue)?,
-                ))
-                .map_err(|_| OutOfDomainValue)?
+            utc.with_time_zone(TimeZone::fixed(
+                Offset::from_seconds(offset_secs).map_err(|_| OutOfDomainValue)?,
+            ))
         };
         Ok(())
     }
@@ -551,7 +542,7 @@ mod zoned {
         .into_iter()
     }
 
-    fn test_zones() -> impl Iterator<Item = Zoned> + Clone {
+    pub(in super::super) fn test_zoneds() -> impl Iterator<Item = Zoned> + Clone {
         iproduct!(test_timestamps(), test_timezones())
             .map(|(ts, tz)| ts.to_zoned(tz))
             .chain([
@@ -566,7 +557,7 @@ mod zoned {
 
     #[test]
     fn check_type() {
-        for zoned in test_zones() {
+        for zoned in test_zoneds() {
             relaxed::check_type_general(zoned, 123, WireType::LengthDelimited).unwrap();
         }
     }

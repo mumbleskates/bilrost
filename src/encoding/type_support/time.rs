@@ -9,7 +9,7 @@ use crate::Canonicity::Canonical;
 use crate::DecodeErrorKind::{InvalidValue, OutOfDomainValue};
 use time::{Date, Duration, OffsetDateTime, PrimitiveDateTime, Time, UtcOffset};
 
-#[cfg(all(test, feature = "chrono"))]
+#[cfg(test)]
 pub(super) use {
     date::test_dates,
     duration::test_durations,
