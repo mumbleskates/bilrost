@@ -392,11 +392,7 @@ mod chrono_time_value_compat {
 
     fn aware_c_to_t(aware: chrono::DateTime<FixedOffset>) -> Option<time::OffsetDateTime> {
         let wall_time_utc = datetime_c_to_t(aware.naive_utc())?;
-        let wall_time = time::OffsetDateTime::new_in_offset(
-            wall_time_utc.date(),
-            wall_time_utc.time(),
-            time::UtcOffset::UTC,
-        );
+        let wall_time = wall_time_utc.assume_utc();
         let offset = offset_c_to_t(*aware.offset())?;
         let res = wall_time.checked_to_offset(offset)?;
         assert_eq!(aware.timestamp(), res.unix_timestamp());
