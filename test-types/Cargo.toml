@@ -25,7 +25,7 @@ bytestring = "1.3.1"
 chrono = "0.4.34"
 jiff = "0.2.35"
 smol_str = { version = ">=0.1.24,<0.4", default-features = false }
-time = "0.3"
+time = "0.3.22"
 tinyvec = "1"
 
 [features]

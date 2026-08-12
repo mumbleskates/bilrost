@@ -571,16 +571,20 @@ impl Proxiable<SealedBilrostTag> for Timestamp {
     type Proxy = TimestampProxy;
 
     fn encode_proxy(&self) -> Self::Proxy {
-        TimestampProxy {
-            secs: self.as_second(),
-            nanos: self.subsec_nanosecond(),
-        }
+        let (secs, nanos) = match (self.as_second(), self.subsec_nanosecond()) {
+            (secs, nanos @ -999_999_999..=-1) => (secs - 1, nanos + 1_000_000_000),
+            (secs, nanos @ 0..=999_999_999) => (secs, nanos),
+            _ => {
+                unreachable!("jiff timestamp violated invariants");
+            }
+        };
+        TimestampProxy { secs, nanos }
     }
 
     fn decode_proxy(&mut self, proxy: Self::Proxy) -> Result<(), DecodeErrorKind> {
-        match (proxy.secs, proxy.nanos) {
-            // we ensure that the sign of secs and nanos matches and that nanos is in-bounds
-            (..=0, -999_999_999..=-1) | (.., 0) | (0.., 1..=999_999_999) => {}
+        match proxy.nanos {
+            // we ensure that nanos are in range
+            0..=999_999_999 => {}
             _ => return Err(InvalidValue),
         }
         *self = Self::new(proxy.secs, proxy.nanos).map_err(|_| OutOfDomainValue)?;
@@ -626,7 +630,7 @@ mod timestamp {
             Timestamp::MAX,
             <() as EmptyState<(), Timestamp>>::empty(),
             Timestamp::new(900, 10).unwrap(),
-            Timestamp::new(-60, 0).unwrap(),
+            Timestamp::new(-60, -500_000_000).unwrap(),
             DateTime::constant(0, 1, 1, 0, 0, 0, 0)
                 .in_tz("UTC")
                 .unwrap()
@@ -637,9 +641,9 @@ mod timestamp {
 
     #[test]
     fn check_type() {
-        for td in test_timestamps() {
-            relaxed::check_type_general(td, 123, WireType::LengthDelimited).unwrap();
-            distinguished::check_type_general(td, 123, WireType::LengthDelimited).unwrap();
+        for ts in test_timestamps() {
+            relaxed::check_type_general(ts, 123, WireType::LengthDelimited).unwrap();
+            distinguished::check_type_general(ts, 123, WireType::LengthDelimited).unwrap();
         }
     }
 

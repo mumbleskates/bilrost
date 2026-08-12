@@ -560,10 +560,10 @@ impl Proxiable<SealedBilrostTag> for Duration {
     }
 
     fn decode_proxy(&mut self, proxy: Self::Proxy) -> Result<(), DecodeErrorKind> {
-        #[allow(overlapping_range_endpoints)]
         let (secs, nanos) = match (proxy.secs, proxy.nanos) {
-            (secs @ i64::MIN..=0, nanos @ -999_999_999..=0)
-            | (secs @ 0.., nanos @ 0..=999_999_999) => (secs, nanos),
+            (secs @ i64::MIN..=0, nanos @ -999_999_999..=-1)
+            | (secs, nanos @ 0)
+            | (secs @ 0.., nanos @ 1..=999_999_999) => (secs, nanos),
             _ => return Err(InvalidValue),
         };
         *self = Self::new(secs, nanos);

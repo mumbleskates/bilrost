@@ -1,4 +1,4 @@
-#[cfg(any(feature = "chrono", feature = "time"))]
+#[cfg(any(feature = "chrono", feature = "time", feature = "jiff"))]
 pub(crate) mod time_proxies {
     use crate::buf::ReverseBuf;
     use crate::encoding::underived::{
@@ -144,12 +144,7 @@ pub(crate) mod time_proxies {
             underived_decode!(Timestamp {
                 1: General => secs: &mut value.secs,
                 2: Fixed => nanos: &mut value.nanos,
-            }, owned, buf, ctx)?;
-            if value.secs.signum() as i32 * value.nanos.signum() == -1 {
-                Err(DecodeError::new(InvalidValue))
-            } else {
-                Ok(())
-            }
+            }, owned, buf, ctx)
         }
     }
 
@@ -396,23 +391,48 @@ mod chrono_time_value_compat {
     }
 
     fn aware_c_to_t(aware: chrono::DateTime<FixedOffset>) -> Option<time::OffsetDateTime> {
-        let (datetime, offset) = aware.encode_proxy();
-        aware_compose_time((datetime_c_to_t(datetime)?, offset_c_to_t(offset)?))
+        let wall_time_utc = datetime_c_to_t(aware.naive_utc())?;
+        let wall_time = time::OffsetDateTime::new_in_offset(
+            wall_time_utc.date(),
+            wall_time_utc.time(),
+            time::UtcOffset::UTC,
+        );
+        let offset = offset_c_to_t(*aware.offset())?;
+        let res = wall_time.checked_to_offset(offset)?;
+        assert_eq!(aware.timestamp(), res.unix_timestamp());
+        Some(res)
     }
 
     fn aware_t_to_c(aware: time::OffsetDateTime) -> Option<chrono::DateTime<FixedOffset>> {
-        let (datetime, offset) = aware.encode_proxy();
-        aware_compose_chrono((datetime_t_to_c(datetime)?, offset_t_to_c(offset)?))
+        let wall_time_zoned =
+            datetime_t_to_c(time::PrimitiveDateTime::new(aware.date(), aware.time()))?;
+        let tz = chrono::FixedOffset::east_opt(aware.offset().whole_seconds())?;
+        let wall_time_utc = wall_time_zoned.checked_sub_offset(tz)?;
+        let res =
+            chrono::DateTime::<chrono::FixedOffset>::from_naive_utc_and_offset(wall_time_utc, tz);
+        assert_eq!(aware.unix_timestamp(), res.timestamp());
+        Some(res)
     }
 
     fn aware_c_to_j(aware: chrono::DateTime<FixedOffset>) -> Option<jiff::Zoned> {
-        Some(
-            jiff::Timestamp::new(aware.timestamp(), aware.nanosecond() as i32)
-                .ok()?
-                .to_zoned(jiff::tz::TimeZone::fixed(
-                    jiff::tz::Offset::from_seconds(aware.offset().local_minus_utc()).ok()?,
-                )),
-        )
+        let res = jiff::Timestamp::new(aware.timestamp(), aware.nanosecond() as i32)
+            .ok()?
+            .to_zoned(jiff::tz::TimeZone::fixed(
+                jiff::tz::Offset::from_seconds(aware.offset().local_minus_utc()).ok()?,
+            ));
+        assert_eq!(
+            aware.timestamp(),
+            res.timestamp().as_second()
+                + if res.timestamp().subsec_nanosecond() < 0 {
+                    -1
+                } else {
+                    0
+                },
+            "chrono {:?} / jiff {:?}",
+            aware,
+            res
+        );
+        Some(res)
     }
 
     fn aware_j_to_c(aware: &jiff::Zoned) -> Option<chrono::DateTime<FixedOffset>> {
@@ -429,10 +449,21 @@ mod chrono_time_value_compat {
             (secs, signed_nanos as u32)
         };
 
-        Some(
-            chrono::DateTime::from_timestamp(corrected_secs, unsigned_nanos)?
-                .with_timezone(&chrono::FixedOffset::east_opt(aware.offset().seconds())?),
-        )
+        let res = chrono::DateTime::from_timestamp(corrected_secs, unsigned_nanos)?
+            .with_timezone(&FixedOffset::east_opt(aware.offset().seconds())?);
+        assert_eq!(
+            aware.timestamp().as_second()
+                + if aware.timestamp().subsec_nanosecond() < 0 {
+                    -1
+                } else {
+                    0
+                },
+            res.timestamp(),
+            "jiff {:?} / chrono {:?}",
+            aware,
+            res
+        );
+        Some(res)
     }
 
     #[test]
@@ -440,8 +471,9 @@ mod chrono_time_value_compat {
         for chrono_pair in iproduct!(impl_chrono::test_datetimes(), impl_chrono::test_zones()) {
             let chrono_aware = aware_compose_chrono(chrono_pair).unwrap();
             if let Some(time_aware) = aware_c_to_t(chrono_aware) {
-                assert_eq!(chrono_aware.timestamp(), time_aware.unix_timestamp());
-                assert_same_encoding(&chrono_aware, &time_aware);
+                if chrono_aware.offset().local_minus_utc() == 0 {
+                    assert_same_encoding(&chrono_aware, &time_aware);
+                }
             }
             if let Some(jiff_aware) = aware_c_to_j(chrono_aware) {
                 assert_same_encoding(&chrono_aware, &jiff_aware);
@@ -453,7 +485,9 @@ mod chrono_time_value_compat {
         )) {
             let time_aware = aware_compose_time(time_pair).unwrap();
             if let Some(chrono_aware) = aware_t_to_c(time_aware) {
-                assert_same_encoding(&time_aware, &chrono_aware);
+                if time_aware.offset().is_utc() {
+                    assert_same_encoding(&time_aware, &chrono_aware);
+                }
             }
         }
         for jiff_aware in impl_jiff::test_zoneds() {

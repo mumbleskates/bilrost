@@ -6,6 +6,7 @@
   decoding methods from the public `Message` traits. These methods were already
   hidden in the documentation, and defining them as concrete dyn-compatible
   methods never found a use case.
+* Increased minimum supported version of the `time` crate to `0.3.22`.
 
 ### New features
 
@@ -15,11 +16,14 @@
 * Added support for string-data types `Arc<str>`, `Rc<str>`, and `Box<str>` via
   the "general" encoding. These aren't necessarily very efficient, but there's
   no major reason we can't support them.
+* Added support for `jiff` time types.
 * Added support for a "crate" attribute that enables using `bilrost` from a
   different path or crate name.
 
 ### Fixes
 
+* Fixed documentation asserting that the representations of timezone-aware
+  date-times are always portable between `time` and `chrono`.
 * Added missing impls for borrowed decoding for `bstr::BString`.
 * Added support for deriving `Oneof` enums with zero non-empty variants and
   including them in messages. This isn't often useful but there's no reason

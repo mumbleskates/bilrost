@@ -1919,26 +1919,61 @@ this way.
 With the relevant crate features enabled there is built in support for certain
 additional types as well, each supported by the general encodings:
 
-| Value type                                         | Empty value                            | Distinguished | Required feature |
-|----------------------------------------------------|----------------------------------------|---------------|------------------|
-| [`core::time::Duration`][coreduration]             | zero duration                          | yes           | (none)           |
-| [`std::time::SystemTime`][stdsystemtime]           | `UNIX_EPOCH` (1970-01-01 00:00:00 UTC) | no            | "std"            |
-| [`chrono::NaiveDate`][chrononaivedate]             | 0000-01-01                             | yes           | "chrono"         |
-| [`chrono::NaiveTime`][chrononaivetime]             | 00:00:00                               | yes           | "chrono"         |
-| [`chrono::NaiveDateTime`][chrononaivedatetime]     | 0000-01-01 00:00:00                    | yes           | "chrono"         |
-| [`chrono::Utc`][chronoutc]                         | Utc                                    | yes           | "chrono"         |
-| [`chrono::FixedOffset`][chronofixedoffset]         | UTC+00:00                              | yes           | "chrono"         |
-| [`chrono::DateTime<Tz>`][chronodatetime]*          | 0000-01-01 00:00:00 +00:00             | yes           | "chrono"         |
-| [`chrono::TimeDelta`][chronotimedelta]             | zero duration                          | yes           | "chrono"         |
-| [`time::Date`][timedate]                           | 0000-01-01                             | yes           | "time"           |
-| [`time::Time`][timetime]                           | 00:00:00                               | yes           | "time"           |
-| [`time::PrimitiveDateTime`][timeprimitivedatetime] | 0000-01-01 00:00:00                    | yes           | "time"           |
-| [`time::UtcOffset`][timeutcoffset]                 | UTC+00:00                              | yes           | "time"           |
-| [`time::OffsetDateTime`][timeoffsetdatetime]       | 0000-01-01 00:00:00 +00:00             | yes           | "time"           |
-| [`time::Duration`][timeduration]                   | zero duration                          | yes           | "time"           |
+| Value type                                         | Empty value                              | Distinguished | Required feature |
+|----------------------------------------------------|------------------------------------------|---------------|------------------|
+| [`core::time::Duration`][coreduration]             | zero duration                            | yes           | (none)           |
+| [`std::time::SystemTime`][stdsystemtime]           | `UNIX_EPOCH` (1970-01-01 00:00:00 UTC)   | no            | "std"            |
+| [`chrono::NaiveDate`][chrononaivedate]             | 0000-01-01                               | yes           | "chrono"         |
+| [`chrono::NaiveTime`][chrononaivetime]             | 00:00:00                                 | yes           | "chrono"         |
+| [`chrono::NaiveDateTime`][chrononaivedatetime]     | 0000-01-01 00:00:00                      | yes           | "chrono"         |
+| [`chrono::Utc`][chronoutc]                         | Utc                                      | yes           | "chrono"         |
+| [`chrono::FixedOffset`][chronofixedoffset]         | UTC+00:00                                | yes           | "chrono"         |
+| [`chrono::DateTime<Tz>`][chronodatetime]*          | 0000-01-01 00:00:00 +00:00               | yes           | "chrono"         |
+| [`chrono::TimeDelta`][chronotimedelta]             | zero duration                            | yes           | "chrono"         |
+| [`jiff::civil::Date`][jiffdate]                    | 0000-01-01                               | yes           | "jiff"           |
+| [`jiff::civil::Time`][jifftime]                    | 00:00:00                                 | yes           | "jiff"           |
+| [`jiff::civil::DateTime`][jiffdatetime]            | 0000-01-01 00:00:00                      | yes           | "jiff"           |
+| [`jiff::Zoned`][jiffzoned]                         | 0000-01-01 00:00:00 UTC                  | no            | "jiff"           |
+| [`jiff::SignedDuration`][jiffduration]             | zero duration                            | yes           | "jiff"           |
+| [`jiff::Timestamp`][jifftimestamp]                 | The UNIX epoch (1970-01-01 00:00:00 UTC) | yes           | "jiff"           |
+| [`time::Date`][timedate]                           | 0000-01-01                               | yes           | "time"           |
+| [`time::Time`][timetime]                           | 00:00:00                                 | yes           | "time"           |
+| [`time::PrimitiveDateTime`][timeprimitivedatetime] | 0000-01-01 00:00:00                      | yes           | "time"           |
+| [`time::UtcOffset`][timeutcoffset]                 | UTC+00:00                                | yes           | "time"           |
+| [`time::OffsetDateTime`][timeoffsetdatetime]       | 0000-01-01 00:00:00 +00:00               | yes           | "time"           |
+| [`time::Duration`][timeduration]                   | zero duration                            | yes           | "time"           |
+| [`time::Timestamp`][timetimestamp]                 | The UNIX epoch (1970-01-01 00:00:00 UTC) | yes           | "time"           |
 
 *`chrono::DateTime<Tz>` is supported whenever `Tz::Offset` is supported by the
 encodings. Currently this means `Utc` and `FixedOffset`.
+
+The representations of dates, times, date-times, and time zones is implemented
+as follows:
+* Times are represented as four packed unsigned integers representing hour,
+  minute, second, and nanosecond with all trailing zeros omitted
+* Dates are represented as two packed signed integers representing year and
+  day-of-year with all trailing zeros omitted
+* Date-times are represented as six packed signed integers representing year,
+  day-of-year, hour, minute, second, and nanosecond with all trailing zeros
+  omitted
+* Timezone offsets are represented as a tuple message with signed integer
+  fields for (hour, minute, second), and optionally an additional field (with
+  tag 3) that contains the string of the IANA timezone name if present. This
+  timezone name does not make the offset optional if it is present.
+* Timezone-aware date-times are represented as a tuple message of
+  (date-time, timezone)
+* Timestamps (other than `SystemTime`) and signed durations of time are
+  represented the same as `bilrost_types::{Duration, Timestamp}`, with signed
+  seconds (from zero or the Unix Epoch) in field 1 and signed integer
+  nanoseconds in field 2
+
+This makes time types largely cross-compatible. However they are not entirely
+semantically portable: **`chrono` and `jiff` timezone-aware date-times always
+represent their date-time components in UTC, while `time::OffsetDateTime`
+represents it in civil time in the given timezone.** This is to ensure that
+`bilrost` encoding cannot fail, as these libraries all store their internals
+differently; for example, `time::OffsetDateTime` can represent moments in a
+non-UTC timezone that are outside the range that it supports in UTC.
 
 [coreduration]: https://doc.rust-lang.org/core/time/struct.Duration.html
 
@@ -1957,6 +1992,18 @@ encodings. Currently this means `Utc` and `FixedOffset`.
 [chronodatetime]: https://docs.rs/chrono/latest/chrono/struct.DateTime.html
 
 [chronotimedelta]: https://docs.rs/chrono/latest/chrono/struct.TimeDelta.html
+
+[jiffdate]: https://docs.rs/jiff/latest/jiff/civil/struct.Date.html
+
+[jifftime]: https://docs.rs/jiff/latest/jiff/civil/struct.Time.html
+
+[jiffdatetime]: https://docs.rs/jiff/latest/jiff/civil/struct.DateTime.html
+
+[jiffzoned]: https://docs.rs/jiff/latest/jiff/struct.Zoned.html
+
+[jiffduration]: https://docs.rs/jiff/latest/jiff/struct.SignedDuration.html
+
+[jifftimestamp]: https://docs.rs/jiff/latest/jiff/struct.Timestamp.html
 
 [nonzero]: https://doc.rust-lang.org/std/num/index.html#types
 
@@ -2260,28 +2307,30 @@ Old message data will always decode to an equivalent/corresponding value, and
 those corresponding values will re-encode from the new widened struct into the
 same representation.
 
-| Change                                                                                 | Corresponding values                                                                        | Backwards compatibility breaks when...                                                                                                |
-|----------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------|
-| `bool` --> `u8` --> `u16` --> `u32` --> `u64`, all with `general` or `varint` encoding | `true`/`false` becomes 1/0                                                                  | value is out of range of the narrower type                                                                                            |
-| `bool` --> `i8` --> `i16` --> `i32` --> `i64`, all with `general` or `varint` encoding | `true`/`false` becomes -1/0                                                                 | value is out of range of the narrower type                                                                                            |
-| any `NonZero` number type --> the plain number type                                    | the unchanged numeric value                                                                 | numeric value is zero                                                                                                                 |
-| `String` --> `Vec<u8>`                                                                 | string becomes its UTF-8 data                                                               | value contains invalid UTF-8                                                                                                          |
-| `T` --> `Option<T>`                                                                    | default value of `T` becomes `None`                                                         | `Some(empty)` is encoded; it will be considered non-canonical                                                                         |
-| `Option<T>` --> `Vec<T>` (with `unpacked` encoding)                                    | maybe-contained value is identical                                                          | multiple values are in the `Vec`                                                                                                      |
-| `[T; N]` --> `Vec<T>`                                                                  | when each array value is empty, the `Vec` will be empty instead of filled with empty values | data is a nonzero length different than that of the array                                                                             |
-| `Option<[T; N]>` --> `Vec<T>`                                                          | no change                                                                                   | data is a length different than that of the array                                                                                     |
-| `Range<T>` or `RangeInclusive<T>` <--> `(start, end)` tuple (with the same encoding)   | no change                                                                                   | never                                                                                                                                 |
-| `Message` types --> with new fields added                                              | no change, new fields are empty                                                             | new fields are not empty; it will be considered non-canonical                                                                         |
-| `Enumeration` types --> with new variants added                                        | no change                                                                                   | value is a new variant                                                                                                                |
-| `chrono::NaiveDate` --> `chrono::NaiveDateTime`                                        | midnight on the corresponding date                                                          | value has a non-midnight time component                                                                                               |
-| `time::Date` --> `time::PrimitiveDateTime`                                             | midnight on the corresponding date                                                          | value as a non-midnight time component                                                                                                |
-| `chrono::Utc` --> `chrono::FixedOffset` (and `chrono::DateTime` using those)           | timezone is always UTC                                                                      | value has a non-UTC offset                                                                                                            |
-| `chrono::NaiveDate` <--> `time::Date`                                                  | no change                                                                                   | whenever one library is out of its supported range                                                                                    |
-| `chrono::NaiveTime` <--> `time::Time`                                                  | no change                                                                                   | whenever one library is out of its supported range (including leap seconds)                                                           |
-| `chrono::NaiveDateTime` <--> `time::PrimitiveDateTime`                                 | no change                                                                                   | whenever one library is out of its supported range                                                                                    |
-| `chrono::FixedOffset` <--> `time::UtcOffset`                                           | no change                                                                                   | whenever one library is out of its supported range                                                                                    |
-| `chrono::DateTime<Tz>` <--> `time::OffsetDateTime`                                     | no change                                                                                   | whenever one library is out of its supported range                                                                                    |
-| `chrono::TimeDelta` <--> `time::Duration` <--> `bilrost_types::Duration`               | no change                                                                                   | whenever one library is out of its supported range. `time` and `chrono` impls are strict about seconds and nanos having matching sign |
+| Change                                                                                               | Corresponding values                                                                        | Backwards compatibility breaks when...                                                                               |
+|------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------|
+| `bool` --> `u8` --> `u16` --> `u32` --> `u64`, all with `general` or `varint` encoding               | `true`/`false` becomes 1/0                                                                  | value is out of range of the narrower type                                                                           |
+| `bool` --> `i8` --> `i16` --> `i32` --> `i64`, all with `general` or `varint` encoding               | `true`/`false` becomes -1/0                                                                 | value is out of range of the narrower type                                                                           |
+| any `NonZero` number type --> the plain number type                                                  | the unchanged numeric value                                                                 | numeric value is zero                                                                                                |
+| `String` --> `Vec<u8>`                                                                               | string becomes its UTF-8 data                                                               | value contains invalid UTF-8                                                                                         |
+| `T` --> `Option<T>`                                                                                  | default value of `T` becomes `None`                                                         | `Some(empty)` is encoded; it will be considered non-canonical                                                        |
+| `Option<T>` --> `Vec<T>` (with `unpacked` encoding)                                                  | maybe-contained value is identical                                                          | multiple values are in the `Vec`                                                                                     |
+| `[T; N]` --> `Vec<T>`                                                                                | when each array value is empty, the `Vec` will be empty instead of filled with empty values | data is a nonzero length different than that of the array                                                            |
+| `Option<[T; N]>` --> `Vec<T>`                                                                        | no change                                                                                   | data is a length different than that of the array                                                                    |
+| `Range<T>` or `RangeInclusive<T>` <--> `(start, end)` tuple (with the same encoding)                 | no change                                                                                   | never                                                                                                                |
+| `Message` types --> with new fields added                                                            | no change, new fields are empty                                                             | new fields are not empty; it will be considered non-canonical                                                        |
+| `Enumeration` types --> with new variants added                                                      | no change                                                                                   | value is a new variant                                                                                               |
+| `chrono::NaiveDate` --> `chrono::NaiveDateTime`                                                      | midnight on the corresponding date                                                          | value has a non-midnight time component                                                                              |
+| `jiff::civil::Date` --> `jiff::civil::DateTime`                                                      | midnight on the corresponding date                                                          | value has a non-midnight time component                                                                              |
+| `time::Date` --> `time::PrimitiveDateTime`                                                           | midnight on the corresponding date                                                          | value has a non-midnight time component                                                                              |
+| `chrono::Utc` --> `chrono::FixedOffset` (and `chrono::DateTime` using those)                         | timezone is always UTC                                                                      | value has a non-UTC offset                                                                                           |
+| `chrono::NaiveDate` <--> `jiff::civil::Date` <--> `time::Date`                                       | no change                                                                                   | whenever one library is out of its supported range                                                                   |
+| `chrono::NaiveTime` <--> `jiff::civil::Time` <--> `time::Time`                                       | no change                                                                                   | whenever one library is out of its supported range (including leap seconds)                                          |
+| `chrono::NaiveDateTime` <--> `jiff::civil::DateTime` <--> `time::PrimitiveDateTime`                  | no change                                                                                   | whenever one library is out of its supported range                                                                   |
+| `chrono::FixedOffset` <--> `time::UtcOffset`                                                         | no change                                                                                   | whenever one library is out of its supported range                                                                   |
+| `chrono::DateTime<Utc>` <--> `time::OffsetDateTime`                                                  | **only UTC time zones are represented the same**\*                                          | whenever one library is out of its supported range                                                                   |
+| `chrono::DateTime<FixedOffset>` <--> `jiff::Zoned`                                                   | semantically equivalent value                                                               | whenever one library is out of its supported range                                                                   |
+| `chrono::TimeDelta` <--> `time::Duration` <--> `jiff::SignedDuration` <--> `bilrost_types::Duration` | no change                                                                                   | whenever one library is out of its supported range. impls may be strict about seconds and nanos having matching sign |
 
 `Vec<T>` and other list- and set-like collections that contain repeated values
 can also be changed between `unpacked` and `packed` encoding, as long as the

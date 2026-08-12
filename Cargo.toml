@@ -73,7 +73,7 @@ jiff = { version = ">=0.2.35,<0.3", default-features = false, optional = true }
 smallvec = { version = ">=1.6.1,<2", default-features = false, features = ["const_generics"], optional = true }
 smol_str = { version = ">=0.1.24,<0.4", default-features = false, optional = true }
 thin-vec = { version = "^0.2", default-features = false, optional = true }
-time = { version = "^0.3.0", default-features = false, optional = true }
+time = { version = "^0.3.22", default-features = false, optional = true }
 tinyvec = { version = "^1", default-features = false, features = ["alloc", "rustc_1_57"], optional = true }
 
 # pprof prevents building on windows, so must be an optional feature.
@@ -95,7 +95,7 @@ itertools = { version = "0.15", default-features = false, features = ["use_alloc
 proptest = ">=1.6,<1.7"
 rand = "0.8"
 static_assertions = "1"
-time = { version = ">=0.3.0", default-features = false, features = ["rand"] }
+time = { version = ">=0.3.22", default-features = false, features = ["rand"] }
 yoke = { version = ">=0.7.1,<0.9", features = ["derive"] }
 
 [features]
