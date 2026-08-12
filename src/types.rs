@@ -99,7 +99,7 @@ impl From<&mut [u8]> for Blob {
 
 impl<const N: usize> From<&[u8; N]> for Blob {
     fn from(value: &[u8; N]) -> Self {
-        // MSRV: as_slice() needed
+        // MSRV: as_slice() needed until 1.74
         Self(value.as_slice().into())
     }
 }

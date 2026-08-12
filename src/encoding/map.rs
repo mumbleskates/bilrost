@@ -136,7 +136,7 @@ macro_rules! impl_decoders {
                 ctx: DecodeContext,
             ) -> Result<(), DecodeError> {
                 let mut capped = buf.take_length_delimited()?;
-                // MSRV: this could be .is_some_and(..)
+                // MSRV: this could be .is_some_and(..) (1.70)
                 if matches!(
                     combined_fixed_size(
                         <() as Wiretyped<KE, M::Key>>::WIRE_TYPE,
@@ -180,7 +180,7 @@ macro_rules! impl_decoders {
                 ctx: RestrictedDecodeContext,
             ) -> Result<Canonicity, DecodeError> {
                 let mut capped = buf.take_length_delimited()?;
-                // MSRV: this could be .is_some_and(..)
+                // MSRV: this could be .is_some_and(..) (1.70)
                 if matches!(
                     combined_fixed_size(
                         <() as Wiretyped<KE, M::Key>>::WIRE_TYPE,

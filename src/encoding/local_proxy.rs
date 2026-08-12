@@ -69,7 +69,7 @@ where
     /// then the backing array still contains [5, 0, 0] but the latter decoded value wouldn't have
     /// been encoded if we were using new_without_empty_suffix, and thus isn't canonical.
     pub fn into_inner_distinguished(self) -> ([T; N], Canonicity) {
-        // MSRV: this could be is_some_and(..)
+        // MSRV: this could be is_some_and(..) (1.70)
         let canon = if matches!(
             self.reversed().next(),
             Some(last_item) if <() as EmptyState<(), _>>::is_empty(last_item)
