@@ -43,6 +43,11 @@ pub trait ReverseBuf: Buf {
     /// writes can succeed, and may be smaller than the real capacity possible.
     ///
     /// This method follows the same general contract as `bytes::BufMut::remaining_mut()`.
+    ///
+    /// The `Buf::remaining` implementation of this type must also always exactly mirror the number
+    /// of bytes that are present in this `ReverseBuf` after the current position -- that is, if an
+    /// empty `ReverseBuf` is written into, `remaining()` must always return the number of bytes
+    /// that have been written so far.
     fn remaining_writable(&self) -> usize;
 
     // --- Provided: ---
