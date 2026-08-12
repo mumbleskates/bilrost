@@ -87,7 +87,8 @@ pub fn parse_message_fields(
                 init_mode.clone(),
             )
             .map_err(|e| err!("invalid field {field_ident}: {e}"))?;
-            if !field.is_ignored() {
+            // fields without tags include ignored fields and vacant oneofs
+            if !field.tags().is_empty() {
                 next_tag = field.last_tag().checked_add(1);
             }
             Ok(field)
@@ -563,6 +564,7 @@ impl<'a> MessageFieldsSorted<'a> {
         let mut chunks: Vec<FieldChunk> = vec![];
         let mut fields = unsorted_fields
             .into_iter()
+            .filter(|field| !field.tags().is_empty())
             .sorted_unstable_by_key(|field| field.first_tag())
             .peekable();
         // Current vecs we are building for FieldChunk::SortGroup and SortGroupPart::Contiguous

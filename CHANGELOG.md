@@ -21,6 +21,9 @@
 ### Fixes
 
 * Added missing impls for borrowed decoding for `bstr::BString`.
+* Added support for deriving `Oneof` enums with zero non-empty variants and
+  including them in messages. This isn't often useful but there's no reason
+  it should be impossible.
 
 ### Cleanups
 

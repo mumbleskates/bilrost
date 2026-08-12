@@ -4101,6 +4101,58 @@ fn oneof_named_after_builtin_encoding_alias() {
 }
 
 #[test]
+fn vacant_oneof_decoding() {
+    #[derive(Debug, PartialEq, Eq, Oneof, Message, Schema)]
+    #[bilrost(distinguished)]
+    enum Vacant {
+        Empty,
+    }
+
+    #[derive(Debug, PartialEq, Eq, Oneof, Schema)]
+    #[bilrost(distinguished)]
+    enum VacantNonempty {}
+
+    #[derive(Debug, PartialEq, Eq, Message, Schema)]
+    #[bilrost(distinguished)]
+    struct VacantWrapper {
+        #[bilrost(oneof())]
+        field1: Vacant,
+        #[bilrost(oneof())]
+        field2: Option<VacantNonempty>,
+    }
+
+    assert::decodes!(
+        owned distinguished,
+        [],
+        VacantWrapper {
+            field1: Vacant::Empty,
+            field2: None,
+        },
+    );
+    assert::decodes!(
+        owned non-canonically,
+        [(1, OV::string("hello"))],
+        VacantWrapper {
+            field1: Vacant::Empty,
+            field2: None,
+        },
+        HasExtensions,
+        "",
+    );
+
+    let schema = Schema::new();
+    schema.register::<VacantWrapper>();
+    assert_eq!(
+        format!("{schema}"),
+        "\
+[1] message VacantWrapper {
+    // empty
+}
+"
+    )
+}
+
+#[test]
 fn embedded_messages() {
     #[derive(Debug, PartialEq, Eq, Oneof, Message)]
     #[bilrost(distinguished)]

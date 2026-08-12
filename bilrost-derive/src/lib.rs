@@ -335,20 +335,24 @@ fn try_message(input: TokenStream) -> Result<TokenStream> {
     let [decode_owned, decode_borrowed] = [Owned, Borrowed].map(|lifetime| {
         let self_instance = self_instance.clone();
         let schema_type_name = schema_type_name.clone();
-        unsorted_fields.iter().map(move |field| {
+        unsorted_fields.iter().filter_map(move |field| {
+            let tags = field.tags();
+            if tags.is_empty() {
+                return None;
+            }
             let decode = field.decode(&self_instance, lifetime, Relaxed, ctx);
-            let tags = field.tags().into_iter().map(|tag| quote!(#tag));
+            let tags = tags.into_iter().map(|tag| quote!(#tag));
             let tags = Itertools::intersperse(tags, quote!(|));
             let schema_field_name = field.schema_field_name();
 
-            quote! {
+            Some(quote! {
                 #(#tags)* => {
                     if let ::core::result::Result::Err(mut error) = #decode {
                         error.push(#schema_type_name, #schema_field_name);
                         return ::core::result::Result::Err(error);
                     }
                 }
-            }
+            })
         })
     });
 
@@ -547,13 +551,17 @@ fn try_message(input: TokenStream) -> Result<TokenStream> {
         let [decode_owned, decode_borrowed] = [Owned, Borrowed].map(|lifetime| {
             let schema_type_name = &schema_type_name;
             let self_instance = &self_instance;
-            unsorted_fields.iter().map(move |field| {
+            unsorted_fields.iter().filter_map(move |field| {
+                let tags = field.tags();
+                if tags.is_empty() {
+                    return None;
+                }
                 let decode = field.decode(self_instance, lifetime, Distinguished, ctx);
                 let tags = field.tags().into_iter().map(|tag| quote!(#tag));
                 let tags = Itertools::intersperse(tags, quote!(|));
                 let schema_field_name = field.schema_field_name();
 
-                quote! {
+                Some(quote! {
                     #(#tags)* => {
                         match #decode {
                             ::core::result::Result::Ok(new_canon) => {
@@ -565,7 +573,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream> {
                             }
                         }
                     }
-                }
+                })
             })
         });
 
@@ -1576,7 +1584,18 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream> {
                 let variant_ident = variant.ident();
                 quote!(Self::#variant_ident { .. } => #tag)
             })
+            .chain(
+                variants
+                    .is_empty()
+                    .then(|| quote! { _ => { unreachable!("no non-empty variants"); } }),
+            )
             .collect();
+
+        if variants.is_empty() {
+            encode.push(quote! { _ => { unreachable!("no non-empty variants"); } });
+            prepend.push(quote! { _ => { unreachable!("no non-empty variants"); } });
+            encoded_len.push(quote! { _ => { unreachable!("no non-empty variants"); } });
+        }
 
         empty_methods_impl = None;
     };
@@ -1605,6 +1624,13 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream> {
     };
 
     let [decode_owned, decode_borrowed] = match empty_variant {
+        _ if variants.is_empty() => {
+            let ident_str = ident.to_string();
+            let cannot_decode = quote!{
+                unreachable!(concat!("oneof ", #ident_str, " has no non-empty variants"));
+            };
+            [cannot_decode.clone(), cannot_decode]
+        }
         None => [decode_arms(Owned, Relaxed), decode_arms(Borrowed, Relaxed)],
         Some(ref empty_ident) => [
             decode_arms(Owned, Relaxed),
@@ -1788,6 +1814,13 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream> {
         };
 
         let [decode_owned, decode_borrowed] = match empty_variant {
+            _ if variants.is_empty() => {
+                let ident_str = ident.to_string();
+                let cannot_decode = quote! {
+                    unreachable!(concat!("oneof ", #ident_str, " has no non-empty variants"));
+                };
+                [cannot_decode.clone(), cannot_decode]
+            }
             None => [
                 decode_arms(Owned, Distinguished),
                 decode_arms(Borrowed, Distinguished),
