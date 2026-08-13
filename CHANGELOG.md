@@ -23,6 +23,8 @@
 * Added support for `jiff` time types.
 * Added support for a "crate" attribute that enables using `bilrost` from a
   different path or crate name.
+* Added support for taking ignored fields' initializer expressions from
+  default field values (an unstable syntax).
 
 ### Fixes
 
