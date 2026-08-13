@@ -486,6 +486,13 @@ The `bilrost` crate has several optional features:
     * [`TimeDelta`][chronotimedelta]
 * "hashbrown": provides first-party support for `hashbrown` types
   [`HashMap`][hbmap] and [`HashSet`][hbset]
+* "jiff": provides first-party support for the following `jiff` types:
+    * [`Date`][jiffdate]
+    * [`Time`][jifftime]
+    * [`DateTime`][jiffdatetime]
+    * [`Zoned`][jiffzoned]
+    * [`SignedDuration`][jiffduration]
+    * [`Timestamp`][jifftimestamp]
 * "smallvec": provides first-party support for [`smallvec::SmallVec`][smallvec]
 * "smol_str": provides first-party support for [`smol_str::SmolStr`][smol_str]
 * "thin-vec": provides first-party support for [`thin_vec::ThinVec`][thinvec]
