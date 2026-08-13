@@ -170,12 +170,14 @@ pub(crate) mod time_proxies {
 }
 
 /// This is where we show that we have equivalent encodings for the time and chrono crate types.
-#[cfg(all(test, feature = "chrono", feature = "time", feature = "jiff"))]
+#[cfg(all(test, feature = "chrono"))]
 mod chrono_time_value_compat {
+    use crate::encoding::type_support::chrono as impl_chrono;
+    #[cfg(feature = "jiff")]
+    use crate::encoding::type_support::jiff as impl_jiff;
+    #[cfg(feature = "time")]
+    use crate::encoding::type_support::time as impl_time;
     use crate::encoding::type_support::time::with_random_values;
-    use crate::encoding::type_support::{
-        chrono as impl_chrono, jiff as impl_jiff, time as impl_time,
-    };
     use crate::encoding::{EmptyState, General, Proxiable, ValueEncoder};
     use alloc::fmt::Debug;
     use alloc::vec::Vec;
@@ -197,14 +199,17 @@ mod chrono_time_value_compat {
         }
     }
 
+    #[cfg(feature = "time")]
     fn date_c_to_t(date: chrono::NaiveDate) -> Option<time::Date> {
         time::Date::from_ordinal_date(date.year(), date.ordinal() as u16).ok()
     }
 
+    #[cfg(feature = "time")]
     fn date_t_to_c(date: time::Date) -> Option<chrono::NaiveDate> {
         chrono::NaiveDate::from_yo_opt(date.year(), date.ordinal().into())
     }
 
+    #[cfg(feature = "jiff")]
     fn date_c_to_j(date: chrono::NaiveDate) -> Option<jiff::civil::Date> {
         jiff::civil::Date::new(date.year().try_into().ok()?, 1, 1)
             .ok()?
@@ -214,6 +219,7 @@ mod chrono_time_value_compat {
             .ok()
     }
 
+    #[cfg(feature = "jiff")]
     fn date_j_to_c(date: jiff::civil::Date) -> Option<chrono::NaiveDate> {
         chrono::NaiveDate::from_ymd_opt(date.year() as i32, date.month() as u32, date.day() as u32)
     }
@@ -221,18 +227,22 @@ mod chrono_time_value_compat {
     #[test]
     fn date() {
         for chrono_date in impl_chrono::test_dates() {
+            #[cfg(feature = "time")]
             if let Some(time_date) = date_c_to_t(chrono_date) {
                 assert_same_encoding(&chrono_date, &time_date);
             };
+            #[cfg(feature = "jiff")]
             if let Some(jiff_date) = date_c_to_j(chrono_date) {
                 assert_same_encoding(&chrono_date, &jiff_date);
             }
         }
+        #[cfg(feature = "time")]
         for time_date in with_random_values(impl_time::test_dates()) {
             if let Some(chrono_date) = date_t_to_c(time_date) {
                 assert_same_encoding(&time_date, &chrono_date);
             };
         }
+        #[cfg(feature = "jiff")]
         for jiff_date in impl_jiff::test_dates() {
             if let Some(chrono_date) = date_j_to_c(jiff_date) {
                 assert_same_encoding(&jiff_date, &chrono_date);
@@ -240,6 +250,7 @@ mod chrono_time_value_compat {
         }
     }
 
+    #[cfg(feature = "time")]
     fn time_c_to_t(t: chrono::NaiveTime) -> Option<time::Time> {
         time::Time::from_hms_nano(
             u8::try_from(t.hour()).unwrap(),
@@ -250,6 +261,7 @@ mod chrono_time_value_compat {
         .ok()
     }
 
+    #[cfg(feature = "time")]
     fn time_t_to_c(t: time::Time) -> Option<chrono::NaiveTime> {
         chrono::NaiveTime::from_hms_nano_opt(
             t.hour().into(),
@@ -259,6 +271,7 @@ mod chrono_time_value_compat {
         )
     }
 
+    #[cfg(feature = "jiff")]
     fn time_c_to_j(t: chrono::NaiveTime) -> Option<jiff::civil::Time> {
         jiff::civil::Time::new(
             t.hour() as i8,
@@ -269,6 +282,7 @@ mod chrono_time_value_compat {
         .ok()
     }
 
+    #[cfg(feature = "jiff")]
     fn time_j_to_c(t: jiff::civil::Time) -> Option<chrono::NaiveTime> {
         chrono::NaiveTime::from_hms_nano_opt(
             t.hour() as u32,
@@ -281,18 +295,22 @@ mod chrono_time_value_compat {
     #[test]
     fn time() {
         for chrono_time in impl_chrono::test_times() {
+            #[cfg(feature = "time")]
             if let Some(time_time) = time_c_to_t(chrono_time) {
                 assert_same_encoding(&chrono_time, &time_time);
             }
+            #[cfg(feature = "jiff")]
             if let Some(jiff_time) = time_c_to_j(chrono_time) {
                 assert_same_encoding(&chrono_time, &jiff_time);
             }
         }
+        #[cfg(feature = "time")]
         for time_time in with_random_values(impl_time::test_times()) {
             if let Some(chrono_time) = time_t_to_c(time_time) {
                 assert_same_encoding(&time_time, &chrono_time);
             }
         }
+        #[cfg(feature = "jiff")]
         for jiff_time in impl_jiff::test_times() {
             if let Some(chrono_time) = time_j_to_c(jiff_time) {
                 assert_same_encoding(&jiff_time, &chrono_time);
@@ -300,6 +318,7 @@ mod chrono_time_value_compat {
         }
     }
 
+    #[cfg(feature = "time")]
     fn datetime_c_to_t(dt: chrono::NaiveDateTime) -> Option<time::PrimitiveDateTime> {
         Some(time::PrimitiveDateTime::new(
             date_c_to_t(dt.date())?,
@@ -307,6 +326,7 @@ mod chrono_time_value_compat {
         ))
     }
 
+    #[cfg(feature = "time")]
     fn datetime_t_to_c(dt: time::PrimitiveDateTime) -> Option<chrono::NaiveDateTime> {
         Some(chrono::NaiveDateTime::new(
             date_t_to_c(dt.date())?,
@@ -314,6 +334,7 @@ mod chrono_time_value_compat {
         ))
     }
 
+    #[cfg(feature = "jiff")]
     fn datetime_c_to_j(dt: chrono::NaiveDateTime) -> Option<jiff::civil::DateTime> {
         Some(jiff::civil::DateTime::from_parts(
             date_c_to_j(dt.date())?,
@@ -321,6 +342,7 @@ mod chrono_time_value_compat {
         ))
     }
 
+    #[cfg(feature = "jiff")]
     fn datetime_j_to_c(dt: jiff::civil::DateTime) -> Option<chrono::NaiveDateTime> {
         Some(chrono::NaiveDateTime::new(
             date_j_to_c(dt.date())?,
@@ -331,18 +353,22 @@ mod chrono_time_value_compat {
     #[test]
     fn datetime() {
         for chrono_datetime in impl_chrono::test_datetimes() {
+            #[cfg(feature = "time")]
             if let Some(time_datetime) = datetime_c_to_t(chrono_datetime) {
                 assert_same_encoding(&chrono_datetime, &time_datetime);
             }
+            #[cfg(feature = "jiff")]
             if let Some(jiff_datetime) = datetime_c_to_j(chrono_datetime) {
                 assert_same_encoding(&chrono_datetime, &jiff_datetime);
             }
         }
+        #[cfg(feature = "time")]
         for time_datetime in with_random_values(impl_time::test_datetimes()) {
             if let Some(chrono_datetime) = datetime_t_to_c(time_datetime) {
                 assert_same_encoding(&time_datetime, &chrono_datetime);
             }
         }
+        #[cfg(feature = "jiff")]
         for jiff_datetime in impl_jiff::test_datetimes() {
             if let Some(chrono_datetime) = datetime_j_to_c(jiff_datetime) {
                 assert_same_encoding(&jiff_datetime, &chrono_datetime);
@@ -350,10 +376,12 @@ mod chrono_time_value_compat {
         }
     }
 
+    #[cfg(feature = "time")]
     fn offset_c_to_t(offset: FixedOffset) -> Option<time::UtcOffset> {
         time::UtcOffset::from_whole_seconds(offset.local_minus_utc()).ok()
     }
 
+    #[cfg(feature = "time")]
     fn offset_t_to_c(offset: time::UtcOffset) -> Option<FixedOffset> {
         FixedOffset::east_opt(offset.whole_seconds())
     }
@@ -361,16 +389,16 @@ mod chrono_time_value_compat {
     #[test]
     fn zone() {
         for chrono_offset in impl_chrono::test_zones() {
-            let Some(time_offset) = offset_c_to_t(chrono_offset) else {
-                continue;
+            #[cfg(feature = "time")]
+            if let Some(time_offset) = offset_c_to_t(chrono_offset) {
+                assert_same_encoding(&chrono_offset, &time_offset);
             };
-            assert_same_encoding(&chrono_offset, &time_offset);
         }
+        #[cfg(feature = "time")]
         for time_offset in with_random_values(impl_time::test_zones()) {
-            let Some(chrono_offset) = offset_t_to_c(time_offset) else {
-                continue;
+            if let Some(chrono_offset) = offset_t_to_c(time_offset) {
+                assert_same_encoding(&time_offset, &chrono_offset);
             };
-            assert_same_encoding(&time_offset, &chrono_offset);
         }
     }
 
@@ -382,6 +410,7 @@ mod chrono_time_value_compat {
         Some(result)
     }
 
+    #[cfg(feature = "time")]
     fn aware_compose_time(
         pair: (time::PrimitiveDateTime, time::UtcOffset),
     ) -> Option<time::OffsetDateTime> {
@@ -390,6 +419,7 @@ mod chrono_time_value_compat {
         Some(result)
     }
 
+    #[cfg(feature = "time")]
     fn aware_c_to_t(aware: chrono::DateTime<FixedOffset>) -> Option<time::OffsetDateTime> {
         let wall_time_utc = datetime_c_to_t(aware.naive_utc())?;
         let wall_time = wall_time_utc.assume_utc();
@@ -399,6 +429,7 @@ mod chrono_time_value_compat {
         Some(res)
     }
 
+    #[cfg(feature = "time")]
     fn aware_t_to_c(aware: time::OffsetDateTime) -> Option<chrono::DateTime<FixedOffset>> {
         let wall_time_zoned =
             datetime_t_to_c(time::PrimitiveDateTime::new(aware.date(), aware.time()))?;
@@ -410,6 +441,7 @@ mod chrono_time_value_compat {
         Some(res)
     }
 
+    #[cfg(feature = "jiff")]
     fn aware_c_to_j(aware: chrono::DateTime<FixedOffset>) -> Option<jiff::Zoned> {
         let res = jiff::Timestamp::new(aware.timestamp(), aware.nanosecond() as i32)
             .ok()?
@@ -431,6 +463,7 @@ mod chrono_time_value_compat {
         Some(res)
     }
 
+    #[cfg(feature = "jiff")]
     fn aware_j_to_c(aware: &jiff::Zoned) -> Option<chrono::DateTime<FixedOffset>> {
         if aware.offset().seconds() != 0 && aware.time_zone().iana_name().is_some() {
             return None;
@@ -466,15 +499,18 @@ mod chrono_time_value_compat {
     fn aware_date() {
         for chrono_pair in iproduct!(impl_chrono::test_datetimes(), impl_chrono::test_zones()) {
             let chrono_aware = aware_compose_chrono(chrono_pair).unwrap();
+            #[cfg(feature = "time")]
             if let Some(time_aware) = aware_c_to_t(chrono_aware) {
                 if chrono_aware.offset().local_minus_utc() == 0 {
                     assert_same_encoding(&chrono_aware, &time_aware);
                 }
             }
+            #[cfg(feature = "jiff")]
             if let Some(jiff_aware) = aware_c_to_j(chrono_aware) {
                 assert_same_encoding(&chrono_aware, &jiff_aware);
             }
         }
+        #[cfg(feature = "time")]
         for time_pair in with_random_values(iproduct!(
             impl_time::test_datetimes(),
             impl_time::test_zones()
@@ -486,6 +522,7 @@ mod chrono_time_value_compat {
                 }
             }
         }
+        #[cfg(feature = "jiff")]
         for jiff_aware in impl_jiff::test_zoneds() {
             if let Some(chrono_aware) = aware_j_to_c(&jiff_aware) {
                 assert_same_encoding(&jiff_aware, &chrono_aware);
@@ -493,11 +530,13 @@ mod chrono_time_value_compat {
         }
     }
 
+    #[cfg(feature = "time")]
     fn delta_c_to_t(delta: chrono::TimeDelta) -> Option<time::Duration> {
         time::Duration::seconds(delta.num_seconds())
             .checked_add(time::Duration::nanoseconds(delta.subsec_nanos().into()))
     }
 
+    #[cfg(feature = "time")]
     fn delta_t_to_c(delta: time::Duration) -> Option<chrono::TimeDelta> {
         let (secs, signed_nanos) = (delta.whole_seconds(), delta.subsec_nanoseconds());
         let (corrected_secs, unsigned_nanos) = if signed_nanos < 0 {
@@ -508,6 +547,7 @@ mod chrono_time_value_compat {
         chrono::TimeDelta::new(corrected_secs, unsigned_nanos)
     }
 
+    #[cfg(feature = "jiff")]
     fn delta_c_to_j(delta: chrono::TimeDelta) -> Option<jiff::SignedDuration> {
         Some(jiff::SignedDuration::new(
             delta.num_seconds(),
@@ -515,6 +555,7 @@ mod chrono_time_value_compat {
         ))
     }
 
+    #[cfg(feature = "jiff")]
     fn delta_j_to_c(delta: jiff::SignedDuration) -> Option<chrono::TimeDelta> {
         let (secs, signed_nanos) = (delta.as_secs(), delta.subsec_nanos());
         let (corrected_secs, unsigned_nanos) = if signed_nanos < 0 {
@@ -534,18 +575,22 @@ mod chrono_time_value_compat {
             }))
             .take(crate::encoding::type_support::time::RANDOM_SAMPLES)
         {
+            #[cfg(feature = "time")]
             if let Some(time_delta) = delta_c_to_t(chrono_delta) {
                 assert_same_encoding(&chrono_delta, &time_delta);
             }
+            #[cfg(feature = "jiff")]
             if let Some(jiff_delta) = delta_c_to_j(chrono_delta) {
                 assert_same_encoding(&chrono_delta, &jiff_delta);
             }
         }
+        #[cfg(feature = "time")]
         for time_delta in with_random_values(impl_time::test_durations()) {
             if let Some(chrono_delta) = delta_t_to_c(time_delta) {
                 assert_same_encoding(&time_delta, &chrono_delta);
             }
         }
+        #[cfg(feature = "jiff")]
         for jiff_delta in impl_jiff::test_signeddurations() {
             if let Some(chrono_delta) = delta_j_to_c(jiff_delta) {
                 assert_same_encoding(&jiff_delta, &chrono_delta);
