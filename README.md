@@ -1152,9 +1152,10 @@ struct Foo {
 * **"ignore"**: Must be alone, with no tag or other attribute. This causes the
   field to be ignored by the generated message implementation. An expression
   may be provided to this attribute, overriding the value that field will be
-  initialized to. If any fields in a message are ignored without an initializer
-  expression, they are initialized from the whole struct's `Default` impl, and
-  the struct must implement `Default` to implement `Message`.
+  initialized to. If any fields in a message are ignored and do not have either
+  an initializer expression or a [default field value][defaultfieldval], they
+  are initialized from the whole struct's `Default` impl, and the struct must
+  implement `Default` to implement `Message`.
 
   Ignored fields are not currently considered compatible with distinguished
   decoding.
@@ -1182,6 +1183,8 @@ assert_eq!(
     }
 )
 ```
+
+[defaultfieldval]: https://doc.rust-lang.org/1.97.1/unstable-book/language-features/default-field-values.html
 
 * **"default"**: Providing an expression with this attribute on the struct
   itself causes ignored fields with no initializer expression to be initialized
@@ -1212,8 +1215,8 @@ assert_eq!(
 ```
 
 * **"default_per_field"**: Causes ignored fields with no initializer expression
-  to be initialized with `Default::default()` for each individual field, rather
-  than from the whole struct's `Default` impl value.
+  or field default to be initialized with `Default::default()` for each
+  individual field, rather than from the whole struct's `Default` impl value.
 
   This conflicts with the "default" struct attribute.
 
