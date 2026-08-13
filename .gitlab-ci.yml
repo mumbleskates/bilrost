@@ -67,6 +67,8 @@ test-old:
 test-msrv:
   image: rust:1.68
   stage: test
+  env:
+    CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
   before_script:
     - ./.gitlab-cargo-cache-expire.sh
     - ./msrv-lock.sh
