@@ -2,6 +2,10 @@
 
 ### Breaking changes
 
+* Increased the MSRV from 1.65 to 1.68. While there aren't really any essential
+  features in that upgrade that the library uses, `cargo` before 1.68 is
+  becoming intolerably slow and impractical to test and maintain as it does not
+  yet use the "sparse" method for the crates.io index.
 * Possible breaking change: Removed some unused and unnecessary `*_capped_dyn`
   decoding methods from the public `Message` traits. These methods were already
   hidden in the documentation, and defining them as concrete dyn-compatible

@@ -23,7 +23,7 @@ jobs:
         toolchain:
           - stable
           - "1.70"
-          - "1.65"
+          - "1.68"
         os:
           - ubuntu-latest
     #     - macos-latest
@@ -38,17 +38,17 @@ jobs:
       - name: msrv pinning
         run: if [[ "stable" != "${{ matrix.toolchain }}" ]]; then ./msrv-lock.sh ; fi
       - name: test
-        run: cargo test --workspace --all-targets --features "${{ matrix.toolchain == '1.65' && 'msrv-test-suite' || 'full-test-suite' }}"
+        run: cargo test --workspace --all-targets --features "${{ matrix.toolchain == '1.68' && 'msrv-test-suite' || 'full-test-suite' }}"
       - name: test forbid-unsafe
-        run: cargo test --workspace --all-targets --features "${{ matrix.toolchain == '1.65' && 'msrv-test-suite' || 'full-test-suite' }}",forbid-unsafe
+        run: cargo test --workspace --all-targets --features "${{ matrix.toolchain == '1.68' && 'msrv-test-suite' || 'full-test-suite' }}",forbid-unsafe
       - name: test no-default-features
-        run: cargo test --workspace --all-targets --features "${{ matrix.toolchain == '1.65' && 'msrv-test-suite' || 'full-test-suite' }}" --no-default-features
+        run: cargo test --workspace --all-targets --features "${{ matrix.toolchain == '1.68' && 'msrv-test-suite' || 'full-test-suite' }}" --no-default-features
       - name: test minimal features
         run: cargo test --workspace --all-targets --no-default-features
       - name: test doc
-        run: cargo test --workspace --doc --features "${{ matrix.toolchain == '1.65' && 'msrv-test-suite' || 'full-test-suite' }}"
+        run: cargo test --workspace --doc --features "${{ matrix.toolchain == '1.68' && 'msrv-test-suite' || 'full-test-suite' }}"
       - name: test doc no-default-features
-        run: cargo test --workspace --doc --features "${{ matrix.toolchain == '1.65' && 'msrv-test-suite' || 'full-test-suite' }}" --no-default-features
+        run: cargo test --workspace --doc --features "${{ matrix.toolchain == '1.68' && 'msrv-test-suite' || 'full-test-suite' }}" --no-default-features
       - name: test doc minimal features
         run: cargo test --workspace --doc --no-default-features
       - name: test suite extra external crate options

@@ -584,9 +584,7 @@ impl<'a> MessageFieldsSorted<'a> {
             let overlaps =
                 matches!(next_field, Some(next_field) if last_tag > next_field.first_tag());
             // Check if this field is already in a range we know requires runtime sorting.
-            // MSRV: can't use .last() (1.66)
-            let in_current_sort_group =
-                matches!(sort_group_oneof_tags.iter().next_back(), Some(&end) if end > first_tag);
+            matches!(sort_group_oneof_tags.last(), Some(&end) if end > first_tag);
 
             if in_current_sort_group {
                 // We're still building a sort group.
@@ -644,8 +642,7 @@ impl<'a> MessageFieldsSorted<'a> {
                 }
             }
 
-            // MSRV: can't use .last() (1.66)
-            if let Some(&sort_group_end) = sort_group_oneof_tags.iter().next_back() {
+            if let Some(&sort_group_end) = sort_group_oneof_tags.last() {
                 if !matches!(
                     next_field,
                     Some(next_field) if next_field.first_tag() < sort_group_end

@@ -252,10 +252,6 @@ where
 {
     #[inline]
     fn insert_distinguished(&mut self, item: Self::Item) -> Result<Canonicity, DecodeErrorKind> {
-        #[cfg(not(rustc_1_66))]
-        let last = &self.iter().next_back();
-        #[cfg(rustc_1_66)]
-        #[allow(clippy::incompatible_msrv)]
         let last = self.last();
         match Some(&item).cmp(&last) {
             Less => {
@@ -344,10 +340,6 @@ where
         key: Self::Key,
         value: Self::Value,
     ) -> Result<Canonicity, DecodeErrorKind> {
-        #[cfg(not(rustc_1_66))]
-        let last_key = &self.keys().next_back();
-        #[cfg(rustc_1_66)]
-        #[allow(clippy::incompatible_msrv)]
         let last_key = self.last_key_value().map(|(k, ..)| k);
         match Some(&key).cmp(&last_key) {
             Less => {

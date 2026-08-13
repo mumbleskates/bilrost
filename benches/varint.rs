@@ -8,9 +8,6 @@ use criterion::{Criterion, Throughput};
 use rand::{rngs::StdRng, seq::SliceRandom, SeedableRng};
 use std::iter;
 
-#[cfg(not(rustc_1_66))]
-use criterion::black_box;
-#[cfg(rustc_1_66)]
 use std::hint::black_box;
 
 fn benchmark_varint(criterion: &mut Criterion, name: &str, mut values: Vec<u64>) {
@@ -36,7 +33,6 @@ fn benchmark_varint(criterion: &mut Criterion, name: &str, mut values: Vec<u64>)
                     for &value in &encode_values {
                         encode_varint(value, &mut buf);
                     }
-                    #[allow(clippy::incompatible_msrv)]
                     black_box(&buf);
                 })
             }
@@ -54,7 +50,6 @@ fn benchmark_varint(criterion: &mut Criterion, name: &str, mut values: Vec<u64>)
                     for &value in &encode_values {
                         prepend_varint(value, &mut buf);
                     }
-                    #[allow(clippy::incompatible_msrv)]
                     black_box(&buf);
                 })
             }
@@ -77,7 +72,6 @@ fn benchmark_varint(criterion: &mut Criterion, name: &str, mut values: Vec<u64>)
                     while buf.has_remaining() {
                         let result = decode_varint(&mut buf);
                         debug_assert!(result.is_ok());
-                        #[allow(clippy::incompatible_msrv)]
                         black_box(&result);
                     }
                 })
@@ -93,7 +87,6 @@ fn benchmark_varint(criterion: &mut Criterion, name: &str, mut values: Vec<u64>)
                 for &value in &values {
                     sum += encoded_len_varint(value);
                 }
-                #[allow(clippy::incompatible_msrv)]
                 black_box(sum);
             })
         });
@@ -128,7 +121,6 @@ fn benchmark_decode_key(criterion: &mut Criterion, name: &str, mut values: Vec<u
                     while buf.remaining() > 0 {
                         let result = TagReader::new().decode_key(buf.lend());
                         debug_assert!(result.is_ok());
-                        #[allow(clippy::incompatible_msrv)]
                         black_box(&result);
                     }
                 })

@@ -65,7 +65,7 @@ test-old:
     - ./test-ancient-hashbrown.sh
 
 test-msrv:
-  image: rust:1.65
+  image: rust:1.68
   stage: test
   before_script:
     - ./.gitlab-cargo-cache-expire.sh

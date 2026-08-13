@@ -310,7 +310,7 @@ macro_rules! impl_decoders {
                 ctx: DecodeContext,
             ) -> Result<(), DecodeError> {
                 let mut capped = buf.take_length_delimited()?;
-                // MSRV: this could be .is_some_and(..)
+                // MSRV: this could be .is_some_and(..) (1.70)
                 if matches!(
                     <() as Wiretyped<E, T>>::WIRE_TYPE.fixed_size(),
                     Some(fixed_size) if capped.remaining_before_cap() % fixed_size != 0
@@ -348,7 +348,7 @@ macro_rules! impl_decoders {
                 ctx: RestrictedDecodeContext,
             ) -> Result<Canonicity, DecodeError> {
                 let mut capped = buf.take_length_delimited()?;
-                // MSRV: this could be .is_some_and(..)
+                // MSRV: this could be .is_some_and(..) (1.70)
                 if matches!(
                     <() as Wiretyped<E, T>>::WIRE_TYPE.fixed_size(),
                     Some(fixed_size) if capped.remaining_before_cap() % fixed_size != 0
@@ -457,7 +457,7 @@ macro_rules! impl_decoders {
                 ctx: DecodeContext,
             ) -> Result<(), DecodeError> {
                 let mut capped = buf.take_length_delimited()?;
-                // MSRV: this could be .is_some_and(..)
+                // MSRV: this could be .is_some_and(..) (1.70)
                 if matches!(
                     <() as Wiretyped<E, T>>::WIRE_TYPE.fixed_size(),
                     Some(fixed_size) if capped.remaining_before_cap() != fixed_size * N

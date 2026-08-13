@@ -31,7 +31,7 @@ resolver = "2"
 [workspace.package]
 version = "0.1016.0-dev"
 edition = "2021"
-rust-version = "1.65"
+rust-version = "1.68"
 
 [lib]
 # https://bheisler.github.io/criterion.rs/book/faq.html#cargo-bench-gives-unrecognized-option-errors-for-valid-command-line-options
@@ -77,8 +77,8 @@ time = { version = "^0.3.22", default-features = false, optional = true }
 tinyvec = { version = "^1", default-features = false, features = ["alloc", "rustc_1_57"], optional = true }
 
 # pprof prevents building on windows, so must be an optional feature.
-# pprof's MSRV was bumped to 1.66 in the v0.14 release, so we should continue to support 0.13.
-pprof = { version = ">=0.13,<0.16", features = ["flamegraph"], optional = true }
+# pprof's MSRV was bumped to 1.74 in the v0.15 release, so we should continue to support 0.14.
+pprof = { version = ">=0.14,<0.15", features = ["flamegraph"], optional = true }
 
 [build-dependencies]
 autocfg = "1.5.1"
