@@ -584,7 +584,8 @@ impl<'a> MessageFieldsSorted<'a> {
             let overlaps =
                 matches!(next_field, Some(next_field) if last_tag > next_field.first_tag());
             // Check if this field is already in a range we know requires runtime sorting.
-            matches!(sort_group_oneof_tags.last(), Some(&end) if end > first_tag);
+            let in_current_sort_group =
+                matches!(sort_group_oneof_tags.last(), Some(&end) if end > first_tag);
 
             if in_current_sort_group {
                 // We're still building a sort group.
