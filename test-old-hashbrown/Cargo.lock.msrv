@@ -10,7 +10,7 @@ checksum = "f2032f911046de80f0a198e0901378627c33f59ea0ac00e363d481118bd70a53"
 
 [[package]]
 name = "bilrost"
-version = "0.1015.0-dev"
+version = "0.1016.0-dev"
 dependencies = [
  "autocfg",
  "bilrost-derive",
@@ -20,7 +20,7 @@ dependencies = [
 
 [[package]]
 name = "bilrost-derive"
-version = "0.1015.0-dev"
+version = "0.1016.0-dev"
 dependencies = [
  "eyre",
  "itertools",
@@ -83,14 +83,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "old-hashbrown-check"
-version = "0.0.0"
-dependencies = [
- "bilrost",
- "hashbrown",
-]
-
-[[package]]
 name = "once_cell"
 version = "1.21.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -129,6 +121,14 @@ dependencies = [
  "proc-macro2",
  "quote",
  "unicode-ident",
+]
+
+[[package]]
+name = "test-old-hashbrown"
+version = "0.0.0"
+dependencies = [
+ "bilrost",
+ "hashbrown",
 ]
 
 [[package]]

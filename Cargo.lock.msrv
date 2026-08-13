@@ -113,7 +113,7 @@ dependencies = [
 
 [[package]]
 name = "bilrost"
-version = "0.1015.0-dev"
+version = "0.1016.0-dev"
 dependencies = [
  "arbitrary",
  "arrayvec",
@@ -128,6 +128,7 @@ dependencies = [
  "criterion",
  "hashbrown",
  "itertools 0.15.0",
+ "jiff",
  "pprof",
  "proptest",
  "rand",
@@ -142,7 +143,7 @@ dependencies = [
 
 [[package]]
 name = "bilrost-derive"
-version = "0.1015.0-dev"
+version = "0.1016.0-dev"
 dependencies = [
  "eyre",
  "itertools 0.15.0",
@@ -153,7 +154,7 @@ dependencies = [
 
 [[package]]
 name = "bilrost-types"
-version = "0.1015.0-dev"
+version = "0.1016.0-dev"
 dependencies = [
  "bilrost",
  "proptest",
@@ -320,16 +321,12 @@ version = "0.0.0"
 dependencies = [
  "bilrost",
  "bilrost-types",
- "bstr",
  "bytes",
- "bytestring",
  "chrono",
  "eyre",
  "once_cell",
  "regex",
- "smol_str",
- "time",
- "tinyvec",
+ "test-types",
 ]
 
 [[package]]
@@ -403,6 +400,37 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bef552e6f588e446098f6ba40d89ac146c8c7b64aade83c051ee00bb5d2bc18d"
 dependencies = [
  "uuid",
+]
+
+[[package]]
+name = "defmt"
+version = "1.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e2953bfe4f93bbd20cc71198842756f77d161884c99ebbabc41d80231ded88d1"
+dependencies = [
+ "bitflags 1.3.2",
+ "defmt-macros",
+]
+
+[[package]]
+name = "defmt-macros"
+version = "1.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bad9c72e7ca2137e0dc3813245a0d282fd6daad32fd800af018306a9169b5fe8"
+dependencies = [
+ "defmt-parser",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "defmt-parser"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "10d60334b3b2e7c9d91ef8150abfb6fa4c1c39ebbcf4a81c2e346aad939fee3e"
+dependencies = [
+ "thiserror",
 ]
 
 [[package]]
@@ -651,6 +679,59 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4a5f13b858c8d314ee3e8f639011f7ccefe71f97f96e50151fb991f267928e2c"
 
 [[package]]
+name = "jiff"
+version = "0.2.35"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "668b7183bd07af9a4885f5c35b0cc5c83c4607a913c16b7e17291832910d2dcc"
+dependencies = [
+ "defmt",
+ "jiff-core",
+ "jiff-static",
+ "jiff-tzdb-platform",
+ "log",
+ "portable-atomic",
+ "portable-atomic-util",
+ "serde_core",
+ "windows-link",
+]
+
+[[package]]
+name = "jiff-core"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7feca88439efe53da3754500c1851dedf3cb36c524dd5cf8225cc0794de95d09"
+dependencies = [
+ "defmt",
+]
+
+[[package]]
+name = "jiff-static"
+version = "0.2.35"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3a69dcb3a21cfb32ce1cd056169337ca284af0766dd766e7878819b251a49204"
+dependencies = [
+ "jiff-core",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "jiff-tzdb"
+version = "0.1.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "142bd39932ad231f10513df9ab62661fead8719872150b7ad02a2df79f4e141e"
+
+[[package]]
+name = "jiff-tzdb-platform"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "875a5a69ac2bab1a891711cf5eccbec1ce0341ea805560dcd90b7a2e925132e8"
+dependencies = [
+ "jiff-tzdb",
+]
+
+[[package]]
 name = "js-sys"
 version = "0.3.85"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -767,6 +848,21 @@ name = "oorandom"
 version = "11.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d6790f58c7ff633d8771f42965289203411a5e5c68388703c06e14f24770b41e"
+
+[[package]]
+name = "portable-atomic"
+version = "1.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "05c8b63e8d9609db387f0324918f81d68fe27748f084ef092fb35954d0539a85"
+
+[[package]]
+name = "portable-atomic-util"
+version = "0.2.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c2a106d1259c23fac8e543272398ae0e3c0b8d33c88ed73d0cc71b0f1d902618"
+dependencies = [
+ "portable-atomic",
+]
 
 [[package]]
 name = "pprof"
@@ -1140,6 +1236,37 @@ dependencies = [
 ]
 
 [[package]]
+name = "test-custom-crate-name"
+version = "0.0.0"
+dependencies = [
+ "bilrost",
+]
+
+[[package]]
+name = "test-derived-schema"
+version = "0.0.0"
+dependencies = [
+ "bilrost",
+ "test-types",
+]
+
+[[package]]
+name = "test-types"
+version = "0.0.0"
+dependencies = [
+ "bilrost",
+ "bilrost-types",
+ "bstr",
+ "bytes",
+ "bytestring",
+ "chrono",
+ "jiff",
+ "smol_str",
+ "time",
+ "tinyvec",
+]
+
+[[package]]
 name = "thin-vec"
 version = "0.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1167,20 +1294,30 @@ dependencies = [
 
 [[package]]
 name = "time"
-version = "0.3.0"
+version = "0.3.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6cf2535c6456e772ad756a0854ec907ede55d73d0b5a34855d808cb2d2f0942e"
+checksum = "ea9e1b3cf1243ae005d9e74085d4d542f3125458f3a81af210d901dcd7411efd"
 dependencies = [
- "libc",
  "rand",
+ "serde",
+ "time-core",
  "time-macros",
 ]
 
 [[package]]
-name = "time-macros"
-version = "0.2.0"
+name = "time-core"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "10758c2d95454f52ffd0173cd4a0dce8d6b118b9aac27c5a4b785ddf9a499c72"
+checksum = "7300fbefb4dadc1af235a9cef3737cea692a9d97e1b9cbcd4ebdae6f8868e6fb"
+
+[[package]]
+name = "time-macros"
+version = "0.2.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "372950940a5f07bf38dbe211d7283c9e6d7327df53794992d293e534c733d09b"
+dependencies = [
+ "time-core",
+]
 
 [[package]]
 name = "tinytemplate"

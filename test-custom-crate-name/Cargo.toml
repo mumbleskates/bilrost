@@ -1,5 +1,5 @@
 [package]
-name = "custom-crate-name-test"
+name = "test-custom-crate-name"
 version = "0.0.0"
 publish = false
 edition.workspace = true
