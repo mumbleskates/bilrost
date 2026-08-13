@@ -46,8 +46,8 @@ test:
     - cargo test --workspace --all-targets --features test-suite-extra --no-default-features
     - ./test-ancient-hashbrown.sh
 
-test-msrv:
-  image: rust:1.65
+test-old:
+  image: rust:1.70
   stage: test
   before_script:
     - ./.gitlab-cargo-cache-expire.sh
@@ -59,6 +59,24 @@ test-msrv:
     - cargo test --workspace --doc         --features full-test-suite,forbid-unsafe
     - cargo test --workspace --all-targets --features full-test-suite --no-default-features
     - cargo test --workspace --doc         --features full-test-suite --no-default-features
+    - cargo test --workspace --all-targets --no-default-features
+    - cargo test --workspace --doc         --no-default-features
+    - cargo test --workspace --all-targets --features test-suite-extra --no-default-features
+    - ./test-ancient-hashbrown.sh
+
+test-msrv:
+  image: rust:1.65
+  stage: test
+  before_script:
+    - ./.gitlab-cargo-cache-expire.sh
+    - ./msrv-lock.sh
+  script:
+    - cargo test --workspace --all-targets --features msrv-test-suite
+    - cargo test --workspace --doc         --features msrv-test-suite
+    - cargo test --workspace --all-targets --features msrv-test-suite,forbid-unsafe
+    - cargo test --workspace --doc         --features msrv-test-suite,forbid-unsafe
+    - cargo test --workspace --all-targets --features msrv-test-suite --no-default-features
+    - cargo test --workspace --doc         --features msrv-test-suite --no-default-features
     - cargo test --workspace --all-targets --no-default-features
     - cargo test --workspace --doc         --no-default-features
     - cargo test --workspace --all-targets --features test-suite-extra --no-default-features

@@ -107,18 +107,21 @@ forbid-unsafe = []
 no-recursion-limit = []
 std = []
 
-third-party-type-support = [
+msrv-type-support = [
     "arrayvec",
     "bstr",
     "bytestring",
     "chrono",
     "hashbrown",
-    "jiff",
     "smallvec",
     "smol_str",
     "thin-vec",
     "time",
     "tinyvec",
+]
+third-party-type-support = [
+    "msrv-type-support",
+    "jiff",
 ]
 arrayvec = ["dep:arrayvec"]
 bstr = ["dep:bstr"]
@@ -167,10 +170,14 @@ auto-unroll-varint-encoding = []
 prefer-no-unroll-varint-encoding = []
 unroll-varint-encoding = []
 
-full-test-suite = [
+msrv-test-suite = [
     "derive",
     "detailed-errors",
     "extended-diagnostics",
+    "msrv-type-support",
+]
+full-test-suite = [
+    "msrv-test-suite",
     "third-party-type-support",
 ]
 
