@@ -25,9 +25,10 @@ test-types = { path = "../../test-types" }
 [features]
 compare-borrowed = []
 forbid-unsafe = ["bilrost/forbid-unsafe"]
-# this is the feature name we enable everywhere for the workspace test suite, ensuring that we will
-# assert all our types' borrowing impls via the test messages.
-full-test-suite = ["compare-borrowed"]
+# these are the feature names we enable everywhere for the workspace test suite, ensuring that we
+# will assert all our types' borrowing impls via the test messages.
+msrv-test-suite = ["compare-borrowed"]
+full-test-suite = ["msrv-test-suite", "test-types/full-type-support"]
 extra = ["bilrost/test-suite-extra"]
 
 [[bin]]

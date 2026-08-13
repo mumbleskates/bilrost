@@ -801,16 +801,22 @@ pub struct TestTypeSupport<'a> {
     bstr: bstr::BString,
     #[bilrost(18)]
     bstr_cow: Cow<'a, bstr::BStr>,
+    #[cfg(feature = "jiff")]
     #[bilrost(19)]
     jiff_date: jiff::civil::Date,
+    #[cfg(feature = "jiff")]
     #[bilrost(20)]
     jiff_time: jiff::civil::Time,
+    #[cfg(feature = "jiff")]
     #[bilrost(21)]
     jiff_datetime: jiff::civil::DateTime,
+    #[cfg(feature = "jiff")]
     #[bilrost(22)]
     jiff_timestamp: jiff::Timestamp,
+    #[cfg(feature = "jiff")]
     #[bilrost(23)]
     jiff_duration: jiff::SignedDuration,
+    #[cfg(feature = "jiff")]
     #[bilrost(24)]
     jiff_zoned: jiff::Zoned,
 }
@@ -852,14 +858,19 @@ pub struct TestTypeSupportDistinguished<'a> {
     bstr: bstr::BString,
     #[bilrost(17)]
     bstr_cow: Cow<'a, bstr::BStr>,
+    #[cfg(feature = "jiff")]
     #[bilrost(18)]
     jiff_date: jiff::civil::Date,
+    #[cfg(feature = "jiff")]
     #[bilrost(19)]
     jiff_time: jiff::civil::Time,
+    #[cfg(feature = "jiff")]
     #[bilrost(20)]
     jiff_datetime: jiff::civil::DateTime,
+    #[cfg(feature = "jiff")]
     #[bilrost(21)]
     jiff_timestamp: jiff::Timestamp,
+    #[cfg(feature = "jiff")]
     #[bilrost(22)]
     jiff_duration: jiff::SignedDuration,
 }
