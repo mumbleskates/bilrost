@@ -31,7 +31,7 @@ jobs:
     #     - windows-latest
     env:
       TEST_SUITE: "${{ matrix.toolchain == '1.68' && 'msrv-test-suite' || 'full-test-suite' }}"
-      CARGO_REGISTRIES_CRATES_IO_PROTOCOL: "${{ matrix.toolchain == '1.68' && 'sparse' || '' }}"
+      CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
     steps:
       - uses: actions/checkout@v7
       - name: install toolchain (${{ matrix.toolchain }})
