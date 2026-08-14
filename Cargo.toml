@@ -29,7 +29,7 @@ exclude = [
 resolver = "2"
 
 [workspace.package]
-version = "0.1016.0-dev"
+version = "0.1016.0"
 edition = "2021"
 rust-version = "1.68"
 
@@ -62,7 +62,7 @@ harness = false # just run the binary
 
 [dependencies]
 arrayvec = { version = ">=0.6.0,<0.8", default-features = false, optional = true }
-bilrost-derive = { version = "=0.1016.0-dev", path = "bilrost-derive", optional = true }
+bilrost-derive = { version = "=0.1016.0", path = "bilrost-derive", optional = true }
 bstr = { version = "^1", default-features = false, features = ["alloc"], optional = true }
 bytes = { version = "^1", default-features = false }
 bytestring = { version = "^1", default-features = false, optional = true }
