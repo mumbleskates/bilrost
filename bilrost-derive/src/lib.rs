@@ -2728,7 +2728,7 @@ mod test {
     }
 
     #[test]
-    fn test_rejects_attributes_on_value_variant() {
+    fn test_rejects_attributes_inside_value_variant() {
         let output = try_oneof(quote!(
             enum A {
                 #[bilrost(1)]
