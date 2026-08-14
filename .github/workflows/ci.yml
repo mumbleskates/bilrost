@@ -6,9 +6,10 @@ jobs:
   rustfmt:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@v7
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
+          toolchain: stable
           components: clippy, rustfmt
       - run: cargo clippy --all --all-targets --features full-test-suite
       - run: cargo clippy --all --all-targets --features full-test-suite,forbid-unsafe
@@ -21,9 +22,9 @@ jobs:
     strategy:
       matrix:
         toolchain:
-          - stable
-          - "1.70"
-          - "1.68"
+          - stable  # current rust
+          - "1.70"  # oldest rust version that supports all features
+          - "1.68"  # oldest supported rust version
         os:
           - ubuntu-latest
     #     - macos-latest
@@ -32,9 +33,9 @@ jobs:
       TEST_SUITE: "${{ matrix.toolchain == '1.68' && 'msrv-test-suite' || 'full-test-suite }}"
       CARGO_REGISTRIES_CRATES_IO_PROTOCOL: "${{ matrix.toolchain == '1.68' && 'sparse' || '' }}"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: install toolchain (${{ matrix.toolchain }})
-        uses: dtolnay/rust-toolchain@master
+        uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: ${{ matrix.toolchain }}
       - uses: Swatinem/rust-cache@v2
@@ -62,8 +63,10 @@ jobs:
   no-std:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@nightly
+      - uses: actions/checkout@v7
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
       - uses: Swatinem/rust-cache@v2
       - name: install cargo-no-std-check
         uses: baptiste0928/cargo-install@v3

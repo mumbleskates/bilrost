@@ -30,6 +30,7 @@ lint:
     - cargo clippy --workspace --all-targets --no-default-features
     - cargo fmt --all --check
 
+# modern rust
 test:
   stage: test
   before_script:
@@ -46,6 +47,7 @@ test:
     - cargo test --workspace --all-targets --features test-suite-extra --no-default-features
     - ./test-ancient-hashbrown.sh
 
+# oldest version of rust that supports all features
 test-old:
   image: rust:1.70
   stage: test
@@ -64,6 +66,7 @@ test-old:
     - cargo test --workspace --all-targets --features test-suite-extra --no-default-features
     - ./test-ancient-hashbrown.sh
 
+# oldest supported version of rust
 test-msrv:
   image: rust:1.68
   stage: test
