@@ -24,3 +24,6 @@ itertools = { version = "0.15", default-features = false, features = ["use_alloc
 proc-macro2 = "1"
 quote = "1"
 syn = { version = ">=2,<4", features = ["extra-traits", "full"] }
+
+[build-dependencies]
+autocfg = "1.5.1"
