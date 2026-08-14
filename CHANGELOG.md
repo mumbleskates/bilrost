@@ -34,6 +34,7 @@
 * Added support for deriving `Oneof` enums with zero non-empty variants and
   including them in messages. This isn't often useful but there's no reason
   it should be impossible.
+* Fixed a reference to the `std` crate in the `smol_str` feature.
 
 ### Cleanups
 
