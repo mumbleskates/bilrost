@@ -10,7 +10,9 @@ for feature in std \
                bytestring \
                chrono \
                hashbrown \
+               jiff \
                smallvec \
+               smol_str \
                thin-vec \
                time \
                tinyvec \
