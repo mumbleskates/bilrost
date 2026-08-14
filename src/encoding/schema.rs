@@ -17,8 +17,8 @@ use alloc::boxed::Box;
 use alloc::collections::btree_map::Entry;
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::format;
+use alloc::rc::Rc;
 use alloc::string::String;
-use alloc::sync::Arc;
 use core::any::{type_name, Any, TypeId};
 use core::fmt::{Display, Formatter};
 use core::ops::DerefMut;
@@ -67,12 +67,12 @@ pub trait PopulateSchema {
 
 /// A collected internally-complete set of message definitions.
 #[derive(Clone)]
-pub struct Schema(Arc<MessageSet>);
+pub struct Schema(Rc<MessageSet>);
 
 #[derive(Default)]
 struct MessageSet {
-    types: Guard<BTreeMap<TypeId, Arc<Guard<TypeInfo>>>>,
-    subtypes: Guard<BTreeMap<TypeId, Arc<Guard<OneofMessages>>>>,
+    types: Guard<BTreeMap<TypeId, Rc<Guard<TypeInfo>>>>,
+    subtypes: Guard<BTreeMap<TypeId, Rc<Guard<OneofMessages>>>>,
     type_index: Guard<BTreeMap<(TypeId, Option<u32>), usize>>,
     message_wrappers: Guard<BTreeMap<TypeId, TypeId>>,
 }
@@ -106,6 +106,12 @@ impl Schema {
     }
 }
 
+impl Default for Schema {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Methods to actually populate a schema's data for messages and so forth.
 ///
 /// This trait is usable from a const reference with interior mutability because when messages
@@ -123,7 +129,7 @@ impl PopulateSchema for Schema {
         }
         let info = match self.0.types.borrow_mut().entry(ty_id) {
             Entry::Vacant(entry) => entry
-                .insert(Arc::new(Guard::new(TypeInfo::Message(MessageFields::new(
+                .insert(Rc::new(Guard::new(TypeInfo::Message(MessageFields::new(
                     name,
                     type_name::<M>(),
                 )))))
@@ -150,7 +156,7 @@ impl PopulateSchema for Schema {
         }
         let info = match self.0.types.borrow_mut().entry(ty_id) {
             Entry::Vacant(entry) => entry
-                .insert(Arc::new(Guard::new(TypeInfo::Enum(EnumInfo::new(
+                .insert(Rc::new(Guard::new(TypeInfo::Enum(EnumInfo::new(
                     name,
                     type_name::<E>(),
                 )))))
@@ -181,7 +187,7 @@ impl PopulateSchema for Schema {
         }
         let info = match self.0.subtypes.borrow_mut().entry(TypeId::of::<T>()) {
             Entry::Vacant(entry) => entry
-                .insert(Arc::new(Guard::new(OneofMessages::new(
+                .insert(Rc::new(Guard::new(OneofMessages::new(
                     name,
                     type_name::<T>(),
                 ))))
@@ -365,7 +371,7 @@ impl Schema {
             if first_print {
                 first_print = false;
             } else {
-                writeln!(f, "")?;
+                writeln!(f)?;
             }
             match subtype_tag {
                 None => {
@@ -477,7 +483,7 @@ impl MessageFields {
     }
 
     pub fn add_oneof(&mut self, oneof_name: &str, tags: &[u32]) {
-        let tag_set = tags.into_iter().copied().collect();
+        let tag_set = tags.iter().copied().collect();
         for (existing_oneof_name, existing_set) in &self.oneofs {
             if let Some(conflicting_tag) = existing_set.intersection(&tag_set).next() {
                 panic!(

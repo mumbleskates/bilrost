@@ -305,7 +305,7 @@ impl Proxiable<SealedBilrostTag> for DateTime {
             self.hour() as i32,
             self.minute() as i32,
             self.second() as i32,
-            self.subsec_nanosecond() as i32,
+            self.subsec_nanosecond(),
         ])
     }
 

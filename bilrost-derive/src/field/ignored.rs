@@ -152,9 +152,7 @@ pub fn initializer_class_definition(
             }
         }))
         .peekable();
-    if all_methods.peek().is_none() {
-        return None;
-    }
+    all_methods.peek()?; // no result if there aren't any methods
     Some(quote! {
         struct __BilrostInitializer<T>(T);
         impl #impl_generics __BilrostInitializer<__Self #type_generics> #where_clause {

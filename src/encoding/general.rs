@@ -223,7 +223,7 @@ impl<const P: u8> ValueRepr<GeneralGeneric<P>, &str> for () {
     }
 }
 
-impl<'a, const P: u8> ValueEncoder<GeneralGeneric<P>, &'a str> for () {
+impl<const P: u8> ValueEncoder<GeneralGeneric<P>, &str> for () {
     #[inline]
     fn encode_value<B: BufMut + ?Sized>(value: &&str, buf: &mut B) {
         <() as ValueEncoder<PlainBytes, _>>::encode_value(&value.as_bytes(), buf)
