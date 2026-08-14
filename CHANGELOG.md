@@ -34,6 +34,10 @@
 * Added support for deriving `Oneof` enums with zero non-empty variants and
   including them in messages. This isn't often useful but there's no reason
   it should be impossible.
+* Made the `Oneof` derive fail when there are `#[bilrost]` attributes on the
+  field *inside* a value variant. Previously attributes in this position had no
+  effect, and could be error-prone since it looks like the attributes do
+  something when they do not.
 
 ### Cleanups
 
