@@ -47,6 +47,24 @@ test:
     - cargo test --workspace --all-targets --features test-suite-extra --no-default-features
     - ./test-ancient-hashbrown.sh
 
+# modern rust with outdated dependencies
+test-outdated:
+  stage: test
+  before_script:
+    - ./.gitlab-cargo-cache-expire.sh
+    - ./msrv-lock.sh
+  script:
+    - cargo test --workspace --all-targets --features full-test-suite
+    - cargo test --workspace --doc         --features full-test-suite
+    - cargo test --workspace --all-targets --features full-test-suite,forbid-unsafe
+    - cargo test --workspace --doc         --features full-test-suite,forbid-unsafe
+    - cargo test --workspace --all-targets --features full-test-suite --no-default-features
+    - cargo test --workspace --doc         --features full-test-suite --no-default-features
+    - cargo test --workspace --all-targets --no-default-features
+    - cargo test --workspace --doc         --no-default-features
+    - cargo test --workspace --all-targets --features test-suite-extra --no-default-features
+    - ./test-ancient-hashbrown.sh
+
 # oldest version of rust that supports all features
 test-old:
   image: rust:1.70

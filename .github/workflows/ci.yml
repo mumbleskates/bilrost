@@ -60,6 +60,46 @@ jobs:
       - name: ancient hashbrown check
         run: ./test-ancient-hashbrown.sh
 
+  test-outdated:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        toolchain:
+          - stable  # current rust
+        os:
+          - ubuntu-latest
+    #     - macos-latest
+    #     - windows-latest
+    env:
+      TEST_SUITE: full-test-suite
+    steps:
+      - uses: actions/checkout@v7
+      - name: install toolchain (${{ matrix.toolchain }})
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: ${{ matrix.toolchain }}
+      - uses: Swatinem/rust-cache@v2
+      - name: pin to old dependency versions
+        run: ./msrv-lock.sh
+      - name: test
+        run: cargo test --workspace --all-targets --features $TEST_SUITE
+      - name: test forbid-unsafe
+        run: cargo test --workspace --all-targets --features $TEST_SUITE,forbid-unsafe
+      - name: test no-default-features
+        run: cargo test --workspace --all-targets --features $TEST_SUITE --no-default-features
+      - name: test minimal features
+        run: cargo test --workspace --all-targets --no-default-features
+      - name: test doc
+        run: cargo test --workspace --doc --features $TEST_SUITE
+      - name: test doc no-default-features
+        run: cargo test --workspace --doc --features $TEST_SUITE --no-default-features
+      - name: test doc minimal features
+        run: cargo test --workspace --doc --no-default-features
+      - name: test suite extra external crate options
+        run: cargo test --workspace --features test-suite-extra --no-default-features
+      - name: ancient hashbrown check
+        run: ./test-ancient-hashbrown.sh
+
   no-std:
     runs-on: ubuntu-latest
     steps:
