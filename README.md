@@ -472,6 +472,10 @@ The `bilrost` crate has several optional features:
 * "extended-diagnostics": with a small added dependency, attempts to provide
   better compile-time diagnostics when derives and derived implementations don't
   work. Somewhat experimental.
+* "default-field-values": enables parsing and using the
+  [default field value][defaultfieldval] unstable syntax for ignored fields in
+  the derive macros. This requires building the `bilrost-derive` crate with
+  `syn 3`.
 * "arrayvec": provides first-party support for [`arrayvec::ArrayVec`][arrayvec]
 * "bstr": provides first-party support for [`bstr::BString`][bstr]
 * "bytestring": provides first-party support for

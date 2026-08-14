@@ -98,6 +98,7 @@ yoke = { version = ">=0.7.1,<0.9", features = ["derive"] }
 
 [features]
 default = ["auto-optimize", "derive", "detailed-errors", "std"]
+default-field-values = ["bilrost-derive?/default-field-values"]
 derive = ["dep:bilrost-derive"]
 detailed-errors = ["dep:thin-vec"]
 extended-diagnostics = ["dep:const_panic"]

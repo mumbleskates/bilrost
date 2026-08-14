@@ -79,12 +79,12 @@ pub fn parse_message_fields(
                     let index = syn::Index::from(index);
                     quote!(#index)
                 });
-            #[cfg(rustc_1_84)]
+            #[cfg(feature = "default-field-values")]
             let init_mode = match &field.default {
                 Some((_, init_expr)) => InitMode::Override(init_expr.clone()),
                 None => init_mode.clone(),
             };
-            #[cfg(not(rustc_1_84))]
+            #[cfg(not(feature = "default-field-values"))]
             let init_mode = init_mode.clone();
             let field = Field::new(&field_ident, &field.ty, &field.attrs, next_tag, init_mode)
                 .map_err(|e| err!("invalid field {field_ident}: {e}"))?;

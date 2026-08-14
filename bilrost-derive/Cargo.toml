@@ -25,5 +25,5 @@ proc-macro2 = "1"
 quote = "1"
 syn = { version = ">=2,<4", features = ["extra-traits", "full"] }
 
-[build-dependencies]
-autocfg = "1.5.1"
+[features]
+default-field-values = [] # support for default field values syntax; requires syn 3
