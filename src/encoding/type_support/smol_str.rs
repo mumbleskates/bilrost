@@ -18,9 +18,7 @@ impl<const P: u8> Wiretyped<GeneralGeneric<P>, smol_str::SmolStr> for () {
 }
 
 impl<const P: u8> ValueRepr<GeneralGeneric<P>, smol_str::SmolStr> for () {
-    fn repr(
-        schema: &crate::encoding::schema::Schema,
-    ) -> std::prelude::v1::Box<dyn core::fmt::Display> {
+    fn repr(schema: &crate::encoding::schema::Schema) -> alloc::boxed::Box<dyn core::fmt::Display> {
         <() as ValueRepr<General, &str>>::repr(schema)
     }
 }
