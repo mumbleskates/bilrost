@@ -81,7 +81,7 @@ pub fn parse_message_fields(
                 });
             #[cfg(rustc_1_84)]
             let init_mode = match &field.default {
-                Some((_, init_expr)) => InitMode::Override(init_expr.clone),
+                Some((_, init_expr)) => InitMode::Override(init_expr.clone()),
                 None => init_mode.clone(),
             };
             #[cfg(not(rustc_1_84))]
