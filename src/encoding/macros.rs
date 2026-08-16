@@ -514,6 +514,7 @@ macro_rules! delegate_proxied_encoding {
             delegate from ($from)
             to ($crate::encoding::Proxied<$to $(, $proxy_tag)?>)
             for type ($value_ty)
+            including schema
             $(with where clause ($($where_clause)*))?
             $(with generics ($($impl_generics)*))?
         );
