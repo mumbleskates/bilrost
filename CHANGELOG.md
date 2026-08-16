@@ -6,6 +6,9 @@
 
 ### Fixes
 
+* Fixed a missing "with schema" passthrough in the "delegate_proxied_encoding!"
+  macro.
+
 ### Cleanups
 
 ## v0.1016.0
