@@ -99,7 +99,7 @@ pub fn parse_message_fields(
     // Index all fields by their tag(s) and check them against the forbidden tag ranges
     let all_tags: BTreeMap<u32, &Field> = unsorted_fields
         .iter()
-        .flat_map(|field| field.tags().into_iter().zip(repeat(field)))
+        .flat_map(|field| field.tags().iter().copied().zip(repeat(field)))
         .collect();
     for reserved_range in reserved.unwrap_or_default().iter_tag_ranges() {
         if let Some((forbidden_tag, bad_field)) = all_tags.range(reserved_range).next() {
@@ -126,7 +126,13 @@ pub fn parse_message_fields(
 pub fn tag_measurer<T: Tagged>(
     for_these: impl IntoIterator<Item = T>,
 ) -> fn(&Context) -> TokenStream {
-    if matches!(for_these.into_iter().flat_map(|t| t.tags()).max(), Some(max_tag) if max_tag < 32) {
+    if matches!(
+        for_these
+            .into_iter()
+            .flat_map(|t| t.tags().iter().copied().max())
+            .max(),
+        Some(max_tag) if max_tag < 32
+    ) {
         |ctx| {
             let crate_ = &ctx.crate_name;
             quote!(#crate_::encoding::TrivialTagMeasurer)
@@ -196,7 +202,7 @@ impl Field {
     pub fn ty(&self) -> &Type {
         match &self.content {
             Value(value) => value.ty(),
-            Oneof(oneof) => oneof.ty(),
+            Oneof(oneof) => &oneof.ty,
             Ignored(_) => panic!("ignored fields have no type"),
         }
     }
@@ -220,8 +226,7 @@ impl Field {
             return None; // only oneof inclusions have lists of tags that need assertions
         };
         let crate_ = &ctx.crate_name;
-        let mut tags = self.tags();
-        tags.sort();
+        let tags: Vec<u32> = self.tags().iter().cloned().sorted_unstable().collect();
         let oneof_ty = &field.ty;
         let description = format!(
             "tags don't match for oneof field {field_name} with type {oneof_ty_name}",
@@ -361,17 +366,17 @@ impl FieldBearer for Field {
 }
 
 impl Tagged for Field {
-    fn tags(&self) -> Vec<u32> {
+    fn tags(&self) -> &[u32] {
         match &self.content {
             Value(scalar) => scalar.tags(),
             Oneof(oneof) => oneof.tags(),
-            Ignored(..) => vec![],
+            Ignored(..) => &[],
         }
     }
 }
 
 impl Tagged for &Field {
-    fn tags(&self) -> Vec<u32> {
+    fn tags(&self) -> &[u32] {
         (**self).tags()
     }
 }

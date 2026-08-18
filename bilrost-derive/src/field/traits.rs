@@ -1,5 +1,4 @@
 use crate::Context;
-use alloc::vec;
 use alloc::vec::Vec;
 use core::ops::Deref;
 use proc_macro2::TokenStream;
@@ -53,22 +52,27 @@ where
 }
 
 pub trait SinglyTagged {
-    fn tag(&self) -> u32;
+    fn ref_tag(&self) -> &u32;
+
+    fn tag(&self) -> u32 {
+        *self.ref_tag()
+    }
 }
 
 impl<T: SinglyTagged> SinglyTagged for &T {
-    fn tag(&self) -> u32 {
-        (**self).tag()
+    fn ref_tag(&self) -> &u32 {
+        (**self).ref_tag()
     }
 }
 
 pub trait Tagged {
-    fn tags(&self) -> Vec<u32>;
+    fn tags(&self) -> &[u32];
 
     /// Returns the tag of this field with the least value
     fn first_tag(&self) -> u32 {
         self.tags()
-            .into_iter()
+            .iter()
+            .copied()
             .min()
             .expect("no first tag when there are no tags")
     }
@@ -76,14 +80,15 @@ pub trait Tagged {
     /// Returns the tag of this field with the greatest value
     fn last_tag(&self) -> u32 {
         self.tags()
-            .into_iter()
+            .iter()
+            .copied()
             .max()
             .expect("no last tag when there are no tags")
     }
 }
 
 impl<T: SinglyTagged> Tagged for T {
-    fn tags(&self) -> Vec<u32> {
-        vec![self.tag()]
+    fn tags(&self) -> &[u32] {
+        core::slice::from_ref(self.ref_tag())
     }
 }

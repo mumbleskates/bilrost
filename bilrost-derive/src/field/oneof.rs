@@ -55,10 +55,6 @@ impl OneofInclusion {
         })))
     }
 
-    pub fn ty(&self) -> &Type {
-        &self.ty
-    }
-
     /// Returns a statement which encodes the oneof field. `target` should be a reference to the
     /// field value.
     pub fn encode(&self, target: TokenStream, ctx: &Context) -> TokenStream {
@@ -202,7 +198,7 @@ impl OneofInclusion {
 }
 
 impl Tagged for OneofInclusion {
-    fn tags(&self) -> Vec<u32> {
-        self.tags.clone()
+    fn tags(&self) -> &[u32] {
+        &self.tags
     }
 }

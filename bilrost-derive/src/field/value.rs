@@ -317,8 +317,8 @@ impl MessageField {
 }
 
 impl SinglyTagged for MessageField {
-    fn tag(&self) -> u32 {
-        self.tag
+    fn ref_tag(&self) -> &u32 {
+        &self.tag
     }
 }
 
@@ -1003,8 +1003,8 @@ impl FieldBearer for OneofVariant {
 }
 
 impl SinglyTagged for OneofVariant {
-    fn tag(&self) -> u32 {
-        self.tag
+    fn ref_tag(&self) -> &u32 {
+        &self.tag
     }
 }
 
