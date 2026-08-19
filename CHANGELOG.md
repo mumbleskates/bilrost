@@ -8,6 +8,7 @@
 
 * Fixed a missing "with schema" passthrough in the "delegate_proxied_encoding!"
   macro.
+* Further fixes to allow including vacant oneofs inside oneof message variants.
 
 ### Cleanups
 
