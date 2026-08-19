@@ -598,7 +598,7 @@ impl OneofVariant {
     fn binding(fields: &[Field]) -> TokenStream {
         let bindings = fields
             .iter()
-            .filter(|field| !field.is_ignored())
+            .filter(|field| !field.tags().is_empty())
             .map(|field| {
                 let field_ident = field.ident();
                 let binding_ident = FieldTarget::free_field_ident(field);
@@ -629,7 +629,7 @@ impl OneofVariant {
             }
             VariantContents::Message(fields) => {
                 let binding = OneofVariant::binding(fields);
-                let sorted_fields = MessageFieldsSorted::new_filtering_ignored(fields);
+                let sorted_fields = MessageFieldsSorted::new(fields);
                 let encoded_len = sorted_fields.encoded_len(&FieldTarget::BoundVariantFields, ctx);
                 let encode = sorted_fields.encode(&FieldTarget::BoundVariantFields, ctx);
                 quote! {
@@ -667,8 +667,8 @@ impl OneofVariant {
             }
             VariantContents::Message(fields) => {
                 let binding = OneofVariant::binding(fields);
-                let prepend = MessageFieldsSorted::new_filtering_ignored(fields)
-                    .prepend(&FieldTarget::BoundVariantFields, ctx);
+                let prepend =
+                    MessageFieldsSorted::new(fields).prepend(&FieldTarget::BoundVariantFields, ctx);
                 quote! {
                     #type_ident::#variant_ident { #binding } => {
                         tw.begin_field(#tag, #crate_::encoding::WireType::LengthDelimited, buf);
@@ -702,7 +702,7 @@ impl OneofVariant {
             }
             VariantContents::Message(fields) => {
                 let binding = OneofVariant::binding(fields);
-                let encoded_len = MessageFieldsSorted::new_filtering_ignored(fields)
+                let encoded_len = MessageFieldsSorted::new(fields)
                     .encoded_len(&FieldTarget::BoundVariantFields, ctx);
                 quote! {
                     #type_ident::#variant_ident { #binding } => {
@@ -767,7 +767,7 @@ impl OneofVariant {
             }
             VariantContents::Message(fields) => {
                 let empties = fields.iter().filter_map(|field| {
-                    if field.is_ignored() {
+                    if field.tags().is_empty() {
                         return None; // we don't need mutable variables to parse ignored fields into
                     }
                     let field_ident = FieldTarget::free_field_ident(field);
@@ -818,7 +818,7 @@ impl OneofVariant {
                 let field_arms: Vec<_> = fields
                     .iter()
                     .filter_map(|field| {
-                        if field.is_ignored() {
+                        if field.tags().is_empty() {
                             return None;
                         }
                         let tags = field.tags().into_iter().map(|tag| quote!(#tag));
@@ -905,7 +905,7 @@ impl OneofVariant {
                     // variant like `..Default::default()`, since that would require an impl on
                     // the variant itself. so, we will only ever initialize them on a per-field
                     // basis like this.
-                    if field.is_ignored() {
+                    if field.tags().is_empty() {
                         let empty = field.empty(Some(self.tag), ctx);
                         quote!(#ident: #empty)
                     } else {

@@ -4121,6 +4121,19 @@ fn vacant_oneof_decoding() {
         field2: Option<VacantNonempty>,
     }
 
+    #[derive(Debug, PartialEq, Eq, Oneof, Message, Schema)]
+    #[bilrost(distinguished)]
+    enum VacantOneofWrapper {
+        Empty,
+        #[bilrost(tag(1), message)]
+        Wrapper {
+            #[bilrost(oneof())]
+            field1: Vacant,
+            #[bilrost(oneof())]
+            field2: Option<VacantNonempty>,
+        },
+    }
+
     assert::decodes!(
         owned distinguished,
         [],
@@ -4139,13 +4152,40 @@ fn vacant_oneof_decoding() {
         HasExtensions,
         "",
     );
+    assert::decodes!(
+        owned distinguished,
+        [(1, OV::message(&()))],
+        VacantOneofWrapper::Wrapper {
+            field1: Vacant::Empty,
+            field2: None,
+        },
+    );
+    assert::decodes!(
+        owned non-canonically,
+        [(1, OV::message(&[(1, OV::string("hello"))].into_opaque_message()))],
+        VacantWrapper {
+            field1: Vacant::Empty,
+            field2: None,
+        },
+        HasExtensions,
+        "",
+    );
 
     let schema = Schema::new();
     schema.register::<VacantWrapper>();
+    schema.register::<VacantOneofWrapper>();
     assert_eq!(
         format!("{schema}"),
         "\
-[1] message VacantWrapper {
+[1] message VacantOneofWrapper {
+    1: variant Wrapper (delimited message VacantOneofWrapper::Wrapper [2]),
+}
+
+[2] message VacantOneofWrapper::Wrapper {
+    // empty
+}
+
+[3] message VacantWrapper {
     // empty
 }
 "

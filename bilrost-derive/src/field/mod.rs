@@ -677,14 +677,6 @@ impl<'a> MessageFieldsSorted<'a> {
         }
     }
 
-    pub fn new_filtering_ignored(unsorted_fields: impl IntoIterator<Item = &'a Field>) -> Self {
-        Self::new(
-            unsorted_fields
-                .into_iter()
-                .filter(|field| !field.is_ignored()),
-        )
-    }
-
     pub fn encoded_len(&self, instance: &FieldTarget, ctx: &Context) -> TokenStream {
         let tag_measurer_ty = (self.tag_measurer_ty)(ctx);
         let sort_group_instance;
