@@ -29,8 +29,8 @@ sed -i -E "s/(version|bilrost) = \"${VERSION_MATCHER}\"/\1 = \"${MINOR}\"/" "${D
 # Update html_root_url attributes.
 sed -i -E "s~html_root_url = \"https://docs\.rs/${BILROST_CRATE_MATCHER}/${VERSION_MATCHER}\"~html_root_url = \"https://docs.rs/\1/${VERSION}\"~" \
   "${DIR}/src/lib.rs" \
-  "${DIR}/bilrost-derive/src/lib.rs" \
-  "${DIR}/bilrost-types/src/lib.rs"
+  "${DIR}/crate-derive/src/lib.rs" \
+  "${DIR}/crate-types/src/lib.rs"
 
 # Update Cargo.toml version fields.
 sed -i -E "s/^version = \"${VERSION_MATCHER}\"$/version = \"${VERSION}\"/" \
@@ -39,8 +39,8 @@ sed -i -E "s/^version = \"${VERSION_MATCHER}\"$/version = \"${VERSION}\"/" \
 # Update Cargo.toml dependency versions.
 sed -i -E "s/^${BILROST_CRATE_MATCHER} = \{ version = \"=${VERSION_MATCHER}\"/\1 = { version = \"=${VERSION}\"/" \
   "${DIR}/Cargo.toml" \
-  "${DIR}/bilrost-derive/Cargo.toml" \
-  "${DIR}/bilrost-types/Cargo.toml"
+  "${DIR}/crate-derive/Cargo.toml" \
+  "${DIR}/crate-types/Cargo.toml"
 
 # Update first line of CHANGELOG.md
 sed -i -E "1 s/^## v${VERSION_MATCHER}$/## v${VERSION}/" \

@@ -17,7 +17,7 @@ bilrost = { path = "..", default-features = false, features = [
     "time",
     "tinyvec",
 ] }
-bilrost-types = { path = "../bilrost-types" }
+bilrost-types = { path = "../crate-types" }
 bstr = "1.10"
 bytes = "1"
 bytestring = "1.3.1"

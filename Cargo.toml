@@ -16,8 +16,8 @@ rust-version.workspace = true
 
 [workspace]
 members = [
-    "bilrost-derive",
-    "bilrost-types",
+    "crate-derive",
+    "crate-types",
     "fuzz/common",
     "test-custom-crate-name",
     "test-derived-schema",
@@ -62,7 +62,7 @@ harness = false # just run the binary
 
 [dependencies]
 arrayvec = { version = ">=0.6.0,<0.8", default-features = false, optional = true }
-bilrost-derive = { version = "=0.1017.0-dev", path = "bilrost-derive", optional = true }
+bilrost-derive = { version = "=0.1017.0-dev", path = "crate-derive", optional = true }
 bstr = { version = "^1", default-features = false, features = ["alloc"], optional = true }
 bytes = { version = "^1", default-features = false }
 bytestring = { version = "^1", default-features = false, optional = true }
