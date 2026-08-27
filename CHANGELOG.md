@@ -1,16 +1,10 @@
 ## v0.1016.1-dev
 
-### Breaking changes
-
-### New features
-
 ### Fixes
 
 * Fixed a missing "with schema" passthrough in the "delegate_proxied_encoding!"
   macro.
 * Further fixes to allow including vacant oneofs inside oneof message variants.
-
-### Cleanups
 
 ## v0.1016.0
 
