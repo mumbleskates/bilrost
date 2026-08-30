@@ -1498,11 +1498,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream> {
         .sorted_unstable()
         .collect();
     if let Some((duplicate_tag, _)) = sorted_tags.iter().tuple_windows().find(|(a, b)| a == b) {
-        bail!(
-            "invalid oneof {}: multiple variants have tag {}",
-            ident,
-            duplicate_tag
-        );
+        bail!("invalid oneof {ident}: multiple variants have tag {duplicate_tag}");
     }
 
     let self_alias = quote!(Self);
