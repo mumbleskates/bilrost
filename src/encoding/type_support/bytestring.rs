@@ -60,10 +60,12 @@ impl<const P: u8> ValueDecoder<GeneralGeneric<P>, bytestring::ByteString> for ()
     fn decode_value<B: Buf + ?Sized>(
         value: &mut bytestring::ByteString,
         mut buf: Capped<B>,
-        _ctx: impl DecodeContext,
+        ctx: impl DecodeContext,
     ) -> Result<(), DecodeError> {
         let mut string_data = buf.take_length_delimited()?;
         let string_len = string_data.remaining_before_cap();
+        // heap used: the data is at least claimed by this bytes object
+        ctx.heap_used(string_len)?;
         *value = bytestring::ByteString::try_from(string_data.copy_to_bytes(string_len))
             .map_err(|_| DecodeError::new(InvalidValue))?;
         Ok(())

@@ -308,7 +308,7 @@ impl<const P: u8> ValueDecoder<GeneralGeneric<P>, String> for () {
     fn decode_value<B: Buf + ?Sized>(
         value: &mut String,
         mut buf: Capped<B>,
-        _ctx: impl DecodeContext,
+        ctx: impl DecodeContext,
     ) -> Result<(), DecodeError> {
         // ## Unsafety
         //
@@ -332,6 +332,8 @@ impl<const P: u8> ValueDecoder<GeneralGeneric<P>, String> for () {
         }
 
         let source = buf.take_length_delimited()?.take_all();
+        // heap used: string data is on the heap
+        ctx.heap_used(source.remaining())?;
         // If we must copy, make sure to copy only once.
         value.clear();
         value.reserve(source.remaining());
@@ -428,9 +430,12 @@ impl<const P: u8> ValueDecoder<GeneralGeneric<P>, Arc<str>> for () {
     fn decode_value<B: Buf + ?Sized>(
         value: &mut Arc<str>,
         mut buf: Capped<B>,
-        _ctx: impl DecodeContext,
+        ctx: impl DecodeContext,
     ) -> Result<(), DecodeError> {
-        *value = read_arc_str(buf.take_length_delimited()?)?;
+        let buf = buf.take_length_delimited()?;
+        // heap used: string data is on the heap
+        ctx.heap_used(buf.remaining_before_cap())?;
+        *value = read_arc_str(buf)?;
         Ok(())
     }
 }
@@ -501,9 +506,12 @@ impl<const P: u8> ValueDecoder<GeneralGeneric<P>, Rc<str>> for () {
     fn decode_value<B: Buf + ?Sized>(
         value: &mut Rc<str>,
         mut buf: Capped<B>,
-        _ctx: impl DecodeContext,
+        ctx: impl DecodeContext,
     ) -> Result<(), DecodeError> {
-        *value = read_rc_str(buf.take_length_delimited()?)?;
+        let buf = buf.take_length_delimited()?;
+        // heap used: string data is on the heap
+        ctx.heap_used(buf.remaining_before_cap())?;
+        *value = read_rc_str(buf)?;
         Ok(())
     }
 }
@@ -574,9 +582,12 @@ impl<const P: u8> ValueDecoder<GeneralGeneric<P>, Box<str>> for () {
     fn decode_value<B: Buf + ?Sized>(
         value: &mut Box<str>,
         mut buf: Capped<B>,
-        _ctx: impl DecodeContext,
+        ctx: impl DecodeContext,
     ) -> Result<(), DecodeError> {
-        *value = read_box_str(buf.take_length_delimited()?)?;
+        let buf = buf.take_length_delimited()?;
+        // heap used: string data is on the heap
+        ctx.heap_used(buf.remaining_before_cap())?;
+        *value = read_box_str(buf)?;
         Ok(())
     }
 }
@@ -657,10 +668,12 @@ impl<const P: u8> ValueDecoder<GeneralGeneric<P>, Bytes> for () {
     fn decode_value<B: Buf + ?Sized>(
         value: &mut Bytes,
         mut buf: Capped<B>,
-        _ctx: impl DecodeContext,
+        ctx: impl DecodeContext,
     ) -> Result<(), DecodeError> {
         let mut buf = buf.take_length_delimited()?;
         let len = buf.remaining_before_cap();
+        // heap used: the data is at least claimed by this bytes object
+        ctx.heap_used(len)?;
         *value = buf.copy_to_bytes(len);
         Ok(())
     }

@@ -408,6 +408,11 @@ fn try_message(input: TokenStream) -> Result<TokenStream> {
         None
     };
 
+    let field_init_heaps = unsorted_fields
+        .iter()
+        .flat_map(|field| field.init_heap(ctx));
+    let init_heap = quote!(0 #(+ #field_init_heaps)*);
+
     let impl_owned_decoder = (!borrow_only).then(|| {
         quote! {
             impl #impl_generics #crate_::encoding::RawMessageDecoder
@@ -447,6 +452,8 @@ fn try_message(input: TokenStream) -> Result<TokenStream> {
         impl #impl_generics #crate_::encoding::RawMessage
         for __Self #ty_generics #encoder_where_clause {
             const __ASSERTIONS: () = { #(#static_guards)* };
+
+            const INIT_HEAP: usize = #init_heap;
 
             fn empty() -> Self {
                 Self {
@@ -741,6 +748,7 @@ fn try_message_via_oneof(input: DeriveInput) -> Result<TokenStream> {
         impl #impl_generics #crate_::encoding::RawMessage
         for #ident #ty_generics #encoder_where_clause {
             const __ASSERTIONS: () = { #version_guard };
+            const INIT_HEAP: usize = <Self as #crate_::encoding::Oneof>::INIT_HEAP;
 
             #[inline(always)]
             fn empty() -> Self {

@@ -6,6 +6,7 @@ use crate::encoding::{
 use crate::{Canonicity, DecodeError};
 use alloc::boxed::Box;
 use bytes::{Buf, BufMut};
+use core::mem;
 
 /// Trait to be implemented by (or more commonly derived for) oneofs, which have knowledge of their
 /// variants' tags and encoding.
@@ -36,6 +37,9 @@ use bytes::{Buf, BufMut};
 /// to cover that.
 pub trait Oneof {
     const FIELD_TAGS: &'static [u32];
+
+    /// The amount of extra memory consumed if this type is empty initialized, other than its size.
+    const INIT_HEAP: usize = 0;
 
     /// Returns a new empty oneof.
     fn empty() -> Self;
@@ -115,6 +119,9 @@ pub trait DistinguishedOneofBorrowDecoder<'a>: Oneof {
 /// users.
 pub trait NonEmptyOneof {
     const FIELD_TAGS: &'static [u32];
+
+    /// The amount of extra memory consumed if this type is empty initialized, other than its size.
+    const INIT_HEAP: usize = 0;
 
     /// Encodes the fields of the oneof into the given buffer.
     fn oneof_encode<B: BufMut + ?Sized>(&self, buf: &mut B, tw: &mut TagWriter);
@@ -252,6 +259,8 @@ mod generic_oneof_grant_empty_state_impls {
                     ConflictingFields
                 }))
             } else {
+                // heap used: type initialized
+                ctx.heap_used(T::INIT_HEAP)?;
                 T::oneof_decode_field(tag, wire_type, buf, ctx)
                     .map(|decoded| *value = Some(decoded))
             }
@@ -266,7 +275,6 @@ mod generic_oneof_grant_empty_state_impls {
     impl<T> DistinguishedOneofDecoder for Option<T>
     where
         T: NonEmptyDistinguishedOneofDecoder + NonEmptyOneof,
-        Self: Oneof,
     {
         #[inline]
         fn oneof_decode_field_distinguished<B: Buf + ?Sized>(
@@ -283,6 +291,8 @@ mod generic_oneof_grant_empty_state_impls {
                     ConflictingFields
                 }))
             } else {
+                // heap used: type initialized
+                ctx.heap_used(T::INIT_HEAP)?;
                 T::oneof_decode_field_distinguished(tag, wire_type, buf, ctx).map(
                     |(decoded, canon)| {
                         *value = Some(decoded);
@@ -317,6 +327,8 @@ mod generic_oneof_grant_empty_state_impls {
                     ConflictingFields
                 }))
             } else {
+                // heap used: type initialized
+                ctx.heap_used(T::INIT_HEAP)?;
                 T::oneof_borrow_decode_field(tag, wire_type, buf, ctx)
                     .map(|decoded| *value = Some(decoded))
             }
@@ -331,7 +343,6 @@ mod generic_oneof_grant_empty_state_impls {
     impl<'a, T> DistinguishedOneofBorrowDecoder<'a> for Option<T>
     where
         T: NonEmptyDistinguishedOneofBorrowDecoder<'a> + NonEmptyOneof,
-        Self: Oneof,
     {
         #[inline]
         fn oneof_borrow_decode_field_distinguished(
@@ -348,6 +359,8 @@ mod generic_oneof_grant_empty_state_impls {
                     ConflictingFields
                 }))
             } else {
+                // heap used: type initialized
+                ctx.heap_used(T::INIT_HEAP)?;
                 T::oneof_borrow_decode_field_distinguished(tag, wire_type, buf, ctx).map(
                     |(decoded, canon)| {
                         *value = Some(decoded);
@@ -382,6 +395,7 @@ mod generic_boxed_oneof_impls {
         T: Oneof,
     {
         const FIELD_TAGS: &'static [u32] = <T as Oneof>::FIELD_TAGS;
+        const INIT_HEAP: usize = mem::size_of::<T>() + T::INIT_HEAP;
 
         #[inline]
         fn empty() -> Self {
@@ -505,6 +519,7 @@ mod generic_boxed_oneof_impls {
         T: NonEmptyOneof,
     {
         const FIELD_TAGS: &'static [u32] = <T as NonEmptyOneof>::FIELD_TAGS;
+        const INIT_HEAP: usize = mem::size_of::<T>() + T::INIT_HEAP;
 
         #[inline]
         fn oneof_encode<B: BufMut + ?Sized>(&self, buf: &mut B, tw: &mut TagWriter) {
@@ -543,6 +558,8 @@ mod generic_boxed_oneof_impls {
             buf: Capped<B>,
             ctx: impl DecodeContext,
         ) -> Result<Self, DecodeError> {
+            // heap used: we initialize the type and put it in a box
+            ctx.heap_used(mem::size_of::<T>() + T::INIT_HEAP)?;
             T::oneof_decode_field(tag, wire_type, buf, ctx).map(Box::new)
         }
     }
@@ -558,6 +575,8 @@ mod generic_boxed_oneof_impls {
             buf: Capped<B>,
             ctx: impl RestrictedDecodeContext,
         ) -> Result<(Self, Canonicity), DecodeError> {
+            // heap used: we initialize the type and put it in a box
+            ctx.heap_used(mem::size_of::<T>() + T::INIT_HEAP)?;
             NonEmptyDistinguishedOneofDecoder::oneof_decode_field_distinguished(
                 tag, wire_type, buf, ctx,
             )
@@ -576,6 +595,8 @@ mod generic_boxed_oneof_impls {
             buf: Capped<&'a [u8]>,
             ctx: impl DecodeContext,
         ) -> Result<Self, DecodeError> {
+            // heap used: we initialize the type and put it in a box
+            ctx.heap_used(mem::size_of::<T>() + T::INIT_HEAP)?;
             NonEmptyOneofBorrowDecoder::oneof_borrow_decode_field(tag, wire_type, buf, ctx)
                 .map(Box::new)
         }
@@ -592,6 +613,8 @@ mod generic_boxed_oneof_impls {
             buf: Capped<&'a [u8]>,
             ctx: impl RestrictedDecodeContext,
         ) -> Result<(Self, Canonicity), DecodeError> {
+            // heap used: we initialize the type and put it in a box
+            ctx.heap_used(mem::size_of::<T>() + T::INIT_HEAP)?;
             NonEmptyDistinguishedOneofBorrowDecoder::oneof_borrow_decode_field_distinguished(
                 tag, wire_type, buf, ctx,
             )

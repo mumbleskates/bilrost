@@ -120,7 +120,7 @@
 //! and mappings like `std::collections::HashSet` never bother to iterate their items in any
 //! special order, nor do they support distinguished decoding as a result.
 use crate::buf::ReverseBuf;
-use crate::error::RecursionError;
+use crate::error::{OversizeDecodingError, RecursionError};
 use crate::DecodeErrorKind::{
     InvalidValue, InvalidVarint, NotCanonical, Oversize, TagOverflowed, Truncated, UnknownField,
     WrongWireType,
@@ -132,6 +132,7 @@ use alloc::string::String;
 use alloc::sync::Arc;
 use bytes::buf::Take;
 use bytes::{Buf, BufMut};
+use core::cell::Cell;
 use core::cmp::{min, Eq, Ordering, PartialEq};
 use core::default::Default;
 use core::fmt::Debug;
@@ -628,6 +629,10 @@ pub trait DecodeContext: Clone {
     /// to be used at the next level of recursion. Continue to use the old context
     /// at the previous level of recursion.
     fn enter_recursion(&self) -> Result<Self, RecursionError>;
+
+    /// Call this function when consuming additional heap memory during decoding. Memory that is
+    /// already occupied by the type and its fields at rest are not counted.
+    fn heap_used(&self, bytes_used: usize) -> Result<(), OversizeDecodingError>;
 }
 
 pub trait RestrictedDecodeContext: DecodeContext {
@@ -657,6 +662,7 @@ pub trait RestrictedDecodeContext: DecodeContext {
     fn into_inner(&self) -> Self::Unrestricted;
 }
 
+/// This is the basic underlying decode context type.
 #[derive(Clone, Debug)]
 pub struct DecodeCtx {
     /// How many times we can recurse in the current decode stack before we hit
@@ -691,6 +697,81 @@ impl DecodeContext for DecodeCtx {
             recurse_count: self.recurse_count - 1,
         })
     }
+
+    #[inline]
+    fn heap_used(&self, _bytes_used: usize) -> Result<(), OversizeDecodingError> {
+        Ok(())
+    }
+}
+
+/// Basic context that records additional heap memory used.
+#[derive(Clone, Debug)]
+pub struct HeapTrackingCtx<'a> {
+    context: DecodeCtx,
+    tracker: &'a Cell<usize>,
+}
+
+impl<'a> HeapTrackingCtx<'a> {
+    pub fn new(tracker: &'a Cell<usize>) -> Self {
+        Self {
+            context: DecodeCtx::default(),
+            tracker,
+        }
+    }
+}
+
+impl DecodeContext for HeapTrackingCtx<'_> {
+    #[inline]
+    fn enter_recursion(&self) -> Result<Self, RecursionError> {
+        Ok(Self {
+            context: self.context.enter_recursion()?,
+            tracker: self.tracker,
+        })
+    }
+
+    #[inline]
+    fn heap_used(&self, bytes_used: usize) -> Result<(), OversizeDecodingError> {
+        self.tracker.set(self.tracker.get() + bytes_used);
+        Ok(())
+    }
+}
+
+/// Basic context that records additional heap memory used and returns an error if a quota is
+/// exceeded.
+#[derive(Clone, Debug)]
+pub struct QuotaCtx<'a> {
+    context: DecodeCtx,
+    tracker_max: &'a (Cell<usize>, usize),
+}
+
+impl<'a> QuotaCtx<'a> {
+    pub fn new(tracker_max: &'a (Cell<usize>, usize)) -> Self {
+        Self {
+            context: DecodeCtx::default(),
+            tracker_max,
+        }
+    }
+}
+
+impl DecodeContext for QuotaCtx<'_> {
+    #[inline]
+    fn enter_recursion(&self) -> Result<Self, RecursionError> {
+        Ok(Self {
+            context: self.context.enter_recursion()?,
+            tracker_max: self.tracker_max,
+        })
+    }
+
+    #[inline]
+    fn heap_used(&self, bytes_used: usize) -> Result<(), OversizeDecodingError> {
+        let (tracker, max) = self.tracker_max;
+        let new_tracked = tracker.get() + bytes_used;
+        tracker.set(new_tracked);
+        if new_tracked > *max {
+            return Err(OversizeDecodingError);
+        }
+        Ok(())
+    }
 }
 
 /// Additional information passed to every distinguished decode/merge function.
@@ -723,6 +804,11 @@ impl<D: DecodeContext> DecodeContext for RestrictedCtx<D> {
             context: self.context.enter_recursion()?,
             min_canonicity: self.min_canonicity,
         })
+    }
+
+    #[inline]
+    fn heap_used(&self, bytes_used: usize) -> Result<(), OversizeDecodingError> {
+        self.context.heap_used(bytes_used)
     }
 }
 

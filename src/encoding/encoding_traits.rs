@@ -413,6 +413,8 @@ mod generic_optional {
             buf: Capped<B>,
             ctx: impl DecodeContext,
         ) -> Result<(), DecodeError> {
+            // heap used: we initialize the type
+            ctx.heap_used(<() as ForOverwrite<E, T>>::INIT_HEAP)?;
             <() as FieldDecoder<E, T>>::decode_field(
                 wire_type,
                 value.get_or_insert_with(<() as ForOverwrite<E, T>>::for_overwrite),
@@ -435,6 +437,8 @@ mod generic_optional {
             ctx: impl RestrictedDecodeContext,
         ) -> Result<Canonicity, DecodeError> {
             check_wire_type(<() as Wiretyped<E, T>>::WIRE_TYPE, wire_type)?;
+            // heap used: we initialize the type
+            ctx.heap_used(<() as ForOverwrite<E, T>>::INIT_HEAP)?;
             <() as DistinguishedValueDecoder<E, T>>::decode_value_distinguished::<true>(
                 value.get_or_insert_with(<() as ForOverwrite<E, T>>::for_overwrite),
                 buf,
@@ -454,6 +458,8 @@ mod generic_optional {
             buf: Capped<&'a [u8]>,
             ctx: impl DecodeContext,
         ) -> Result<(), DecodeError> {
+            // heap used: we initialize the type
+            ctx.heap_used(<() as ForOverwrite<E, T>>::INIT_HEAP)?;
             <() as FieldBorrowDecoder<E, T>>::borrow_decode_field(
                 wire_type,
                 value.get_or_insert_with(<() as ForOverwrite<E, T>>::for_overwrite),
@@ -476,6 +482,8 @@ mod generic_optional {
             ctx: impl RestrictedDecodeContext,
         ) -> Result<Canonicity, DecodeError> {
             check_wire_type(<() as Wiretyped<E, T>>::WIRE_TYPE, wire_type)?;
+            // heap used: we initialize the type
+            ctx.heap_used(<() as ForOverwrite<E, T>>::INIT_HEAP)?;
             <() as DistinguishedValueBorrowDecoder<E, T>>::borrow_decode_value_distinguished::<true>(
                 value.get_or_insert_with(<() as ForOverwrite<E, T>>::for_overwrite),
                 buf,

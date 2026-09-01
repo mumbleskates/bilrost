@@ -17,6 +17,7 @@ use alloc::format;
 use alloc::string::String;
 use bytes::BufMut;
 use core::fmt::Display;
+use core::mem;
 
 pub struct Unpacked<E = GeneralPacked>(E);
 
@@ -54,6 +55,11 @@ macro_rules! define_decoders {
             check_wire_type(<() as Wiretyped<E, T::Item>>::WIRE_TYPE, wire_type)?;
             loop {
                 // Decode one item
+                // heap used: initializing the type and storing it in the collection
+                ctx.heap_used(
+                    mem::size_of::<T::Item>()
+                    + <() as ForOverwrite<E, T::Item>>::INIT_HEAP
+                )?;
                 let mut new_item = <() as ForOverwrite<E, T::Item>>::for_overwrite();
                 <() as $relaxed_value<E, _>>::$relaxed_value_method(&mut new_item, buf.lend(), ctx.clone())?;
                 collection.insert(new_item)?;
@@ -146,6 +152,11 @@ macro_rules! define_decoders {
             let mut canon = Canonicity::Canonical;
             loop {
                 // Decode one item
+                // heap used: initializing the type and storing it in the collection
+                ctx.heap_used(
+                    mem::size_of::<T::Item>()
+                    + <() as ForOverwrite<E, T::Item>>::INIT_HEAP
+                )?;
                 let mut new_item = <() as ForOverwrite<E, T::Item>>::for_overwrite();
                 // Decoded field values are nested within the collection; empty values are OK
                 canon.update(

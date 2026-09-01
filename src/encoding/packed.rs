@@ -17,6 +17,7 @@ use alloc::format;
 use alloc::string::String;
 use bytes::{Buf, BufMut};
 use core::fmt::Display;
+use core::mem;
 
 pub struct Packed<E = GeneralPacked>(E);
 
@@ -319,6 +320,7 @@ macro_rules! impl_decoders {
                     return Err(DecodeError::new(Truncated));
                 }
                 while capped.has_remaining()? {
+                    ctx.heap_used(mem::size_of::<T>() + <() as ForOverwrite<E, T>>::INIT_HEAP)?;
                     let mut new_val = <() as ForOverwrite<E, T>>::for_overwrite();
                     <() as $relaxed_value<E, _>>::$relaxed_value_method(
                         &mut new_val,
@@ -358,6 +360,7 @@ macro_rules! impl_decoders {
                 }
                 let mut canon = Canonicity::Canonical;
                 while capped.has_remaining()? {
+                    ctx.heap_used(mem::size_of::<T>() + <() as ForOverwrite<E, T>>::INIT_HEAP)?;
                     let mut new_val = <() as ForOverwrite<E, T>>::for_overwrite();
                     canon.update(
                         <() as $distinguished_value<E, _>>::$distinguished_value_method::<true>(

@@ -14,6 +14,7 @@ use alloc::format;
 use alloc::string::String;
 use bytes::{Buf, BufMut};
 use core::fmt::Display;
+use core::mem;
 
 pub struct Map<KE = GeneralPacked, VE = GeneralPacked>(KE, VE);
 
@@ -148,6 +149,11 @@ macro_rules! impl_decoders {
                     return Err(DecodeError::new(Truncated));
                 }
                 while capped.has_remaining()? {
+                    // heap used: initializing both types and putting them in the map container
+                    ctx.heap_used(
+                        <() as ForOverwrite<KE, K>>::INIT_HEAP + mem::size_of::<K>() +
+                        <() as ForOverwrite<VE, V>>::INIT_HEAP + mem::size_of::<V>()
+                    )?;
                     let mut new_key = <() as ForOverwrite::<KE, K>>::for_overwrite();
                     let mut new_val = <() as ForOverwrite::<VE, V>>::for_overwrite();
                     <() as $relaxed_value<KE, _>>::$relaxed_value_method(
@@ -193,6 +199,11 @@ macro_rules! impl_decoders {
                 }
                 let mut canon = Canonicity::Canonical;
                 while capped.has_remaining()? {
+                    // heap used: initializing both types and putting them in the map container
+                    ctx.heap_used(
+                        <() as ForOverwrite<KE, K>>::INIT_HEAP + mem::size_of::<K>() +
+                        <() as ForOverwrite<VE, V>>::INIT_HEAP + mem::size_of::<V>()
+                    )?;
                     let mut new_key = <() as ForOverwrite<KE, K>>::for_overwrite();
                     let mut new_val = <() as ForOverwrite<VE, V>>::for_overwrite();
                     canon.update(

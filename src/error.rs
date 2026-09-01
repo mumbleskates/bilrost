@@ -29,7 +29,7 @@ pub enum DecodeErrorKind {
     UnknownField,
     /// Recursion limit was reached when parsing.
     RecursionLimitReached,
-    /// Size of a length-delimited region exceeds what is supported on this platform.
+    /// Size of a length-delimited region exceeds what is supported.
     Oversize,
     /// Something else.
     Other,
@@ -51,7 +51,7 @@ impl fmt::Display for DecodeErrorKind {
             NotCanonical => "value not encoded canonically",
             UnknownField => "unknown field",
             RecursionLimitReached => "recursion limit reached",
-            Oversize => "region too large to decode",
+            Oversize => "too large to decode",
             Other => "other error",
         })
     }
@@ -253,3 +253,27 @@ impl From<RecursionError> for DecodeError {
 
 #[cfg(feature = "std")]
 impl std::error::Error for RecursionError {}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct OversizeDecodingError;
+
+impl fmt::Display for OversizeDecodingError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "recursion limit reached")
+    }
+}
+
+impl From<OversizeDecodingError> for DecodeErrorKind {
+    fn from(_: OversizeDecodingError) -> Self {
+        Oversize
+    }
+}
+
+impl From<OversizeDecodingError> for DecodeError {
+    fn from(_: OversizeDecodingError) -> Self {
+        DecodeError::new(Oversize)
+    }
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for OversizeDecodingError {}

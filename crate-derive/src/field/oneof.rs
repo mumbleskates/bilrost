@@ -195,6 +195,12 @@ impl OneofInclusion {
             );
         }
     }
+
+    pub fn init_heap(&self, ctx: &Context) -> TokenStream {
+        let crate_ = &ctx.crate_name;
+        let ty = &self.ty;
+        quote!(<#ty as #crate_::encoding::Oneof>::INIT_HEAP)
+    }
 }
 
 impl Tagged for OneofInclusion {

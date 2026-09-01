@@ -353,6 +353,14 @@ impl Field {
             Ignored(..) => None,
         }
     }
+
+    pub fn init_heap(&self, ctx: &Context) -> Option<TokenStream> {
+        match &self.content {
+            Value(scalar) => Some(scalar.init_heap(ctx)),
+            Oneof(oneof) => Some(oneof.init_heap(ctx)),
+            Ignored(..) => None,
+        }
+    }
 }
 
 impl FieldBearer for Field {

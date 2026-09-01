@@ -75,6 +75,11 @@ macro_rules! impls_for_tuple {
         where
             $((): ForOverwrite<(), $letters>,)*
         {
+            const INIT_HEAP: usize = {
+                0
+                $(+ <() as ForOverwrite<(), $letters>>::INIT_HEAP)*
+            };
+
             #[inline]
             fn for_overwrite() -> ($($letters,)*) {
                 ($(<() as ForOverwrite<(), $letters>>::for_overwrite(),)*)

@@ -13,6 +13,7 @@ use alloc::format;
 use bytes::{Buf, BufMut};
 use core::any::Any;
 use core::fmt::Display;
+use core::mem;
 
 /// Encoding that performs the actual value-encoding of messages, to and from `RawMessage`-family
 /// traits into length-delimited values on the wire. By default this is directly delegated to by
@@ -126,6 +127,9 @@ pub(crate) fn borrow_merge_distinguished<'a, T: RawDistinguishedMessageBorrowDec
 pub trait RawMessage {
     const __ASSERTIONS: ();
 
+    /// The amount of extra memory consumed if this type is empty initialized, other than its size.
+    const INIT_HEAP: usize = 0;
+
     /// Returns an initialized message in an empty state.
     fn empty() -> Self
     where
@@ -226,6 +230,7 @@ where
     T: RawMessage,
 {
     const __ASSERTIONS: () = ();
+    const INIT_HEAP: usize = mem::size_of::<T>() + T::INIT_HEAP;
 
     fn empty() -> Self
     where

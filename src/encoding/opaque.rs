@@ -14,6 +14,7 @@ use alloc::collections::BTreeMap;
 use alloc::string::String;
 use alloc::vec::Vec;
 use bytes::{Buf, BufMut};
+use core::mem;
 use core::ops::Index;
 
 /// Represents an opaque bilrost field value. Can represent any valid encoded value.
@@ -438,9 +439,16 @@ impl RawMessageDecoder for OpaqueMessage<'_> {
         wire_type: WireType,
         _duplicated: bool,
         buf: Capped<B>,
-        _ctx: impl DecodeContext,
+        ctx: impl DecodeContext,
     ) -> Result<(), DecodeError> {
-        self.insert(tag, OpaqueValue::decode_value(wire_type, buf)?);
+        // heap used: let's just say we have to store the tag with the value, that's close enough
+        ctx.heap_used(mem::size_of::<(u32, OpaqueValue)>())?;
+        let value = OpaqueValue::decode_value(wire_type, buf)?;
+        if let LengthDelimited(delimited) = &value {
+            // in this owned decoding case, delimited bytes are also on the heap
+            ctx.heap_used(delimited.len())?;
+        }
+        self.insert(tag, value);
         Ok(())
     }
 }
@@ -469,8 +477,9 @@ impl<'a> RawMessageBorrowDecoder<'a> for OpaqueMessage<'a> {
         wire_type: WireType,
         _duplicated: bool,
         buf: Capped<&'a [u8]>,
-        _ctx: impl DecodeContext,
+        ctx: impl DecodeContext,
     ) -> Result<(), DecodeError> {
+        ctx.heap_used(mem::size_of::<(u32, OpaqueValue)>())?;
         self.insert(tag, OpaqueValue::borrow_decode_value(wire_type, buf)?);
         Ok(())
     }

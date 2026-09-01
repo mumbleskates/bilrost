@@ -117,9 +117,10 @@ impl ValueDecoder<PlainBytes, Vec<u8>> for () {
     fn decode_value<B: Buf + ?Sized>(
         value: &mut Vec<u8>,
         mut buf: Capped<B>,
-        _ctx: impl DecodeContext,
+        ctx: impl DecodeContext,
     ) -> Result<(), DecodeError> {
         let buf = buf.take_length_delimited()?;
+        ctx.heap_used(buf.remaining_before_cap())?;
         value.clear();
         value.reserve(buf.remaining_before_cap());
         value.put(buf.take_all());
@@ -478,9 +479,11 @@ macro_rules! plain_bytes_vec_impl {
             fn decode_value<B: $crate::bytes::Buf + ?Sized>(
                 $value: &mut $ty,
                 mut buf: $crate::encoding::Capped<B>,
-                _ctx: impl $crate::encoding::DecodeContext,
+                ctx: impl $crate::encoding::DecodeContext,
             ) -> Result<(), $crate::DecodeError> {
                 let mut $buf = buf.take_length_delimited()?.take_all();
+                // heap used: bytes data goes on the heap
+                ctx.heap_used($buf.remaining())?;
                 $value.clear();
                 $do_reserve;
                 while $buf.has_remaining() {

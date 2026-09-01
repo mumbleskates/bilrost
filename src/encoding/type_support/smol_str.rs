@@ -47,7 +47,7 @@ impl<const P: u8> ValueDecoder<GeneralGeneric<P>, smol_str::SmolStr> for () {
     fn decode_value<B: Buf + ?Sized>(
         value: &mut smol_str::SmolStr,
         mut buf: Capped<B>,
-        _ctx: impl DecodeContext,
+        ctx: impl DecodeContext,
     ) -> Result<(), DecodeError> {
         let string_data = buf.take_length_delimited()?;
         let string_len = string_data.remaining_before_cap();
@@ -59,6 +59,8 @@ impl<const P: u8> ValueDecoder<GeneralGeneric<P>, smol_str::SmolStr> for () {
             let inline_string_data = from_utf8(&inline[..string_len]).map_err(|_| InvalidValue)?;
             smol_str::SmolStr::new_inline(inline_string_data)
         } else {
+            // heap used: longer strings go on the heap
+            ctx.heap_used(string_len)?;
             smol_str::SmolStr::from(read_arc_str(string_data)?)
         };
         *value = decoded_val;

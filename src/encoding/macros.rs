@@ -757,6 +757,9 @@ macro_rules! implement_core_empty_state_rules {
             (): $crate::encoding::ForOverwrite<$encoding, __T>,
             $($($where_clause)*)?
         {
+            const INIT_HEAP: usize =
+                <() as $crate::encoding::ForOverwrite<$encoding, __T>>::INIT_HEAP * __N;
+
             #[inline]
             fn for_overwrite() -> [__T; __N] {
                 ::core::array::from_fn(|_| {

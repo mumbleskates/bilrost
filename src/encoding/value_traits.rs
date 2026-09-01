@@ -37,6 +37,9 @@ pub trait EmptyState<E, T: ?Sized>: ForOverwrite<E, T> {
 /// that does not own a type to implement this trait for the base implementation, only for an
 /// encoding type that it *does* own.
 pub trait ForOverwrite<E, T: ?Sized> {
+    /// The amount of extra memory consumed if this type is initialized, other than its size.
+    const INIT_HEAP: usize = 0;
+
     /// Produces a new `Self` value to be overwritten.
     fn for_overwrite() -> T
     where

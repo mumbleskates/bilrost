@@ -314,6 +314,10 @@ impl MessageField {
     pub fn schema(&self, field_name: &str, in_oneof: bool, ctx: &Context) -> TokenStream {
         self.value.schema(self.tag, field_name, in_oneof, ctx)
     }
+
+    pub fn init_heap(&self, ctx: &Context) -> TokenStream {
+        self.value.init_heap(ctx)
+    }
 }
 
 impl SinglyTagged for MessageField {
@@ -388,6 +392,13 @@ impl ValueField {
                 <() as #crate_::encoding::schema::FieldRepr<#encoding, #ty>>::repr(schema),
             );
         }
+    }
+
+    fn init_heap(&self, ctx: &Context) -> TokenStream {
+        let crate_ = &ctx.crate_name;
+        let encoding = &self.encoding;
+        let ty = &self.ty;
+        quote!(<() as #crate_::encoding::ForOverwrite<#encoding, #ty>>::INIT_HEAP)
     }
 }
 
@@ -726,7 +737,9 @@ impl OneofVariant {
         mode: DecodeMode,
         ctx: &Context,
     ) -> TokenStream {
+        let crate_ = &ctx.crate_name;
         let tag = self.tag;
+        let init_heap = self.init_heap(ctx);
         let for_overwrite = self.for_overwrite(ctx);
         let decode = self.decode_fields(lifetime, mode, ctx);
         let construct = self.construct(type_ident, ctx);
@@ -742,12 +755,22 @@ impl OneofVariant {
         // still path down through the oneof variant.
         quote! {
             #tag => {
-                #for_overwrite
-                match #decode {
-                    ::core::result::Result::Ok(#decode_result) => {
-                        ::core::result::Result::Ok(#output)
-                    },
-                    ::core::result::Result::Err(error) => ::core::result::Result::Err(error),
+                // heap used: we're initializing this variant's fields
+                match ctx.heap_used(#init_heap) {
+                    ::core::result::Result::Ok(()) => {
+                        #for_overwrite
+                        match #decode {
+                            ::core::result::Result::Ok(#decode_result) => {
+                                ::core::result::Result::Ok(#output)
+                            },
+                            ::core::result::Result::Err(error) => {
+                                ::core::result::Result::Err(error)
+                            }
+                        }
+                    }
+                    ::core::result::Result::Err(error) => {
+                        ::core::result::Result::Err(#crate_::DecodeError::from(error))
+                    }
                 }
             }
         }
@@ -988,6 +1011,16 @@ impl OneofVariant {
                         ),
                     );
                 }
+            }
+        }
+    }
+
+    pub fn init_heap(&self, ctx: &Context) -> TokenStream {
+        match &self.contents {
+            VariantContents::Value(field_in_variant) => field_in_variant.value.init_heap(ctx),
+            VariantContents::Message(fields) => {
+                let field_init_heaps = fields.iter().flat_map(|field| field.init_heap(ctx));
+                quote!(0 #(+ #field_init_heaps)*)
             }
         }
     }

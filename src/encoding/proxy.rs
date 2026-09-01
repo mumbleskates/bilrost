@@ -35,6 +35,12 @@ pub trait Proxiable<Tag = ()> {
     /// The type that the value should appear as when it is encoded on the wire.
     type Proxy;
 
+    /// The number of bytes the type being proxied uses when empty.
+    ///
+    /// Total heap usage for a proxied type is currently assumed to be this value plus the amount of
+    /// heap memory the Proxy type reported using when it was decoded.
+    const INIT_HEAP: usize = 0;
+
     /// Convert this value into a value of the proxy's type.
     fn encode_proxy(&self) -> Self::Proxy;
 
