@@ -182,11 +182,10 @@ macro_rules! impl_tuple {
             fn decode_value<__B: Buf + ?Sized>(
                 value: &mut ($($letters,)*),
                 mut buf: Capped<__B>,
-                ctx: DecodeContext,
+                ctx: impl DecodeContext,
             ) -> Result<(), DecodeError> {
                 let mut buf = buf.take_length_delimited()?;
-                ctx.limit_reached()?;
-                let ctx = ctx.enter_recursion();
+                let ctx = ctx.enter_recursion()?;
                 let tr = &mut TagReader::new();
                 let mut last_tag = None::<u32>;
                 while buf.has_remaining()? {
@@ -234,7 +233,7 @@ macro_rules! impl_tuple {
             fn decode_value_distinguished<const ALLOW_EMPTY: bool>(
                 value: &mut ($($letters,)*),
                 mut buf: Capped<impl Buf + ?Sized>,
-                ctx: RestrictedDecodeContext,
+                ctx: impl RestrictedDecodeContext,
             ) -> Result<Canonicity, DecodeError>
             where
                 ($($letters,)*): Sized,
@@ -246,9 +245,8 @@ macro_rules! impl_tuple {
                 if !ALLOW_EMPTY && buf.remaining_before_cap() == 0 {
                     return ctx.check(Canonicity::NotCanonical);
                 }
-                ctx.limit_reached()?;
                 let mut canon = Canonicity::Canonical;
-                let ctx = ctx.enter_recursion();
+                let ctx = ctx.enter_recursion()?;
                 let tr = &mut TagReader::new();
                 let mut last_tag = None::<u32>;
                 while buf.has_remaining()? {
@@ -299,11 +297,10 @@ macro_rules! impl_tuple {
             fn borrow_decode_value(
                 value: &mut ($($letters,)*),
                 mut buf: Capped<&'a [u8]>,
-                ctx: DecodeContext,
+                ctx: impl DecodeContext,
             ) -> Result<(), DecodeError> {
                 let mut buf = buf.take_length_delimited()?;
-                ctx.limit_reached()?;
-                let ctx = ctx.enter_recursion();
+                let ctx = ctx.enter_recursion()?;
                 let tr = &mut TagReader::new();
                 let mut last_tag = None::<u32>;
                 while buf.has_remaining()? {
@@ -351,7 +348,7 @@ macro_rules! impl_tuple {
             fn borrow_decode_value_distinguished<const ALLOW_EMPTY: bool>(
                 value: &mut ($($letters,)*),
                 mut buf: Capped<&'a [u8]>,
-                ctx: RestrictedDecodeContext,
+                ctx: impl RestrictedDecodeContext,
             ) -> Result<Canonicity, DecodeError>
             where
                 ($($letters,)*): Sized,
@@ -363,9 +360,8 @@ macro_rules! impl_tuple {
                 if !ALLOW_EMPTY && buf.remaining_before_cap() == 0 {
                     return ctx.check(Canonicity::NotCanonical);
                 }
-                ctx.limit_reached()?;
                 let mut canon = Canonicity::Canonical;
-                let ctx = ctx.enter_recursion();
+                let ctx = ctx.enter_recursion()?;
                 let tr = &mut TagReader::new();
                 let mut last_tag = None::<u32>;
                 while buf.has_remaining()? {

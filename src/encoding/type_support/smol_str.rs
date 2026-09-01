@@ -47,7 +47,7 @@ impl<const P: u8> ValueDecoder<GeneralGeneric<P>, smol_str::SmolStr> for () {
     fn decode_value<B: Buf + ?Sized>(
         value: &mut smol_str::SmolStr,
         mut buf: Capped<B>,
-        _ctx: DecodeContext,
+        _ctx: impl DecodeContext,
     ) -> Result<(), DecodeError> {
         let string_data = buf.take_length_delimited()?;
         let string_len = string_data.remaining_before_cap();
@@ -73,7 +73,7 @@ impl<const P: u8> DistinguishedValueDecoder<GeneralGeneric<P>, smol_str::SmolStr
     fn decode_value_distinguished<const ALLOW_EMPTY: bool>(
         value: &mut smol_str::SmolStr,
         buf: Capped<impl Buf + ?Sized>,
-        ctx: RestrictedDecodeContext,
+        ctx: impl RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
         <() as ValueDecoder<GeneralGeneric<P>, _>>::decode_value(value, buf, ctx.into_inner())?;
         Ok(Canonicity::Canonical)

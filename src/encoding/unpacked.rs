@@ -43,7 +43,7 @@ macro_rules! define_decoders {
             wire_type: WireType,
             collection: &mut T,
             mut buf: Capped<$impl_buf_ty>,
-            ctx: DecodeContext,
+            ctx: impl DecodeContext,
         ) -> Result<(), DecodeError>
         where
             T: Collection,
@@ -74,7 +74,7 @@ macro_rules! define_decoders {
             wire_type: WireType,
             arr: &mut [T; N],
             buf: Capped<$impl_buf_ty>,
-            ctx: DecodeContext,
+            ctx: impl DecodeContext,
         ) -> Result<(), DecodeError>
         where
             (): $relaxed_value <$($lifetime,)? E, T>,
@@ -98,7 +98,7 @@ macro_rules! define_decoders {
             wire_type: WireType,
             arr: &mut [T; N],
             mut buf: Capped<$impl_buf_ty>,
-            ctx: DecodeContext,
+            ctx: impl DecodeContext,
         ) -> Result<(), DecodeError>
         where
             (): $relaxed_value <$($lifetime,)? E, T>,
@@ -133,7 +133,7 @@ macro_rules! define_decoders {
             wire_type: WireType,
             collection: &mut T,
             mut buf: Capped<$impl_buf_ty>,
-            ctx: RestrictedDecodeContext,
+            ctx: impl RestrictedDecodeContext,
         ) -> Result<Canonicity, DecodeError>
         where
             T: DistinguishedCollection,
@@ -173,7 +173,7 @@ macro_rules! define_decoders {
             wire_type: WireType,
             arr: &mut [T; N],
             buf: Capped<$impl_buf_ty>,
-            ctx: RestrictedDecodeContext,
+            ctx: impl RestrictedDecodeContext,
         ) -> Result<Canonicity, DecodeError>
         where
             T: Eq,
@@ -204,7 +204,7 @@ macro_rules! define_decoders {
             wire_type: WireType,
             arr: &mut [T; N],
             mut buf: Capped<$impl_buf_ty>,
-            ctx: RestrictedDecodeContext,
+            ctx: impl RestrictedDecodeContext,
         ) -> Result<Canonicity, DecodeError>
         where
             T: Eq,
@@ -501,7 +501,7 @@ macro_rules! impl_decoders {
                 wire_type: WireType,
                 value: &mut C,
                 buf: Capped<$buf_ty>,
-                ctx: DecodeContext,
+                ctx: impl DecodeContext,
             ) -> Result<(), DecodeError> {
                 if wire_type == WireType::LengthDelimited
                     && <() as Wiretyped<E, C::Item>>::WIRE_TYPE != WireType::LengthDelimited
@@ -532,7 +532,7 @@ macro_rules! impl_decoders {
                 wire_type: WireType,
                 value: &mut C,
                 buf: Capped<$buf_ty>,
-                ctx: RestrictedDecodeContext,
+                ctx: impl RestrictedDecodeContext,
             ) -> Result<Canonicity, DecodeError> {
                 if wire_type == WireType::LengthDelimited
                     && <() as Wiretyped<E, T>>::WIRE_TYPE != WireType::LengthDelimited
@@ -564,7 +564,7 @@ macro_rules! impl_decoders {
                 wire_type: WireType,
                 value: &mut [T; N],
                 buf: Capped<$buf_ty>,
-                ctx: DecodeContext,
+                ctx: impl DecodeContext,
             ) -> Result<(), DecodeError> {
                 $mode::decode_array_either_repr(wire_type, value, buf, ctx)
             }
@@ -584,7 +584,7 @@ macro_rules! impl_decoders {
                 wire_type: WireType,
                 value: &mut [T; N],
                 buf: Capped<$buf_ty>,
-                ctx: RestrictedDecodeContext,
+                ctx: impl RestrictedDecodeContext,
             ) -> Result<Canonicity, DecodeError> {
                 let canon = $mode::decode_distinguished_array_either_repr(
                     wire_type,
@@ -610,7 +610,7 @@ macro_rules! impl_decoders {
                 wire_type: WireType,
                 value: &mut Option<[T; N]>,
                 buf: Capped<$buf_ty>,
-                ctx: DecodeContext,
+                ctx: impl DecodeContext,
             ) -> Result<(), DecodeError> {
                 $mode::decode_array_either_repr(
                     wire_type,
@@ -636,7 +636,7 @@ macro_rules! impl_decoders {
                 wire_type: WireType,
                 value: &mut Option<[T; N]>,
                 buf: Capped<$buf_ty>,
-                ctx: RestrictedDecodeContext,
+                ctx: impl RestrictedDecodeContext,
             ) -> Result<Canonicity, DecodeError> {
                 $mode::decode_distinguished_array_either_repr(
                     wire_type,

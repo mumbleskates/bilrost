@@ -229,3 +229,27 @@ impl From<EncodeError> for std::io::Error {
         std::io::Error::new(std::io::ErrorKind::InvalidInput, error)
     }
 }
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct RecursionError;
+
+impl fmt::Display for RecursionError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "recursion limit reached")
+    }
+}
+
+impl From<RecursionError> for DecodeErrorKind {
+    fn from(_: RecursionError) -> Self {
+        RecursionLimitReached
+    }
+}
+
+impl From<RecursionError> for DecodeError {
+    fn from(_: RecursionError) -> Self {
+        DecodeError::new(RecursionLimitReached)
+    }
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for RecursionError {}

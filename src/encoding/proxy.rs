@@ -130,7 +130,7 @@ where
     fn decode_value<B: Buf + ?Sized>(
         value: &mut T,
         buf: Capped<B>,
-        ctx: DecodeContext,
+        ctx: impl DecodeContext,
     ) -> Result<(), DecodeError> {
         let mut proxy = <() as ForOverwrite<E, T::Proxy>>::for_overwrite();
         <() as ValueDecoder<E, _>>::decode_value(&mut proxy, buf, ctx)?;
@@ -148,7 +148,7 @@ where
     fn decode_value_distinguished<const ALLOW_EMPTY: bool>(
         value: &mut T,
         buf: Capped<impl Buf + ?Sized>,
-        ctx: RestrictedDecodeContext,
+        ctx: impl RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
         let mut proxy = <() as ForOverwrite<E, T::Proxy>>::for_overwrite();
         let mut canon = <() as DistinguishedValueDecoder<E, _>>::decode_value_distinguished::<
@@ -168,7 +168,7 @@ where
     fn borrow_decode_value(
         value: &mut T,
         buf: Capped<&'a [u8]>,
-        ctx: DecodeContext,
+        ctx: impl DecodeContext,
     ) -> Result<(), DecodeError> {
         let mut proxy = <() as ForOverwrite<E, T::Proxy>>::for_overwrite();
         <() as ValueBorrowDecoder<E, _>>::borrow_decode_value(&mut proxy, buf, ctx)?;
@@ -186,7 +186,7 @@ where
     fn borrow_decode_value_distinguished<const ALLOW_EMPTY: bool>(
         value: &mut T,
         buf: Capped<&'a [u8]>,
-        ctx: RestrictedDecodeContext,
+        ctx: impl RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
         let mut proxy = <() as ForOverwrite<E, T::Proxy>>::for_overwrite();
         let mut canon =

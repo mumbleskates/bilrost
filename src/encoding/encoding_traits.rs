@@ -36,7 +36,7 @@ pub trait Decoder<E, T>: Encoder<E, T> {
         wire_type: WireType,
         value: &mut T,
         buf: Capped<B>,
-        ctx: DecodeContext,
+        ctx: impl DecodeContext,
     ) -> Result<(), DecodeError>;
 }
 
@@ -49,7 +49,7 @@ pub trait DistinguishedDecoder<E, T>: Encoder<E, T> {
         wire_type: WireType,
         value: &mut T,
         buf: Capped<B>,
-        ctx: RestrictedDecodeContext,
+        ctx: impl RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError>;
 }
 
@@ -59,7 +59,7 @@ pub trait BorrowDecoder<'a, E, T>: Encoder<E, T> {
         wire_type: WireType,
         value: &mut T,
         buf: Capped<&'a [u8]>,
-        ctx: DecodeContext,
+        ctx: impl DecodeContext,
     ) -> Result<(), DecodeError>;
 }
 
@@ -70,7 +70,7 @@ pub trait DistinguishedBorrowDecoder<'a, E, T>: Encoder<E, T> {
         wire_type: WireType,
         value: &mut T,
         buf: Capped<&'a [u8]>,
-        ctx: RestrictedDecodeContext,
+        ctx: impl RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError>;
 }
 
@@ -118,7 +118,7 @@ pub trait ValueDecoder<E, T>: ValueEncoder<E, T> {
     fn decode_value<B: Buf + ?Sized>(
         value: &mut T,
         buf: Capped<B>,
-        ctx: DecodeContext,
+        ctx: impl DecodeContext,
     ) -> Result<(), DecodeError>;
 }
 
@@ -138,7 +138,7 @@ pub trait DistinguishedValueDecoder<E, T>: ValueEncoder<E, T> + Eq {
     fn decode_value_distinguished<const ALLOW_EMPTY: bool>(
         value: &mut T,
         buf: Capped<impl Buf + ?Sized>,
-        ctx: RestrictedDecodeContext,
+        ctx: impl RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError>;
 }
 
@@ -148,7 +148,7 @@ pub trait ValueBorrowDecoder<'a, E, T>: ValueEncoder<E, T> {
     fn borrow_decode_value(
         value: &mut T,
         buf: Capped<&'a [u8]>,
-        ctx: DecodeContext,
+        ctx: impl DecodeContext,
     ) -> Result<(), DecodeError>;
 }
 
@@ -167,7 +167,7 @@ pub trait DistinguishedValueBorrowDecoder<'a, E, T>: ValueEncoder<E, T> + Eq {
     fn borrow_decode_value_distinguished<const ALLOW_EMPTY: bool>(
         value: &mut T,
         buf: Capped<&'a [u8]>,
-        ctx: RestrictedDecodeContext,
+        ctx: impl RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError>;
 }
 
@@ -197,7 +197,7 @@ pub trait FieldDecoder<E, T>: ValueDecoder<E, T> {
         wire_type: WireType,
         value: &mut T,
         buf: Capped<B>,
-        ctx: DecodeContext,
+        ctx: impl DecodeContext,
     ) -> Result<(), DecodeError>;
 }
 
@@ -209,7 +209,7 @@ pub trait DistinguishedFieldDecoder<E, T>: DistinguishedValueDecoder<E, T> {
         wire_type: WireType,
         value: &mut T,
         buf: Capped<impl Buf + ?Sized>,
-        ctx: RestrictedDecodeContext,
+        ctx: impl RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError>;
 }
 
@@ -221,7 +221,7 @@ pub trait FieldBorrowDecoder<'a, E, T>: ValueBorrowDecoder<'a, E, T> {
         wire_type: WireType,
         value: &mut T,
         buf: Capped<&'a [u8]>,
-        ctx: DecodeContext,
+        ctx: impl DecodeContext,
     ) -> Result<(), DecodeError>;
 }
 
@@ -235,7 +235,7 @@ pub trait DistinguishedFieldBorrowDecoder<'a, E, T>:
         wire_type: WireType,
         value: &mut T,
         buf: Capped<&'a [u8]>,
-        ctx: RestrictedDecodeContext,
+        ctx: impl RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError>;
 }
 
@@ -275,7 +275,7 @@ where
         wire_type: WireType,
         value: &mut T,
         buf: Capped<B>,
-        ctx: DecodeContext,
+        ctx: impl DecodeContext,
     ) -> Result<(), DecodeError> {
         check_wire_type(<() as Wiretyped<E, T>>::WIRE_TYPE, wire_type)?;
         <() as ValueDecoder<E, T>>::decode_value(value, buf, ctx)
@@ -291,7 +291,7 @@ where
         wire_type: WireType,
         value: &mut T,
         buf: Capped<impl Buf + ?Sized>,
-        ctx: RestrictedDecodeContext,
+        ctx: impl RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
         check_wire_type(<() as Wiretyped<E, T>>::WIRE_TYPE, wire_type)?;
         <() as DistinguishedValueDecoder<E, T>>::decode_value_distinguished::<ALLOW_EMPTY>(
@@ -309,7 +309,7 @@ where
         wire_type: WireType,
         value: &mut T,
         buf: Capped<&'a [u8]>,
-        ctx: DecodeContext,
+        ctx: impl DecodeContext,
     ) -> Result<(), DecodeError> {
         check_wire_type(<() as Wiretyped<E, T>>::WIRE_TYPE, wire_type)?;
         <() as ValueBorrowDecoder<E, T>>::borrow_decode_value(value, buf, ctx)
@@ -325,7 +325,7 @@ where
         wire_type: WireType,
         value: &mut T,
         buf: Capped<&'a [u8]>,
-        ctx: RestrictedDecodeContext,
+        ctx: impl RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
         check_wire_type(<() as Wiretyped<E, T>>::WIRE_TYPE, wire_type)?;
         <() as DistinguishedValueBorrowDecoder<E, T>>::borrow_decode_value_distinguished::<
@@ -411,7 +411,7 @@ mod generic_optional {
             wire_type: WireType,
             value: &mut Option<T>,
             buf: Capped<B>,
-            ctx: DecodeContext,
+            ctx: impl DecodeContext,
         ) -> Result<(), DecodeError> {
             <() as FieldDecoder<E, T>>::decode_field(
                 wire_type,
@@ -432,7 +432,7 @@ mod generic_optional {
             wire_type: WireType,
             value: &mut Option<T>,
             buf: Capped<B>,
-            ctx: RestrictedDecodeContext,
+            ctx: impl RestrictedDecodeContext,
         ) -> Result<Canonicity, DecodeError> {
             check_wire_type(<() as Wiretyped<E, T>>::WIRE_TYPE, wire_type)?;
             <() as DistinguishedValueDecoder<E, T>>::decode_value_distinguished::<true>(
@@ -452,7 +452,7 @@ mod generic_optional {
             wire_type: WireType,
             value: &mut Option<T>,
             buf: Capped<&'a [u8]>,
-            ctx: DecodeContext,
+            ctx: impl DecodeContext,
         ) -> Result<(), DecodeError> {
             <() as FieldBorrowDecoder<E, T>>::borrow_decode_field(
                 wire_type,
@@ -473,7 +473,7 @@ mod generic_optional {
             wire_type: WireType,
             value: &mut Option<T>,
             buf: Capped<&'a [u8]>,
-            ctx: RestrictedDecodeContext,
+            ctx: impl RestrictedDecodeContext,
         ) -> Result<Canonicity, DecodeError> {
             check_wire_type(<() as Wiretyped<E, T>>::WIRE_TYPE, wire_type)?;
             <() as DistinguishedValueBorrowDecoder<E, T>>::borrow_decode_value_distinguished::<true>(

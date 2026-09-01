@@ -60,7 +60,7 @@ impl<'a> ValueBorrowDecoder<'a, PlainBytes, &'a [u8]> for () {
     fn borrow_decode_value(
         value: &mut &'a [u8],
         mut buf: Capped<&'a [u8]>,
-        _ctx: DecodeContext,
+        _ctx: impl DecodeContext,
     ) -> Result<(), DecodeError> {
         *value = buf.take_borrowed_length_delimited()?;
         Ok(())
@@ -74,7 +74,7 @@ impl<'a> DistinguishedValueBorrowDecoder<'a, PlainBytes, &'a [u8]> for () {
     fn borrow_decode_value_distinguished<const ALLOW_EMPTY: bool>(
         value: &mut &'a [u8],
         mut buf: Capped<&'a [u8]>,
-        _ctx: RestrictedDecodeContext,
+        _ctx: impl RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
         *value = buf.take_borrowed_length_delimited()?;
         Ok(Canonicity::Canonical)
@@ -117,7 +117,7 @@ impl ValueDecoder<PlainBytes, Vec<u8>> for () {
     fn decode_value<B: Buf + ?Sized>(
         value: &mut Vec<u8>,
         mut buf: Capped<B>,
-        _ctx: DecodeContext,
+        _ctx: impl DecodeContext,
     ) -> Result<(), DecodeError> {
         let buf = buf.take_length_delimited()?;
         value.clear();
@@ -133,7 +133,7 @@ impl DistinguishedValueDecoder<PlainBytes, Vec<u8>> for () {
     fn decode_value_distinguished<const ALLOW_EMPTY: bool>(
         value: &mut Vec<u8>,
         buf: Capped<impl Buf + ?Sized>,
-        ctx: RestrictedDecodeContext,
+        ctx: impl RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
         <() as ValueDecoder<PlainBytes, _>>::decode_value(value, buf, ctx.into_inner())?;
         Ok(Canonicity::Canonical)
@@ -242,7 +242,7 @@ impl<const N: usize> ValueDecoder<PlainBytes, [u8; N]> for () {
     fn decode_value<B: Buf + ?Sized>(
         value: &mut [u8; N],
         mut buf: Capped<B>,
-        _ctx: DecodeContext,
+        _ctx: impl DecodeContext,
     ) -> Result<(), DecodeError> {
         let mut delimited = buf.take_length_delimited()?;
         if delimited.remaining_before_cap() != N {
@@ -259,7 +259,7 @@ impl<const N: usize> DistinguishedValueDecoder<PlainBytes, [u8; N]> for () {
     fn decode_value_distinguished<const ALLOW_EMPTY: bool>(
         value: &mut [u8; N],
         buf: Capped<impl Buf + ?Sized>,
-        ctx: RestrictedDecodeContext,
+        ctx: impl RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
         <() as ValueDecoder<PlainBytes, _>>::decode_value(value, buf, ctx.into_inner())?;
         Ok(Canonicity::Canonical)
@@ -312,7 +312,7 @@ impl<'a, const N: usize> ValueBorrowDecoder<'a, PlainBytes, &'a [u8; N]> for () 
     fn borrow_decode_value(
         value: &mut &'a [u8; N],
         mut buf: Capped<&'a [u8]>,
-        _ctx: DecodeContext,
+        _ctx: impl DecodeContext,
     ) -> Result<(), DecodeError> {
         *value = buf
             .take_borrowed_length_delimited()?
@@ -329,7 +329,7 @@ impl<'a, const N: usize> DistinguishedValueBorrowDecoder<'a, PlainBytes, &'a [u8
     fn borrow_decode_value_distinguished<const ALLOW_EMPTY: bool>(
         value: &mut &'a [u8; N],
         buf: Capped<&'a [u8]>,
-        ctx: RestrictedDecodeContext,
+        ctx: impl RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
         <() as ValueBorrowDecoder<PlainBytes, _>>::borrow_decode_value(
             value,
@@ -478,7 +478,7 @@ macro_rules! plain_bytes_vec_impl {
             fn decode_value<B: $crate::bytes::Buf + ?Sized>(
                 $value: &mut $ty,
                 mut buf: $crate::encoding::Capped<B>,
-                _ctx: $crate::encoding::DecodeContext,
+                _ctx: impl $crate::encoding::DecodeContext,
             ) -> Result<(), $crate::DecodeError> {
                 let mut $buf = buf.take_length_delimited()?.take_all();
                 $value.clear();
@@ -499,7 +499,7 @@ macro_rules! plain_bytes_vec_impl {
             fn decode_value_distinguished<const ALLOW_EMPTY: bool>(
                 value: &mut $ty,
                 buf: $crate::encoding::Capped<impl $crate::bytes::Buf + ?Sized>,
-                ctx: $crate::encoding::RestrictedDecodeContext,
+                ctx: impl $crate::encoding::RestrictedDecodeContext,
             ) -> Result<$crate::Canonicity, $crate::DecodeError> {
                 <() as $crate::encoding::ValueDecoder<$crate::encoding::PlainBytes, _>>::
                     decode_value

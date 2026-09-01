@@ -402,8 +402,8 @@ mod utcoffset {
     use super::SealedBilrostTag;
     use crate::encoding::test::{check_type_empty, distinguished, relaxed};
     use crate::encoding::{
-        Capped, DecodeContext, DistinguishedValueDecoder, EmptyState, ForOverwrite, General,
-        RestrictedDecodeContext, ValueDecoder, ValueEncoder, WireType,
+        Capped, DecodeCtx, DistinguishedValueDecoder, EmptyState, ForOverwrite, General,
+        RestrictedCtx, ValueDecoder, ValueEncoder, WireType,
     };
     use crate::Canonicity::NotCanonical;
     use crate::DecodeError;
@@ -443,7 +443,7 @@ mod utcoffset {
                 <() as ValueDecoder<General, _>>::decode_value(
                     &mut utc_off,
                     Capped::new(&mut buf.as_slice()),
-                    DecodeContext::default(),
+                    DecodeCtx::default(),
                 ),
                 Err(DecodeError::new(InvalidValue))
             );
@@ -451,7 +451,7 @@ mod utcoffset {
                 <() as DistinguishedValueDecoder<General, _>>::decode_value_distinguished::<true>(
                     &mut utc_off,
                     Capped::new(&mut buf.as_slice()),
-                    RestrictedDecodeContext::new(NotCanonical),
+                    RestrictedCtx::new(DecodeCtx::default(), NotCanonical),
                 ),
                 Err(DecodeError::new(InvalidValue))
             );

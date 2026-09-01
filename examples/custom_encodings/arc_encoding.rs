@@ -121,7 +121,7 @@ mod impl_arc_encoding {
         fn decode_value<B: Buf + ?Sized>(
             value: &mut Arc<T>,
             buf: Capped<B>,
-            ctx: DecodeContext,
+            ctx: impl DecodeContext,
         ) -> Result<(), DecodeError> {
             <() as ValueDecoder<E, T>>::decode_value(Arc::make_mut(value), buf, ctx)
         }
@@ -138,7 +138,7 @@ mod impl_arc_encoding {
         fn decode_value_distinguished<const ALLOW_EMPTY: bool>(
             value: &mut Arc<T>,
             buf: Capped<impl Buf + ?Sized>,
-            ctx: RestrictedDecodeContext,
+            ctx: impl RestrictedDecodeContext,
         ) -> Result<Canonicity, DecodeError> {
             <() as DistinguishedValueDecoder<E, T>>::decode_value_distinguished::<ALLOW_EMPTY>(
                 Arc::make_mut(value),
@@ -157,7 +157,7 @@ mod impl_arc_encoding {
         fn borrow_decode_value(
             value: &mut Arc<T>,
             buf: Capped<&'a [u8]>,
-            ctx: DecodeContext,
+            ctx: impl DecodeContext,
         ) -> Result<(), DecodeError> {
             <() as ValueBorrowDecoder<E, T>>::borrow_decode_value(Arc::make_mut(value), buf, ctx)
         }
@@ -174,7 +174,7 @@ mod impl_arc_encoding {
         fn borrow_decode_value_distinguished<const ALLOW_EMPTY: bool>(
             value: &mut Arc<T>,
             buf: Capped<&'a [u8]>,
-            ctx: RestrictedDecodeContext,
+            ctx: impl RestrictedDecodeContext,
         ) -> Result<Canonicity, DecodeError> {
             <() as DistinguishedValueBorrowDecoder<E, T>>::borrow_decode_value_distinguished::<
                 ALLOW_EMPTY,
@@ -217,7 +217,7 @@ mod impl_arc_encoding {
             wire_type: WireType,
             value: &mut Arc<T>,
             buf: Capped<B>,
-            ctx: DecodeContext,
+            ctx: impl DecodeContext,
         ) -> Result<(), DecodeError> {
             <() as Decoder<E, T>>::decode(wire_type, Arc::make_mut(value), buf, ctx)
         }
@@ -233,7 +233,7 @@ mod impl_arc_encoding {
             wire_type: WireType,
             value: &mut Arc<T>,
             buf: Capped<B>,
-            ctx: RestrictedDecodeContext,
+            ctx: impl RestrictedDecodeContext,
         ) -> Result<Canonicity, DecodeError> {
             <() as DistinguishedDecoder<E, T>>::decode_distinguished(
                 wire_type,
@@ -254,7 +254,7 @@ mod impl_arc_encoding {
             wire_type: WireType,
             value: &mut Arc<T>,
             buf: Capped<&'a [u8]>,
-            ctx: DecodeContext,
+            ctx: impl DecodeContext,
         ) -> Result<(), DecodeError> {
             <() as BorrowDecoder<E, T>>::borrow_decode(wire_type, Arc::make_mut(value), buf, ctx)
         }
@@ -270,7 +270,7 @@ mod impl_arc_encoding {
             wire_type: WireType,
             value: &mut Arc<T>,
             buf: Capped<&'a [u8]>,
-            ctx: RestrictedDecodeContext,
+            ctx: impl RestrictedDecodeContext,
         ) -> Result<Canonicity, DecodeError> {
             <() as DistinguishedBorrowDecoder<E, T>>::borrow_decode_distinguished(
                 wire_type,
@@ -368,7 +368,7 @@ mod impl_arc_slice_encoding {
         fn decode_value<B: Buf + ?Sized>(
             value: &mut Arc<[T]>,
             buf: Capped<B>,
-            ctx: DecodeContext,
+            ctx: impl DecodeContext,
         ) -> Result<(), DecodeError> {
             let mut decoded = vec![];
             <() as ValueDecoder<E, Vec<T>>>::decode_value(&mut decoded, buf, ctx)?;
@@ -388,7 +388,7 @@ mod impl_arc_slice_encoding {
         fn decode_value_distinguished<const ALLOW_EMPTY: bool>(
             value: &mut Arc<[T]>,
             buf: Capped<impl Buf + ?Sized>,
-            ctx: RestrictedDecodeContext,
+            ctx: impl RestrictedDecodeContext,
         ) -> Result<Canonicity, DecodeError> {
             let mut decoded = vec![];
             let canon = <() as DistinguishedValueDecoder<E, Vec<T>>>::decode_value_distinguished::<
@@ -407,7 +407,7 @@ mod impl_arc_slice_encoding {
         fn borrow_decode_value(
             value: &mut Arc<[T]>,
             buf: Capped<&'a [u8]>,
-            ctx: DecodeContext,
+            ctx: impl DecodeContext,
         ) -> Result<(), DecodeError> {
             let mut decoded = vec![];
             <() as ValueBorrowDecoder<E, Vec<T>>>::borrow_decode_value(&mut decoded, buf, ctx)?;
@@ -427,7 +427,7 @@ mod impl_arc_slice_encoding {
         fn borrow_decode_value_distinguished<const ALLOW_EMPTY: bool>(
             value: &mut Arc<[T]>,
             buf: Capped<&'a [u8]>,
-            ctx: RestrictedDecodeContext,
+            ctx: impl RestrictedDecodeContext,
         ) -> Result<Canonicity, DecodeError> {
             let mut decoded = vec![];
             let canon = <() as DistinguishedValueBorrowDecoder<E, Vec<T>>>::borrow_decode_value_distinguished::<
@@ -474,7 +474,7 @@ mod impl_arc_slice_encoding {
             wire_type: WireType,
             value: &mut Arc<[T]>,
             buf: Capped<B>,
-            ctx: DecodeContext,
+            ctx: impl DecodeContext,
         ) -> Result<(), DecodeError> {
             let mut decoded = vec![];
             <() as Decoder<E, Vec<T>>>::decode(wire_type, &mut decoded, buf, ctx)?;
@@ -492,7 +492,7 @@ mod impl_arc_slice_encoding {
             wire_type: WireType,
             value: &mut Arc<[T]>,
             buf: Capped<B>,
-            ctx: RestrictedDecodeContext,
+            ctx: impl RestrictedDecodeContext,
         ) -> Result<Canonicity, DecodeError> {
             let mut decoded = vec![];
             let canon = <() as DistinguishedDecoder<E, Vec<T>>>::decode_distinguished(
@@ -515,7 +515,7 @@ mod impl_arc_slice_encoding {
             wire_type: WireType,
             value: &mut Arc<[T]>,
             buf: Capped<&'a [u8]>,
-            ctx: DecodeContext,
+            ctx: impl DecodeContext,
         ) -> Result<(), DecodeError> {
             let mut decoded = vec![];
             <() as BorrowDecoder<E, Vec<T>>>::borrow_decode(wire_type, &mut decoded, buf, ctx)?;
@@ -533,7 +533,7 @@ mod impl_arc_slice_encoding {
             wire_type: WireType,
             value: &mut Arc<[T]>,
             buf: Capped<&'a [u8]>,
-            ctx: RestrictedDecodeContext,
+            ctx: impl RestrictedDecodeContext,
         ) -> Result<Canonicity, DecodeError> {
             let mut decoded = vec![];
             let canon = <() as DistinguishedBorrowDecoder<E, Vec<T>>>::borrow_decode_distinguished(

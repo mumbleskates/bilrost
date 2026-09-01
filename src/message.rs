@@ -5,9 +5,9 @@ use crate::encoding::message::{
 #[cfg(debug_assertions)]
 use crate::encoding::paranoid_buf_asserts::Counted;
 use crate::encoding::{
-    encode_varint, encoded_len_varint, prepend_varint, Capped, DecodeContext,
+    encode_varint, encoded_len_varint, prepend_varint, Capped, DecodeCtx,
     RawDistinguishedMessageBorrowDecoder, RawDistinguishedMessageDecoder, RawMessage,
-    RawMessageBorrowDecoder, RawMessageDecoder, RestrictedDecodeContext,
+    RawMessageBorrowDecoder, RawMessageDecoder, RestrictedCtx, RestrictedDecodeContext,
 };
 use crate::Canonicity::{Canonical, NotCanonical};
 use crate::{length_delimiter_len, Canonicity, DecodeError, EncodeError};
@@ -780,7 +780,7 @@ where
     #[doc(hidden)]
     fn decode_capped<B: Buf + ?Sized>(buf: Capped<B>) -> Result<Self, DecodeError> {
         let mut message = Self::empty();
-        merge(&mut message, buf, DecodeContext::default())?;
+        merge(&mut message, buf, DecodeCtx::default())?;
         Ok(message)
     }
 
@@ -813,7 +813,7 @@ where
     fn replace_from_capped<B: Buf + ?Sized>(&mut self, buf: Capped<B>) -> Result<(), DecodeError> {
         self.clear();
         // MSRV: here, and elsewhere, this `map_err` could be `inspect_err` (1.76)
-        merge(self, buf, DecodeContext::default()).map_err(|err| {
+        merge(self, buf, DecodeCtx::default()).map_err(|err| {
             self.clear();
             err
         })
@@ -937,7 +937,7 @@ where
         restrict_to: Canonicity,
     ) -> Result<(Self, Canonicity), DecodeError> {
         let mut message = Self::empty();
-        let ctx = RestrictedDecodeContext::new(restrict_to);
+        let ctx = RestrictedCtx::new(DecodeCtx::default(), restrict_to);
         let canon = merge_distinguished(&mut message, buf, ctx.clone())
             // Safety backstop to ensure we do not return a canonicity worse than restrict_to.
             // See the docs on `RestrictedDecodeContext::check` for details on canonicity
@@ -988,7 +988,7 @@ where
         restrict_to: Canonicity,
     ) -> Result<Canonicity, DecodeError> {
         self.clear();
-        let ctx = RestrictedDecodeContext::new(restrict_to);
+        let ctx = RestrictedCtx::new(DecodeCtx::default(), restrict_to);
         merge_distinguished(self, buf, ctx.clone())
             .map_err(|err| {
                 self.clear();
@@ -1097,11 +1097,7 @@ where
 {
     fn decode_borrowed(mut buf: &'a [u8]) -> Result<Self, DecodeError> {
         let mut message = Self::empty();
-        borrow_merge(
-            &mut message,
-            Capped::new(&mut buf),
-            DecodeContext::default(),
-        )?;
+        borrow_merge(&mut message, Capped::new(&mut buf), DecodeCtx::default())?;
         Ok(message)
     }
 
@@ -1111,7 +1107,7 @@ where
 
     fn replace_borrowed_from(&mut self, mut buf: &'a [u8]) -> Result<(), DecodeError> {
         self.clear();
-        borrow_merge(self, Capped::new(&mut buf), DecodeContext::default()).map_err(|err| {
+        borrow_merge(self, Capped::new(&mut buf), DecodeCtx::default()).map_err(|err| {
             self.clear();
             err
         })
@@ -1158,7 +1154,7 @@ where
         restrict_to: Canonicity,
     ) -> Result<(Self, Canonicity), DecodeError> {
         let mut message = Self::empty();
-        let ctx = RestrictedDecodeContext::new(restrict_to);
+        let ctx = RestrictedCtx::new(DecodeCtx::default(), restrict_to);
         let canon = borrow_merge_distinguished(&mut message, Capped::new(&mut buf), ctx.clone())
             // Safety backstop to ensure we do not return a canonicity worse than restrict_to.
             // See the docs on `RestrictedDecodeContext::check` for details on canonicity
@@ -1183,7 +1179,7 @@ where
         restrict_to: Canonicity,
     ) -> Result<Canonicity, DecodeError> {
         self.clear();
-        let ctx = RestrictedDecodeContext::new(restrict_to);
+        let ctx = RestrictedCtx::new(DecodeCtx::default(), restrict_to);
         borrow_merge_distinguished(self, Capped::new(&mut buf), ctx.clone())
             .map_err(|err| {
                 self.clear();

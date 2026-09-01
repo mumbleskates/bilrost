@@ -307,7 +307,7 @@ macro_rules! impl_decoders {
             fn $relaxed_value_method $($($buf_generic)*)? (
                 value: &mut C,
                 mut buf: Capped<$buf_ty>,
-                ctx: DecodeContext,
+                ctx: impl DecodeContext,
             ) -> Result<(), DecodeError> {
                 let mut capped = buf.take_length_delimited()?;
                 // MSRV: this could be .is_some_and(..) (1.70)
@@ -345,7 +345,7 @@ macro_rules! impl_decoders {
             fn $distinguished_value_method <const ALLOW_EMPTY: bool>(
                 value: &mut C,
                 mut buf: Capped<$impl_buf_ty>,
-                ctx: RestrictedDecodeContext,
+                ctx: impl RestrictedDecodeContext,
             ) -> Result<Canonicity, DecodeError> {
                 let mut capped = buf.take_length_delimited()?;
                 // MSRV: this could be .is_some_and(..) (1.70)
@@ -385,7 +385,7 @@ macro_rules! impl_decoders {
                 wire_type: WireType,
                 value: &mut C,
                 buf: Capped<$buf_ty>,
-                ctx: DecodeContext,
+                ctx: impl DecodeContext,
             ) -> Result<(), DecodeError> {
                 if wire_type == WireType::LengthDelimited {
                     // We've encountered the expected length-delimited type: decode it in packed
@@ -412,7 +412,7 @@ macro_rules! impl_decoders {
                 wire_type: WireType,
                 value: &mut C,
                 buf: Capped<$buf_ty>,
-                ctx: RestrictedDecodeContext,
+                ctx: impl RestrictedDecodeContext,
             ) -> Result<Canonicity, DecodeError> {
                 if wire_type == WireType::LengthDelimited {
                     // We've encountered the expected length-delimited type: decode it in packed
@@ -454,7 +454,7 @@ macro_rules! impl_decoders {
             fn $relaxed_value_method $($($buf_generic)*)? (
                 value: &mut [T; N],
                 mut buf: Capped<$buf_ty>,
-                ctx: DecodeContext,
+                ctx: impl DecodeContext,
             ) -> Result<(), DecodeError> {
                 let mut capped = buf.take_length_delimited()?;
                 // MSRV: this could be .is_some_and(..) (1.70)
@@ -501,7 +501,7 @@ macro_rules! impl_decoders {
             fn $distinguished_value_method <const ALLOW_EMPTY: bool>(
                 value: &mut [T; N],
                 mut buf: Capped<$impl_buf_ty>,
-                ctx: RestrictedDecodeContext,
+                ctx: impl RestrictedDecodeContext,
             ) -> Result<Canonicity, DecodeError> {
                 let mut capped = buf.take_length_delimited()?;
                 // MSRV: this could be .is_some_and(..) (1.70)
@@ -554,7 +554,7 @@ macro_rules! impl_decoders {
                 wire_type: WireType,
                 value: &mut [T; N],
                 buf: Capped<$buf_ty>,
-                ctx: DecodeContext,
+                ctx: impl DecodeContext,
             ) -> Result<(), DecodeError> {
                 if wire_type == WireType::LengthDelimited {
                     // We've encountered the expected length-delimited type: decode it in packed
@@ -586,7 +586,7 @@ macro_rules! impl_decoders {
                 wire_type: WireType,
                 value: &mut [T; N],
                 buf: Capped<$buf_ty>,
-                ctx: RestrictedDecodeContext,
+                ctx: impl RestrictedDecodeContext,
             ) -> Result<Canonicity, DecodeError> {
                 if wire_type == WireType::LengthDelimited {
                     // We've encountered the expected length-delimited type: decode it in packed

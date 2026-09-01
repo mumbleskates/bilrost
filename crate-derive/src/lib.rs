@@ -420,7 +420,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream> {
                     wire_type: #crate_::encoding::WireType,
                     duplicated: bool,
                     buf: #crate_::encoding::Capped<__B>,
-                    ctx: #crate_::encoding::DecodeContext,
+                    ctx: impl #crate_::encoding::DecodeContext,
                 ) -> ::core::result::Result<(), #crate_::DecodeError>
                 where
                     __B: #crate_::bytes::Buf + ?Sized,
@@ -500,7 +500,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream> {
                 wire_type: #crate_::encoding::WireType,
                 duplicated: bool,
                 buf: #crate_::encoding::Capped<&'__a [u8]>,
-                ctx: #crate_::encoding::DecodeContext,
+                ctx: impl #crate_::encoding::DecodeContext,
             ) -> ::core::result::Result<(), #crate_::DecodeError> {
                 let _ = <Self as #crate_::encoding::RawMessage>::__ASSERTIONS;
                 match tag {
@@ -589,7 +589,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream> {
                         wire_type: #crate_::encoding::WireType,
                         duplicated: bool,
                         buf: #crate_::encoding::Capped<__B>,
-                        ctx: #crate_::encoding::RestrictedDecodeContext,
+                        ctx: impl #crate_::encoding::RestrictedDecodeContext,
                     ) -> ::core::result::Result<#crate_::Canonicity, #crate_::DecodeError>
                     where
                         __B: #crate_::bytes::Buf + ?Sized,
@@ -621,7 +621,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream> {
                     wire_type: #crate_::encoding::WireType,
                     duplicated: bool,
                     buf: #crate_::encoding::Capped<&'__a [u8]>,
-                    ctx: #crate_::encoding::RestrictedDecodeContext,
+                    ctx: impl #crate_::encoding::RestrictedDecodeContext,
                 ) -> ::core::result::Result<#crate_::Canonicity, #crate_::DecodeError> {
                     let canon = &mut #crate_::Canonicity::Canonical;
                     match tag {
@@ -716,7 +716,7 @@ fn try_message_via_oneof(input: DeriveInput) -> Result<TokenStream> {
                     wire_type: #crate_::encoding::WireType,
                     _duplicated: bool,
                     buf: #crate_::encoding::Capped<__B>,
-                    ctx: #crate_::encoding::DecodeContext,
+                    ctx: impl #crate_::encoding::DecodeContext,
                 ) -> ::core::result::Result<(), #crate_::DecodeError>
                 where
                     __B: #crate_::bytes::Buf + ?Sized,
@@ -820,7 +820,7 @@ fn try_message_via_oneof(input: DeriveInput) -> Result<TokenStream> {
                 wire_type: #crate_::encoding::WireType,
                 _duplicated: bool,
                 buf: #crate_::encoding::Capped<&'__a [u8]>,
-                ctx: #crate_::encoding::DecodeContext,
+                ctx: impl #crate_::encoding::DecodeContext,
             ) -> ::core::result::Result<(), #crate_::DecodeError> {
                 if <Self as #crate_::encoding::Oneof>::FIELD_TAGS.contains(&tag) {
                     <Self as #crate_::encoding::OneofBorrowDecoder>::oneof_borrow_decode_field(
@@ -862,7 +862,7 @@ fn try_message_via_oneof(input: DeriveInput) -> Result<TokenStream> {
                         wire_type: #crate_::encoding::WireType,
                         _duplicated: bool,
                         buf: #crate_::encoding::Capped<__B>,
-                        ctx: #crate_::encoding::RestrictedDecodeContext,
+                        ctx: impl #crate_::encoding::RestrictedDecodeContext,
                     ) -> ::core::result::Result<#crate_::Canonicity, #crate_::DecodeError>
                     where
                         __B: #crate_::bytes::Buf + ?Sized,
@@ -899,7 +899,7 @@ fn try_message_via_oneof(input: DeriveInput) -> Result<TokenStream> {
                     wire_type: #crate_::encoding::WireType,
                     _duplicated: bool,
                     buf: #crate_::encoding::Capped<&'__a [u8]>,
-                    ctx: #crate_::encoding::RestrictedDecodeContext,
+                    ctx: impl #crate_::encoding::RestrictedDecodeContext,
                 ) -> ::core::result::Result<#crate_::Canonicity, #crate_::DecodeError> {
                     if <Self as #crate_::encoding::Oneof>::FIELD_TAGS.contains(&tag) {
                         <Self as #crate_::encoding::DistinguishedOneofBorrowDecoder>::
@@ -1231,7 +1231,7 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream> {
             fn decode_value<__B: #crate_::bytes::Buf + ?Sized>(
                 value: &mut #ident #ty_generics,
                 mut buf: #crate_::encoding::Capped<__B>,
-                _ctx: #crate_::encoding::DecodeContext,
+                _ctx: impl #crate_::encoding::DecodeContext,
             ) -> ::core::result::Result<(), #crate_::DecodeError> {
                 let decoded = buf.decode_varint()?;
                 let ::core::result::Result::Ok(in_range) = u32::try_from(decoded) else {
@@ -1261,7 +1261,7 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream> {
             fn decode_value_distinguished<const ALLOW_EMPTY: bool>(
                 value: &mut #ident #ty_generics,
                 buf: #crate_::encoding::Capped<impl #crate_::bytes::Buf + ?Sized>,
-                ctx: #crate_::encoding::RestrictedDecodeContext,
+                ctx: impl #crate_::encoding::RestrictedDecodeContext,
             ) -> ::core::result::Result<#crate_::Canonicity, #crate_::DecodeError> {
                 <() as #crate_::encoding::ValueDecoder<
                     #crate_::encoding::GeneralGeneric<__G>, #ident #ty_generics
@@ -1284,7 +1284,7 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream> {
             fn borrow_decode_value(
                 value: &mut #ident #ty_generics,
                 mut buf: #crate_::encoding::Capped<&'__a [u8]>,
-                ctx: #crate_::encoding::DecodeContext,
+                ctx: impl #crate_::encoding::DecodeContext,
             ) -> ::core::result::Result<(), #crate_::DecodeError> {
                 <() as #crate_::encoding::ValueDecoder<
                     #crate_::encoding::GeneralGeneric<__G>, #ident #ty_generics
@@ -1308,7 +1308,7 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream> {
             fn borrow_decode_value_distinguished<const ALLOW_EMPTY: bool>(
                 value: &mut #ident #ty_generics,
                 buf: #crate_::encoding::Capped<&'__a [u8]>,
-                ctx: #crate_::encoding::RestrictedDecodeContext,
+                ctx: impl #crate_::encoding::RestrictedDecodeContext,
             ) -> ::core::result::Result<#crate_::Canonicity, #crate_::DecodeError> {
                 <() as #crate_::encoding::ValueDecoder<
                     #crate_::encoding::GeneralGeneric<__G>, #ident #ty_generics
@@ -1688,7 +1688,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream> {
                     tag: u32,
                     wire_type: #crate_::encoding::WireType,
                     buf: #crate_::encoding::Capped<__B>,
-                    ctx: #crate_::encoding::DecodeContext,
+                    ctx: impl #crate_::encoding::DecodeContext,
                 ) -> ::core::result::Result<#decode_field_return_ty, #crate_::DecodeError> {
                     #decode_owned
                 }
@@ -1757,7 +1757,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream> {
                 tag: u32,
                 wire_type: #crate_::encoding::WireType,
                 buf: #crate_::encoding::Capped<&'__a [u8]>,
-                ctx: #crate_::encoding::DecodeContext,
+                ctx: impl #crate_::encoding::DecodeContext,
             ) -> ::core::result::Result<#decode_field_return_ty, #crate_::DecodeError> {
                 #decode_borrowed
             }
@@ -1872,7 +1872,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream> {
                         tag: u32,
                         wire_type: #crate_::encoding::WireType,
                         buf: #crate_::encoding::Capped<__B>,
-                        ctx: #crate_::encoding::RestrictedDecodeContext,
+                        ctx: impl #crate_::encoding::RestrictedDecodeContext,
                     ) -> ::core::result::Result<#decode_field_return_ty, #crate_::DecodeError> {
                         #decode_owned
                     }
@@ -1891,7 +1891,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream> {
                     tag: u32,
                     wire_type: #crate_::encoding::WireType,
                     buf: #crate_::encoding::Capped<&'__a [u8]>,
-                    ctx: #crate_::encoding::RestrictedDecodeContext,
+                    ctx: impl #crate_::encoding::RestrictedDecodeContext,
                 ) -> ::core::result::Result<#decode_field_return_ty, #crate_::DecodeError> {
                     #decode_borrowed
                 }

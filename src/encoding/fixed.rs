@@ -61,7 +61,7 @@ macro_rules! fixed_width_common {
             fn decode_value<B: Buf + ?Sized>(
                 $value: &mut $ty,
                 mut buf: Capped<B>,
-                _ctx: DecodeContext,
+                _ctx: impl DecodeContext,
             ) -> Result<(), DecodeError> {
                 if buf.remaining_before_cap() < WireType::$wire_type.fixed_size().unwrap() {
                     return Err(DecodeError::new(Truncated));
@@ -114,7 +114,7 @@ macro_rules! fixed_width_int {
             fn decode_value_distinguished<const ALLOW_EMPTY: bool>(
                 value: &mut $ty,
                 buf: Capped<impl Buf + ?Sized>,
-                ctx: RestrictedDecodeContext,
+                ctx: impl RestrictedDecodeContext,
             ) -> Result<Canonicity, DecodeError> {
                 <() as ValueDecoder<Fixed, _>>::decode_value(value, buf, ctx.into_inner())?;
                 Ok(Canonicity::Canonical)
@@ -246,7 +246,7 @@ macro_rules! fixed_width_array {
             fn decode_value<B: Buf + ?Sized>(
                 value: &mut [u8; $N],
                 mut buf: Capped<B>,
-                _ctx: DecodeContext,
+                _ctx: impl DecodeContext,
             ) -> Result<(), DecodeError> {
                 if buf.remaining() < $N {
                     return Err(DecodeError::new(Truncated));
@@ -263,7 +263,7 @@ macro_rules! fixed_width_array {
             fn decode_value_distinguished<const ALLOW_EMPTY: bool>(
                 value: &mut [u8; $N],
                 buf: Capped<impl Buf + ?Sized>,
-                ctx: RestrictedDecodeContext,
+                ctx: impl RestrictedDecodeContext,
             ) -> Result<Canonicity, DecodeError> {
                 <() as ValueDecoder<Fixed, _>>::decode_value(value, buf, ctx.into_inner())?;
                 Ok(Canonicity::Canonical)

@@ -90,7 +90,7 @@ macro_rules! delegate_encoding {
                 wire_type: $crate::encoding::WireType,
                 value: &mut $value_ty,
                 buf: $crate::encoding::Capped<B>,
-                ctx: $crate::encoding::DecodeContext,
+                ctx: impl $crate::encoding::DecodeContext,
             ) -> Result<(), $crate::DecodeError> {
                 <() as $crate::encoding::Decoder::<$to_ty, _>>::decode(
                     wire_type,
@@ -112,7 +112,7 @@ macro_rules! delegate_encoding {
                 wire_type: $crate::encoding::WireType,
                 value: &mut $value_ty,
                 buf: $crate::encoding::Capped<&'__a [u8]>,
-                ctx: $crate::encoding::DecodeContext,
+                ctx: impl $crate::encoding::DecodeContext,
             ) -> Result<(), $crate::DecodeError> {
                 <() as $crate::encoding::BorrowDecoder::<$to_ty, _>>::borrow_decode(
                     wire_type,
@@ -168,7 +168,7 @@ macro_rules! delegate_encoding {
                 wire_type: $crate::encoding::WireType,
                 value: &mut $value_ty,
                 buf: $crate::encoding::Capped<B>,
-                ctx: $crate::encoding::RestrictedDecodeContext,
+                ctx: impl $crate::encoding::RestrictedDecodeContext,
             ) -> Result<$crate::Canonicity, $crate::DecodeError> {
                 <() as $crate::encoding::DistinguishedDecoder::<$to_ty, _>>::decode_distinguished(
                     wire_type,
@@ -191,7 +191,7 @@ macro_rules! delegate_encoding {
                 wire_type: $crate::encoding::WireType,
                 value: &mut $value_ty,
                 buf: $crate::encoding::Capped<&'__a [u8]>,
-                ctx: $crate::encoding::RestrictedDecodeContext,
+                ctx: impl $crate::encoding::RestrictedDecodeContext,
             ) -> Result<$crate::Canonicity, $crate::DecodeError> {
                 <() as $crate::encoding::DistinguishedBorrowDecoder::<$to_ty, _>>::
                     borrow_decode_distinguished
@@ -318,7 +318,7 @@ macro_rules! delegate_value_encoding {
             fn decode_value<__B: $crate::bytes::Buf + ?Sized>(
                 value: &mut $value_ty,
                 buf: $crate::encoding::Capped<__B>,
-                ctx: $crate::encoding::DecodeContext,
+                ctx: impl $crate::encoding::DecodeContext,
             ) -> Result<(), $crate::DecodeError> {
                 <() as $crate::encoding::ValueDecoder::<$to_ty, _>>::decode_value(value, buf, ctx)
             }
@@ -334,7 +334,7 @@ macro_rules! delegate_value_encoding {
             fn borrow_decode_value(
                 value: &mut $value_ty,
                 buf: $crate::encoding::Capped<&'__a [u8]>,
-                ctx: $crate::encoding::DecodeContext,
+                ctx: impl $crate::encoding::DecodeContext,
             ) -> Result<(), $crate::DecodeError> {
                 <() as $crate::encoding::ValueBorrowDecoder::<$to_ty, _>>::borrow_decode_value(
                     value,
@@ -394,7 +394,7 @@ macro_rules! delegate_value_encoding {
             fn decode_value_distinguished<const ALLOW_EMPTY: bool>(
                 value: &mut $value_ty,
                 buf: $crate::encoding::Capped<impl $crate::bytes::Buf + ?Sized>,
-                ctx: $crate::encoding::RestrictedDecodeContext,
+                ctx: impl $crate::encoding::RestrictedDecodeContext,
             ) -> Result<$crate::Canonicity, $crate::DecodeError> {
                 <() as $crate::encoding::DistinguishedValueDecoder::<$to_ty, _>>::
                     decode_value_distinguished::<ALLOW_EMPTY>
@@ -421,7 +421,7 @@ macro_rules! delegate_value_encoding {
             fn borrow_decode_value_distinguished<const ALLOW_EMPTY: bool>(
                 value: &mut $value_ty,
                 buf: $crate::encoding::Capped<&'__a [u8]>,
-                ctx: $crate::encoding::RestrictedDecodeContext,
+                ctx: impl $crate::encoding::RestrictedDecodeContext,
             ) -> Result<$crate::Canonicity, $crate::DecodeError> {
                 <() as $crate::encoding::DistinguishedValueBorrowDecoder::<$to_ty, _>>::
                     borrow_decode_value_distinguished::<ALLOW_EMPTY>
@@ -448,7 +448,7 @@ macro_rules! delegate_value_encoding {
             fn borrow_decode_value(
                 value: &mut $ty,
                 buf: $crate::encoding::Capped<&'__a [u8]>,
-                ctx: $crate::encoding::DecodeContext,
+                ctx: impl $crate::encoding::DecodeContext,
             ) -> Result<(), $crate::DecodeError> {
                 <() as $crate::encoding::ValueDecoder::<$encoding, _>>::decode_value(
                     value,
@@ -482,7 +482,7 @@ macro_rules! delegate_value_encoding {
             fn borrow_decode_value_distinguished<const ALLOW_EMPTY: bool>(
                 value: &mut $ty,
                 buf: $crate::encoding::Capped<&'__a [u8]>,
-                ctx: $crate::encoding::RestrictedDecodeContext,
+                ctx: impl $crate::encoding::RestrictedDecodeContext,
             ) -> Result<$crate::Canonicity, $crate::DecodeError> {
                 <() as $crate::encoding::DistinguishedValueDecoder::<$encoding, _>>::
                     decode_value_distinguished::<ALLOW_EMPTY>
@@ -831,7 +831,7 @@ macro_rules! __impl_decoder_where_value_decoder {
                 wire_type: $crate::encoding::WireType,
                 value: &mut T,
                 buf: $crate::encoding::Capped<$buf_ty>,
-                ctx: $crate::encoding::DecodeContext,
+                ctx: impl $crate::encoding::DecodeContext,
             ) -> ::core::result::Result<(), $crate::DecodeError> {
                 <() as $crate::encoding::$relaxed_field<$encoding, _>>::$relaxed_field_method(
                     wire_type, value, buf, ctx)
@@ -854,7 +854,7 @@ macro_rules! __impl_decoder_where_value_decoder {
                 wire_type: $crate::encoding::WireType,
                 value: &mut T,
                 buf: $crate::encoding::Capped<$buf_ty>,
-                ctx: $crate::encoding::RestrictedDecodeContext,
+                ctx: impl $crate::encoding::RestrictedDecodeContext,
             ) -> ::core::result::Result<$crate::Canonicity, $crate::DecodeError> {
                 // decoding a value as a whole message field, empty values are unacceptable
                 let mut canon = <() as $crate::encoding::$distinguished_field<$encoding, _>>::
@@ -1042,7 +1042,7 @@ macro_rules! impl_cow_value_encoding {
                 fn decode_value<B: Buf + ?Sized>(
                     value: &mut Cow<$T>,
                     buf: Capped<B>,
-                    ctx: DecodeContext,
+                    ctx: impl DecodeContext,
                 ) -> Result<(), DecodeError> {
                     <() as ValueDecoder<$E, _>>::decode_value(value.to_mut(), buf, ctx)
                 }
@@ -1056,7 +1056,7 @@ macro_rules! impl_cow_value_encoding {
                 fn decode_value_distinguished<const ALLOW_EMPTY: bool>(
                     value: &mut Cow<$T>,
                     buf: Capped<impl Buf + ?Sized>,
-                    ctx: RestrictedDecodeContext,
+                    ctx: impl RestrictedDecodeContext,
                 ) -> Result<Canonicity, DecodeError> {
                     <() as DistinguishedValueDecoder<$E, _>>::
                         decode_value_distinguished::<ALLOW_EMPTY>
@@ -1073,7 +1073,7 @@ macro_rules! impl_cow_value_encoding {
                 fn borrow_decode_value(
                     value: &mut Cow<'a, $T>,
                     buf: Capped<&'a [u8]>,
-                    ctx: DecodeContext,
+                    ctx: impl DecodeContext,
                 ) -> Result<(), DecodeError> {
                     let mut s = <() as ForOverwrite<$E, &$T>>::for_overwrite();
                     <() as ValueBorrowDecoder<$E, _>>::borrow_decode_value(&mut s, buf, ctx)?;
@@ -1091,7 +1091,7 @@ macro_rules! impl_cow_value_encoding {
                 fn borrow_decode_value_distinguished<const ALLOW_EMPTY: bool>(
                     value: &mut Cow<'a, $T>,
                     buf: Capped<&'a [u8]>,
-                    ctx: RestrictedDecodeContext,
+                    ctx: impl RestrictedDecodeContext,
                 ) -> Result<Canonicity, DecodeError> {
                     let mut s = <() as ForOverwrite<$E, &$T>>::for_overwrite();
                     let canon = <() as DistinguishedValueBorrowDecoder<$E, _>>::

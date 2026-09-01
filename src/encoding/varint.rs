@@ -110,7 +110,7 @@ macro_rules! varint {
             fn decode_value<B: Buf + ?Sized>(
                 __value: &mut $ty,
                 mut buf: Capped<B>,
-                _ctx: DecodeContext,
+                _ctx: impl DecodeContext,
             ) -> Result<(), DecodeError> {
                 let $from_uint64_value = buf.decode_varint()?;
                 *__value = $from_uint64;
@@ -125,7 +125,7 @@ macro_rules! varint {
             fn decode_value_distinguished<const ALLOW_EMPTY: bool>(
                 value: &mut $ty,
                 buf: Capped<impl Buf + ?Sized>,
-                ctx: RestrictedDecodeContext,
+                ctx: impl RestrictedDecodeContext,
             ) -> Result<Canonicity, DecodeError> {
                 <() as ValueDecoder::<Varint, _>>::decode_value(value, buf, ctx.into_inner())?;
                 Ok(Canonicity::Canonical)

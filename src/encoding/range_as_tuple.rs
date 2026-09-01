@@ -96,7 +96,7 @@ where
     fn decode_value<B: Buf + ?Sized>(
         value: &mut Range<T>,
         mut buf: Capped<B>,
-        ctx: DecodeContext,
+        ctx: impl DecodeContext,
     ) -> Result<(), DecodeError> {
         underived_decode!(Range {
             0: Estart => start: &mut value.start,
@@ -114,7 +114,7 @@ where
     fn decode_value_distinguished<const ALLOW_EMPTY: bool>(
         value: &mut Range<T>,
         mut buf: Capped<impl Buf + ?Sized>,
-        ctx: RestrictedDecodeContext,
+        ctx: impl RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
         underived_decode_distinguished!(Range {
             0: Estart => start: &mut value.start,
@@ -130,7 +130,7 @@ where
     fn borrow_decode_value(
         value: &mut Range<T>,
         mut buf: Capped<&'a [u8]>,
-        ctx: DecodeContext,
+        ctx: impl DecodeContext,
     ) -> Result<(), DecodeError> {
         underived_decode!(Range {
             0: Estart => start: &mut value.start,
@@ -148,7 +148,7 @@ where
     fn borrow_decode_value_distinguished<const ALLOW_EMPTY: bool>(
         value: &mut Range<T>,
         mut buf: Capped<&'a [u8]>,
-        ctx: RestrictedDecodeContext,
+        ctx: impl RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
         underived_decode_distinguished!(Range {
             0: Estart => start: &mut value.start,
@@ -283,7 +283,7 @@ where
     fn decode_value<B: Buf + ?Sized>(
         value: &mut RangeInclusive<T>,
         mut buf: Capped<B>,
-        ctx: DecodeContext,
+        ctx: impl DecodeContext,
     ) -> Result<(), DecodeError> {
         let (mut start, mut end) = mem::replace(
             value,
@@ -314,7 +314,7 @@ where
     fn decode_value_distinguished<const ALLOW_EMPTY: bool>(
         value: &mut RangeInclusive<T>,
         mut buf: Capped<impl Buf + ?Sized>,
-        ctx: RestrictedDecodeContext,
+        ctx: impl RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
         let (mut start, mut end) = mem::replace(
             value,
@@ -343,7 +343,7 @@ where
     fn borrow_decode_value(
         value: &mut RangeInclusive<T>,
         mut buf: Capped<&'a [u8]>,
-        ctx: DecodeContext,
+        ctx: impl DecodeContext,
     ) -> Result<(), DecodeError> {
         let (mut start, mut end) = mem::replace(
             value,
@@ -375,7 +375,7 @@ where
     fn borrow_decode_value_distinguished<const ALLOW_EMPTY: bool>(
         value: &mut RangeInclusive<T>,
         mut buf: Capped<&'a [u8]>,
-        ctx: RestrictedDecodeContext,
+        ctx: impl RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
         let (mut start, mut end) = mem::replace(
             value,

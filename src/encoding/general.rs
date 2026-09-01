@@ -245,7 +245,7 @@ impl<'a, const P: u8> ValueBorrowDecoder<'a, GeneralGeneric<P>, &'a str> for () 
     fn borrow_decode_value(
         value: &mut &'a str,
         mut buf: Capped<&'a [u8]>,
-        _ctx: DecodeContext,
+        _ctx: impl DecodeContext,
     ) -> Result<(), DecodeError> {
         *value = str::from_utf8(buf.take_borrowed_length_delimited()?).map_err(|_| InvalidValue)?;
         Ok(())
@@ -259,7 +259,7 @@ impl<'a, const P: u8> DistinguishedValueBorrowDecoder<'a, GeneralGeneric<P>, &'a
     fn borrow_decode_value_distinguished<const ALLOW_EMPTY: bool>(
         value: &mut &'a str,
         buf: Capped<&'a [u8]>,
-        ctx: RestrictedDecodeContext,
+        ctx: impl RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
         <() as ValueBorrowDecoder<GeneralGeneric<P>, _>>::borrow_decode_value(
             value,
@@ -308,7 +308,7 @@ impl<const P: u8> ValueDecoder<GeneralGeneric<P>, String> for () {
     fn decode_value<B: Buf + ?Sized>(
         value: &mut String,
         mut buf: Capped<B>,
-        _ctx: DecodeContext,
+        _ctx: impl DecodeContext,
     ) -> Result<(), DecodeError> {
         // ## Unsafety
         //
@@ -356,7 +356,7 @@ impl<const P: u8> ValueDecoder<GeneralGeneric<P>, String> for () {
     fn decode_value<B: Buf + ?Sized>(
         value: &mut String,
         buf: Capped<B>,
-        ctx: DecodeContext,
+        ctx: impl DecodeContext,
     ) -> Result<(), DecodeError> {
         // In this implementation we do the safe thing: the string is taken out and turned into a
         // Vec, we decode into that, and then we convert it into a String before putting it back.
@@ -374,7 +374,7 @@ impl<const P: u8> DistinguishedValueDecoder<GeneralGeneric<P>, String> for () {
     fn decode_value_distinguished<const ALLOW_EMPTY: bool>(
         value: &mut String,
         buf: Capped<impl Buf + ?Sized>,
-        ctx: RestrictedDecodeContext,
+        ctx: impl RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
         <() as ValueDecoder<GeneralGeneric<P>, _>>::decode_value(value, buf, ctx.into_inner())?;
         Ok(Canonicity::Canonical)
@@ -428,7 +428,7 @@ impl<const P: u8> ValueDecoder<GeneralGeneric<P>, Arc<str>> for () {
     fn decode_value<B: Buf + ?Sized>(
         value: &mut Arc<str>,
         mut buf: Capped<B>,
-        _ctx: DecodeContext,
+        _ctx: impl DecodeContext,
     ) -> Result<(), DecodeError> {
         *value = read_arc_str(buf.take_length_delimited()?)?;
         Ok(())
@@ -442,7 +442,7 @@ impl<const P: u8> DistinguishedValueDecoder<GeneralGeneric<P>, Arc<str>> for () 
     fn decode_value_distinguished<const ALLOW_EMPTY: bool>(
         value: &mut Arc<str>,
         buf: Capped<impl Buf + ?Sized>,
-        ctx: RestrictedDecodeContext,
+        ctx: impl RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
         <() as ValueDecoder<GeneralGeneric<P>, _>>::decode_value(value, buf, ctx.into_inner())?;
         Ok(Canonicity::Canonical)
@@ -501,7 +501,7 @@ impl<const P: u8> ValueDecoder<GeneralGeneric<P>, Rc<str>> for () {
     fn decode_value<B: Buf + ?Sized>(
         value: &mut Rc<str>,
         mut buf: Capped<B>,
-        _ctx: DecodeContext,
+        _ctx: impl DecodeContext,
     ) -> Result<(), DecodeError> {
         *value = read_rc_str(buf.take_length_delimited()?)?;
         Ok(())
@@ -515,7 +515,7 @@ impl<const P: u8> DistinguishedValueDecoder<GeneralGeneric<P>, Rc<str>> for () {
     fn decode_value_distinguished<const ALLOW_EMPTY: bool>(
         value: &mut Rc<str>,
         buf: Capped<impl Buf + ?Sized>,
-        ctx: RestrictedDecodeContext,
+        ctx: impl RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
         <() as ValueDecoder<GeneralGeneric<P>, _>>::decode_value(value, buf, ctx.into_inner())?;
         Ok(Canonicity::Canonical)
@@ -574,7 +574,7 @@ impl<const P: u8> ValueDecoder<GeneralGeneric<P>, Box<str>> for () {
     fn decode_value<B: Buf + ?Sized>(
         value: &mut Box<str>,
         mut buf: Capped<B>,
-        _ctx: DecodeContext,
+        _ctx: impl DecodeContext,
     ) -> Result<(), DecodeError> {
         *value = read_box_str(buf.take_length_delimited()?)?;
         Ok(())
@@ -588,7 +588,7 @@ impl<const P: u8> DistinguishedValueDecoder<GeneralGeneric<P>, Box<str>> for () 
     fn decode_value_distinguished<const ALLOW_EMPTY: bool>(
         value: &mut Box<str>,
         buf: Capped<impl Buf + ?Sized>,
-        ctx: RestrictedDecodeContext,
+        ctx: impl RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
         <() as ValueDecoder<GeneralGeneric<P>, _>>::decode_value(value, buf, ctx.into_inner())?;
         Ok(Canonicity::Canonical)
@@ -657,7 +657,7 @@ impl<const P: u8> ValueDecoder<GeneralGeneric<P>, Bytes> for () {
     fn decode_value<B: Buf + ?Sized>(
         value: &mut Bytes,
         mut buf: Capped<B>,
-        _ctx: DecodeContext,
+        _ctx: impl DecodeContext,
     ) -> Result<(), DecodeError> {
         let mut buf = buf.take_length_delimited()?;
         let len = buf.remaining_before_cap();
@@ -673,7 +673,7 @@ impl<const P: u8> DistinguishedValueDecoder<GeneralGeneric<P>, Bytes> for () {
     fn decode_value_distinguished<const ALLOW_EMPTY: bool>(
         value: &mut Bytes,
         buf: Capped<impl Buf + ?Sized>,
-        ctx: RestrictedDecodeContext,
+        ctx: impl RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
         <() as ValueDecoder<GeneralGeneric<P>, _>>::decode_value(value, buf, ctx.into_inner())?;
         Ok(Canonicity::Canonical)
@@ -727,7 +727,7 @@ impl<const P: u8> ValueDecoder<GeneralGeneric<P>, Blob> for () {
     fn decode_value<B: Buf + ?Sized>(
         value: &mut Blob,
         buf: Capped<B>,
-        ctx: DecodeContext,
+        ctx: impl DecodeContext,
     ) -> Result<(), DecodeError> {
         <() as ValueDecoder<PlainBytes, _>>::decode_value(&mut **value, buf, ctx)
     }
@@ -740,7 +740,7 @@ impl<const P: u8> DistinguishedValueDecoder<GeneralGeneric<P>, Blob> for () {
     fn decode_value_distinguished<const ALLOW_EMPTY: bool>(
         value: &mut Blob,
         buf: Capped<impl Buf + ?Sized>,
-        ctx: RestrictedDecodeContext,
+        ctx: impl RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
         <() as DistinguishedValueDecoder<PlainBytes, _>>::decode_value_distinguished::<ALLOW_EMPTY>(
             &mut **value,
@@ -872,7 +872,7 @@ mod delegate_to_message_encoding {
         fn decode_value<B: Buf + ?Sized>(
             value: &mut T,
             buf: Capped<B>,
-            ctx: DecodeContext,
+            ctx: impl DecodeContext,
         ) -> Result<(), DecodeError> {
             <() as ValueDecoder<MessageEncoding, _>>::decode_value(value, buf, ctx)
         }
@@ -890,7 +890,7 @@ mod delegate_to_message_encoding {
         fn decode_value_distinguished<const ALLOW_EMPTY: bool>(
             value: &mut T,
             buf: Capped<impl Buf + ?Sized>,
-            ctx: RestrictedDecodeContext,
+            ctx: impl RestrictedDecodeContext,
         ) -> Result<Canonicity, DecodeError> {
             <() as DistinguishedValueDecoder<MessageEncoding, _>>::decode_value_distinguished::<
                 ALLOW_EMPTY,
@@ -907,7 +907,7 @@ mod delegate_to_message_encoding {
         fn borrow_decode_value(
             value: &mut T,
             buf: Capped<&'a [u8]>,
-            ctx: DecodeContext,
+            ctx: impl DecodeContext,
         ) -> Result<(), DecodeError> {
             <() as ValueBorrowDecoder<MessageEncoding, _>>::borrow_decode_value(value, buf, ctx)
         }
@@ -925,7 +925,7 @@ mod delegate_to_message_encoding {
         fn borrow_decode_value_distinguished<const ALLOW_EMPTY: bool>(
             value: &mut T,
             buf: Capped<&'a [u8]>,
-            ctx: RestrictedDecodeContext,
+            ctx: impl RestrictedDecodeContext,
         ) -> Result<Canonicity, DecodeError> {
             <() as DistinguishedValueBorrowDecoder<MessageEncoding, _>>::borrow_decode_value_distinguished::<
                 ALLOW_EMPTY,

@@ -457,8 +457,8 @@ delegate_proxied_encoding!(
 #[cfg(test)]
 mod utc {
     use crate::encoding::{
-        Capped, DecodeContext, DistinguishedValueDecoder, ForOverwrite, General,
-        RestrictedDecodeContext, ValueDecoder, ValueEncoder,
+        Capped, DecodeCtx, DistinguishedValueDecoder, ForOverwrite, General, RestrictedCtx,
+        ValueDecoder, ValueEncoder,
     };
     use crate::Canonicity::{Canonical, NotCanonical};
     use crate::DecodeError;
@@ -477,7 +477,7 @@ mod utc {
                 <() as ValueDecoder<General, _>>::decode_value(
                     &mut utc,
                     Capped::new(&mut buf.as_slice()),
-                    DecodeContext::default(),
+                    DecodeCtx::default(),
                 ),
                 Ok(())
             );
@@ -485,7 +485,7 @@ mod utc {
                 <() as DistinguishedValueDecoder<General, _>>::decode_value_distinguished::<true>(
                     &mut utc,
                     Capped::new(&mut buf.as_slice()),
-                    RestrictedDecodeContext::new(NotCanonical),
+                    RestrictedCtx::new(DecodeCtx::default(), NotCanonical),
                 ),
                 Ok(Canonical)
             );
@@ -500,7 +500,7 @@ mod utc {
                 <() as ValueDecoder<General, _>>::decode_value(
                     &mut utc,
                     Capped::new(&mut buf.as_slice()),
-                    DecodeContext::default(),
+                    DecodeCtx::default(),
                 ),
                 Err(DecodeError::new(OutOfDomainValue))
             );
@@ -508,7 +508,7 @@ mod utc {
                 <() as DistinguishedValueDecoder<General, _>>::decode_value_distinguished::<true>(
                     &mut utc,
                     Capped::new(&mut buf.as_slice()),
-                    RestrictedDecodeContext::new(NotCanonical),
+                    RestrictedCtx::new(DecodeCtx::default(), NotCanonical),
                 ),
                 Err(DecodeError::new(OutOfDomainValue))
             );
@@ -597,8 +597,8 @@ mod fixedoffset {
     use crate::encoding::test::{check_type_empty, check_type_test, distinguished, relaxed};
     use crate::encoding::value_traits::ForOverwrite;
     use crate::encoding::{
-        Capped, DecodeContext, DistinguishedValueDecoder, EmptyState, General,
-        RestrictedDecodeContext, ValueDecoder, ValueEncoder, WireType,
+        Capped, DecodeCtx, DistinguishedValueDecoder, EmptyState, General, RestrictedCtx,
+        ValueDecoder, ValueEncoder, WireType,
     };
     use crate::Canonicity::NotCanonical;
     use crate::DecodeError;
@@ -664,7 +664,7 @@ mod fixedoffset {
                 <() as ValueDecoder<General, _>>::decode_value(
                     &mut fixed,
                     Capped::new(&mut buf.as_slice()),
-                    DecodeContext::default(),
+                    DecodeCtx::default(),
                 ),
                 Err(DecodeError::new(OutOfDomainValue))
             );
@@ -672,7 +672,7 @@ mod fixedoffset {
                 <() as DistinguishedValueDecoder<General, _>>::decode_value_distinguished::<true>(
                     &mut fixed,
                     Capped::new(&mut buf.as_slice()),
-                    RestrictedDecodeContext::new(NotCanonical),
+                    RestrictedCtx::new(DecodeCtx::default(), NotCanonical),
                 ),
                 Err(DecodeError::new(OutOfDomainValue))
             );
@@ -690,7 +690,7 @@ mod fixedoffset {
                 <() as ValueDecoder<General, _>>::decode_value(
                     &mut fixed,
                     Capped::new(&mut buf.as_slice()),
-                    DecodeContext::default(),
+                    DecodeCtx::default(),
                 ),
                 Err(DecodeError::new(InvalidValue))
             );
@@ -698,7 +698,7 @@ mod fixedoffset {
                 <() as DistinguishedValueDecoder<General, _>>::decode_value_distinguished::<true>(
                     &mut fixed,
                     Capped::new(&mut buf.as_slice()),
-                    RestrictedDecodeContext::new(NotCanonical),
+                    RestrictedCtx::new(DecodeCtx::default(), NotCanonical),
                 ),
                 Err(DecodeError::new(InvalidValue))
             );

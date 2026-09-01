@@ -180,7 +180,7 @@ impl RawMessageDecoder for () {
         wire_type: WireType,
         _duplicated: bool,
         buf: Capped<B>,
-        _ctx: DecodeContext,
+        _ctx: impl DecodeContext,
     ) -> Result<(), DecodeError>
     where
         Self: Sized,
@@ -196,7 +196,7 @@ impl RawDistinguishedMessageDecoder for () {
         wire_type: WireType,
         _duplicated: bool,
         buf: Capped<B>,
-        ctx: RestrictedDecodeContext,
+        ctx: impl RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError>
     where
         Self: Sized,
@@ -214,7 +214,7 @@ impl RawMessageBorrowDecoder<'_> for () {
         wire_type: WireType,
         _duplicated: bool,
         buf: Capped<&'_ [u8]>,
-        _ctx: DecodeContext,
+        _ctx: impl DecodeContext,
     ) -> Result<(), DecodeError> {
         skip_field(wire_type, buf)
     }
@@ -227,7 +227,7 @@ impl RawDistinguishedMessageBorrowDecoder<'_> for () {
         wire_type: WireType,
         _duplicated: bool,
         buf: Capped<&'_ [u8]>,
-        ctx: RestrictedDecodeContext,
+        ctx: impl RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
         _ = ctx.check(Canonicity::HasExtensions)?;
         skip_field(wire_type, buf)?;

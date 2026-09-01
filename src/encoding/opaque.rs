@@ -438,7 +438,7 @@ impl RawMessageDecoder for OpaqueMessage<'_> {
         wire_type: WireType,
         _duplicated: bool,
         buf: Capped<B>,
-        _ctx: DecodeContext,
+        _ctx: impl DecodeContext,
     ) -> Result<(), DecodeError> {
         self.insert(tag, OpaqueValue::decode_value(wire_type, buf)?);
         Ok(())
@@ -452,7 +452,7 @@ impl RawDistinguishedMessageDecoder for OpaqueMessage<'_> {
         wire_type: WireType,
         duplicated: bool,
         buf: Capped<B>,
-        ctx: RestrictedDecodeContext,
+        ctx: impl RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError>
     where
         Self: Sized,
@@ -469,7 +469,7 @@ impl<'a> RawMessageBorrowDecoder<'a> for OpaqueMessage<'a> {
         wire_type: WireType,
         _duplicated: bool,
         buf: Capped<&'a [u8]>,
-        _ctx: DecodeContext,
+        _ctx: impl DecodeContext,
     ) -> Result<(), DecodeError> {
         self.insert(tag, OpaqueValue::borrow_decode_value(wire_type, buf)?);
         Ok(())
@@ -483,7 +483,7 @@ impl<'a> RawDistinguishedMessageBorrowDecoder<'a> for OpaqueMessage<'a> {
         wire_type: WireType,
         duplicated: bool,
         buf: Capped<&'a [u8]>,
-        ctx: RestrictedDecodeContext,
+        ctx: impl RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError>
     where
         Self: Sized,

@@ -27,7 +27,7 @@ implement_core_empty_state_rules!(MessageEncoding);
 pub(crate) fn merge<T: RawMessageDecoder, B: Buf + ?Sized>(
     value: &mut T,
     mut buf: Capped<B>,
-    ctx: DecodeContext,
+    ctx: impl DecodeContext,
 ) -> Result<(), DecodeError> {
     let tr = &mut TagReader::new();
     let mut last_tag = None::<u32>;
@@ -46,7 +46,7 @@ pub(crate) fn merge<T: RawMessageDecoder, B: Buf + ?Sized>(
 pub(crate) fn merge_distinguished<T: RawDistinguishedMessageDecoder, B: Buf + ?Sized>(
     value: &mut T,
     mut buf: Capped<B>,
-    ctx: RestrictedDecodeContext,
+    ctx: impl RestrictedDecodeContext,
 ) -> Result<Canonicity, DecodeError> {
     let tr = &mut TagReader::new();
     let mut last_tag = None::<u32>;
@@ -64,7 +64,7 @@ pub(crate) fn merge_distinguished<T: RawDistinguishedMessageDecoder, B: Buf + ?S
         )?);
     }
     debug_assert!(
-        canon >= ctx.min_canonicity,
+        ctx.check(canon).is_ok(),
         "a poorly behaved distinguished decoder did not check canonicity against the context and \
         convert it into an error"
     );
@@ -77,7 +77,7 @@ pub(crate) fn merge_distinguished<T: RawDistinguishedMessageDecoder, B: Buf + ?S
 pub(crate) fn borrow_merge<'a, T: RawMessageBorrowDecoder<'a>>(
     value: &mut T,
     mut buf: Capped<&'a [u8]>,
-    ctx: DecodeContext,
+    ctx: impl DecodeContext,
 ) -> Result<(), DecodeError> {
     let tr = &mut TagReader::new();
     let mut last_tag = None::<u32>;
@@ -96,7 +96,7 @@ pub(crate) fn borrow_merge<'a, T: RawMessageBorrowDecoder<'a>>(
 pub(crate) fn borrow_merge_distinguished<'a, T: RawDistinguishedMessageBorrowDecoder<'a>>(
     value: &mut T,
     mut buf: Capped<&'a [u8]>,
-    ctx: RestrictedDecodeContext,
+    ctx: impl RestrictedDecodeContext,
 ) -> Result<Canonicity, DecodeError> {
     let tr = &mut TagReader::new();
     let mut last_tag = None::<u32>;
@@ -114,7 +114,7 @@ pub(crate) fn borrow_merge_distinguished<'a, T: RawDistinguishedMessageBorrowDec
         )?);
     }
     debug_assert!(
-        canon >= ctx.min_canonicity,
+        ctx.check(canon).is_ok(),
         "a poorly behaved distinguished decoder did not check canonicity against the context and \
         convert it into an error"
     );
@@ -159,7 +159,7 @@ pub trait RawMessageDecoder: RawMessage {
         wire_type: WireType,
         duplicated: bool,
         buf: Capped<B>,
-        ctx: DecodeContext,
+        ctx: impl DecodeContext,
     ) -> Result<(), DecodeError>
     where
         Self: Sized;
@@ -174,7 +174,7 @@ pub trait RawDistinguishedMessageDecoder: RawMessage + Eq {
         wire_type: WireType,
         duplicated: bool,
         buf: Capped<B>,
-        ctx: RestrictedDecodeContext,
+        ctx: impl RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError>
     where
         Self: Sized;
@@ -190,7 +190,7 @@ pub trait RawMessageBorrowDecoder<'a>: RawMessage {
         wire_type: WireType,
         duplicated: bool,
         buf: Capped<&'a [u8]>,
-        ctx: DecodeContext,
+        ctx: impl DecodeContext,
     ) -> Result<(), DecodeError>
     where
         Self: Sized;
@@ -205,7 +205,7 @@ pub trait RawDistinguishedMessageBorrowDecoder<'a>: RawMessage + Eq {
         wire_type: WireType,
         duplicated: bool,
         buf: Capped<&'a [u8]>,
-        ctx: RestrictedDecodeContext,
+        ctx: impl RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError>
     where
         Self: Sized;
@@ -265,7 +265,7 @@ where
         wire_type: WireType,
         duplicated: bool,
         buf: Capped<B>,
-        ctx: DecodeContext,
+        ctx: impl DecodeContext,
     ) -> Result<(), DecodeError>
     where
         Self: Sized,
@@ -284,7 +284,7 @@ where
         wire_type: WireType,
         duplicated: bool,
         buf: Capped<&'a [u8]>,
-        ctx: DecodeContext,
+        ctx: impl DecodeContext,
     ) -> Result<(), DecodeError>
     where
         Self: Sized,
@@ -303,7 +303,7 @@ where
         wire_type: WireType,
         duplicated: bool,
         buf: Capped<B>,
-        ctx: RestrictedDecodeContext,
+        ctx: impl RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError>
     where
         Self: Sized,
@@ -322,7 +322,7 @@ where
         wire_type: WireType,
         duplicated: bool,
         buf: Capped<&'a [u8]>,
-        ctx: RestrictedDecodeContext,
+        ctx: impl RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError>
     where
         Self: Sized,
@@ -410,10 +410,9 @@ where
     fn decode_value<B: Buf + ?Sized>(
         value: &mut T,
         mut buf: Capped<B>,
-        ctx: DecodeContext,
+        ctx: impl DecodeContext,
     ) -> Result<(), DecodeError> {
-        ctx.limit_reached()?;
-        merge(value, buf.take_length_delimited()?, ctx.enter_recursion())
+        merge(value, buf.take_length_delimited()?, ctx.enter_recursion()?)
     }
 }
 
@@ -427,9 +426,9 @@ where
     fn decode_value_distinguished<const ALLOW_EMPTY: bool>(
         value: &mut T,
         mut buf: Capped<impl Buf + ?Sized>,
-        ctx: RestrictedDecodeContext,
+        ctx: impl RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
-        ctx.limit_reached()?;
+        let ctx = ctx.enter_recursion()?;
         let buf = buf.take_length_delimited()?;
         // Empty message types always encode and decode from zero bytes. It is far cheaper to check
         // here than to check after the value has been decoded and checking the message's
@@ -437,7 +436,7 @@ where
         if !ALLOW_EMPTY && buf.remaining_before_cap() == 0 {
             return ctx.check(Canonicity::NotCanonical);
         }
-        merge_distinguished(value, buf, ctx.enter_recursion())
+        merge_distinguished(value, buf, ctx)
     }
 }
 
@@ -449,10 +448,9 @@ where
     fn borrow_decode_value(
         value: &mut T,
         mut buf: Capped<&'a [u8]>,
-        ctx: DecodeContext,
+        ctx: impl DecodeContext,
     ) -> Result<(), DecodeError> {
-        ctx.limit_reached()?;
-        borrow_merge(value, buf.take_length_delimited()?, ctx.enter_recursion())
+        borrow_merge(value, buf.take_length_delimited()?, ctx.enter_recursion()?)
     }
 }
 
@@ -466,9 +464,9 @@ where
     fn borrow_decode_value_distinguished<const ALLOW_EMPTY: bool>(
         value: &mut T,
         mut buf: Capped<&'a [u8]>,
-        ctx: RestrictedDecodeContext,
+        ctx: impl RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
-        ctx.limit_reached()?;
+        let ctx = ctx.enter_recursion()?;
         let buf = buf.take_length_delimited()?;
         // Empty message types always encode and decode from zero bytes. It is far cheaper to check
         // here than to check after the value has been decoded and checking the message's
@@ -476,6 +474,6 @@ where
         if !ALLOW_EMPTY && buf.remaining_before_cap() == 0 {
             return ctx.check(Canonicity::NotCanonical);
         }
-        borrow_merge_distinguished(value, buf, ctx.enter_recursion())
+        borrow_merge_distinguished(value, buf, ctx)
     }
 }

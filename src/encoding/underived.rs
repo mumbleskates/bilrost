@@ -135,8 +135,7 @@ macro_rules! underived_decode {
             use crate::encoding::{skip_field, $decode_trait, TagReader};
             let mut buf = $buf.take_length_delimited()?;
             let ctx = $ctx;
-            ctx.limit_reached()?;
-            let ctx = ctx.enter_recursion();
+            let ctx = ctx.enter_recursion()?;
             let tr = &mut TagReader::new();
             let mut last_tag = None::<u32>;
             while buf.has_remaining()? {
@@ -221,9 +220,8 @@ macro_rules! underived_decode_distinguished {
             if !ALLOW_EMPTY && buf.remaining_before_cap() == 0 {
                 ctx.check(Canonicity::NotCanonical)
             } else {
-                ctx.limit_reached()?;
                 let mut canon = Canonicity::Canonical;
-                let ctx = ctx.enter_recursion();
+                let ctx = ctx.enter_recursion()?;
                 let tr = &mut TagReader::new();
                 let mut last_tag = None::<u32>;
                 while buf.has_remaining()? {

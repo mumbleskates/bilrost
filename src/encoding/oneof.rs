@@ -71,7 +71,7 @@ pub trait OneofDecoder: Oneof {
         tag: u32,
         wire_type: WireType,
         buf: Capped<B>,
-        ctx: DecodeContext,
+        ctx: impl DecodeContext,
     ) -> Result<(), DecodeError>;
 }
 
@@ -83,7 +83,7 @@ pub trait DistinguishedOneofDecoder: Oneof {
         tag: u32,
         wire_type: WireType,
         buf: Capped<B>,
-        ctx: RestrictedDecodeContext,
+        ctx: impl RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError>;
 }
 
@@ -94,7 +94,7 @@ pub trait OneofBorrowDecoder<'a>: Oneof {
         tag: u32,
         wire_type: WireType,
         buf: Capped<&'a [u8]>,
-        ctx: DecodeContext,
+        ctx: impl DecodeContext,
     ) -> Result<(), DecodeError>;
 }
 
@@ -105,7 +105,7 @@ pub trait DistinguishedOneofBorrowDecoder<'a>: Oneof {
         tag: u32,
         wire_type: WireType,
         buf: Capped<&'a [u8]>,
-        ctx: RestrictedDecodeContext,
+        ctx: impl RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError>;
 }
 
@@ -140,7 +140,7 @@ pub trait NonEmptyOneofDecoder: NonEmptyOneof + Sized {
         tag: u32,
         wire_type: WireType,
         buf: Capped<B>,
-        ctx: DecodeContext,
+        ctx: impl DecodeContext,
     ) -> Result<Self, DecodeError>;
 }
 
@@ -151,7 +151,7 @@ pub trait NonEmptyDistinguishedOneofDecoder: NonEmptyOneof + Sized {
         tag: u32,
         wire_type: WireType,
         buf: Capped<B>,
-        ctx: RestrictedDecodeContext,
+        ctx: impl RestrictedDecodeContext,
     ) -> Result<(Self, Canonicity), DecodeError>;
 }
 
@@ -161,7 +161,7 @@ pub trait NonEmptyOneofBorrowDecoder<'a>: NonEmptyOneof + Sized {
         tag: u32,
         wire_type: WireType,
         buf: Capped<&'a [u8]>,
-        ctx: DecodeContext,
+        ctx: impl DecodeContext,
     ) -> Result<Self, DecodeError>;
 }
 
@@ -171,7 +171,7 @@ pub trait NonEmptyDistinguishedOneofBorrowDecoder<'a>: NonEmptyOneof + Sized {
         tag: u32,
         wire_type: WireType,
         buf: Capped<&'a [u8]>,
-        ctx: RestrictedDecodeContext,
+        ctx: impl RestrictedDecodeContext,
     ) -> Result<(Self, Canonicity), DecodeError>;
 }
 
@@ -243,7 +243,7 @@ mod generic_oneof_grant_empty_state_impls {
             tag: u32,
             wire_type: WireType,
             buf: Capped<B>,
-            ctx: DecodeContext,
+            ctx: impl DecodeContext,
         ) -> Result<(), DecodeError> {
             if let Some(already) = value {
                 Err(DecodeError::new(if already.oneof_current_tag() == tag {
@@ -274,7 +274,7 @@ mod generic_oneof_grant_empty_state_impls {
             tag: u32,
             wire_type: WireType,
             buf: Capped<B>,
-            ctx: RestrictedDecodeContext,
+            ctx: impl RestrictedDecodeContext,
         ) -> Result<Canonicity, DecodeError> {
             if let Some(already) = value {
                 Err(DecodeError::new(if already.oneof_current_tag() == tag {
@@ -308,7 +308,7 @@ mod generic_oneof_grant_empty_state_impls {
             tag: u32,
             wire_type: WireType,
             buf: Capped<&'a [u8]>,
-            ctx: DecodeContext,
+            ctx: impl DecodeContext,
         ) -> Result<(), DecodeError> {
             if let Some(already) = value {
                 Err(DecodeError::new(if already.oneof_current_tag() == tag {
@@ -339,7 +339,7 @@ mod generic_oneof_grant_empty_state_impls {
             tag: u32,
             wire_type: WireType,
             buf: Capped<&'a [u8]>,
-            ctx: RestrictedDecodeContext,
+            ctx: impl RestrictedDecodeContext,
         ) -> Result<Canonicity, DecodeError> {
             if let Some(already) = value {
                 Err(DecodeError::new(if already.oneof_current_tag() == tag {
@@ -434,7 +434,7 @@ mod generic_boxed_oneof_impls {
             tag: u32,
             wire_type: WireType,
             buf: Capped<B>,
-            ctx: DecodeContext,
+            ctx: impl DecodeContext,
         ) -> Result<(), DecodeError> {
             OneofDecoder::oneof_decode_field(&mut **value, tag, wire_type, buf, ctx)
         }
@@ -450,7 +450,7 @@ mod generic_boxed_oneof_impls {
             tag: u32,
             wire_type: WireType,
             buf: Capped<B>,
-            ctx: RestrictedDecodeContext,
+            ctx: impl RestrictedDecodeContext,
         ) -> Result<Canonicity, DecodeError> {
             DistinguishedOneofDecoder::oneof_decode_field_distinguished(
                 &mut **value,
@@ -472,7 +472,7 @@ mod generic_boxed_oneof_impls {
             tag: u32,
             wire_type: WireType,
             buf: Capped<&'a [u8]>,
-            ctx: DecodeContext,
+            ctx: impl DecodeContext,
         ) -> Result<(), DecodeError> {
             OneofBorrowDecoder::oneof_borrow_decode_field(&mut **value, tag, wire_type, buf, ctx)
         }
@@ -488,7 +488,7 @@ mod generic_boxed_oneof_impls {
             tag: u32,
             wire_type: WireType,
             buf: Capped<&'a [u8]>,
-            ctx: RestrictedDecodeContext,
+            ctx: impl RestrictedDecodeContext,
         ) -> Result<Canonicity, DecodeError> {
             DistinguishedOneofBorrowDecoder::oneof_borrow_decode_field_distinguished(
                 &mut **value,
@@ -541,7 +541,7 @@ mod generic_boxed_oneof_impls {
             tag: u32,
             wire_type: WireType,
             buf: Capped<B>,
-            ctx: DecodeContext,
+            ctx: impl DecodeContext,
         ) -> Result<Self, DecodeError> {
             T::oneof_decode_field(tag, wire_type, buf, ctx).map(Box::new)
         }
@@ -556,7 +556,7 @@ mod generic_boxed_oneof_impls {
             tag: u32,
             wire_type: WireType,
             buf: Capped<B>,
-            ctx: RestrictedDecodeContext,
+            ctx: impl RestrictedDecodeContext,
         ) -> Result<(Self, Canonicity), DecodeError> {
             NonEmptyDistinguishedOneofDecoder::oneof_decode_field_distinguished(
                 tag, wire_type, buf, ctx,
@@ -574,7 +574,7 @@ mod generic_boxed_oneof_impls {
             tag: u32,
             wire_type: WireType,
             buf: Capped<&'a [u8]>,
-            ctx: DecodeContext,
+            ctx: impl DecodeContext,
         ) -> Result<Self, DecodeError> {
             NonEmptyOneofBorrowDecoder::oneof_borrow_decode_field(tag, wire_type, buf, ctx)
                 .map(Box::new)
@@ -590,7 +590,7 @@ mod generic_boxed_oneof_impls {
             tag: u32,
             wire_type: WireType,
             buf: Capped<&'a [u8]>,
-            ctx: RestrictedDecodeContext,
+            ctx: impl RestrictedDecodeContext,
         ) -> Result<(Self, Canonicity), DecodeError> {
             NonEmptyDistinguishedOneofBorrowDecoder::oneof_borrow_decode_field_distinguished(
                 tag, wire_type, buf, ctx,

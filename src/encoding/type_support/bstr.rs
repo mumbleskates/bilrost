@@ -47,7 +47,7 @@ impl<'a, const P: u8> ValueBorrowDecoder<'a, GeneralGeneric<P>, &'a bstr::BStr> 
     fn borrow_decode_value(
         value: &mut &'a bstr::BStr,
         mut buf: Capped<&'a [u8]>,
-        _ctx: DecodeContext,
+        _ctx: impl DecodeContext,
     ) -> Result<(), DecodeError> {
         *value = bstr::BStr::new(buf.take_borrowed_length_delimited()?);
         Ok(())
@@ -63,7 +63,7 @@ impl<'a, const P: u8> DistinguishedValueBorrowDecoder<'a, GeneralGeneric<P>, &'a
     fn borrow_decode_value_distinguished<const ALLOW_EMPTY: bool>(
         value: &mut &'a bstr::BStr,
         buf: Capped<&'a [u8]>,
-        ctx: RestrictedDecodeContext,
+        ctx: impl RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
         <() as ValueBorrowDecoder<GeneralGeneric<P>, _>>::borrow_decode_value(
             value,
@@ -129,7 +129,7 @@ impl<const P: u8> ValueDecoder<GeneralGeneric<P>, bstr::BString> for () {
     fn decode_value<B: Buf + ?Sized>(
         value: &mut bstr::BString,
         buf: Capped<B>,
-        ctx: DecodeContext,
+        ctx: impl DecodeContext,
     ) -> Result<(), DecodeError> {
         <() as ValueDecoder<PlainBytes, _>>::decode_value(&mut **value, buf, ctx)
     }
@@ -142,7 +142,7 @@ impl<const P: u8> DistinguishedValueDecoder<GeneralGeneric<P>, bstr::BString> fo
     fn decode_value_distinguished<const ALLOW_EMPTY: bool>(
         value: &mut bstr::BString,
         buf: Capped<impl Buf + ?Sized>,
-        ctx: RestrictedDecodeContext,
+        ctx: impl RestrictedDecodeContext,
     ) -> Result<Canonicity, DecodeError> {
         <() as DistinguishedValueDecoder<PlainBytes, _>>::decode_value_distinguished::<ALLOW_EMPTY>(
             &mut **value,

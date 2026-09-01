@@ -120,6 +120,7 @@
 //! and mappings like `std::collections::HashSet` never bother to iterate their items in any
 //! special order, nor do they support distinguished decoding as a result.
 use crate::buf::ReverseBuf;
+use crate::error::RecursionError;
 use crate::DecodeErrorKind::{
     InvalidValue, InvalidVarint, NotCanonical, Oversize, TagOverflowed, Truncated, UnknownField,
     WrongWireType,
@@ -620,103 +621,17 @@ fn decode_varint_slow<B: Buf + ?Sized>(buf: &mut B) -> Result<u64, DecodeError> 
 ///
 /// The context should be passed by value and can be freely cloned. When passing
 /// to a function which is decoding a nested object, then use `enter_recursion`.
-#[derive(Clone, Debug)]
-pub struct DecodeContext {
-    /// How many times we can recurse in the current decode stack before we hit
-    /// the recursion limit.
-    ///
-    /// The recursion limit is defined by `RECURSION_LIMIT` and cannot be
-    /// customized. The recursion limit can be ignored by building the Bilrost
-    /// crate with the `no-recursion-limit` feature.
-    #[cfg(not(feature = "no-recursion-limit"))]
-    recurse_count: u32,
-}
-
-impl Default for DecodeContext {
-    #[inline]
-    fn default() -> DecodeContext {
-        DecodeContext {
-            #[cfg(not(feature = "no-recursion-limit"))]
-            recurse_count: crate::RECURSION_LIMIT,
-        }
-    }
-}
-
-impl DecodeContext {
+pub trait DecodeContext: Clone {
     /// Call this function before recursively decoding.
     ///
     /// There is no `exit` function since this function creates a new `DecodeContext`
     /// to be used at the next level of recursion. Continue to use the old context
-    // at the previous level of recursion.
-    #[inline]
-    pub fn enter_recursion(&self) -> DecodeContext {
-        DecodeContext {
-            #[cfg(not(feature = "no-recursion-limit"))]
-            recurse_count: self.recurse_count - 1,
-        }
-    }
-
-    /// Checks whether the recursion limit has been reached in the stack of
-    /// decodes described by the `DecodeContext` at `self.ctx`.
-    ///
-    /// Returns `Ok<()>` if it is ok to continue recursing.
-    /// Returns `Err<DecodeError>` if the recursion limit has been reached.
-    #[inline]
-    pub fn limit_reached(&self) -> Result<(), DecodeError> {
-        #[cfg(not(feature = "no-recursion-limit"))]
-        if self.recurse_count == 0 {
-            return Err(DecodeError::new(DecodeErrorKind::RecursionLimitReached));
-        }
-        Ok(())
-    }
+    /// at the previous level of recursion.
+    fn enter_recursion(&self) -> Result<Self, RecursionError>;
 }
 
-/// Additional information passed to every distinguished decode/merge function.
-///
-/// The context should be passed by value and can be freely cloned. When passing
-/// to a function which is decoding a nested object, then use `enter_recursion`.
-#[derive(Clone, Debug)]
-pub struct RestrictedDecodeContext {
-    context: DecodeContext,
-    min_canonicity: Canonicity,
-}
-
-impl RestrictedDecodeContext {
-    /// Creates a new context with a given minimum canonicity.
-    pub fn new(min_canonicity: Canonicity) -> Self {
-        Self {
-            context: DecodeContext::default(),
-            min_canonicity,
-        }
-    }
-
-    /// Call this function before recursively decoding.
-    ///
-    /// There is no `exit` function since this function creates a new `DecodeContext`
-    /// to be used at the next level of recursion. Continue to use the old context
-    // at the previous level of recursion.
-    #[inline]
-    pub fn enter_recursion(&self) -> Self {
-        Self {
-            context: self.context.enter_recursion(),
-            ..*self
-        }
-    }
-
-    /// Checks whether the recursion limit has been reached in the stack of
-    /// decodes described by the `DecodeContext` at `self.ctx`.
-    ///
-    /// Returns `Ok<()>` if it is ok to continue recursing.
-    /// Returns `Err<DecodeError>` if the recursion limit has been reached.
-    #[inline]
-    pub fn limit_reached(&self) -> Result<(), DecodeError> {
-        self.context.limit_reached()
-    }
-
-    /// Returns the inner non-restricted context for relaxed decoding.
-    pub fn into_inner(self) -> DecodeContext {
-        self.context
-    }
+pub trait RestrictedDecodeContext: DecodeContext {
+    type Unrestricted: DecodeContext;
 
     /// Checks the given canonicity against the minimum constraint that this context has.
     ///
@@ -736,13 +651,96 @@ impl RestrictedDecodeContext {
     /// After these canonicity values have been checked, and at all other times, it should be safe
     /// to directly update the canonicity that an implementation will itself return since each value
     /// it receives should already be tolerated by the context.
+    fn check(&self, canon: Canonicity) -> Result<Canonicity, DecodeError>;
+
+    /// Gets the inner relaxed decoding context.
+    fn into_inner(&self) -> Self::Unrestricted;
+}
+
+#[derive(Clone, Debug)]
+pub struct DecodeCtx {
+    /// How many times we can recurse in the current decode stack before we hit
+    /// the recursion limit.
+    ///
+    /// The recursion limit is defined by `RECURSION_LIMIT` and cannot be
+    /// customized. The recursion limit can be ignored by building the Bilrost
+    /// crate with the `no-recursion-limit` feature.
+    #[cfg(not(feature = "no-recursion-limit"))]
+    recurse_count: u32,
+}
+
+impl Default for DecodeCtx {
     #[inline]
-    pub fn check(&self, canon: Canonicity) -> Result<Canonicity, DecodeError> {
+    fn default() -> DecodeCtx {
+        DecodeCtx {
+            #[cfg(not(feature = "no-recursion-limit"))]
+            recurse_count: crate::RECURSION_LIMIT,
+        }
+    }
+}
+
+impl DecodeContext for DecodeCtx {
+    #[inline]
+    fn enter_recursion(&self) -> Result<DecodeCtx, RecursionError> {
+        #[cfg(not(feature = "no-recursion-limit"))]
+        if self.recurse_count == 0 {
+            return Err(RecursionError);
+        }
+        Ok(DecodeCtx {
+            #[cfg(not(feature = "no-recursion-limit"))]
+            recurse_count: self.recurse_count - 1,
+        })
+    }
+}
+
+/// Additional information passed to every distinguished decode/merge function.
+///
+/// The context should be passed by value and can be freely cloned. When passing
+/// to a function which is decoding a nested object, then use `enter_recursion`.
+#[derive(Clone, Debug)]
+pub struct RestrictedCtx<D = DecodeCtx>
+where
+    D: DecodeContext,
+{
+    context: D,
+    min_canonicity: Canonicity,
+}
+
+impl<D: DecodeContext> RestrictedCtx<D> {
+    /// Creates a new context with a given minimum canonicity.
+    pub fn new(context: D, min_canonicity: Canonicity) -> Self {
+        Self {
+            context,
+            min_canonicity,
+        }
+    }
+}
+
+impl<D: DecodeContext> DecodeContext for RestrictedCtx<D> {
+    #[inline]
+    fn enter_recursion(&self) -> Result<Self, RecursionError> {
+        Ok(Self {
+            context: self.context.enter_recursion()?,
+            min_canonicity: self.min_canonicity,
+        })
+    }
+}
+
+impl<D: DecodeContext> RestrictedDecodeContext for RestrictedCtx<D> {
+    type Unrestricted = D;
+
+    #[inline]
+    fn check(&self, canon: Canonicity) -> Result<Canonicity, DecodeError> {
         match (canon < self.min_canonicity, canon) {
             (true, Canonicity::NotCanonical) => Err(DecodeError::new(NotCanonical)),
             (true, Canonicity::HasExtensions) => Err(DecodeError::new(UnknownField)),
             _ => Ok(canon),
         }
+    }
+
+    #[inline]
+    fn into_inner(&self) -> D {
+        self.context.clone()
     }
 }
 

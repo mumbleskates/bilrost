@@ -59,7 +59,7 @@ pub(crate) mod time_proxies {
         fn decode_value<B: Buf + ?Sized>(
             value: &mut TimeDeltaProxy,
             mut buf: Capped<B>,
-            ctx: DecodeContext,
+            ctx: impl DecodeContext,
         ) -> Result<(), DecodeError> {
             underived_decode!(TimeDelta {
                 1: General => secs: &mut value.secs,
@@ -79,7 +79,7 @@ pub(crate) mod time_proxies {
         fn decode_value_distinguished<const ALLOW_EMPTY: bool>(
             value: &mut TimeDeltaProxy,
             mut buf: Capped<impl Buf + ?Sized>,
-            ctx: RestrictedDecodeContext,
+            ctx: impl RestrictedDecodeContext,
         ) -> Result<Canonicity, DecodeError> {
             underived_decode_distinguished!(TimeDelta {
                 1: General => secs: &mut value.secs,
@@ -139,7 +139,7 @@ pub(crate) mod time_proxies {
         fn decode_value<B: Buf + ?Sized>(
             value: &mut TimestampProxy,
             mut buf: Capped<B>,
-            ctx: DecodeContext,
+            ctx: impl DecodeContext,
         ) -> Result<(), DecodeError> {
             underived_decode!(Timestamp {
                 1: General => secs: &mut value.secs,
@@ -154,7 +154,7 @@ pub(crate) mod time_proxies {
         fn decode_value_distinguished<const ALLOW_EMPTY: bool>(
             value: &mut TimestampProxy,
             mut buf: Capped<impl Buf + ?Sized>,
-            ctx: RestrictedDecodeContext,
+            ctx: impl RestrictedDecodeContext,
         ) -> Result<Canonicity, DecodeError> {
             underived_decode_distinguished!(Timestamp {
                 1: General => secs: &mut value.secs,
