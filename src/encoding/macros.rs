@@ -684,6 +684,8 @@ macro_rules! encoding_uses_base_empty_state {
             (): $crate::encoding::ForOverwrite<(), __T>,
             $($($where_clause)*)?
         {
+            const INIT_HEAP: usize = <() as $crate::encoding::ForOverwrite<(), __T>>::INIT_HEAP;
+
             #[inline(always)]
             fn for_overwrite() -> __T {
                 <() as $crate::encoding::ForOverwrite::<(), _>>::for_overwrite()
