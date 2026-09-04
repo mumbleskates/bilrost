@@ -35,4 +35,4 @@ extra = ["bilrost/test-suite-extra"]
 name = "reproduce"
 
 [[bin]]
-name = "reproduce_parse_date"
+name = "reproduce-parse-date"
