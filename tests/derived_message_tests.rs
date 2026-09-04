@@ -631,6 +631,34 @@ fn recursive_messages() {
     static_assertions::assert_impl_all!(Tree: DistinguishedOwnedMessage);
 }
 
+#[test]
+fn recursive_borrowing_messages() {
+    // This type is co-recursive *and* borrows its content, which is a problem without the
+    // "borrowed_lifetime" attribute since all the lifetime assertions are sheared off the moment
+    // we stop directly requiring the recursing field to implement the decoding traits. The
+    // attribute helps fix this by making the impl itself more explicit about the specific lifetime
+    // it functions for.
+    #[derive(PartialEq, Eq, Message)]
+    #[bilrost(borrowed_lifetime('a))]
+    struct Tree<'a, 'b> {
+        #[bilrost(recurses)]
+        children: Vec<Tree<'a, 'b>>,
+        name: Cow<'a, str>,
+        #[bilrost(ignore(Cow::default()))]
+        irrelevant_lifetime: Cow<'b, str>,
+    }
+
+    // We need a function with some scoped lifetimes. These lifetimes have no declared dependency,
+    // either one could be longer than the other.
+    fn _scope<'a, 'b>(a: &'a [u8], b: &'b [u8]) {
+        let _ = Tree::<'a, 'b>::decode(a); // with lifetime 'a, decodes and borrow-decodes from 'a
+        let _ = Tree::<'a, 'b>::decode_borrowed(a);
+
+        let _ = Tree::<'b, 'a>::decode(b); // with lifetime 'b, decodes and borrow-decodes from 'b
+        let _ = Tree::<'b, 'a>::decode_borrowed(b);
+    }
+}
+
 // Tests for encoding rigor
 
 #[test]
