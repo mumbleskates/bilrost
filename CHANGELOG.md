@@ -4,6 +4,9 @@
 
 ### New features
 
+* Added support for the "recurses" field on oneof inclusion fields, not just
+  regular value fields.
+
 ### Fixes
 
 * Fixed a missing "with schema" passthrough in the "delegate_proxied_encoding!"

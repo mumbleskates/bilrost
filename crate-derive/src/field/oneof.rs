@@ -1,4 +1,4 @@
-use crate::attrs::{set_option_with_display, tag_list_attr, TagList};
+use crate::attrs::{set_bool, set_option_with_display, tag_list_attr, word_attr, TagList};
 use crate::field::traits::{
     DecodeLifetime::{self, Borrowed, Owned},
     DecodeMode::{self, Distinguished, Relaxed},
@@ -18,11 +18,13 @@ use syn::{Meta, Type};
 pub struct OneofInclusion {
     pub ty: Type,
     pub tags: Vec<u32>,
+    recurses: bool,
 }
 
 impl OneofInclusion {
     pub fn new(ty: &Type, attrs: &[Meta]) -> Result<Option<Box<OneofInclusion>>> {
         let mut oneof_tags = None;
+        let mut recurses = false;
         let mut unknown_attrs = Vec::new();
 
         for attr in attrs {
@@ -33,6 +35,8 @@ impl OneofInclusion {
                     "duplicate oneof attributes",
                     TagList::display,
                 )?;
+            } else if word_attr(attr, "recurses") {
+                set_bool(&mut recurses, "duplicate recurses attributes")?;
             } else {
                 unknown_attrs.push(attr);
             }
@@ -52,6 +56,7 @@ impl OneofInclusion {
         Ok(Some(Box::new(OneofInclusion {
             ty: ty.clone(),
             tags: tags.iter_tags().collect(),
+            recurses,
         })))
     }
 
@@ -145,6 +150,9 @@ impl OneofInclusion {
 
     /// Returns the where clause constraint term for the field really implementing the oneof trait.
     pub fn where_terms(&self, purpose: WhereFor, ctx: &Context) -> Vec<TokenStream> {
+        if self.recurses {
+            return vec![];
+        }
         let crate_ = &ctx.crate_name;
         let ty = &self.ty;
         match purpose {

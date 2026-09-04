@@ -5,7 +5,7 @@
 use bilrost::encoding::opaque::{OpaqueMessage, OpaqueValue as OV};
 use bilrost::encoding::{
     encode_varint, Collection, DistinguishedOneofBorrowDecoder, DistinguishedOneofDecoder,
-    EmptyState, General, Oneof, OneofBorrowDecoder, OneofDecoder, Varint,
+    EmptyState, General, Oneof, OneofBorrowDecoder, OneofDecoder, RawMessage, Varint,
 };
 use bilrost::Canonicity::{Canonical, HasExtensions, NotCanonical};
 use bilrost::DecodeErrorKind::{
@@ -4190,6 +4190,43 @@ fn vacant_oneof_decoding() {
 }
 "
     )
+}
+
+#[test]
+fn oneof_recurses() {
+    #[derive(Debug, PartialEq, Eq, Message)]
+    #[bilrost(distinguished)]
+    struct Recurses {
+        #[bilrost(oneof(1), recurses)]
+        recurses: Recurser,
+    }
+
+    #[derive(Debug, PartialEq, Eq, Oneof)]
+    #[bilrost(distinguished)]
+    enum Recurser {
+        Empty,
+        #[bilrost(1)]
+        Some(Box<Recurses>),
+    }
+
+    let empty = OpaqueMessage::empty();
+    let once = [(1, OV::message(&empty))].into_opaque_message();
+    let twice = [(1, OV::message(&once))].into_opaque_message();
+    let thrice = [(1, OV::message(&twice))].into_opaque_message();
+
+    assert::decodes!(
+        owned distinguished,
+        thrice,
+        Recurses {
+            recurses: Recurser::Some(Box::new(Recurses {
+                recurses: Recurser::Some(Box::new(Recurses {
+                    recurses: Recurser::Some(Box::new(Recurses {
+                        recurses: Recurser::Empty,
+                    })),
+                })),
+            })),
+        },
+    );
 }
 
 #[test]
