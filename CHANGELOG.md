@@ -2,10 +2,25 @@
 
 ### Breaking changes
 
+* Internal traits: Decoding contexts have become trait-based. This affects
+  the API of public traits for anyone implementing advanced encodings.
+  Fortunately migration is not complicated:
+  * The types `DecodeContext` and `RestrictedDecodeContext` have become traits
+  * Every method that received one of those structs as an argument now receives
+    `impl Trait` in its place
+  * The method `DecodeContext::limit_reached` has been removed. Rather than
+    first calling `ctx.limit_reached()?; let new_ctx = ctx.enter_recursion();`,
+    the api is now `let new_ctx = ctx.enter_recursion()?;`.
+  * Other than this, the contexts should be usable in the same ways.
+
 ### New features
 
 * Added support for the "recurses" field on oneof inclusion fields, not just
   regular value fields.
+* Added a type-level attribute for messages and oneofs, "borrowed_lifetime",
+  that can specify the lifetime by which the type's borrowed decoding should
+  be implemented. This unblocks a lot of hassle when trying to write
+  co-recursive message types that can be borrow-decoded.
 
 ### Fixes
 
