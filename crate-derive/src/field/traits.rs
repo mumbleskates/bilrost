@@ -2,6 +2,7 @@ use crate::Context;
 use alloc::vec::Vec;
 use core::ops::Deref;
 use proc_macro2::TokenStream;
+use syn::Lifetime;
 
 #[derive(Copy, Clone)]
 pub enum DecodeMode {
@@ -9,13 +10,13 @@ pub enum DecodeMode {
     Distinguished,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Clone)]
 pub enum DecodeLifetime {
     Owned,
-    Borrowed,
+    Borrowed(Lifetime),
 }
 
-#[derive(Copy, Clone)]
+#[derive(Clone)]
 pub enum WhereFor {
     Encode,
     Decode(DecodeLifetime, DecodeMode),
@@ -35,7 +36,7 @@ where
 {
     fn where_terms(&self, purpose: WhereFor, ctx: &Context) -> Vec<TokenStream> {
         self.iter()
-            .flat_map(|bearer| bearer.where_terms(purpose, ctx))
+            .flat_map(|bearer| bearer.where_terms(purpose.clone(), ctx))
             .collect()
     }
 }

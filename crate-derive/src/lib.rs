@@ -11,12 +11,12 @@
 //! [bilrost]: https://docs.rs/bilrost
 
 use crate::attrs::{
-    bilrost_attrs, enum_val_attr, named_attr, set_bool, set_option, set_option_with_display,
-    shorthand_enum_val, string_attr, tag_list_attr, word_attr, TagList,
+    bilrost_attrs, enum_val_attr, lifetime_attr, named_attr, set_bool, set_option,
+    set_option_with_display, shorthand_enum_val, string_attr, tag_list_attr, word_attr, TagList,
 };
 use crate::context::Context;
 use crate::field::traits::{
-    DecodeLifetime::{Borrowed, Owned},
+    DecodeLifetime::{self, Borrowed, Owned},
     DecodeMode::{Distinguished, Relaxed},
     FieldBearer, SinglyTagged, Tagged,
     WhereFor::{self, Decode, Encode, Schema as ForSchema},
@@ -33,7 +33,9 @@ use eyre::{bail, eyre as err, Result};
 use itertools::Itertools;
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
-use syn::{parse2, Data, DeriveInput, Expr, Fields, Generics, Ident, Path, Variant, WhereClause};
+use syn::{
+    parse2, Data, DeriveInput, Expr, Fields, Generics, Ident, Lifetime, Path, Variant, WhereClause,
+};
 
 extern crate alloc;
 
@@ -164,6 +166,7 @@ struct PreprocessedMessageStruct {
     fields: Vec<Field>,
     distinguished: bool,
     borrow_only: bool,
+    borrowed_lifetime: Option<Lifetime>,
     struct_update_expr: Option<Expr>,
     crate_name: Option<Path>,
     schema_type_name: String,
@@ -189,6 +192,7 @@ fn preprocess_message_struct(input: DeriveInput) -> Result<PreprocessedMessageSt
     let mut struct_update_expr: Option<Expr> = None;
     let mut crate_name: Option<Path> = None;
     let mut schema_type_name = None;
+    let mut borrowed_lifetime: Option<Lifetime> = None;
     let mut unknown_attrs = Vec::new();
     for attr in bilrost_attrs(&input_attrs, None)? {
         if let Some(tags) = tag_list_attr(&attr, "reserved_tags", None)? {
@@ -202,6 +206,13 @@ fn preprocess_message_struct(input: DeriveInput) -> Result<PreprocessedMessageSt
             set_bool(&mut distinguished, "duplicated distinguished attributes")?;
         } else if word_attr(&attr, "borrowed_only") {
             set_bool(&mut borrow_only, "duplicated borrowed_only attributes")?;
+        } else if let Some(b) = lifetime_attr(&attr, "borrowed_lifetime")? {
+            set_option_with_display(
+                &mut borrowed_lifetime,
+                b,
+                "duplicated borrowed_lifetime attributes",
+                |t| quote!(#t).to_string(),
+            )?;
         } else if word_attr(&attr, "default_per_field") {
             set_bool(
                 &mut default_per_field,
@@ -258,6 +269,7 @@ fn preprocess_message_struct(input: DeriveInput) -> Result<PreprocessedMessageSt
         fields,
         distinguished,
         borrow_only,
+        borrowed_lifetime,
         struct_update_expr,
         crate_name,
         schema_type_name,
@@ -281,6 +293,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream> {
         fields,
         distinguished,
         borrow_only,
+        borrowed_lifetime,
         struct_update_expr,
         crate_name,
         schema_type_name,
@@ -310,13 +323,24 @@ fn try_message(input: TokenStream) -> Result<TokenStream> {
         None
     };
 
-    let borrow_generics = combine_generics(&generics, quote!('__a));
+    // This is the borrow lifetime we'll be using.
+    let a;
+    // And these are the generics we use for borrowed impls, which may include an added lifetime
+    let borrow_generics;
+
+    if let Some(borrowed_lifetime) = borrowed_lifetime {
+        a = borrowed_lifetime;
+        borrow_generics = quote!(#generics);
+    } else {
+        a = parse2(quote!('__a)).unwrap();
+        borrow_generics = combine_generics(&generics, quote!(#a));
+    }
 
     let where_fields = vec![unsorted_fields.as_slice(), ignored_fields.as_slice()];
     let encoder_where_clause =
         append_wheres_with_fields(where_clause, self_where.clone(), &where_fields, Encode, ctx);
-    let [owned_decoder_where_clause, borrowed_decoder_where_clause] =
-        [Owned, Borrowed].map(|lifetime| {
+    let [owned_decoder_where_clause, borrowed_decoder_where_clause] = [Owned, Borrowed(a.clone())]
+        .map(|lifetime| {
             append_wheres_with_fields(
                 where_clause,
                 self_where.clone(),
@@ -332,7 +356,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream> {
     let encode = fields.encode(&self_instance, ctx);
     let prepend = fields.prepend(&self_instance, ctx);
 
-    let [decode_owned, decode_borrowed] = [Owned, Borrowed].map(|lifetime| {
+    let [decode_owned, decode_borrowed] = [Owned, Borrowed(a.clone())].map(|lifetime| {
         let self_instance = self_instance.clone();
         let schema_type_name = schema_type_name.clone();
         unsorted_fields.iter().filter_map(move |field| {
@@ -340,7 +364,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream> {
             if tags.is_empty() {
                 return None;
             }
-            let decode = field.decode(&self_instance, lifetime, Relaxed, ctx);
+            let decode = field.decode(&self_instance, lifetime.clone(), Relaxed, ctx);
             let tags = tags.into_iter().map(|tag| quote!(#tag));
             let tags = Itertools::intersperse(tags, quote!(|));
             let schema_field_name = field.schema_field_name();
@@ -497,7 +521,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream> {
 
         #impl_owned_decoder
 
-        impl #borrow_generics #crate_::encoding::RawMessageBorrowDecoder<'__a>
+        impl #borrow_generics #crate_::encoding::RawMessageBorrowDecoder<#a>
         for __Self #ty_generics #borrowed_decoder_where_clause {
             #[allow(unused_variables)]
             #[inline]
@@ -506,7 +530,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream> {
                 tag: u32,
                 wire_type: #crate_::encoding::WireType,
                 duplicated: bool,
-                buf: #crate_::encoding::Capped<&'__a [u8]>,
+                buf: #crate_::encoding::Capped<&#a [u8]>,
                 ctx: impl #crate_::encoding::DecodeContext,
             ) -> ::core::result::Result<(), #crate_::DecodeError> {
                 let _ = <Self as #crate_::encoding::RawMessage>::__ASSERTIONS;
@@ -545,7 +569,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream> {
             .into_iter()
             .chain(self_where);
         let [owned_decoder_where_clause, borrowed_decoder_where_clause] =
-            [Owned, Borrowed].map(|lifetime| {
+            [Owned, Borrowed(a.clone())].map(|lifetime| {
                 append_wheres_with_fields(
                     where_clause,
                     distinguished_self_where.clone(),
@@ -555,7 +579,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream> {
                 )
             });
 
-        let [decode_owned, decode_borrowed] = [Owned, Borrowed].map(|lifetime| {
+        let [decode_owned, decode_borrowed] = [Owned, Borrowed(a.clone())].map(|lifetime| {
             let schema_type_name = &schema_type_name;
             let self_instance = &self_instance;
             unsorted_fields.iter().filter_map(move |field| {
@@ -563,7 +587,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream> {
                 if tags.is_empty() {
                     return None;
                 }
-                let decode = field.decode(self_instance, lifetime, Distinguished, ctx);
+                let decode = field.decode(self_instance, lifetime.clone(), Distinguished, ctx);
                 let tags = field.tags().into_iter().map(|tag| quote!(#tag));
                 let tags = Itertools::intersperse(tags, quote!(|));
                 let schema_field_name = field.schema_field_name();
@@ -618,7 +642,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream> {
         quote! {
             #impl_owned_decoder
 
-            impl #borrow_generics #crate_::encoding::RawDistinguishedMessageBorrowDecoder<'__a>
+            impl #borrow_generics #crate_::encoding::RawDistinguishedMessageBorrowDecoder<#a>
             for __Self #ty_generics #borrowed_decoder_where_clause {
                 #[allow(unused_variables)]
                 #[inline]
@@ -627,7 +651,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream> {
                     tag: u32,
                     wire_type: #crate_::encoding::WireType,
                     duplicated: bool,
-                    buf: #crate_::encoding::Capped<&'__a [u8]>,
+                    buf: #crate_::encoding::Capped<&#a [u8]>,
                     ctx: impl #crate_::encoding::RestrictedDecodeContext,
                 ) -> ::core::result::Result<#crate_::Canonicity, #crate_::DecodeError> {
                     let canon = &mut #crate_::Canonicity::Canonical;
@@ -680,6 +704,7 @@ fn try_message_via_oneof(input: DeriveInput) -> Result<TokenStream> {
         variants,
         distinguished,
         borrow_only,
+        borrowed_lifetime,
         empty_variant,
         crate_name,
         schema_type_name: _,
@@ -697,7 +722,18 @@ fn try_message_via_oneof(input: DeriveInput) -> Result<TokenStream> {
         bail!("Message can only be derived for Oneof enums that have an empty variant.");
     }
 
-    let borrow_generics = combine_generics(&generics, quote!('__a));
+    // This is the borrow lifetime we'll be using.
+    let a;
+    // And these are the generics we use for borrowed impls, which may include an added lifetime
+    let borrow_generics;
+
+    if let Some(borrowed_lifetime) = borrowed_lifetime {
+        a = borrowed_lifetime;
+        borrow_generics = quote!(#generics);
+    } else {
+        a = parse2(quote!('__a)).unwrap();
+        borrow_generics = combine_generics(&generics, quote!(#a));
+    }
 
     let encoder_where_clause = append_wheres(
         where_clause,
@@ -709,7 +745,7 @@ fn try_message_via_oneof(input: DeriveInput) -> Result<TokenStream> {
     );
     let borrowed_decoder_where_clause = append_wheres(
         where_clause,
-        [quote!(#ident #ty_generics: #crate_::encoding::OneofBorrowDecoder<'__a>)],
+        [quote!(#ident #ty_generics: #crate_::encoding::OneofBorrowDecoder<#a>)],
     );
 
     let impl_owned_decoder = (!borrow_only).then(|| {
@@ -819,7 +855,7 @@ fn try_message_via_oneof(input: DeriveInput) -> Result<TokenStream> {
 
         #impl_owned_decoder
 
-        impl #borrow_generics #crate_::encoding::RawMessageBorrowDecoder<'__a>
+        impl #borrow_generics #crate_::encoding::RawMessageBorrowDecoder<#a>
         for #ident #ty_generics #borrowed_decoder_where_clause {
             #[inline(always)]
             fn raw_borrow_decode_field(
@@ -827,7 +863,7 @@ fn try_message_via_oneof(input: DeriveInput) -> Result<TokenStream> {
                 tag: u32,
                 wire_type: #crate_::encoding::WireType,
                 _duplicated: bool,
-                buf: #crate_::encoding::Capped<&'__a [u8]>,
+                buf: #crate_::encoding::Capped<&#a [u8]>,
                 ctx: impl #crate_::encoding::DecodeContext,
             ) -> ::core::result::Result<(), #crate_::DecodeError> {
                 if <Self as #crate_::encoding::Oneof>::FIELD_TAGS.contains(&tag) {
@@ -855,7 +891,7 @@ fn try_message_via_oneof(input: DeriveInput) -> Result<TokenStream> {
         let borrowed_decoder_where_clause = append_wheres(
             where_clause,
             [quote!(
-                Self: #crate_::encoding::DistinguishedOneofBorrowDecoder<'__a> + ::core::cmp::Eq
+                Self: #crate_::encoding::DistinguishedOneofBorrowDecoder<#a> + ::core::cmp::Eq
             )],
         );
 
@@ -898,7 +934,7 @@ fn try_message_via_oneof(input: DeriveInput) -> Result<TokenStream> {
         quote! {
             #impl_owned_decoder
 
-            impl #borrow_generics #crate_::encoding::RawDistinguishedMessageBorrowDecoder<'__a>
+            impl #borrow_generics #crate_::encoding::RawDistinguishedMessageBorrowDecoder<#a>
             for #ident #ty_generics #borrowed_decoder_where_clause {
                 #[inline(always)]
                 fn raw_borrow_decode_field_distinguished(
@@ -906,7 +942,7 @@ fn try_message_via_oneof(input: DeriveInput) -> Result<TokenStream> {
                     tag: u32,
                     wire_type: #crate_::encoding::WireType,
                     _duplicated: bool,
-                    buf: #crate_::encoding::Capped<&'__a [u8]>,
+                    buf: #crate_::encoding::Capped<&#a [u8]>,
                     ctx: impl #crate_::encoding::RestrictedDecodeContext,
                 ) -> ::core::result::Result<#crate_::Canonicity, #crate_::DecodeError> {
                     if <Self as #crate_::encoding::Oneof>::FIELD_TAGS.contains(&tag) {
@@ -982,7 +1018,10 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream> {
     let generics = &input.generics;
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
     let unborrowed_generics = combine_generics(generics, quote!(const __G: u8));
-    let borrow_generics = combine_generics(generics, quote!('__a, const __G: u8));
+
+    // TODO: implement borrowed_lifetime???
+    let a: Lifetime = parse2(quote!('__a)).unwrap();
+    let borrow_generics = combine_generics(generics, quote!(#a, const __G: u8));
 
     let punctuated_variants = match input.data {
         Data::Enum(enum_) => enum_.variants,
@@ -1284,14 +1323,14 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream> {
 
         impl #borrow_generics
         #crate_::encoding::ValueBorrowDecoder<
-            '__a,
+            #a,
             #crate_::encoding::GeneralGeneric<__G>,
             #ident #ty_generics
         > for () #where_clause {
             #[inline(always)]
             fn borrow_decode_value(
                 value: &mut #ident #ty_generics,
-                mut buf: #crate_::encoding::Capped<&'__a [u8]>,
+                mut buf: #crate_::encoding::Capped<&#a [u8]>,
                 ctx: impl #crate_::encoding::DecodeContext,
             ) -> ::core::result::Result<(), #crate_::DecodeError> {
                 <() as #crate_::encoding::ValueDecoder<
@@ -1306,7 +1345,7 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream> {
 
         impl #borrow_generics
         #crate_::encoding::DistinguishedValueBorrowDecoder<
-            '__a,
+            #a,
             #crate_::encoding::GeneralGeneric<__G>,
             #ident #ty_generics
         > for () #where_clause {
@@ -1315,7 +1354,7 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream> {
             #[inline(always)]
             fn borrow_decode_value_distinguished<const ALLOW_EMPTY: bool>(
                 value: &mut #ident #ty_generics,
-                buf: #crate_::encoding::Capped<&'__a [u8]>,
+                buf: #crate_::encoding::Capped<&#a [u8]>,
                 ctx: impl #crate_::encoding::RestrictedDecodeContext,
             ) -> ::core::result::Result<#crate_::Canonicity, #crate_::DecodeError> {
                 <() as #crate_::encoding::ValueDecoder<
@@ -1350,6 +1389,7 @@ struct PreprocessedOneof {
     variants: Vec<OneofVariant>,
     distinguished: bool,
     borrow_only: bool,
+    borrowed_lifetime: Option<Lifetime>,
     empty_variant: Option<Ident>,
     crate_name: Option<Path>,
     schema_type_name: String,
@@ -1373,6 +1413,7 @@ fn preprocess_oneof(input: DeriveInput) -> Result<PreprocessedOneof> {
     let mut unknown_attrs = Vec::new();
     let mut distinguished = false;
     let mut borrow_only = false;
+    let mut borrowed_lifetime = None;
     let mut crate_name: Option<Path> = None;
     let mut schema_type_name = None;
     for attr in bilrost_attrs(&input.attrs, None)? {
@@ -1387,6 +1428,13 @@ fn preprocess_oneof(input: DeriveInput) -> Result<PreprocessedOneof> {
             set_bool(&mut distinguished, "duplicated distinguished attributes")?;
         } else if word_attr(&attr, "borrowed_only") {
             set_bool(&mut borrow_only, "duplicated borrowed_only attributes")?;
+        } else if let Some(b) = lifetime_attr(&attr, "borrowed_lifetime")? {
+            set_option_with_display(
+                &mut borrowed_lifetime,
+                b,
+                "duplicated borrowed_lifetime attributes",
+                |t| quote!(#t).to_string(),
+            )?;
         } else if let Some(path) = named_attr(&attr, "crate")? {
             set_option_with_display(
                 &mut crate_name,
@@ -1462,6 +1510,7 @@ fn preprocess_oneof(input: DeriveInput) -> Result<PreprocessedOneof> {
         variants,
         distinguished,
         borrow_only,
+        borrowed_lifetime,
         empty_variant,
         crate_name,
         schema_type_name,
@@ -1477,6 +1526,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream> {
         variants,
         distinguished,
         borrow_only,
+        borrowed_lifetime,
         empty_variant,
         crate_name,
         schema_type_name,
@@ -1486,7 +1536,19 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream> {
     let crate_ = &ctx.crate_name;
 
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
-    let borrow_generics = combine_generics(&generics, quote!('__a));
+
+    // This is the borrow lifetime we'll be using.
+    let a;
+    // And these are the generics we use for borrowed impls, which may include an added lifetime
+    let borrow_generics;
+
+    if let Some(borrowed_lifetime) = borrowed_lifetime {
+        a = borrowed_lifetime;
+        borrow_generics = quote!(#generics);
+    } else {
+        a = parse2(quote!('__a)).unwrap();
+        borrow_generics = combine_generics(&generics, quote!(#a));
+    }
 
     let encoder_where_clause =
         append_wheres_with_fields(where_clause, None, &variants, Encode, ctx);
@@ -1496,7 +1558,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream> {
         where_clause,
         None,
         &variants,
-        Decode(Borrowed, Relaxed),
+        Decode(Borrowed(a.clone()), Relaxed),
         ctx,
     );
 
@@ -1539,7 +1601,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream> {
     if let Some(empty_ident) = &empty_variant {
         encoder_trait = quote!(Oneof);
         owned_decoder_trait = quote!(OneofDecoder);
-        borrowed_decoder_trait = quote!(OneofBorrowDecoder<'__a>);
+        borrowed_decoder_trait = quote!(OneofBorrowDecoder<#a>);
         decode_field_self_arg = Some(quote!(value: &mut Self,));
         decode_field_return_ty = quote!(());
         some = Some(quote!(::core::option::Option::Some));
@@ -1574,7 +1636,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream> {
     } else {
         encoder_trait = quote!(NonEmptyOneof);
         owned_decoder_trait = quote!(NonEmptyOneofDecoder);
-        borrowed_decoder_trait = quote!(NonEmptyOneofBorrowDecoder<'__a>);
+        borrowed_decoder_trait = quote!(NonEmptyOneofBorrowDecoder<#a>);
         decode_field_self_arg = None;
         decode_field_return_ty = quote!(Self);
         some = None;
@@ -1612,11 +1674,11 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream> {
         }
     });
 
-    let decode_arms = |lifetime, mode| {
+    let decode_arms = |lifetime: DecodeLifetime, mode| {
         let ident_str = ident.to_string();
         let arms = variants
             .iter()
-            .map(|variant| variant.decode(&self_alias, lifetime, mode, ctx));
+            .map(|variant| variant.decode(&self_alias, lifetime.clone(), mode, ctx));
         quote! {
             match tag {
                 #(#arms,)*
@@ -1635,10 +1697,10 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream> {
             };
             [cannot_decode.clone(), cannot_decode]
         }
-        None => [decode_arms(Owned, Relaxed), decode_arms(Borrowed, Relaxed)],
+        None => [decode_arms(Owned, Relaxed), decode_arms(Borrowed(a.clone()), Relaxed)],
         Some(ref empty_ident) => [
             decode_arms(Owned, Relaxed),
-            decode_arms(Borrowed, Relaxed),
+            decode_arms(Borrowed(a.clone()), Relaxed),
         ]
             .map(|decode| quote! {
             // Guards against colliding oneof field decoding are only evaluated by the Oneof trait,
@@ -1764,7 +1826,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream> {
                 #decode_field_self_arg
                 tag: u32,
                 wire_type: #crate_::encoding::WireType,
-                buf: #crate_::encoding::Capped<&'__a [u8]>,
+                buf: #crate_::encoding::Capped<&#a [u8]>,
                 ctx: impl #crate_::encoding::DecodeContext,
             ) -> ::core::result::Result<#decode_field_return_ty, #crate_::DecodeError> {
                 #decode_borrowed
@@ -1783,13 +1845,13 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream> {
         let borrowed_decoder_where_clause;
         if empty_variant.is_some() {
             owned_decoder_trait = quote!(DistinguishedOneofDecoder);
-            borrowed_decoder_trait = quote!(DistinguishedOneofBorrowDecoder<'__a>);
+            borrowed_decoder_trait = quote!(DistinguishedOneofBorrowDecoder<#a>);
             relaxed_oneof_trait = quote!(Oneof);
             decode_field_self_arg = Some(quote!(value: &mut Self,));
             decode_field_return_ty = quote!(#crate_::Canonicity);
             some = Some(quote!(::core::option::Option::Some));
             [owned_decoder_where_clause, borrowed_decoder_where_clause] =
-                [Owned, Borrowed].map(|lifetime| {
+                [Owned, Borrowed(a.clone())].map(|lifetime| {
                     append_wheres_with_fields(
                         where_clause,
                         [quote!(Self: #crate_::encoding::Oneof)],
@@ -1800,13 +1862,13 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream> {
                 });
         } else {
             owned_decoder_trait = quote!(NonEmptyDistinguishedOneofDecoder);
-            borrowed_decoder_trait = quote!(NonEmptyDistinguishedOneofBorrowDecoder<'__a>);
+            borrowed_decoder_trait = quote!(NonEmptyDistinguishedOneofBorrowDecoder<#a>);
             relaxed_oneof_trait = quote!(NonEmptyOneof);
             decode_field_self_arg = None;
             decode_field_return_ty = quote!((Self, #crate_::Canonicity));
             some = None;
             [owned_decoder_where_clause, borrowed_decoder_where_clause] =
-                [Owned, Borrowed].map(|lifetime| {
+                [Owned, Borrowed(a.clone())].map(|lifetime| {
                     append_wheres_with_fields(
                         where_clause,
                         None,
@@ -1827,11 +1889,11 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream> {
             }
             None => [
                 decode_arms(Owned, Distinguished),
-                decode_arms(Borrowed, Distinguished),
+                decode_arms(Borrowed(a.clone()), Distinguished),
             ],
             Some(empty_ident) => [
                 decode_arms(Owned, Distinguished),
-                decode_arms(Borrowed, Distinguished),
+                decode_arms(Borrowed(a.clone()), Distinguished),
             ]
             .map(|decode| {
                 quote! {
@@ -1898,7 +1960,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream> {
                     #decode_field_self_arg
                     tag: u32,
                     wire_type: #crate_::encoding::WireType,
-                    buf: #crate_::encoding::Capped<&'__a [u8]>,
+                    buf: #crate_::encoding::Capped<&#a [u8]>,
                     ctx: impl #crate_::encoding::RestrictedDecodeContext,
                 ) -> ::core::result::Result<#decode_field_return_ty, #crate_::DecodeError> {
                     #decode_borrowed
@@ -1954,6 +2016,7 @@ fn try_struct_schema(input: DeriveInput) -> Result<TokenStream> {
         fields,
         distinguished: _,
         borrow_only: _,
+        borrowed_lifetime: _,
         struct_update_expr,
         crate_name,
         schema_type_name,
@@ -2032,6 +2095,7 @@ fn try_enum_schema(input: DeriveInput) -> Result<TokenStream> {
         variants,
         distinguished: _,
         borrow_only: _,
+        borrowed_lifetime: _,
         empty_variant,
         crate_name,
         schema_type_name,

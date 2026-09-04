@@ -90,7 +90,7 @@ impl OneofInclusion {
         let crate_ = &ctx.crate_name;
         let (trait_name, call) = match (lifetime, mode) {
             (Owned, Relaxed) => (quote!(OneofDecoder), quote!(oneof_decode_field)),
-            (Borrowed, Relaxed) => (
+            (Borrowed(_), Relaxed) => (
                 quote!(OneofBorrowDecoder),
                 quote!(oneof_borrow_decode_field),
             ),
@@ -98,7 +98,7 @@ impl OneofInclusion {
                 quote!(DistinguishedOneofDecoder),
                 quote!(oneof_decode_field_distinguished),
             ),
-            (Borrowed, Distinguished) => (
+            (Borrowed(_), Distinguished) => (
                 quote!(DistinguishedOneofBorrowDecoder),
                 quote!(oneof_borrow_decode_field_distinguished),
             ),
@@ -160,14 +160,14 @@ impl OneofInclusion {
             Decode(Owned, Relaxed) => {
                 vec![quote!(#ty: #crate_::encoding::OneofDecoder)]
             }
-            Decode(Borrowed, Relaxed) => {
-                vec![quote!(#ty: #crate_::encoding::OneofBorrowDecoder<'__a>)]
+            Decode(Borrowed(lifetime), Relaxed) => {
+                vec![quote!(#ty: #crate_::encoding::OneofBorrowDecoder<#lifetime>)]
             }
             Decode(Owned, Distinguished) => {
                 vec![quote!(#ty: #crate_::encoding::DistinguishedOneofDecoder)]
             }
-            Decode(Borrowed, Distinguished) => {
-                vec![quote!(#ty: #crate_::encoding::DistinguishedOneofBorrowDecoder<'__a>)]
+            Decode(Borrowed(lifetime), Distinguished) => {
+                vec![quote!(#ty: #crate_::encoding::DistinguishedOneofBorrowDecoder<#lifetime>)]
             }
             Schema => vec![
                 quote!(#ty: #crate_::encoding::schema::AddOneofFields),

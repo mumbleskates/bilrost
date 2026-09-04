@@ -12,8 +12,8 @@ use syn::parse::ParseStream;
 use syn::punctuated::Punctuated;
 use syn::token::Comma;
 use syn::{
-    parse, parse2, Attribute, BinOp, Expr, ExprBinary, ExprLit, ExprRange, Lit, LitInt, LitStr,
-    Meta, MetaList, MetaNameValue, Pat, RangeLimits, Token,
+    parse, parse2, Attribute, BinOp, Expr, ExprBinary, ExprLit, ExprRange, Lifetime, Lit, LitInt,
+    LitStr, Meta, MetaList, MetaNameValue, Pat, RangeLimits, Token,
 };
 
 /// Get the items belonging to the 'bilrost' list attribute, e.g. `#[bilrost(foo, bar="baz")]`.
@@ -369,6 +369,26 @@ pub fn string_attr(attr: &Meta, key: &str) -> Result<Option<String>> {
                 }),
             ..
         }) => Ok(Some(lit_str.value())),
+        _ => {
+            bail!("invalid {key} attribute: {attr}", attr = quote!(attr));
+        }
+    }
+}
+
+pub fn lifetime_attr(attr: &Meta, key: &str) -> Result<Option<Lifetime>> {
+    if !attr.path().is_ident(key) {
+        return Ok(None);
+    }
+    match attr {
+        Meta::List(MetaList { tokens, .. }) => Ok(Some(parse2(tokens.clone())?)),
+        Meta::NameValue(MetaNameValue {
+            value:
+                Expr::Lit(ExprLit {
+                    lit: Lit::Str(lit_str),
+                    ..
+                }),
+            ..
+        }) => Ok(Some(lit_str.parse()?)),
         _ => {
             bail!("invalid {key} attribute: {attr}", attr = quote!(attr));
         }

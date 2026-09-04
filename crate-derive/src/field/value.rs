@@ -166,9 +166,9 @@ impl MessageField {
         let ty = &self.value.ty;
         let (decoder_trait, call) = match (lifetime, mode) {
             (Owned, Relaxed) => (quote!(Decoder), quote!(decode)),
-            (Borrowed, Relaxed) => (quote!(BorrowDecoder), quote!(borrow_decode)),
+            (Borrowed(_), Relaxed) => (quote!(BorrowDecoder), quote!(borrow_decode)),
             (Owned, Distinguished) => (quote!(DistinguishedDecoder), quote!(decode_distinguished)),
-            (Borrowed, Distinguished) => (
+            (Borrowed(_), Distinguished) => (
                 quote!(DistinguishedBorrowDecoder),
                 quote!(borrow_decode_distinguished),
             ),
@@ -241,25 +241,25 @@ impl MessageField {
         }
         let ty = &self.value.ty;
         let encoding = &self.value.encoding;
-        let mut res = vec![match purpose {
+        let mut res = vec![match &purpose {
             Encode => quote!((): #crate_::encoding::Encoder<#encoding, #ty>),
             Decode(Owned, Relaxed) => {
                 quote!((): #crate_::encoding::Decoder<#encoding, #ty>)
             }
-            Decode(Borrowed, Relaxed) => {
-                quote!((): #crate_::encoding::BorrowDecoder<'__a, #encoding, #ty>)
+            Decode(Borrowed(lifetime), Relaxed) => {
+                quote!((): #crate_::encoding::BorrowDecoder<#lifetime, #encoding, #ty>)
             }
             Decode(Owned, Distinguished) => {
                 quote!((): #crate_::encoding::DistinguishedDecoder<#encoding, #ty>)
             }
-            Decode(Borrowed, Distinguished) => {
+            Decode(Borrowed(lifetime), Distinguished) => {
                 quote!(
-                    (): #crate_::encoding::DistinguishedBorrowDecoder<'__a, #encoding, #ty>
+                    (): #crate_::encoding::DistinguishedBorrowDecoder<#lifetime, #encoding, #ty>
                 )
             }
             Schema => quote!((): #crate_::encoding::schema::FieldRepr<#encoding, #ty>),
         }];
-        if !matches!(purpose, Schema) {
+        if !matches!(&purpose, Schema) {
             res.push(
                 // Message field encoding always requires EmptyState instead of just ForOverwrite
                 // because we need to know whether a field is empty to know whether we should write
@@ -815,14 +815,14 @@ impl OneofVariant {
                 let ty = &field.value.ty;
                 let (decoder_trait, call) = match (lifetime, mode) {
                     (Owned, Relaxed) => (quote!(FieldDecoder), quote!(decode_field)),
-                    (Borrowed, Relaxed) => {
+                    (Borrowed(_), Relaxed) => {
                         (quote!(FieldBorrowDecoder), quote!(borrow_decode_field))
                     }
                     (Owned, Distinguished) => (
                         quote!(DistinguishedFieldDecoder),
                         quote!(decode_field_distinguished::<true>), // empty values are ok
                     ),
-                    (Borrowed, Distinguished) => (
+                    (Borrowed(_), Distinguished) => (
                         quote!(DistinguishedFieldBorrowDecoder),
                         quote!(borrow_decode_field_distinguished::<true>), // empty values are ok
                     ),
@@ -846,8 +846,12 @@ impl OneofVariant {
                         }
                         let tags = field.tags().into_iter().map(|tag| quote!(#tag));
                         let tags = Itertools::intersperse(tags, quote!(|));
-                        let decode =
-                            field.decode(&FieldTarget::FreeVariantFields, lifetime, mode, ctx);
+                        let decode = field.decode(
+                            &FieldTarget::FreeVariantFields,
+                            lifetime.clone(),
+                            mode,
+                            ctx,
+                        );
                         let schema_field_name = field.schema_field_name();
                         Some(quote!(#(#tags)* => match #decode {
                             ::core::result::Result::Ok(res) => ::core::result::Result::Ok(res),
@@ -1052,26 +1056,26 @@ impl FieldBearer for FieldInVariant {
         }
         let ty = &self.value.ty;
         let encoding = &self.value.encoding;
-        let mut res = vec![match purpose {
+        let mut res = vec![match &purpose {
             Encode => quote!((): #crate_::encoding::ValueEncoder<#encoding, #ty>),
             Decode(Owned, Relaxed) => {
                 quote!((): #crate_::encoding::ValueDecoder<#encoding, #ty>)
             }
-            Decode(Borrowed, Relaxed) => {
-                quote!((): #crate_::encoding::ValueBorrowDecoder<'__a, #encoding, #ty>)
+            Decode(Borrowed(lifetime), Relaxed) => {
+                quote!((): #crate_::encoding::ValueBorrowDecoder<#lifetime, #encoding, #ty>)
             }
             Decode(Owned, Distinguished) => {
                 quote!((): #crate_::encoding::DistinguishedValueDecoder<#encoding, #ty>)
             }
-            Decode(Borrowed, Distinguished) => {
+            Decode(Borrowed(lifetime), Distinguished) => {
                 quote!(
                     (): #crate_::encoding::
-                        DistinguishedValueBorrowDecoder<'__a, #encoding, #ty>
+                        DistinguishedValueBorrowDecoder<#lifetime, #encoding, #ty>
                 )
             }
             Schema => quote!((): #crate_::encoding::schema::FieldRepr<#encoding, #ty>),
         }];
-        if !matches!(purpose, Schema) {
+        if !matches!(&purpose, Schema) {
             res.push(
                 // Encoding or decoding a oneof field always has trivially externally determined
                 // presence, and we never need to know whether or not the value is empty; it never
