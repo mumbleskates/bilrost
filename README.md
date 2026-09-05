@@ -1289,6 +1289,50 @@ struct Tree {
 }
 ```
 
+#### Borrowing recursive messages
+
+* **"borrowed_lifetime"**: Sets a specific lifetime for which borrowed decoding
+  will be implemented for the type.
+
+To derive `Message` for a recursive message, we need to add the `recurses`
+attribute to one of the recursing fields to make the traits resolve (see the
+section on [writing recursive messages](#writing-recursive-messages)). This has
+a side effect that now the borrowed decoding methods for the recursing field
+are called unconditionally, so `bilrost` needs to know specifically which
+lifetime it's implementing borrowed decoding for (instead of adding a new
+lifetime to the implementation and letting things work themselves out).
+
+```rust,compile_fail
+# use bilrost::{Message};
+# use std::borrow::Cow;
+# use std::collections::BTreeMap;
+#[derive(Message)]
+//   !!! ^^^^^^^
+//       |
+//       lifetime `'__a` defined here
+//       requires that `'__a` must outlive `'a`
+struct Tree<'a> {
+    value: Cow<'a, str>,
+    #[bilrost(recurses)]
+    children: BTreeMap<Cow<'a, str>, Self>,
+}
+```
+
+This can be solved by adding the "borrowed_lifetime" attribute to the type:
+
+```rust,
+# use bilrost::{Message};
+# use std::borrow::Cow;
+# use std::collections::BTreeMap;
+#[derive(Message)]
+#[bilrost(borrowed_lifetime('a))]
+struct Tree<'a> {
+    value: Cow<'a, str>,
+    #[bilrost(recurses)]
+    children: BTreeMap<Cow<'a, str>, Self>,
+}
+```
+
 ##### Borrowed-only decoding
 
 * **"borrowed_only"**: [disables](#disabling-owned-decoding-traits) derivation
