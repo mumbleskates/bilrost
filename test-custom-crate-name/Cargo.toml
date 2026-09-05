@@ -1,8 +1,0 @@
-[package]
-name = "test-custom-crate-name"
-version = "0.0.0"
-publish = false
-edition.workspace = true
-
-[dependencies]
-tsorlib = { package = "bilrost", path = ".." }

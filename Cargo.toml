@@ -17,11 +17,7 @@ rust-version.workspace = true
 [workspace]
 members = [
     "crate-derive",
-    "crate-types",
-    "fuzz/common",
-    "test-custom-crate-name",
-    "test-derived-schema",
-    "test-types"
+    "test-ice",
 ]
 exclude = [
     "test-old-hashbrown",
@@ -32,33 +28,6 @@ resolver = "2"
 version = "0.1017.0-dev"
 edition = "2021"
 rust-version = "1.68"
-
-[lib]
-# https://bheisler.github.io/criterion.rs/book/faq.html#cargo-bench-gives-unrecognized-option-errors-for-valid-command-line-options
-bench = false
-
-[profile.bench]
-debug = true
-lto = "fat"
-
-[[bench]]
-name = "varint"
-harness = false
-
-[[example]]
-name = "custom_encodings"
-test = true
-harness = false # just run the binary
-
-[[example]]
-name = "proxy_own_type"
-test = true
-harness = false # just run the binary
-
-[[example]]
-name = "proxy_third_party_type"
-test = true
-harness = false # just run the binary
 
 [dependencies]
 arrayvec = { version = ">=0.6.0,<0.8", default-features = false, optional = true }
