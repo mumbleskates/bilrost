@@ -1296,9 +1296,9 @@ struct Tree {
 
 To derive `Message` for a recursive message, we need to add the `recurses`
 attribute to one of the recursing fields to make the traits resolve (see the
-section on [writing recursive messages](#writing-recursive-messages)). This has
-a side effect that now the borrowed decoding methods for the recursing field
-are called unconditionally, so `bilrost` needs to know specifically which
+section above on [writing recursive messages](#writing-recursive-messages)).
+This has a side effect that now the borrowed decoding methods for the recursing
+field are called unconditionally, so `bilrost` needs to know specifically which
 lifetime it's implementing borrowed decoding for (instead of adding a new
 lifetime to the implementation and letting things work themselves out).
 
