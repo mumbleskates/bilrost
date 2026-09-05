@@ -5,4 +5,4 @@ publish = false
 edition.workspace = true
 
 [dependencies]
-bilrost = { path = ".." }
+bilrost = { path = "..", default-features = false }
