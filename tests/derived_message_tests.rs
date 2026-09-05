@@ -638,14 +638,14 @@ fn recursive_borrowing_messages() {
     // we stop directly requiring the recursing field to implement the decoding traits. The
     // attribute helps fix this by making the impl itself more explicit about the specific lifetime
     // it functions for.
-    #[derive(PartialEq, Eq, Message)]
+    #[derive(Message)]
     #[bilrost(borrowed_lifetime('a))]
     struct Tree<'a, 'b> {
+        value: Cow<'a, str>,
         #[bilrost(recurses)]
-        children: Vec<Tree<'a, 'b>>,
-        name: Cow<'a, str>,
-        #[bilrost(ignore(Cow::default()))]
-        irrelevant_lifetime: Cow<'b, str>,
+        children: BTreeMap<Cow<'a, str>, Self>,
+        #[bilrost(ignore(PhantomData))]
+        _phantom: PhantomData<&'b ()>,
     }
 
     // We need a function with some scoped lifetimes. These lifetimes have no declared dependency,
