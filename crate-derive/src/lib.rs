@@ -34,7 +34,8 @@ use itertools::Itertools;
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 use syn::{
-    parse2, Data, DeriveInput, Expr, Fields, Generics, Ident, Lifetime, Path, Variant, WhereClause,
+    parse2, parse_quote, Data, DeriveInput, Expr, Fields, Generics, Ident, Lifetime, Path, Variant,
+    WhereClause,
 };
 
 extern crate alloc;
@@ -52,7 +53,7 @@ mod context {
     impl Context {
         pub fn new(crate_name: Option<Path>) -> Self {
             Context {
-                crate_name: crate_name.unwrap_or_else(|| parse2(quote!(::bilrost)).unwrap()),
+                crate_name: crate_name.unwrap_or_else(|| parse_quote!(::bilrost)),
             }
         }
     }
@@ -153,7 +154,7 @@ fn append_wheres_with_fields(
 
 /// Adds the given generics to the generics list. `to_add` must be a list of generic terms
 fn combine_generics(generics: &Generics, to_add: TokenStream) -> TokenStream {
-    let mut new_generics: Generics = parse2(quote!(<#to_add>)).expect("invalid generic terms");
+    let mut new_generics: Generics = parse_quote!(<#to_add>);
     new_generics.params.extend(generics.params.iter().cloned());
     // wrap the generics in ImplGenerics, which puts lifetime params first when rendered
     let (wrapped, _, _) = new_generics.split_for_impl();
@@ -332,7 +333,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream> {
         a = borrowed_lifetime;
         borrow_generics = quote!(#generics);
     } else {
-        a = parse2(quote!('__a)).unwrap();
+        a = parse_quote!('__a);
         borrow_generics = combine_generics(&generics, quote!(#a));
     }
 
@@ -731,7 +732,7 @@ fn try_message_via_oneof(input: DeriveInput) -> Result<TokenStream> {
         a = borrowed_lifetime;
         borrow_generics = quote!(#generics);
     } else {
-        a = parse2(quote!('__a)).unwrap();
+        a = parse_quote!('__a);
         borrow_generics = combine_generics(&generics, quote!(#a));
     }
 
@@ -1020,7 +1021,7 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream> {
     let unborrowed_generics = combine_generics(generics, quote!(const __G: u8));
 
     // TODO: implement borrowed_lifetime???
-    let a: Lifetime = parse2(quote!('__a)).unwrap();
+    let a: Lifetime = parse_quote!('__a);
     let borrow_generics = combine_generics(generics, quote!(#a, const __G: u8));
 
     let punctuated_variants = match input.data {
@@ -1546,7 +1547,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream> {
         a = borrowed_lifetime;
         borrow_generics = quote!(#generics);
     } else {
-        a = parse2(quote!('__a)).unwrap();
+        a = parse_quote!('__a);
         borrow_generics = combine_generics(&generics, quote!(#a));
     }
 
