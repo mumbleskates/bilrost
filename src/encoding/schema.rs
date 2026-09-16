@@ -5,9 +5,11 @@
 //!  * Create a Schema
 //!  * Register each of the message types we want to see with that schema.
 //!      * When a message is registered this way, new message types that haven't been registered
-//!        before will have `MessageSchema::register_fields` called, and must describe their
-//!        fields into the `FieldSet` provided.
-//!      * Messages that contain other messages will register those in turn.
+//!        before will have `RegisterMessage::register` called, and must describe themselves into
+//!        the schema.
+//!      * Each field's `FieldRepr::repr` is invoked by the message implementation to build its
+//!        own description. Fields whose types are messages will register themselves idempotently,
+//!        via `register_message` (which short circuits if the type was already registered).
 //!  * Finally, once all relevant message types are registered, the schema can be Displayed, which
 //!    will output all the collected information.
 
