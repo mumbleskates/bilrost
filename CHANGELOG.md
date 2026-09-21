@@ -6,6 +6,10 @@
 
 ### Fixes
 
+* Move an assertion from the "Schema" derive macro out of `const`. This could
+  cause generated code to be invalid when the type of a oneof contained a
+  generic lifetime.
+
 ### Cleanups
 
 ## v0.1016.1
