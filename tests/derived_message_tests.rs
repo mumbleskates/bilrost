@@ -4193,6 +4193,25 @@ fn vacant_oneof_decoding() {
 }
 
 #[test]
+fn schema_oneof_with_lifetime() {
+    #[derive(Oneof, Schema)]
+    enum FooOneof<'a> {
+        Empty,
+        #[bilrost(1)]
+        Something(Cow<'a, str>),
+    }
+
+    #[derive(Message, Schema)]
+    struct FooMessage<'a> {
+        #[bilrost(oneof(1))]
+        oneof: FooOneof<'a>,
+    }
+
+    let schema = Schema::new();
+    schema.register::<FooMessage>();
+}
+
+#[test]
 fn embedded_messages() {
     #[derive(Debug, PartialEq, Eq, Oneof, Message)]
     #[bilrost(distinguished)]
