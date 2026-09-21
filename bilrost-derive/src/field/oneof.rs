@@ -186,7 +186,7 @@ impl OneofInclusion {
             oneof_ty_name = ty.to_token_stream(),
         );
         quote! {
-            const _: () = #crate_::assert_tags_are_equal(
+            #crate_::assert_tags_are_equal(
                 #description,
                 <#ty as #crate_::encoding::Oneof>::FIELD_TAGS,
                 &[#(#tags),*],
