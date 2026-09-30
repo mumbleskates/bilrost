@@ -1962,7 +1962,6 @@ additional types as well, each supported by the general encodings:
 | [`time::UtcOffset`][timeutcoffset]                 | UTC+00:00                                | yes           | "time"           |
 | [`time::OffsetDateTime`][timeoffsetdatetime]       | 0000-01-01 00:00:00 +00:00               | yes           | "time"           |
 | [`time::Duration`][timeduration]                   | zero duration                            | yes           | "time"           |
-| [`time::Timestamp`][timetimestamp]                 | The UNIX epoch (1970-01-01 00:00:00 UTC) | yes           | "time"           |
 
 *`chrono::DateTime<Tz>` is supported whenever `Tz::Offset` is supported by the
 encodings. Currently this means `Utc` and `FixedOffset`.
