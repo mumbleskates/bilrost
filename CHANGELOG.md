@@ -26,6 +26,8 @@
 
 * Fixed a missing "with schema" passthrough in the "delegate_proxied_encoding!"
   macro.
+* Fixed `ReverseBuffer::plan_reservation_exact` so that it allocates only the
+  number of bytes needed.
 
 ### Cleanups
 
