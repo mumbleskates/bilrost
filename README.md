@@ -721,8 +721,8 @@ within any message containing it. On the wire, a oneof works as if there were an
 
 In the example above, the `NameOrUUID` oneof must be nested in an `Option` to
 enable it to represent the empty state where none of its fields are present. It
-is also possible to include *up to one* unit variant in a oneof enum. Any such
-variant will be used to represent its empty state.
+is also possible to include *up to one* unit variant in a oneof enum which will
+be used to represent its empty state.
 
 <details><summary>Example of a oneof with an "empty" variant</summary>
 
@@ -737,6 +737,7 @@ enum NameOrUUID {
     UUID {
         octets: [u8; 16],
     },
+    // #[bilrost(empty)] // this attribute is clarifying, but not mandatory
     Neither,
 }
 
