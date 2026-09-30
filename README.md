@@ -874,6 +874,9 @@ struct Address {
 #[derive(Message)]
 struct Phone(u64, Option<PhoneKind>);
 
+#[derive(Message)]
+struct Favorite;
+
 #[derive(Oneof)]
 enum RolodexInfo {
     #[bilrost(2)]
@@ -882,8 +885,8 @@ enum RolodexInfo {
     Address(Address),
     #[bilrost(4)]
     Phone(Phone),
-    #[bilrost(tag(5), message)]
-    Favorite,
+    #[bilrost(tag(5))]
+    Favorite(Favorite),
     #[bilrost(empty)]
     Empty,
 }
