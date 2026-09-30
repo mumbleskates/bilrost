@@ -304,7 +304,12 @@ impl ReverseBuffer {
     }
 
     /// Ensures that the buffer will, upon its next allocation, reserve at least enough space to fit
-    /// this many more bytes than are currently in the buffer.
+    /// this many more bytes than are currently in the buffer. If there is already enough additional
+    /// capacity to fit this many more bytes, this method has no effect.
+    ///
+    /// This method will override any existing allocation plan unless the existing plan is for an
+    /// exact number of bytes (made with `plan_reservation_exact`) that is at least as large as is
+    /// being requested.
     #[inline(always)]
     pub fn plan_reservation(&mut self, additional: usize) {
         let Some(more_needed) = additional.checked_sub(self.front) else {
@@ -316,15 +321,46 @@ impl ReverseBuffer {
         (self.planned_allocation, self.planned_exact) = (more_needed, false);
     }
 
-    /// Ensures that the buffer will, upon its next allocation, reserve enough space to fit this
-    /// many more bytes than are in the buffer at present. If there is already enough additional
-    /// capacity to fit this many more bytes, this method has no effect. If the requested capacity
-    /// is not already met and there is already a set plan for the size of the next allocation, it
-    /// will be overridden by this request.
+    /// Ensures that the buffer will, upon its next allocation, reserve exactly enough space to fit
+    /// this many more bytes than are in the buffer at present. If there is already enough
+    /// additional capacity to fit this many more bytes, this method has no effect.
     ///
-    /// If this method is repeatedly called interleaved with calls to `prepend` that trigger new
-    /// allocations, the buffer may become very fragmented as this method can be used to control the
-    /// exact sizes of all its allocations. Use sparingly.
+    /// If the requested capacity is not already met and there is already a set plan for the size of
+    /// the next allocation, it will be overridden by this request. If this method is repeatedly
+    /// called interleaved with calls to `prepend` that trigger new allocations, the buffer may
+    /// become very fragmented as this method can be used to control the exact sizes of all its
+    /// allocations. Use sparingly. This method is mostly useful for ensuring that prepending a
+    /// small amount of data to an existing buffer will not allocate too much extra capacity.
+    ///
+    /// ```rust
+    /// # use bilrost::alloc::vec;
+    /// # use bilrost::buf::{ReverseBuf, ReverseBuffer};
+    /// let mut this = ReverseBuffer::from(vec!['A' as u8; 1000]);
+    /// assert!(this.contiguous().is_some());
+    /// assert_eq!(this.len(), this.capacity());
+    /// this.plan_reservation_exact(1);
+    /// this.prepend_slice(b">");
+    /// // The exact reservation prevented the buffer from doubling in size:
+    /// assert!(this.contiguous().is_none());
+    /// assert_eq!(this.len(), this.capacity());
+    /// ```
+    ///
+    /// When the planned allocation occurs, the buffer will not be fully contiguous unless the
+    /// buffer was empty and created without an initial capacity. To resize an existing buffer so
+    /// an exact number of bytes can be prepended to form a single contiguous allocation with no
+    /// extra capacity (suitable for converting directly into a `Vec` with `into_vec`), create a new
+    /// buffer and copy this one into it like so:
+    ///
+    /// ```rust
+    /// # use bilrost::buf::{ReverseBuf, ReverseBuffer};
+    /// let mut this = ReverseBuffer::new();
+    /// this.prepend_slice(b"some contents");
+    /// let mut new_buffer = ReverseBuffer::with_capacity(this.len() + 10);
+    /// new_buffer.prepend(this);
+    /// new_buffer.prepend_slice(b"0123456789");
+    /// assert_eq!(new_buffer.contiguous(), Some("0123456789some contents".as_bytes()));
+    /// assert_eq!(new_buffer.len(), new_buffer.capacity());
+    /// ```
     #[inline]
     pub fn plan_reservation_exact(&mut self, additional: usize) {
         let Some(more_needed) = additional.checked_sub(self.front) else {

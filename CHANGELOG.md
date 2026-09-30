@@ -10,7 +10,7 @@
   cause generated code to be invalid when the type of a oneof contained a
   generic lifetime.
 * Fixed `ReverseBuffer::plan_reservation_exact` so that it allocates only the
-  number of bytes needed.
+  number of bytes requested if possible.
 
 ### Cleanups
 
