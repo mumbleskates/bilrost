@@ -310,7 +310,7 @@ impl ReverseBuffer {
         let Some(more_needed) = additional.checked_sub(self.front) else {
             return; // There is already enough capacity for `additional` more bytes.
         };
-        if self.planned_allocation > more_needed {
+        if self.planned_allocation >= more_needed {
             return; // Next planned allocation is already greater than the requested amount.
         }
         (self.planned_allocation, self.planned_exact) = (more_needed, false);
@@ -330,7 +330,7 @@ impl ReverseBuffer {
         let Some(more_needed) = additional.checked_sub(self.front) else {
             return;
         };
-        (self.planned_allocation, self.planned_exact) = (self.capacity + more_needed, true);
+        (self.planned_allocation, self.planned_exact) = (more_needed, true);
     }
 
     /// Returns the slice of bytes ordered at the front of the buffer.
@@ -1139,6 +1139,21 @@ mod test {
         assert_eq!(buf.remaining(), 5);
         compare_buf(&mut buf, b"dfaas");
         assert_eq!(buf.capacity(), 0); // this buffer doesn't retain its back chunk
+    }
+
+    #[test]
+    fn plan_exact_controls_allocations() {
+        let mut buf = ReverseBuffer::new();
+        buf.plan_reservation_exact(3);
+        buf.prepend_slice(b"xyz");
+        assert_eq!(buf.capacity(), buf.len());
+        buf.plan_reservation_exact(2);
+        buf.prepend_slice(b"12");
+        assert_eq!(buf.capacity(), buf.len());
+        buf.plan_reservation_exact(1);
+        buf.prepend_slice(b"a");
+        assert_eq!(buf.capacity(), buf.len());
+        compare_buf(buf.buf_reader(), b"a12xyz");
     }
 
     #[test]

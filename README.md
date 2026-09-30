@@ -1601,9 +1601,11 @@ Trait `Message`: encoding (implemented by every message)
   conversion from the resulting `ReverseBuffer` into a `Vec` (see
   `ReverseBuffer::into_vec`).
 * `encode`, `encode_length_delimited`: encodes the message into a
-  `&mut bytes::BufMut`, appending it after any data that is already there.
-* `prepend`: encodes the message into a `&mut bilrost::buf::ReverseBuf`,
-  *before* any data that is already there.
+  [`&mut bytes::BufMut`][bufmut], appending it after any data that is already
+  there.
+* `prepend`: encodes the message into a
+  [`&mut bilrost::buf::ReverseBuf`](#reversebuf), *before* any data that is
+  already there.
 
 Trait `OwnedMessage`: decoding a fully owned message value from any
 [`bytes::Buf`][buf]
