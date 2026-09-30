@@ -366,7 +366,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream> {
                 return None;
             }
             let decode = field.decode(&self_instance, lifetime.clone(), Relaxed, ctx);
-            let tags = tags.into_iter().map(|tag| quote!(#tag));
+            let tags = tags.iter().map(|tag| quote!(#tag));
             let tags = Itertools::intersperse(tags, quote!(|));
             let schema_field_name = field.schema_field_name();
 
@@ -589,7 +589,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream> {
                     return None;
                 }
                 let decode = field.decode(self_instance, lifetime.clone(), Distinguished, ctx);
-                let tags = field.tags().into_iter().map(|tag| quote!(#tag));
+                let tags = field.tags().iter().map(|tag| quote!(#tag));
                 let tags = Itertools::intersperse(tags, quote!(|));
                 let schema_field_name = field.schema_field_name();
 

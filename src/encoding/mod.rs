@@ -659,6 +659,7 @@ pub trait RestrictedDecodeContext: DecodeContext {
     fn check(&self, canon: Canonicity) -> Result<Canonicity, DecodeError>;
 
     /// Gets the inner relaxed decoding context.
+    #[allow(clippy::wrong_self_convention)]
     fn into_inner(&self) -> Self::Unrestricted;
 }
 

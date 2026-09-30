@@ -844,7 +844,7 @@ impl OneofVariant {
                         if field.tags().is_empty() {
                             return None;
                         }
-                        let tags = field.tags().into_iter().map(|tag| quote!(#tag));
+                        let tags = field.tags().iter().map(|tag| quote!(#tag));
                         let tags = Itertools::intersperse(tags, quote!(|));
                         let decode = field.decode(
                             &FieldTarget::FreeVariantFields,
