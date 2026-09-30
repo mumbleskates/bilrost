@@ -214,7 +214,7 @@ with. This means that:
 * In `bilrost` (this Rust library), floating point values always round trip with
   the *precise* bits of their representation. NaN bits and -0.0 are always
   preserved.
-* If an key appears in a mapping multiple times, the whole message is considered
+* If a key appears in a mapping multiple times, the whole message is considered
   invalid; likewise for values in sets. There should be no room for alternate
   interpretations of data that keep only the first or last such entry, or that
   discard information about a set with repeated elements.
