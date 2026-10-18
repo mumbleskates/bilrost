@@ -1,9 +1,5 @@
 ## v0.1016.2-dev
 
-### Breaking changes
-
-### New features
-
 ### Fixes
 
 * Move an assertion from the "Schema" derive macro out of `const`. This could
@@ -11,8 +7,6 @@
   generic lifetime.
 * Fixed `ReverseBuffer::plan_reservation_exact` so that it allocates only the
   number of bytes requested if possible.
-
-### Cleanups
 
 ## v0.1016.1
 
