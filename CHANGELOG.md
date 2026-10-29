@@ -28,6 +28,8 @@
   macro.
 * Fixed `ReverseBuffer::plan_reservation_exact` so that it allocates only the
   number of bytes requested if possible.
+* Fixed `ReverseBuffer::into_vec` so it converts full & contiguous buffers into
+  `Vec` without copying as it promises to (thanks to Ahmed Farghal)
 
 ### Cleanups
 
