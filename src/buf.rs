@@ -296,7 +296,7 @@ impl ReverseBuffer {
                 }
             };
             // CORRECTNESS: the whole buffer is only one chunk.
-            return whole_buffer.to_vec();
+            return whole_buffer.into_vec();
         }
         let mut res = Vec::with_capacity(self.len());
         bytes::BufMut::put(&mut res, self);
@@ -1198,5 +1198,40 @@ mod test {
         buf.prepend("hello".as_bytes());
         buf.prepend("why ".as_bytes());
         check_read(buf, b"why hello");
+    }
+
+    #[test]
+    fn into_vec_reuses_single_full_chunk() {
+        // A single chunk with no spare capacity becomes the Vec without copying.
+        let mut buf = ReverseBuffer::new();
+        buf.plan_reservation_exact(b"hello world!".len());
+        buf.prepend_slice(b"world!");
+        buf.prepend_slice(b"hello ");
+        assert_eq!((buf.chunks.len(), buf.front), (1, 0));
+        let data = buf.chunk().as_ptr();
+        let vec = buf.into_vec();
+        assert_eq!(vec, b"hello world!");
+        assert_eq!(vec.as_ptr(), data);
+
+        // Round-tripping an exactly-sized Vec keeps its allocation.
+        let original = b"hello world!".to_vec();
+        let data = original.as_ptr();
+        let vec = ReverseBuffer::from(original).into_vec();
+        assert_eq!(vec, b"hello world!");
+        assert_eq!(vec.as_ptr(), data);
+
+        // Spare capacity in the only chunk: the contents are copied out.
+        let mut buf = ReverseBuffer::with_capacity(20);
+        buf.prepend_slice(b"hello world!");
+        assert_eq!(buf.chunks.len(), 1);
+        assert!(buf.front > 0);
+        assert_eq!(buf.into_vec(), b"hello world!");
+
+        // Several full chunks: the contents are concatenated in order.
+        let mut buf = ReverseBuffer::with_capacity(4);
+        buf.prepend_slice(b"!!!!");
+        buf.prepend_slice(&[b'x'; 64]);
+        assert_eq!((buf.chunks.len(), buf.front), (2, 0));
+        assert_eq!(buf.into_vec(), [&[b'x'; 64][..], b"!!!!"].concat());
     }
 }
