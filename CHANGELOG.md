@@ -1,12 +1,9 @@
 ## v0.1016.3-dev
 
-### Breaking changes
-
-### New features
-
 ### Fixes
 
-### Cleanups
+* Fixed `ReverseBuffer::into_vec` so it converts full & contiguous buffers into
+  `Vec` without copying as it promises to (thanks to Ahmed Farghal)
 
 ## v0.1016.2
 
