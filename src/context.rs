@@ -20,6 +20,8 @@ pub(crate) fn default_ctx() -> impl DecodeContext {
 pub struct PlainDecodeCtx {}
 
 impl DecodeContext for PlainDecodeCtx {
+    type Unrestricted = Self;
+
     #[inline]
     fn enter_recursion(&self) -> Result<Self, RecursionError> {
         Ok(self.clone())
@@ -28,6 +30,11 @@ impl DecodeContext for PlainDecodeCtx {
     #[inline]
     fn heap_used(&self, _bytes_used: usize) -> Result<(), OversizeDecodingError> {
         Ok(())
+    }
+
+    #[inline]
+    fn unrestricted(&self) -> Self {
+        self.clone()
     }
 }
 
@@ -58,6 +65,8 @@ impl Default for RecursiveDecodeCtx {
 }
 
 impl DecodeContext for RecursiveDecodeCtx {
+    type Unrestricted = Self;
+
     #[inline]
     fn enter_recursion(&self) -> Result<RecursiveDecodeCtx, RecursionError> {
         if self.recurse_count == 0 {
@@ -71,6 +80,11 @@ impl DecodeContext for RecursiveDecodeCtx {
     #[inline]
     fn heap_used(&self, _bytes_used: usize) -> Result<(), OversizeDecodingError> {
         Ok(())
+    }
+
+    #[inline]
+    fn unrestricted(&self) -> Self {
+        self.clone()
     }
 }
 
@@ -94,6 +108,8 @@ impl<'a, D: DecodeContext> HeapTrackingCtx<'a, D> {
 }
 
 impl<D: DecodeContext> DecodeContext for HeapTrackingCtx<'_, D> {
+    type Unrestricted = Self;
+
     #[inline]
     fn enter_recursion(&self) -> Result<Self, RecursionError> {
         Ok(Self {
@@ -106,6 +122,11 @@ impl<D: DecodeContext> DecodeContext for HeapTrackingCtx<'_, D> {
     fn heap_used(&self, bytes_used: usize) -> Result<(), OversizeDecodingError> {
         self.tracker.set(self.tracker.get() + bytes_used);
         Ok(())
+    }
+
+    #[inline]
+    fn unrestricted(&self) -> Self {
+        self.clone()
     }
 }
 
@@ -134,6 +155,8 @@ impl<'a, D: DecodeContext> HeapQuotaCtx<'a, D> {
 }
 
 impl<D: DecodeContext> DecodeContext for HeapQuotaCtx<'_, D> {
+    type Unrestricted = Self;
+
     #[inline]
     fn enter_recursion(&self) -> Result<Self, RecursionError> {
         Ok(Self {
@@ -151,6 +174,11 @@ impl<D: DecodeContext> DecodeContext for HeapQuotaCtx<'_, D> {
             return Err(OversizeDecodingError);
         }
         Ok(())
+    }
+
+    #[inline]
+    fn unrestricted(&self) -> Self {
+        self.clone()
     }
 }
 
@@ -181,6 +209,8 @@ impl<D: DecodeContext> RestrictedCtx<D> {
 }
 
 impl<D: DecodeContext> DecodeContext for RestrictedCtx<D> {
+    type Unrestricted = D::Unrestricted;
+
     #[inline]
     fn enter_recursion(&self) -> Result<Self, RecursionError> {
         Ok(Self {
@@ -193,11 +223,13 @@ impl<D: DecodeContext> DecodeContext for RestrictedCtx<D> {
     fn heap_used(&self, bytes_used: usize) -> Result<(), OversizeDecodingError> {
         self.context.heap_used(bytes_used)
     }
+
+    fn unrestricted(&self) -> Self::Unrestricted {
+        self.context.unrestricted()
+    }
 }
 
 impl<D: DecodeContext> RestrictedDecodeContext for RestrictedCtx<D> {
-    type Unrestricted = D;
-
     #[inline]
     fn check(&self, canon: Canonicity) -> Result<Canonicity, DecodeError> {
         match (canon < self.min_canonicity, canon) {
@@ -209,10 +241,5 @@ impl<D: DecodeContext> RestrictedDecodeContext for RestrictedCtx<D> {
             }
             _ => Ok(canon),
         }
-    }
-
-    #[inline]
-    fn into_inner(&self) -> D {
-        self.context.clone()
     }
 }

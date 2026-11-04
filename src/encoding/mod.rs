@@ -622,6 +622,8 @@ fn decode_varint_slow<B: Buf + ?Sized>(buf: &mut B) -> Result<u64, DecodeError> 
 /// The context should be passed by value and can be freely cloned. When passing
 /// to a function which is decoding a nested object, then use `enter_recursion`.
 pub trait DecodeContext: Clone {
+    type Unrestricted: DecodeContext;
+
     /// Call this function before recursively decoding.
     ///
     /// There is no `exit` function since this function creates a new `DecodeContext`
@@ -632,11 +634,13 @@ pub trait DecodeContext: Clone {
     /// Call this function when consuming additional heap memory during decoding. Memory that is
     /// already occupied by the type and its fields at rest are not counted.
     fn heap_used(&self, bytes_used: usize) -> Result<(), OversizeDecodingError>;
+
+    /// Gets the inner relaxed decoding context by cloning. For relaxed contexts this should be the
+    /// same as `clone()`.
+    fn unrestricted(&self) -> Self::Unrestricted;
 }
 
 pub trait RestrictedDecodeContext: DecodeContext {
-    type Unrestricted: DecodeContext;
-
     /// Checks the given canonicity against the minimum constraint that this context has.
     ///
     /// This must be called and checked at a few specific times, whenever the canonicity is
@@ -659,7 +663,9 @@ pub trait RestrictedDecodeContext: DecodeContext {
 
     /// Gets the inner relaxed decoding context.
     #[allow(clippy::wrong_self_convention)]
-    fn into_inner(&self) -> Self::Unrestricted;
+    fn into_inner(&self) -> Self::Unrestricted {
+        self.unrestricted()
+    }
 }
 
 /// Returns the encoded length of the value in LEB128-bijective variable length format.

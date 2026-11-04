@@ -1130,7 +1130,7 @@ where
         #[allow(unused_mut)] mut buf: impl Buf,
     ) -> Result<M, DecodeError> {
         let mut message = M::empty();
-        merge(&mut message, make_capped!(buf), self.clone())?;
+        merge(&mut message, make_capped!(buf), self.unrestricted())?;
         Ok(message)
     }
 
@@ -1142,7 +1142,7 @@ where
         merge(
             &mut message,
             make_capped_length_delimited!(buf)?,
-            self.clone(),
+            self.unrestricted(),
         )?;
         Ok(message)
     }
@@ -1154,7 +1154,7 @@ where
     ) -> Result<(), DecodeError> {
         msg.clear();
         // MSRV: here, and elsewhere, this `map_err` could be `inspect_err` (1.76)
-        merge(msg, make_capped!(buf), self.clone()).map_err(|err| {
+        merge(msg, make_capped!(buf), self.unrestricted()).map_err(|err| {
             msg.clear();
             err
         })
@@ -1167,7 +1167,12 @@ where
     ) -> Result<(), DecodeError> {
         msg.clear();
         // MSRV: here, and elsewhere, this `map_err` could be `inspect_err` (1.76)
-        merge(msg, make_capped_length_delimited!(buf)?, self.clone()).map_err(|err| {
+        merge(
+            msg,
+            make_capped_length_delimited!(buf)?,
+            self.unrestricted(),
+        )
+        .map_err(|err| {
             msg.clear();
             err
         })
@@ -1248,7 +1253,7 @@ where
         mut buf: &'a [u8],
     ) -> Result<M, DecodeError> {
         let mut message = M::empty();
-        borrow_merge(&mut message, Capped::new(&mut buf), self.clone())?;
+        borrow_merge(&mut message, Capped::new(&mut buf), self.unrestricted())?;
         Ok(message)
     }
 
@@ -1265,7 +1270,7 @@ where
         mut buf: &'a [u8],
     ) -> Result<(), DecodeError> {
         msg.clear();
-        borrow_merge(msg, Capped::new(&mut buf), self.clone()).map_err(|err| {
+        borrow_merge(msg, Capped::new(&mut buf), self.unrestricted()).map_err(|err| {
             msg.clear();
             err
         })
