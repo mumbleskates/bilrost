@@ -23,6 +23,7 @@ mod error;
 mod message;
 mod types;
 
+pub mod context;
 pub mod encoding;
 #[doc(hidden)]
 mod iter;
@@ -31,7 +32,8 @@ pub use crate::encoding::schema::Schema;
 pub use crate::encoding::{Canonicity, Enumeration, WithCanonicity};
 pub use crate::error::{DecodeError, DecodeErrorKind, EncodeError};
 pub use crate::message::{
-    BorrowedMessage, DistinguishedBorrowedMessage, DistinguishedOwnedMessage, Message, OwnedMessage,
+    BorrowedMessage, DecodeSettings, DistinguishedBorrowedMessage, DistinguishedOwnedMessage,
+    Message, OwnedMessage,
 };
 pub use crate::types::Blob;
 
@@ -42,9 +44,8 @@ use const_panic::concat_panic;
 use crate::encoding::{decode_varint, encode_varint, encoded_len_varint};
 
 // See `encoding::DecodeContext` for more info.
-// 100 is the default recursion limit in the C++ implementation.
-#[cfg(not(feature = "no-recursion-limit"))]
-const RECURSION_LIMIT: u32 = 100;
+// 100 is the default recursion limit in the C++ protobuf implementation.
+const DEFAULT_RECURSION_LIMIT: u32 = 100;
 
 /// Encodes a length delimiter to the buffer.
 ///

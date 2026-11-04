@@ -400,10 +400,11 @@ delegate_proxied_encoding!(
 mod utcoffset {
     use super::helpers::with_random_values;
     use super::SealedBilrostTag;
+    use crate::context::{default_ctx, RestrictedCtx};
     use crate::encoding::test::{check_type_empty, distinguished, relaxed};
     use crate::encoding::{
-        Capped, DecodeCtx, DistinguishedValueDecoder, EmptyState, ForOverwrite, General,
-        RestrictedCtx, ValueDecoder, ValueEncoder, WireType,
+        Capped, DistinguishedValueDecoder, EmptyState, ForOverwrite, General, ValueDecoder,
+        ValueEncoder, WireType,
     };
     use crate::Canonicity::NotCanonical;
     use crate::DecodeError;
@@ -443,7 +444,7 @@ mod utcoffset {
                 <() as ValueDecoder<General, _>>::decode_value(
                     &mut utc_off,
                     Capped::new(&mut buf.as_slice()),
-                    DecodeCtx::default(),
+                    default_ctx(),
                 ),
                 Err(DecodeError::new(InvalidValue))
             );
@@ -451,7 +452,7 @@ mod utcoffset {
                 <() as DistinguishedValueDecoder<General, _>>::decode_value_distinguished::<true>(
                     &mut utc_off,
                     Capped::new(&mut buf.as_slice()),
-                    RestrictedCtx::new(DecodeCtx::default(), NotCanonical),
+                    RestrictedCtx::new(default_ctx(), NotCanonical),
                 ),
                 Err(DecodeError::new(InvalidValue))
             );

@@ -1,13 +1,12 @@
 use crate::buf::{ReverseBuf, ReverseBuffer};
+use crate::context::{default_ctx, RestrictedCtx};
 use crate::encoding::message::{
     borrow_merge, borrow_merge_distinguished, merge, merge_distinguished,
 };
-#[cfg(debug_assertions)]
-use crate::encoding::paranoid_buf_asserts::Counted;
 use crate::encoding::{
-    encode_varint, encoded_len_varint, prepend_varint, Capped, DecodeCtx,
+    encode_varint, encoded_len_varint, prepend_varint, Capped, DecodeContext,
     RawDistinguishedMessageBorrowDecoder, RawDistinguishedMessageDecoder, RawMessage,
-    RawMessageBorrowDecoder, RawMessageDecoder, RestrictedCtx, RestrictedDecodeContext,
+    RawMessageBorrowDecoder, RawMessageDecoder, RestrictedDecodeContext,
 };
 use crate::Canonicity::{Canonical, NotCanonical};
 use crate::{length_delimiter_len, Canonicity, DecodeError, EncodeError};
@@ -99,12 +98,6 @@ pub trait OwnedMessage: Message {
     where
         Self: Sized;
 
-    /// Decodes an instance from the given `Capped` buffer, consuming it to its cap.
-    #[doc(hidden)]
-    fn decode_capped<B: Buf + ?Sized>(buf: Capped<B>) -> Result<Self, DecodeError>
-    where
-        Self: Sized;
-
     /// Decodes the non-ignored fields of this message from the buffer, replacing their values.
     fn replace_from<B: Buf>(&mut self, buf: B) -> Result<(), DecodeError>
     where
@@ -113,13 +106,6 @@ pub trait OwnedMessage: Message {
     /// Decodes the non-ignored fields of this message, replacing their values from a
     /// length-delimited value encoded in the buffer.
     fn replace_from_length_delimited<B: Buf>(&mut self, buf: B) -> Result<(), DecodeError>
-    where
-        Self: Sized;
-
-    /// Decodes the non-ignored fields of this message, replacing their values from the given capped
-    /// buffer.
-    #[doc(hidden)]
-    fn replace_from_capped<B: Buf + ?Sized>(&mut self, buf: Capped<B>) -> Result<(), DecodeError>
     where
         Self: Sized;
 
@@ -183,15 +169,6 @@ pub trait DistinguishedOwnedMessage: OwnedMessage {
     where
         Self: Sized;
 
-    /// Decodes an instance from the given `Capped` buffer in distinguished mode, consuming it to
-    /// its cap.
-    #[doc(hidden)]
-    fn decode_distinguished_capped<B: Buf + ?Sized>(
-        buf: Capped<B>,
-    ) -> Result<(Self, Canonicity), DecodeError>
-    where
-        Self: Sized;
-
     /// Decodes the non-ignored fields of this message from the buffer in distinguished mode,
     /// replacing their values.
     fn replace_distinguished_from<B: Buf>(&mut self, buf: B) -> Result<Canonicity, DecodeError>
@@ -203,16 +180,6 @@ pub trait DistinguishedOwnedMessage: OwnedMessage {
     fn replace_distinguished_from_length_delimited<B: Buf>(
         &mut self,
         buf: B,
-    ) -> Result<Canonicity, DecodeError>
-    where
-        Self: Sized;
-
-    /// Decodes the non-ignored fields of this message in distinguished mode, replacing their values
-    /// from the given capped buffer.
-    #[doc(hidden)]
-    fn replace_distinguished_from_capped<B: Buf + ?Sized>(
-        &mut self,
-        buf: Capped<B>,
     ) -> Result<Canonicity, DecodeError>
     where
         Self: Sized;
@@ -263,16 +230,6 @@ pub trait DistinguishedOwnedMessage: OwnedMessage {
     where
         Self: Sized;
 
-    /// Decodes an instance from the given `Capped` buffer in restricted mode, consuming it to
-    /// its cap.
-    #[doc(hidden)]
-    fn decode_restricted_capped<B: Buf + ?Sized>(
-        buf: Capped<B>,
-        restrict_to: Canonicity,
-    ) -> Result<(Self, Canonicity), DecodeError>
-    where
-        Self: Sized;
-
     /// Decodes the non-ignored fields of this message from the buffer in restricted mode,
     /// replacing their values.
     fn replace_restricted_from<B: Buf>(
@@ -288,17 +245,6 @@ pub trait DistinguishedOwnedMessage: OwnedMessage {
     fn replace_restricted_from_length_delimited<B: Buf>(
         &mut self,
         buf: B,
-        restrict_to: Canonicity,
-    ) -> Result<Canonicity, DecodeError>
-    where
-        Self: Sized;
-
-    /// Decodes the non-ignored fields of this message in restricted mode, replacing their values
-    /// from the given capped buffer.
-    #[doc(hidden)]
-    fn replace_restricted_from_capped<B: Buf + ?Sized>(
-        &mut self,
-        buf: Capped<B>,
         restrict_to: Canonicity,
     ) -> Result<Canonicity, DecodeError>
     where
@@ -351,13 +297,6 @@ pub trait DistinguishedOwnedMessage: OwnedMessage {
     where
         Self: Sized;
 
-    /// Decodes an instance from the given `Capped` buffer in canonical mode, consuming it to
-    /// its cap.
-    #[doc(hidden)]
-    fn decode_canonical_capped<B: Buf + ?Sized>(buf: Capped<B>) -> Result<Self, DecodeError>
-    where
-        Self: Sized;
-
     /// Decodes the non-ignored fields of this message from the buffer in canonical mode,
     /// replacing their values.
     fn replace_canonical_from<B: Buf>(&mut self, buf: B) -> Result<(), DecodeError>
@@ -369,16 +308,6 @@ pub trait DistinguishedOwnedMessage: OwnedMessage {
     fn replace_canonical_from_length_delimited<B: Buf>(
         &mut self,
         buf: B,
-    ) -> Result<(), DecodeError>
-    where
-        Self: Sized;
-
-    /// Decodes the non-ignored fields of this message in canonical mode, replacing their values
-    /// from the given capped buffer.
-    #[doc(hidden)]
-    fn replace_canonical_from_capped<B: Buf + ?Sized>(
-        &mut self,
-        buf: Capped<B>,
     ) -> Result<(), DecodeError>
     where
         Self: Sized;
@@ -623,6 +552,41 @@ pub trait DistinguishedBorrowedMessage<'a>: BorrowedMessage<'a> {
     ) -> Result<(), DecodeError>;
 }
 
+// make_capped{_length_delimited}: We create capped buffers with paranoid counting via these
+// macros when debug assertions are enabled.
+
+#[cfg(debug_assertions)]
+macro_rules! make_capped {
+    ($buf:expr) => {
+        Capped::new(&mut crate::encoding::paranoid_buf_asserts::Counted::new(
+            $buf,
+        ))
+    };
+}
+
+#[cfg(debug_assertions)]
+macro_rules! make_capped_length_delimited {
+    ($buf:expr) => {
+        Capped::new_length_delimited(&mut crate::encoding::paranoid_buf_asserts::Counted::new(
+            $buf,
+        ))
+    };
+}
+
+#[cfg(not(debug_assertions))]
+macro_rules! make_capped {
+    ($buf:expr) => {
+        Capped::new(&mut $buf)
+    };
+}
+
+#[cfg(not(debug_assertions))]
+macro_rules! make_capped_length_delimited {
+    ($buf:expr) => {
+        Capped::new_length_delimited(&mut $buf)
+    };
+}
+
 /// `Message` is implemented as a usability layer on top of the basic functionality afforded by
 /// `RawMessage`.
 // TODO: extension decoding: extensions can't be provided singly alongside the message that's to be
@@ -753,70 +717,20 @@ impl<T> OwnedMessage for T
 where
     T: RawMessageDecoder + Sized,
 {
-    fn decode<B: Buf>(#[allow(unused_mut)] mut buf: B) -> Result<Self, DecodeError> {
-        #[cfg(debug_assertions)]
-        {
-            Self::decode_capped(Capped::new(&mut Counted::new(buf)))
-        }
-        #[cfg(not(debug_assertions))]
-        {
-            Self::decode_capped(Capped::new(&mut buf))
-        }
+    fn decode<B: Buf>(buf: B) -> Result<Self, DecodeError> {
+        default_ctx().decode(buf)
     }
 
-    fn decode_length_delimited<B: Buf>(
-        #[allow(unused_mut)] mut buf: B,
-    ) -> Result<Self, DecodeError> {
-        #[cfg(debug_assertions)]
-        {
-            Self::decode_capped(Capped::new_length_delimited(&mut Counted::new(buf))?)
-        }
-        #[cfg(not(debug_assertions))]
-        {
-            Self::decode_capped(Capped::new_length_delimited(&mut buf)?)
-        }
+    fn decode_length_delimited<B: Buf>(buf: B) -> Result<Self, DecodeError> {
+        default_ctx().decode_length_delimited(buf)
     }
 
-    #[doc(hidden)]
-    fn decode_capped<B: Buf + ?Sized>(buf: Capped<B>) -> Result<Self, DecodeError> {
-        let mut message = Self::empty();
-        merge(&mut message, buf, DecodeCtx::default())?;
-        Ok(message)
+    fn replace_from<B: Buf>(&mut self, buf: B) -> Result<(), DecodeError> {
+        default_ctx().replace(self, buf)
     }
 
-    fn replace_from<B: Buf>(&mut self, #[allow(unused_mut)] mut buf: B) -> Result<(), DecodeError> {
-        #[cfg(debug_assertions)]
-        {
-            self.replace_from_capped(Capped::new(&mut Counted::new(buf)))
-        }
-        #[cfg(not(debug_assertions))]
-        {
-            self.replace_from_capped(Capped::new(&mut buf))
-        }
-    }
-
-    fn replace_from_length_delimited<B: Buf>(
-        &mut self,
-        #[allow(unused_mut)] mut buf: B,
-    ) -> Result<(), DecodeError> {
-        #[cfg(debug_assertions)]
-        {
-            self.replace_from_capped(Capped::new_length_delimited(&mut Counted::new(buf))?)
-        }
-        #[cfg(not(debug_assertions))]
-        {
-            self.replace_from_capped(Capped::new_length_delimited(&mut buf)?)
-        }
-    }
-
-    #[doc(hidden)]
-    fn replace_from_capped<B: Buf + ?Sized>(&mut self, buf: Capped<B>) -> Result<(), DecodeError> {
-        self.clear();
-        // MSRV: here, and elsewhere, this `map_err` could be `inspect_err` (1.76)
-        merge(self, buf, DecodeCtx::default()).map_err(|err| {
-            self.clear();
-            err
-        })
+    fn replace_from_length_delimited<B: Buf>(&mut self, buf: B) -> Result<(), DecodeError> {
+        default_ctx().replace_length_delimited(self, buf)
     }
 
     fn replace_from_slice(&mut self, buf: &[u8]) -> Result<(), DecodeError> {
@@ -850,13 +764,6 @@ where
         Self::decode_restricted_length_delimited(buf, NotCanonical)
     }
 
-    #[doc(hidden)]
-    fn decode_distinguished_capped<B: Buf + ?Sized>(
-        buf: Capped<B>,
-    ) -> Result<(Self, Canonicity), DecodeError> {
-        Self::decode_restricted_capped(buf, NotCanonical)
-    }
-
     fn replace_distinguished_from<B: Buf>(&mut self, buf: B) -> Result<Canonicity, DecodeError> {
         self.replace_restricted_from(buf, NotCanonical)
     }
@@ -866,14 +773,6 @@ where
         buf: B,
     ) -> Result<Canonicity, DecodeError> {
         self.replace_restricted_from_length_delimited(buf, NotCanonical)
-    }
-
-    #[doc(hidden)]
-    fn replace_distinguished_from_capped<B: Buf + ?Sized>(
-        &mut self,
-        buf: Capped<B>,
-    ) -> Result<Canonicity, DecodeError> {
-        self.replace_restricted_from_capped(buf, NotCanonical)
     }
 
     fn replace_distinguished_from_slice(&mut self, buf: &[u8]) -> Result<Canonicity, DecodeError> {
@@ -902,63 +801,25 @@ where
     }
 
     fn decode_restricted<B: Buf>(
-        #[allow(unused_mut)] mut buf: B,
+        buf: B,
         restrict_to: Canonicity,
     ) -> Result<(Self, Canonicity), DecodeError> {
-        #[cfg(debug_assertions)]
-        {
-            Self::decode_restricted_capped(Capped::new(&mut Counted::new(buf)), restrict_to)
-        }
-        #[cfg(not(debug_assertions))]
-        {
-            Self::decode_restricted_capped(Capped::new(&mut buf), restrict_to)
-        }
+        RestrictedCtx::new(default_ctx(), restrict_to).decode_restricted(buf)
     }
 
     fn decode_restricted_length_delimited<B: Buf>(
-        #[allow(unused_mut)] mut buf: B,
+        buf: B,
         restrict_to: Canonicity,
     ) -> Result<(Self, Canonicity), DecodeError> {
-        #[cfg(debug_assertions)]
-        {
-            Self::decode_restricted_capped(
-                Capped::new_length_delimited(&mut Counted::new(buf))?,
-                restrict_to,
-            )
-        }
-        #[cfg(not(debug_assertions))]
-        {
-            Self::decode_restricted_capped(Capped::new_length_delimited(&mut buf)?, restrict_to)
-        }
-    }
-
-    fn decode_restricted_capped<B: Buf + ?Sized>(
-        buf: Capped<B>,
-        restrict_to: Canonicity,
-    ) -> Result<(Self, Canonicity), DecodeError> {
-        let mut message = Self::empty();
-        let ctx = RestrictedCtx::new(DecodeCtx::default(), restrict_to);
-        let canon = merge_distinguished(&mut message, buf, ctx.clone())
-            // Safety backstop to ensure we do not return a canonicity worse than restrict_to.
-            // See the docs on `RestrictedDecodeContext::check` for details on canonicity
-            // checking.
-            .and_then(|canon| ctx.check(canon))?;
-        Ok((message, canon))
+        RestrictedCtx::new(default_ctx(), restrict_to).decode_restricted_length_delimited(buf)
     }
 
     fn replace_restricted_from<B: Buf>(
         &mut self,
-        #[allow(unused_mut)] mut buf: B,
+        buf: B,
         restrict_to: Canonicity,
     ) -> Result<Canonicity, DecodeError> {
-        #[cfg(debug_assertions)]
-        {
-            self.replace_restricted_from_capped(Capped::new(&mut Counted::new(buf)), restrict_to)
-        }
-        #[cfg(not(debug_assertions))]
-        {
-            self.replace_restricted_from_capped(Capped::new(&mut buf), restrict_to)
-        }
+        RestrictedCtx::new(default_ctx(), restrict_to).replace_restricted(self, buf)
     }
 
     fn replace_restricted_from_length_delimited<B: Buf>(
@@ -966,38 +827,8 @@ where
         #[allow(unused_mut)] mut buf: B,
         restrict_to: Canonicity,
     ) -> Result<Canonicity, DecodeError> {
-        #[cfg(debug_assertions)]
-        {
-            self.replace_restricted_from_capped(
-                Capped::new_length_delimited(&mut Counted::new(buf))?,
-                restrict_to,
-            )
-        }
-        #[cfg(not(debug_assertions))]
-        {
-            self.replace_restricted_from_capped(
-                Capped::new_length_delimited(&mut buf)?,
-                restrict_to,
-            )
-        }
-    }
-
-    fn replace_restricted_from_capped<B: Buf + ?Sized>(
-        &mut self,
-        buf: Capped<B>,
-        restrict_to: Canonicity,
-    ) -> Result<Canonicity, DecodeError> {
-        self.clear();
-        let ctx = RestrictedCtx::new(DecodeCtx::default(), restrict_to);
-        merge_distinguished(self, buf, ctx.clone())
-            .map_err(|err| {
-                self.clear();
-                err
-            })
-            // Safety backstop to ensure we do not return a canonicity worse than restrict_to.
-            // See the docs on `RestrictedDecodeContext::check` for details on canonicity
-            // checking.
-            .and_then(|canon| ctx.check(canon))
+        RestrictedCtx::new(default_ctx(), restrict_to)
+            .replace_restricted_length_delimited(self, buf)
     }
 
     fn replace_restricted_from_slice(
@@ -1040,11 +871,6 @@ where
         Self::decode_restricted_length_delimited(buf, Canonical).map(|(val, _)| val)
     }
 
-    #[doc(hidden)]
-    fn decode_canonical_capped<B: Buf + ?Sized>(buf: Capped<B>) -> Result<Self, DecodeError> {
-        Self::decode_restricted_capped(buf, Canonical).map(|(val, _)| val)
-    }
-
     fn replace_canonical_from<B: Buf>(&mut self, buf: B) -> Result<(), DecodeError> {
         self.replace_restricted_from(buf, Canonical).map(|_| ())
     }
@@ -1054,15 +880,6 @@ where
         buf: B,
     ) -> Result<(), DecodeError> {
         self.replace_restricted_from_length_delimited(buf, Canonical)
-            .map(|_| ())
-    }
-
-    #[doc(hidden)]
-    fn replace_canonical_from_capped<B: Buf + ?Sized>(
-        &mut self,
-        buf: Capped<B>,
-    ) -> Result<(), DecodeError> {
-        self.replace_restricted_from_capped(buf, Canonical)
             .map(|_| ())
     }
 
@@ -1095,29 +912,23 @@ impl<'a, T> BorrowedMessage<'a> for T
 where
     T: RawMessageBorrowDecoder<'a> + Sized,
 {
-    fn decode_borrowed(mut buf: &'a [u8]) -> Result<Self, DecodeError> {
-        let mut message = Self::empty();
-        borrow_merge(&mut message, Capped::new(&mut buf), DecodeCtx::default())?;
-        Ok(message)
+    fn decode_borrowed(buf: &'a [u8]) -> Result<Self, DecodeError> {
+        default_ctx().decode_borrowed(buf)
     }
 
     fn decode_borrowed_length_delimited(buf: &mut &'a [u8]) -> Result<Self, DecodeError> {
-        Self::decode_borrowed(Capped::new(buf).take_borrowed_length_delimited()?)
+        default_ctx().decode_borrowed_length_delimited(buf)
     }
 
-    fn replace_borrowed_from(&mut self, mut buf: &'a [u8]) -> Result<(), DecodeError> {
-        self.clear();
-        borrow_merge(self, Capped::new(&mut buf), DecodeCtx::default()).map_err(|err| {
-            self.clear();
-            err
-        })
+    fn replace_borrowed_from(&mut self, buf: &'a [u8]) -> Result<(), DecodeError> {
+        default_ctx().replace_borrowed(self, buf)
     }
 
     fn replace_borrowed_from_length_delimited(
         &mut self,
         buf: &mut &'a [u8],
     ) -> Result<(), DecodeError> {
-        self.replace_borrowed_from(Capped::new(buf).take_borrowed_length_delimited()?)
+        default_ctx().replace_borrowed_length_delimited(self, buf)
     }
 }
 
@@ -1150,45 +961,26 @@ where
     }
 
     fn decode_restricted_borrowed(
-        mut buf: &'a [u8],
+        buf: &'a [u8],
         restrict_to: Canonicity,
     ) -> Result<(Self, Canonicity), DecodeError> {
-        let mut message = Self::empty();
-        let ctx = RestrictedCtx::new(DecodeCtx::default(), restrict_to);
-        let canon = borrow_merge_distinguished(&mut message, Capped::new(&mut buf), ctx.clone())
-            // Safety backstop to ensure we do not return a canonicity worse than restrict_to.
-            // See the docs on `RestrictedDecodeContext::check` for details on canonicity
-            // checking.
-            .and_then(|canon| ctx.check(canon))?;
-        Ok((message, canon))
+        RestrictedCtx::new(default_ctx(), restrict_to).decode_restricted_borrowed(buf)
     }
 
     fn decode_restricted_borrowed_length_delimited(
         buf: &mut &'a [u8],
         restrict_to: Canonicity,
     ) -> Result<(Self, Canonicity), DecodeError> {
-        Self::decode_restricted_borrowed(
-            Capped::new(buf).take_borrowed_length_delimited()?,
-            restrict_to,
-        )
+        RestrictedCtx::new(default_ctx(), restrict_to)
+            .decode_restricted_borrowed_length_delimited(buf)
     }
 
     fn replace_restricted_borrowed_from(
         &mut self,
-        mut buf: &'a [u8],
+        buf: &'a [u8],
         restrict_to: Canonicity,
     ) -> Result<Canonicity, DecodeError> {
-        self.clear();
-        let ctx = RestrictedCtx::new(DecodeCtx::default(), restrict_to);
-        borrow_merge_distinguished(self, Capped::new(&mut buf), ctx.clone())
-            .map_err(|err| {
-                self.clear();
-                err
-            })
-            // Safety backstop to ensure we do not return a canonicity worse than restrict_to.
-            // See the docs on `RestrictedDecodeContext::check` for details on canonicity
-            // checking.
-            .and_then(|canon| ctx.check(canon))
+        RestrictedCtx::new(default_ctx(), restrict_to).replace_restricted_borrowed(self, buf)
     }
 
     fn replace_restricted_borrowed_from_length_delimited(
@@ -1196,10 +988,8 @@ where
         buf: &mut &'a [u8],
         restrict_to: Canonicity,
     ) -> Result<Canonicity, DecodeError> {
-        self.replace_restricted_borrowed_from(
-            Capped::new(buf).take_borrowed_length_delimited()?,
-            restrict_to,
-        )
+        RestrictedCtx::new(default_ctx(), restrict_to)
+            .replace_restricted_borrowed_length_delimited(self, buf)
     }
 
     fn decode_canonical_borrowed(buf: &'a [u8]) -> Result<Self, DecodeError> {
@@ -1221,6 +1011,338 @@ where
     ) -> Result<(), DecodeError> {
         self.replace_restricted_borrowed_from_length_delimited(buf, Canonical)
             .map(|_| ())
+    }
+}
+
+/// User-facing api whereby decoding contexts can be used to better control decoding behavior.
+pub trait DecodeSettings {
+    // TODO: doc
+    fn decode<M: RawMessageDecoder>(&self, buf: impl Buf) -> Result<M, DecodeError>;
+    // TODO: doc
+    fn decode_length_delimited<M: RawMessageDecoder>(
+        &self,
+        buf: impl Buf,
+    ) -> Result<M, DecodeError>;
+    // TODO: doc
+    fn replace<M: RawMessageDecoder>(&self, msg: &mut M, buf: impl Buf) -> Result<(), DecodeError>;
+    // TODO: doc
+    fn replace_length_delimited<M: RawMessageDecoder>(
+        &self,
+        msg: &mut M,
+        buf: impl Buf,
+    ) -> Result<(), DecodeError>;
+
+    // TODO: doc
+    fn decode_restricted<M: RawDistinguishedMessageDecoder>(
+        &self,
+        buf: impl Buf,
+    ) -> Result<(M, Canonicity), DecodeError>
+    where
+        Self: RestrictedDecodeContext;
+    // TODO: doc
+    fn decode_restricted_length_delimited<M: RawDistinguishedMessageDecoder>(
+        &self,
+        buf: impl Buf,
+    ) -> Result<(M, Canonicity), DecodeError>
+    where
+        Self: RestrictedDecodeContext;
+    // TODO: doc
+    fn replace_restricted<M: RawDistinguishedMessageDecoder>(
+        &self,
+        msg: &mut M,
+        buf: impl Buf,
+    ) -> Result<Canonicity, DecodeError>
+    where
+        Self: RestrictedDecodeContext;
+    // TODO: doc
+    fn replace_restricted_length_delimited<M: RawDistinguishedMessageDecoder>(
+        &self,
+        msg: &mut M,
+        buf: impl Buf,
+    ) -> Result<Canonicity, DecodeError>
+    where
+        Self: RestrictedDecodeContext;
+
+    // TODO: doc
+    fn decode_borrowed<'a, M: RawMessageBorrowDecoder<'a>>(
+        &self,
+        buf: &'a [u8],
+    ) -> Result<M, DecodeError>;
+    // TODO: doc
+    fn decode_borrowed_length_delimited<'a, M: RawMessageBorrowDecoder<'a>>(
+        &self,
+        buf: &mut &'a [u8],
+    ) -> Result<M, DecodeError>;
+    // TODO: doc
+    fn replace_borrowed<'a, M: RawMessageBorrowDecoder<'a>>(
+        &self,
+        msg: &mut M,
+        buf: &'a [u8],
+    ) -> Result<(), DecodeError>;
+    // TODO: doc
+    fn replace_borrowed_length_delimited<'a, M: RawMessageBorrowDecoder<'a>>(
+        &self,
+        msg: &mut M,
+        buf: &mut &'a [u8],
+    ) -> Result<(), DecodeError>;
+
+    // TODO: doc
+    fn decode_restricted_borrowed<'a, M: RawDistinguishedMessageBorrowDecoder<'a>>(
+        &self,
+        buf: &'a [u8],
+    ) -> Result<(M, Canonicity), DecodeError>
+    where
+        Self: RestrictedDecodeContext;
+    // TODO: doc
+    fn decode_restricted_borrowed_length_delimited<
+        'a,
+        M: RawDistinguishedMessageBorrowDecoder<'a>,
+    >(
+        &self,
+        buf: &mut &'a [u8],
+    ) -> Result<(M, Canonicity), DecodeError>
+    where
+        Self: RestrictedDecodeContext;
+    // TODO: doc
+    fn replace_restricted_borrowed<'a, M: RawDistinguishedMessageBorrowDecoder<'a>>(
+        &self,
+        msg: &mut M,
+        buf: &'a [u8],
+    ) -> Result<Canonicity, DecodeError>
+    where
+        Self: RestrictedDecodeContext;
+    // TODO: doc
+    fn replace_restricted_borrowed_length_delimited<
+        'a,
+        M: RawDistinguishedMessageBorrowDecoder<'a>,
+    >(
+        &self,
+        msg: &mut M,
+        buf: &mut &'a [u8],
+    ) -> Result<Canonicity, DecodeError>
+    where
+        Self: RestrictedDecodeContext;
+}
+
+impl<T> DecodeSettings for T
+where
+    T: DecodeContext,
+{
+    fn decode<M: RawMessageDecoder>(
+        &self,
+        #[allow(unused_mut)] mut buf: impl Buf,
+    ) -> Result<M, DecodeError> {
+        let mut message = M::empty();
+        merge(&mut message, make_capped!(buf), self.clone())?;
+        Ok(message)
+    }
+
+    fn decode_length_delimited<M: RawMessageDecoder>(
+        &self,
+        #[allow(unused_mut)] mut buf: impl Buf,
+    ) -> Result<M, DecodeError> {
+        let mut message = M::empty();
+        merge(
+            &mut message,
+            make_capped_length_delimited!(buf)?,
+            self.clone(),
+        )?;
+        Ok(message)
+    }
+
+    fn replace<M: RawMessageDecoder>(
+        &self,
+        msg: &mut M,
+        #[allow(unused_mut)] mut buf: impl Buf,
+    ) -> Result<(), DecodeError> {
+        msg.clear();
+        // MSRV: here, and elsewhere, this `map_err` could be `inspect_err` (1.76)
+        merge(msg, make_capped!(buf), self.clone()).map_err(|err| {
+            msg.clear();
+            err
+        })
+    }
+
+    fn replace_length_delimited<M: RawMessageDecoder>(
+        &self,
+        msg: &mut M,
+        #[allow(unused_mut)] mut buf: impl Buf,
+    ) -> Result<(), DecodeError> {
+        msg.clear();
+        // MSRV: here, and elsewhere, this `map_err` could be `inspect_err` (1.76)
+        merge(msg, make_capped_length_delimited!(buf)?, self.clone()).map_err(|err| {
+            msg.clear();
+            err
+        })
+    }
+
+    fn decode_restricted<M: RawDistinguishedMessageDecoder>(
+        &self,
+        #[allow(unused_mut)] mut buf: impl Buf,
+    ) -> Result<(M, Canonicity), DecodeError>
+    where
+        Self: RestrictedDecodeContext,
+    {
+        let mut message = M::empty();
+        let canon = merge_distinguished(&mut message, make_capped!(buf), self.clone())
+            .and_then(|canon| self.check(canon))?;
+        Ok((message, canon))
+    }
+
+    fn decode_restricted_length_delimited<M: RawDistinguishedMessageDecoder>(
+        &self,
+        #[allow(unused_mut)] mut buf: impl Buf,
+    ) -> Result<(M, Canonicity), DecodeError>
+    where
+        Self: RestrictedDecodeContext,
+    {
+        let mut message = M::empty();
+        let canon = merge_distinguished(
+            &mut message,
+            make_capped_length_delimited!(buf)?,
+            self.clone(),
+        )
+        .and_then(|canon| self.check(canon))?;
+        Ok((message, canon))
+    }
+
+    fn replace_restricted<M: RawDistinguishedMessageDecoder>(
+        &self,
+        msg: &mut M,
+        #[allow(unused_mut)] mut buf: impl Buf,
+    ) -> Result<Canonicity, DecodeError>
+    where
+        Self: RestrictedDecodeContext,
+    {
+        msg.clear();
+        merge_distinguished(msg, make_capped!(buf), self.clone())
+            .map_err(|err| {
+                msg.clear();
+                err
+            })
+            // Safety backstop to ensure we do not return a canonicity worse than restrict_to.
+            // See the docs on `RestrictedDecodeContext::check` for details on canonicity
+            // checking.
+            .and_then(|canon| self.check(canon))
+    }
+
+    fn replace_restricted_length_delimited<M: RawDistinguishedMessageDecoder>(
+        &self,
+        msg: &mut M,
+        #[allow(unused_mut)] mut buf: impl Buf,
+    ) -> Result<Canonicity, DecodeError>
+    where
+        Self: RestrictedDecodeContext,
+    {
+        msg.clear();
+        merge_distinguished(msg, make_capped_length_delimited!(buf)?, self.clone())
+            .map_err(|err| {
+                msg.clear();
+                err
+            })
+            // Safety backstop to ensure we do not return a canonicity worse than restrict_to.
+            // See the docs on `RestrictedDecodeContext::check` for details on canonicity
+            // checking.
+            .and_then(|canon| self.check(canon))
+    }
+
+    fn decode_borrowed<'a, M: RawMessageBorrowDecoder<'a>>(
+        &self,
+        mut buf: &'a [u8],
+    ) -> Result<M, DecodeError> {
+        let mut message = M::empty();
+        borrow_merge(&mut message, Capped::new(&mut buf), self.clone())?;
+        Ok(message)
+    }
+
+    fn decode_borrowed_length_delimited<'a, M: RawMessageBorrowDecoder<'a>>(
+        &self,
+        buf: &mut &'a [u8],
+    ) -> Result<M, DecodeError> {
+        self.decode_borrowed(Capped::new(buf).take_borrowed_length_delimited()?)
+    }
+
+    fn replace_borrowed<'a, M: RawMessageBorrowDecoder<'a>>(
+        &self,
+        msg: &mut M,
+        mut buf: &'a [u8],
+    ) -> Result<(), DecodeError> {
+        msg.clear();
+        borrow_merge(msg, Capped::new(&mut buf), self.clone()).map_err(|err| {
+            msg.clear();
+            err
+        })
+    }
+
+    fn replace_borrowed_length_delimited<'a, M: RawMessageBorrowDecoder<'a>>(
+        &self,
+        msg: &mut M,
+        buf: &mut &'a [u8],
+    ) -> Result<(), DecodeError> {
+        self.replace_borrowed(msg, Capped::new(buf).take_borrowed_length_delimited()?)
+    }
+
+    fn decode_restricted_borrowed<'a, M: RawDistinguishedMessageBorrowDecoder<'a>>(
+        &self,
+        mut buf: &'a [u8],
+    ) -> Result<(M, Canonicity), DecodeError>
+    where
+        Self: RestrictedDecodeContext,
+    {
+        let mut message = M::empty();
+        let canon = borrow_merge_distinguished(&mut message, Capped::new(&mut buf), self.clone())
+            // Safety backstop to ensure we do not return a canonicity worse than restrict_to.
+            // See the docs on `RestrictedDecodeContext::check` for details on canonicity
+            // checking.
+            .and_then(|canon| self.check(canon))?;
+        Ok((message, canon))
+    }
+
+    fn decode_restricted_borrowed_length_delimited<
+        'a,
+        M: RawDistinguishedMessageBorrowDecoder<'a>,
+    >(
+        &self,
+        buf: &mut &'a [u8],
+    ) -> Result<(M, Canonicity), DecodeError>
+    where
+        Self: RestrictedDecodeContext,
+    {
+        self.decode_restricted_borrowed(Capped::new(buf).take_borrowed_length_delimited()?)
+    }
+
+    fn replace_restricted_borrowed<'a, M: RawDistinguishedMessageBorrowDecoder<'a>>(
+        &self,
+        msg: &mut M,
+        mut buf: &'a [u8],
+    ) -> Result<Canonicity, DecodeError>
+    where
+        Self: RestrictedDecodeContext,
+    {
+        msg.clear();
+        borrow_merge_distinguished(msg, Capped::new(&mut buf), self.clone())
+            .map_err(|err| {
+                msg.clear();
+                err
+            })
+            // Safety backstop to ensure we do not return a canonicity worse than restrict_to.
+            // See the docs on `RestrictedDecodeContext::check` for details on canonicity
+            // checking.
+            .and_then(|canon| self.check(canon))
+    }
+
+    fn replace_restricted_borrowed_length_delimited<
+        'a,
+        M: RawDistinguishedMessageBorrowDecoder<'a>,
+    >(
+        &self,
+        msg: &mut M,
+        buf: &mut &'a [u8],
+    ) -> Result<Canonicity, DecodeError>
+    where
+        Self: RestrictedDecodeContext,
+    {
+        self.replace_restricted_borrowed(msg, Capped::new(buf).take_borrowed_length_delimited()?)
     }
 }
 

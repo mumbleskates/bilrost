@@ -1,9 +1,10 @@
+use crate::context::{default_ctx, RestrictedCtx};
 use crate::encoding::{
     const_varint, decode_varint, decode_varint_slow, encode_varint, encoded_len_varint, Capped,
-    DecodeCtx, Decoder, DistinguishedDecoder, DistinguishedProxiable, DistinguishedValueDecoder,
-    EmptyState, Encoder, FieldEncoder, Fixed, ForOverwrite, General, Map, Packed, PlainBytes,
-    Proxiable, RestrictedCtx, RuntimeTagMeasurer, TagReader, TagRevWriter, TagWriter, ValueDecoder,
-    ValueEncoder, Varint, WireType,
+    Decoder, DistinguishedDecoder, DistinguishedProxiable, DistinguishedValueDecoder, EmptyState,
+    Encoder, FieldEncoder, Fixed, ForOverwrite, General, Map, Packed, PlainBytes, Proxiable,
+    RuntimeTagMeasurer, TagReader, TagRevWriter, TagWriter, ValueDecoder, ValueEncoder, Varint,
+    WireType,
 };
 use crate::DecodeErrorKind::{
     InvalidValue, InvalidVarint, OutOfDomainValue, TagOverflowed, Truncated, WrongWireType,
@@ -131,8 +132,9 @@ macro_rules! check_borrowable {
         mod $mod_name {
             #[allow(unused_imports)]
             use super::*;
+            use crate::context::{default_ctx, RestrictedCtx};
             use crate::encoding::{
-                Capped, DecodeCtx, DistinguishedValueBorrowDecoder, EmptyState, RestrictedCtx,
+                Capped, DistinguishedValueBorrowDecoder, EmptyState,
                 ValueBorrowDecoder, ValueEncoder,
             };
             use crate::Canonicity::Canonical;
@@ -154,7 +156,7 @@ macro_rules! check_borrowable {
                     (
                         &mut borrowed,
                         Capped::new(&mut buf.as_slice()),
-                        DecodeCtx::default(),
+                        default_ctx(),
                     )?;
                     prop_assert_eq!(
                         borrowed,
@@ -169,7 +171,7 @@ macro_rules! check_borrowable {
                         (
                             &mut borrowed,
                             Capped::new(&mut buf.as_slice()),
-                            RestrictedCtx::new(DecodeCtx::default(), Canonical),
+                            RestrictedCtx::new(default_ctx(), Canonical),
                         )?,
                         Canonical,
                     );
@@ -418,11 +420,11 @@ mod check_type_prepend_must_match_forward {
         pub(crate) const VALUE: bool = true;
     }
 }
-check_type!(relaxed, Decoder, DecodeCtx::default(), decode);
+check_type!(relaxed, Decoder, default_ctx(), decode);
 check_type!(
     distinguished,
     DistinguishedDecoder,
-    RestrictedCtx::new(DecodeCtx::default(), Canonicity::Canonical),
+    RestrictedCtx::new(default_ctx(), Canonicity::Canonical),
     decode_distinguished
 );
 
@@ -541,7 +543,7 @@ where
         let decode_result = <() as ValueDecoder<General, T>>::decode_value(
             &mut val,
             Capped::new(&mut buf),
-            DecodeCtx::default(),
+            default_ctx(),
         );
         if let Some(error) = error {
             assert_eq!(decode_result.err().map(|err| err.kind()), Some(error));
@@ -576,7 +578,7 @@ where
             wire_type,
             &mut decoded,
             capped,
-            RestrictedCtx::new(DecodeCtx::default(), Canonicity::NotCanonical),
+            RestrictedCtx::new(default_ctx(), Canonicity::NotCanonical),
         ),
         Ok(Canonicity::NotCanonical)
     );
@@ -712,7 +714,7 @@ fn unaligned_fixed64_packed() {
     let res = <() as ValueDecoder<Packed<Fixed>, _>>::decode_value(
         &mut parsed,
         Capped::new(&mut buf.as_slice()),
-        DecodeCtx::default(),
+        default_ctx(),
     );
     assert_eq!(
         res.expect_err("unaligned packed fixed64 decoded without error")
@@ -722,7 +724,7 @@ fn unaligned_fixed64_packed() {
     let res = <() as DistinguishedValueDecoder<Packed<Fixed>, _>>::decode_value_distinguished::<true>(
         &mut parsed,
         Capped::new(&mut buf.as_slice()),
-        RestrictedCtx::new(DecodeCtx::default(), Canonicity::NotCanonical),
+        RestrictedCtx::new(default_ctx(), Canonicity::NotCanonical),
     );
     assert_eq!(
         res.expect_err("unaligned packed fixed64 decoded without error")
@@ -742,7 +744,7 @@ fn unaligned_fixed32_packed() {
     let res = <() as ValueDecoder<Packed<Fixed>, _>>::decode_value(
         &mut parsed,
         Capped::new(&mut buf.as_slice()),
-        DecodeCtx::default(),
+        default_ctx(),
     );
     assert_eq!(
         res.expect_err("unaligned packed fixed32 decoded without error")
@@ -752,7 +754,7 @@ fn unaligned_fixed32_packed() {
     let res = <() as DistinguishedValueDecoder<Packed<Fixed>, _>>::decode_value_distinguished::<true>(
         &mut parsed,
         Capped::new(&mut buf.as_slice()),
-        RestrictedCtx::new(DecodeCtx::default(), Canonicity::NotCanonical),
+        RestrictedCtx::new(default_ctx(), Canonicity::NotCanonical),
     );
     assert_eq!(
         res.expect_err("unaligned packed fixed32 decoded without error")
@@ -775,7 +777,7 @@ fn unaligned_map_packed() {
     let res = <() as ValueDecoder<Map<Fixed, Fixed>, _>>::decode_value(
         &mut parsed,
         Capped::new(&mut buf.as_slice()),
-        DecodeCtx::default(),
+        default_ctx(),
     );
     assert_eq!(
         res.expect_err("unaligned 12-byte map decoded without error")
@@ -787,7 +789,7 @@ fn unaligned_map_packed() {
     >(
         &mut parsed,
         Capped::new(&mut buf.as_slice()),
-        RestrictedCtx::new(DecodeCtx::default(), Canonicity::NotCanonical),
+        RestrictedCtx::new(default_ctx(), Canonicity::NotCanonical),
     );
     assert_eq!(
         res.expect_err("unaligned 12-byte map decoded without error")
@@ -804,7 +806,7 @@ fn string_merge_invalid_utf8() {
     let r = <() as ValueDecoder<General, _>>::decode_value(
         &mut s,
         Capped::new(&mut buf.as_slice()),
-        DecodeCtx::default(),
+        default_ctx(),
     );
     r.expect_err("must be an error");
     assert!(s.is_empty());
@@ -1050,7 +1052,7 @@ where
             wire_type,
             &mut out,
             Capped::new(&mut [0u8; 0].as_slice()),
-            DecodeCtx::default(),
+            default_ctx(),
         ),
         Err(DecodeError::new(WrongWireType))
     );
@@ -1066,7 +1068,7 @@ where
             wire_type,
             &mut out,
             Capped::new(&mut [0u8; 0].as_slice()),
-            RestrictedCtx::new(DecodeCtx::default(), Canonicity::NotCanonical),
+            RestrictedCtx::new(default_ctx(), Canonicity::NotCanonical),
         ),
         Err(DecodeError::new(WrongWireType))
     );
@@ -1130,7 +1132,7 @@ proptest! {
         <() as ValueDecoder<General, _>>::decode_value(
             &mut out,
             Capped::new(&mut &*buf),
-            DecodeCtx::default(),
+            default_ctx(),
         )?;
         prop_assert_eq!(out, value as u64);
     }
@@ -1143,7 +1145,7 @@ proptest! {
         <() as ValueDecoder<General, _>>::decode_value(
             &mut out,
             Capped::new(&mut &*buf),
-            DecodeCtx::default(),
+            default_ctx(),
         )?;
         prop_assert_eq!(out, value as i64);
     }
@@ -1157,7 +1159,7 @@ proptest! {
         <() as ValueDecoder<General, _>>::decode_value(
             &mut out,
             Capped::new(&mut &*buf),
-            DecodeCtx::default(),
+            default_ctx(),
         )?;
         prop_assert_eq!(out as u64, value);
     }
@@ -1171,7 +1173,7 @@ proptest! {
         <() as ValueDecoder<General, _>>::decode_value(
             &mut out,
             Capped::new(&mut &*buf),
-            DecodeCtx::default(),
+            default_ctx(),
         )?;
         prop_assert_eq!(out as i64, value);
     }
@@ -1185,7 +1187,7 @@ proptest! {
             <() as ValueDecoder<General, _>>::decode_value(
                 &mut out,
                 Capped::new(&mut &*buf),
-                DecodeCtx::default(),
+                default_ctx(),
             ),
             Err(DecodeError::new(OutOfDomainValue))
         );
@@ -1204,7 +1206,7 @@ proptest! {
                 <() as ValueDecoder<General, _>>::decode_value(
                     &mut out,
                     Capped::new(&mut &*buf),
-                    DecodeCtx::default(),
+                    default_ctx(),
                 ),
                 Err(DecodeError::new(OutOfDomainValue))
             );
@@ -1220,7 +1222,7 @@ proptest! {
             <() as ValueDecoder<General, _>>::decode_value(
                 &mut out,
                 Capped::new(&mut &*buf),
-                DecodeCtx::default(),
+                default_ctx(),
             ),
             Err(DecodeError::new(OutOfDomainValue))
         );
@@ -1239,7 +1241,7 @@ proptest! {
                 <() as ValueDecoder<General, _>>::decode_value(
                     &mut out,
                     Capped::new(&mut &*buf),
-                    DecodeCtx::default(),
+                    default_ctx(),
                 ),
                 Err(DecodeError::new(OutOfDomainValue))
             );
@@ -1255,7 +1257,7 @@ proptest! {
             <() as ValueDecoder<Varint, _>>::decode_value(
                 &mut out,
                 Capped::new(&mut &*buf),
-                DecodeCtx::default(),
+                default_ctx(),
             ),
             Err(DecodeError::new(OutOfDomainValue))
         );
@@ -1274,7 +1276,7 @@ proptest! {
                 <() as ValueDecoder<Varint, _>>::decode_value(
                     &mut out,
                     Capped::new(&mut &*buf),
-                    DecodeCtx::default(),
+                    default_ctx(),
                 ),
                 Err(DecodeError::new(OutOfDomainValue))
             );
@@ -1290,7 +1292,7 @@ proptest! {
             <() as ValueDecoder<General, _>>::decode_value(
                 &mut out,
                 Capped::new(&mut &*buf),
-                DecodeCtx::default(),
+                default_ctx(),
             ),
             Err(DecodeError::new(OutOfDomainValue))
         );

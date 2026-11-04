@@ -2,6 +2,8 @@
 
 ### Breaking changes
 
+* Removed all the remaining `*_capped` trait methods in the public Message
+  traits. These methods were already hidden in the documentation.
 * Internal traits: Decoding contexts have become trait-based. This affects
   the API of public traits for anyone implementing advanced encodings.
   Fortunately migration is not complicated:
@@ -21,6 +23,12 @@
   that can specify the lifetime by which the type's borrowed decoding should
   be implemented. This unblocks a lot of hassle when trying to write
   co-recursive message types that can be borrow-decoded.
+* Added an api for decoding on "decoding context" objects via a user-facing
+  `DecodeSettings` trait. This allows for more granular user control over
+  decoding behavior regarding recursion limits (see
+  `context::RecursiveDecodeCtx`) and heap usage (see
+  `context::{HeapTrackingCtx, HeapQuotaCtx}`) while still offering
+  distinguished decoding (see `context::RestrictedDecodeCtx`)
 
 ### Fixes
 
