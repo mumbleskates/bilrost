@@ -1012,7 +1012,7 @@ where
 }
 
 /// User-facing api whereby decoding contexts can be used to better control decoding behavior.
-pub trait DecodeSettings: DecodeContext {
+pub trait DecodeSettings {
     // TODO: doc
     fn decode<M: RawMessageDecoder>(&self, buf: impl Buf) -> Result<M, DecodeError>;
     // TODO: doc
