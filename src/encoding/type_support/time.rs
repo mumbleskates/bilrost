@@ -452,7 +452,7 @@ mod utcoffset {
                 <() as DistinguishedValueDecoder<General, _>>::decode_value_distinguished::<true>(
                     &mut utc_off,
                     Capped::new(&mut buf.as_slice()),
-                    RestrictedCtx::new(default_ctx(), NotCanonical),
+                    RestrictedCtx::new(NotCanonical),
                 ),
                 Err(DecodeError::new(InvalidValue))
             );

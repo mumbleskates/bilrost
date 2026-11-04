@@ -2,13 +2,15 @@ use crate::encoding::{Canonicity, DecodeContext, RestrictedDecodeContext};
 use crate::error::{DecodeError, DecodeErrorKind, OversizeDecodingError, RecursionError};
 use core::cell::Cell;
 
+#[cfg(feature = "no-recursion-limit")]
+type DefaultCtx = PlainDecodeCtx;
+#[cfg(not(feature = "no-recursion-limit"))]
+type DefaultCtx = RecursiveDecodeCtx;
+
 /// Creates a basic decode context, with or without recursion limits depending on the library
 /// configuration.
 pub(crate) fn default_ctx() -> impl DecodeContext {
-    #[cfg(feature = "no-recursion-limit")]
-    return PlainDecodeCtx::default();
-    #[cfg(not(feature = "no-recursion-limit"))]
-    return RecursiveDecodeCtx::default();
+    DefaultCtx::default()
 }
 
 // TODO: friendlier user-facing api for creating contexts
@@ -34,10 +36,6 @@ impl DecodeContext for PlainDecodeCtx {
 pub struct RecursiveDecodeCtx {
     /// How many times we can recurse in the current decode stack before we hit
     /// the recursion limit.
-    ///
-    /// The recursion limit is defined by `RECURSION_LIMIT` and cannot be
-    /// customized. The recursion limit can be ignored by building the Bilrost
-    /// crate with the `no-recursion-limit` feature.
     recurse_count: u32,
 }
 
@@ -78,19 +76,18 @@ impl DecodeContext for RecursiveDecodeCtx {
 
 /// Basic context that records additional heap memory used.
 #[derive(Clone, Debug)]
-pub struct HeapTrackingCtx<'a, D: DecodeContext> {
+pub struct HeapTrackingCtx<'a, D: DecodeContext = DefaultCtx> {
     context: D,
     tracker: &'a Cell<usize>,
 }
 
-impl<'a, D: DecodeContext> HeapTrackingCtx<'a, D> {
-    pub fn new(tracker: &'a Cell<usize>) -> Self
-    where
-        D: Default,
-    {
+impl<'a> HeapTrackingCtx<'a> {
+    pub fn new(tracker: &'a Cell<usize>) -> Self {
         Self::new_with(Default::default(), tracker)
     }
+}
 
+impl<'a, D: DecodeContext> HeapTrackingCtx<'a, D> {
     pub fn new_with(context: D, tracker: &'a Cell<usize>) -> Self {
         Self { context, tracker }
     }
@@ -115,20 +112,19 @@ impl<D: DecodeContext> DecodeContext for HeapTrackingCtx<'_, D> {
 /// Basic context that records additional heap memory used and returns an error if a quota is
 /// exceeded.
 #[derive(Clone, Debug)]
-pub struct HeapQuotaCtx<'a, D: DecodeContext> {
+pub struct HeapQuotaCtx<'a, D: DecodeContext = DefaultCtx> {
     context: D,
     tracker_max: &'a (Cell<usize>, usize),
 }
 
-impl<'a, D: DecodeContext> HeapQuotaCtx<'a, D> {
+impl<'a> HeapQuotaCtx<'a> {
     // TODO: turn tracker_max into a real type
-    pub fn new(tracker_max: &'a (Cell<usize>, usize)) -> Self
-    where
-        D: Default,
-    {
+    pub fn new(tracker_max: &'a (Cell<usize>, usize)) -> Self {
         Self::new_with(Default::default(), tracker_max)
     }
+}
 
+impl<'a, D: DecodeContext> HeapQuotaCtx<'a, D> {
     pub fn new_with(context: D, tracker_max: &'a (Cell<usize>, usize)) -> Self {
         Self {
             context,
@@ -163,14 +159,20 @@ impl<D: DecodeContext> DecodeContext for HeapQuotaCtx<'_, D> {
 /// The context should be passed by value and can be freely cloned. When passing
 /// to a function which is decoding a nested object, then use `enter_recursion`.
 #[derive(Clone, Debug)]
-pub struct RestrictedCtx<D: DecodeContext> {
+pub struct RestrictedCtx<D: DecodeContext = DefaultCtx> {
     context: D,
     min_canonicity: Canonicity,
 }
 
+impl RestrictedCtx {
+    pub fn new(min_canonicity: Canonicity) -> Self {
+        Self::new_with(Default::default(), min_canonicity)
+    }
+}
+
 impl<D: DecodeContext> RestrictedCtx<D> {
     /// Creates a new context with a given minimum canonicity.
-    pub fn new(context: D, min_canonicity: Canonicity) -> Self {
+    pub fn new_with(context: D, min_canonicity: Canonicity) -> Self {
         Self {
             context,
             min_canonicity,

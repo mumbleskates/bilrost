@@ -171,7 +171,7 @@ macro_rules! check_borrowable {
                         (
                             &mut borrowed,
                             Capped::new(&mut buf.as_slice()),
-                            RestrictedCtx::new(default_ctx(), Canonical),
+                            RestrictedCtx::new(Canonical),
                         )?,
                         Canonical,
                     );
@@ -424,7 +424,7 @@ check_type!(relaxed, Decoder, default_ctx(), decode);
 check_type!(
     distinguished,
     DistinguishedDecoder,
-    RestrictedCtx::new(default_ctx(), Canonicity::Canonical),
+    RestrictedCtx::new(Canonicity::Canonical),
     decode_distinguished
 );
 
@@ -578,7 +578,7 @@ where
             wire_type,
             &mut decoded,
             capped,
-            RestrictedCtx::new(default_ctx(), Canonicity::NotCanonical),
+            RestrictedCtx::new(Canonicity::NotCanonical),
         ),
         Ok(Canonicity::NotCanonical)
     );
@@ -724,7 +724,7 @@ fn unaligned_fixed64_packed() {
     let res = <() as DistinguishedValueDecoder<Packed<Fixed>, _>>::decode_value_distinguished::<true>(
         &mut parsed,
         Capped::new(&mut buf.as_slice()),
-        RestrictedCtx::new(default_ctx(), Canonicity::NotCanonical),
+        RestrictedCtx::new(Canonicity::NotCanonical),
     );
     assert_eq!(
         res.expect_err("unaligned packed fixed64 decoded without error")
@@ -754,7 +754,7 @@ fn unaligned_fixed32_packed() {
     let res = <() as DistinguishedValueDecoder<Packed<Fixed>, _>>::decode_value_distinguished::<true>(
         &mut parsed,
         Capped::new(&mut buf.as_slice()),
-        RestrictedCtx::new(default_ctx(), Canonicity::NotCanonical),
+        RestrictedCtx::new(Canonicity::NotCanonical),
     );
     assert_eq!(
         res.expect_err("unaligned packed fixed32 decoded without error")
@@ -789,7 +789,7 @@ fn unaligned_map_packed() {
     >(
         &mut parsed,
         Capped::new(&mut buf.as_slice()),
-        RestrictedCtx::new(default_ctx(), Canonicity::NotCanonical),
+        RestrictedCtx::new(Canonicity::NotCanonical),
     );
     assert_eq!(
         res.expect_err("unaligned 12-byte map decoded without error")
@@ -1068,7 +1068,7 @@ where
             wire_type,
             &mut out,
             Capped::new(&mut [0u8; 0].as_slice()),
-            RestrictedCtx::new(default_ctx(), Canonicity::NotCanonical),
+            RestrictedCtx::new(Canonicity::NotCanonical),
         ),
         Err(DecodeError::new(WrongWireType))
     );

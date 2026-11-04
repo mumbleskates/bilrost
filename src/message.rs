@@ -804,14 +804,14 @@ where
         buf: B,
         restrict_to: Canonicity,
     ) -> Result<(Self, Canonicity), DecodeError> {
-        RestrictedCtx::new(default_ctx(), restrict_to).decode_restricted(buf)
+        RestrictedCtx::new(restrict_to).decode_restricted(buf)
     }
 
     fn decode_restricted_length_delimited<B: Buf>(
         buf: B,
         restrict_to: Canonicity,
     ) -> Result<(Self, Canonicity), DecodeError> {
-        RestrictedCtx::new(default_ctx(), restrict_to).decode_restricted_length_delimited(buf)
+        RestrictedCtx::new(restrict_to).decode_restricted_length_delimited(buf)
     }
 
     fn replace_restricted_from<B: Buf>(
@@ -819,7 +819,7 @@ where
         buf: B,
         restrict_to: Canonicity,
     ) -> Result<Canonicity, DecodeError> {
-        RestrictedCtx::new(default_ctx(), restrict_to).replace_restricted(self, buf)
+        RestrictedCtx::new(restrict_to).replace_restricted(self, buf)
     }
 
     fn replace_restricted_from_length_delimited<B: Buf>(
@@ -827,8 +827,7 @@ where
         #[allow(unused_mut)] mut buf: B,
         restrict_to: Canonicity,
     ) -> Result<Canonicity, DecodeError> {
-        RestrictedCtx::new(default_ctx(), restrict_to)
-            .replace_restricted_length_delimited(self, buf)
+        RestrictedCtx::new(restrict_to).replace_restricted_length_delimited(self, buf)
     }
 
     fn replace_restricted_from_slice(
@@ -964,15 +963,14 @@ where
         buf: &'a [u8],
         restrict_to: Canonicity,
     ) -> Result<(Self, Canonicity), DecodeError> {
-        RestrictedCtx::new(default_ctx(), restrict_to).decode_restricted_borrowed(buf)
+        RestrictedCtx::new(restrict_to).decode_restricted_borrowed(buf)
     }
 
     fn decode_restricted_borrowed_length_delimited(
         buf: &mut &'a [u8],
         restrict_to: Canonicity,
     ) -> Result<(Self, Canonicity), DecodeError> {
-        RestrictedCtx::new(default_ctx(), restrict_to)
-            .decode_restricted_borrowed_length_delimited(buf)
+        RestrictedCtx::new(restrict_to).decode_restricted_borrowed_length_delimited(buf)
     }
 
     fn replace_restricted_borrowed_from(
@@ -980,7 +978,7 @@ where
         buf: &'a [u8],
         restrict_to: Canonicity,
     ) -> Result<Canonicity, DecodeError> {
-        RestrictedCtx::new(default_ctx(), restrict_to).replace_restricted_borrowed(self, buf)
+        RestrictedCtx::new(restrict_to).replace_restricted_borrowed(self, buf)
     }
 
     fn replace_restricted_borrowed_from_length_delimited(
@@ -988,8 +986,7 @@ where
         buf: &mut &'a [u8],
         restrict_to: Canonicity,
     ) -> Result<Canonicity, DecodeError> {
-        RestrictedCtx::new(default_ctx(), restrict_to)
-            .replace_restricted_borrowed_length_delimited(self, buf)
+        RestrictedCtx::new(restrict_to).replace_restricted_borrowed_length_delimited(self, buf)
     }
 
     fn decode_canonical_borrowed(buf: &'a [u8]) -> Result<Self, DecodeError> {
@@ -1015,7 +1012,7 @@ where
 }
 
 /// User-facing api whereby decoding contexts can be used to better control decoding behavior.
-pub trait DecodeSettings {
+pub trait DecodeSettings: DecodeContext {
     // TODO: doc
     fn decode<M: RawMessageDecoder>(&self, buf: impl Buf) -> Result<M, DecodeError>;
     // TODO: doc

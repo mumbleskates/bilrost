@@ -485,7 +485,7 @@ mod utc {
                 <() as DistinguishedValueDecoder<General, _>>::decode_value_distinguished::<true>(
                     &mut utc,
                     Capped::new(&mut buf.as_slice()),
-                    RestrictedCtx::new(default_ctx(), NotCanonical),
+                    RestrictedCtx::new(NotCanonical),
                 ),
                 Ok(Canonical)
             );
@@ -508,7 +508,7 @@ mod utc {
                 <() as DistinguishedValueDecoder<General, _>>::decode_value_distinguished::<true>(
                     &mut utc,
                     Capped::new(&mut buf.as_slice()),
-                    RestrictedCtx::new(default_ctx(), NotCanonical),
+                    RestrictedCtx::new(NotCanonical),
                 ),
                 Err(DecodeError::new(OutOfDomainValue))
             );
@@ -673,7 +673,7 @@ mod fixedoffset {
                 <() as DistinguishedValueDecoder<General, _>>::decode_value_distinguished::<true>(
                     &mut fixed,
                     Capped::new(&mut buf.as_slice()),
-                    RestrictedCtx::new(default_ctx(), NotCanonical),
+                    RestrictedCtx::new(NotCanonical),
                 ),
                 Err(DecodeError::new(OutOfDomainValue))
             );
@@ -699,7 +699,7 @@ mod fixedoffset {
                 <() as DistinguishedValueDecoder<General, _>>::decode_value_distinguished::<true>(
                     &mut fixed,
                     Capped::new(&mut buf.as_slice()),
-                    RestrictedCtx::new(default_ctx(), NotCanonical),
+                    RestrictedCtx::new(NotCanonical),
                 ),
                 Err(DecodeError::new(InvalidValue))
             );
