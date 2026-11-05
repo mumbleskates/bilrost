@@ -620,7 +620,7 @@ fn decode_varint_slow<B: Buf + ?Sized>(buf: &mut B) -> Result<u64, DecodeError> 
 /// Additional information passed to every decode/merge function.
 ///
 /// The context should be passed by value and can be freely cloned. When passing
-/// to a function which is decoding a nested object, then use `enter_recursion`.
+/// to a function which is decoding a nested object, use `enter_recursion`.
 pub trait DecodeContext: Clone {
     type Unrestricted: DecodeContext;
 
